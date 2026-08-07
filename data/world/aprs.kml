@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<kml xmlns="http://earth.google.com/kml/2.1">
+
+<NetworkLink>
+ <visibility>1</visibility>
+ <name>APRS tracking of all targets</name>
+ <description><![CDATA[
+ <p>Initial view: 43°13.00' N 27°55.00' E</p>
+ <p>Google Earth application by <a href='http://aprs.fi/'>aprs.fi</a></p>
+]]></description>
+ <Snippet maxLines='2'>43°13.00' N 27°55.00' E - Real-time APRS network tracking of all APRS targets in the world</Snippet>
+ <Link>
+   <href>http://aprs.fi/aprsupdate.kml?units=metric&amp;units_temp=C</href>
+   <viewRefreshMode>onStop</viewRefreshMode>
+   <viewRefreshTime>1</viewRefreshTime>
+   <refreshMode>onExpire</refreshMode>
+ </Link>
+<LookAt id='lookat'>
+  <latitude>43.2167</latitude>
+  <longitude>27.9167</longitude>
+  <range>16000</range>
+</LookAt>
+</NetworkLink>
+
+</kml>
+
