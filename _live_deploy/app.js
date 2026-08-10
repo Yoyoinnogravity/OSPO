@@ -3878,16 +3878,22 @@ function finishPreplotLoad(items, zone, hemi, label) {
 
  items.forEach(it => {
  const result = parsePreplotBestEffort(it.text, zone, hemi);
- if (result.lines.length > 0 && result.confidence !== 'low') {
- result.lines.forEach(l => {
- // Avoid colliding ids across files
- allLines.push(Object.assign({}, l, {
- id: allLines.length,
- name: l.name,
- _src: it.name
- }));
- });
- } else if (result.lines.length > 0 && result.confidence === 'low') {
+ // Only auto-accept high confidence. Medium/low/none → ask for columns
+ // (prevents UTM-as-degrees globe-spanning silent imports).
+ if (result.lines.length > 0 && result.confidence === 'high') {
+  const plaus = assessPreplotPlausibility(result.lines);
+  if (!plaus.ok) {
+   ambiguous.push({ item: it, result: Object.assign({}, result, { confidence: 'low', reason: plaus.reason, detail: plaus.detail }) });
+  } else {
+   result.lines.forEach(l => {
+    allLines.push(Object.assign({}, l, {
+     id: allLines.length,
+     name: l.name,
+     _src: it.name
+    }));
+   });
+  }
+ } else if (result.lines.length > 0) {
  ambiguous.push({ item: it, result });
  } else {
  failed.push({ item: it, result });
@@ -3898,14 +3904,25 @@ function finishPreplotLoad(items, zone, hemi, label) {
  if (allLines.length === 0) {
  const problem = ambiguous[0] || failed[0];
  if (problem) {
- showToast('Could not auto-detect columns in "' + problem.item.name + '" - confirm UTM zone, then Line / X / Y');
+ const why = problem.result?.detail || problem.result?.reason || '';
+ const whyMsg = why
+  ? (`Coordinates look wrong (${why}). `)
+  : '';
+ showToast(whyMsg + 'Confirm Line / X / Y columns for "' + problem.item.name + '"');
  promptPreplotColumnMap(problem.item.text, zone, hemi, {
- message: '2D/3D P1 flavours vary - confirm which columns are Line, X and Y. We pre-filled our best guess.',
+ message: whyMsg +
+  'Confirm which columns are Line, X and Y, and whether values are UTM metres or lat/lon degrees. We pre-filled our best guess — please verify before importing.',
  guess: problem.result.layout || null,
  onDone: (lines) => {
  if (!lines || !lines.length) {
- showToast('Still no valid lines - check column choices');
+ showToast('Still no valid lines - check column choices and UTM vs lat/lon');
  return;
+ }
+ const plaus = assessPreplotPlausibility(lines);
+ if (!plaus.ok) {
+  showToast((plaus.detail || 'Imported extent still looks unrealistic') +
+   ' - check columns / coordinate type and try again', 7000);
+  return;
  }
  const z = state.settings.utmZone || zone;
  const hh = state.settings.utmHemi || hemi;
@@ -3928,10 +3945,16 @@ function finishPreplotLoad(items, zone, hemi, label) {
  const next = ambiguous[0] || failed[0];
  if (next) {
  promptPreplotColumnMap(next.item.text, zone, hemi, {
- message: 'Extra file "' + next.item.name + '" needs column confirmation to merge.',
+ message: 'Extra file "' + next.item.name + '" needs column confirmation to merge.' +
+  (next.result?.detail ? (' ' + next.result.detail) : ''),
  guess: next.result.layout || null,
  onDone: (extra) => {
  if (extra && extra.length) {
+ const plaus = assessPreplotPlausibility(extra);
+ if (!plaus.ok) {
+  showToast((plaus.detail || 'Extent looks wrong') + ' - columns not merged', 6000);
+  return;
+ }
  const merged = state.lines.slice();
  extra.forEach(l =>merged.push(Object.assign({}, l, { id: merged.length })));
  setLines(merged);
@@ -4175,7 +4198,24 @@ function _executeCSVColumnMap() {
  };
  const lines = parseDelimitedWithLayout(rows, layout, utmZone, utmHemi);
 
- if (lines.length === 0) { showToast('No valid lines found. Check column assignments.'); return; }
+ if (lines.length === 0) {
+  showToast(
+   coordType === 'latlon'
+    ? 'No valid lines. If values look like metres (e.g. 500000), choose UTM — not lat/lon.'
+    : 'No valid lines found. Check column assignments and UTM zone.',
+   7000
+  );
+  return;
+ }
+ const plaus = assessPreplotPlausibility(lines);
+ if (!plaus.ok) {
+  showToast(
+   (plaus.detail || 'Imported extent looks unrealistic') +
+   ' - switch UTM vs lat/lon or pick different X/Y columns',
+   8000
+  );
+  return;
+ }
 
  dlg.remove();
  state.rawText = rawText;
@@ -5122,7 +5162,32 @@ function askSurveyCriteria({ zone, hemi }, callback) {
  // Parse and display lines without opening Line Manager
  if (state.rawText) {
  // Preserve any user-added infill lines across the re-parse.
- const lines = _mergeExistingInfill(parseCSVWithUtm(state.rawText, z, h));
+ const parsed = parsePreplotBestEffort(state.rawText, z, h);
+ if (!parsed.lines || parsed.lines.length === 0 || parsed.confidence !== 'high' ||
+  !assessPreplotPlausibility(parsed.lines).ok) {
+  const plaus = assessPreplotPlausibility(parsed.lines || []);
+  showToast((plaus.detail || 'Could not safely auto-map columns') +
+   ' - confirm Line / X / Y before viewing', 6000);
+  promptPreplotColumnMap(state.rawText, z, h, {
+   message: (plaus.detail ? plaus.detail + '. ' : '') +
+    'Confirm Line / X / Y and UTM vs lat/lon before viewing the preplot.',
+   guess: parsed.layout || null,
+   skipZoneConfirm: true,
+   onDone: (mapped) => {
+    if (!mapped || !mapped.length) { showToast('No valid lines'); return; }
+    const p2 = assessPreplotPlausibility(mapped);
+    if (!p2.ok) {
+     showToast((p2.detail || 'Extent still looks wrong') + ' - fix columns and retry', 7000);
+     return;
+    }
+    const lines = _mergeExistingInfill(mapped);
+    setLines(lines);
+    showToast(`Viewing ${lines.length} lines | UTM ${z}${h}`, 3000);
+   }
+  });
+  return;
+ }
+ const lines = _mergeExistingInfill(parsed.lines);
  if (lines.length === 0) { showToast('No valid lines found'); return; }
  state.lines = lines;
  state.route = null;
@@ -6381,30 +6446,98 @@ function parsePreplotBestEffort(text, zone, hemi) {
  if (good.length < lines.length * 0.5) {
  return { lines: good, confidence: 'low', layout: null, reason: 'many_invalid_coords' };
  }
+ const plaus = assessPreplotPlausibility(good);
+ if (!plaus.ok) {
+  return { lines: good, confidence: 'low', layout: null, reason: plaus.reason };
+ }
  return { lines: good, confidence: 'high', layout: null };
  }
  lines = parseP190LooseWhitespace(rows, zone, hemi);
- if (lines.length > 0) return { lines, confidence: 'medium', layout: null };
+ if (lines.length > 0) {
+  const plaus = assessPreplotPlausibility(lines);
+  // Loose P1 is always unsure enough to confirm columns if extent looks wrong
+  if (!plaus.ok) return { lines, confidence: 'low', layout: null, reason: plaus.reason };
+  return { lines, confidence: 'medium', layout: null };
+ }
  }
 
  const layout = inferDelimitedLayout(rows);
  if (layout && layout.colX >= 0 && layout.colY >= 0 && layout.colLine >= 0) {
  const lines = parseDelimitedWithLayout(rows, layout, zone, hemi);
  if (lines.length > 0) {
- const conf = layout.confidence >= 0.7 ? 'high' : (layout.confidence >= 0.45 ? 'medium' : 'low');
+ let conf = layout.confidence >= 0.7 ? 'high' : (layout.confidence >= 0.45 ? 'medium' : 'low');
+ const plaus = assessPreplotPlausibility(lines);
+ if (!plaus.ok) {
+  // World-spanning / absurd extents → always ask the user
+  return { lines, confidence: 'low', layout, reason: plaus.reason };
+ }
  // Delimited medium/low ->treat as unsure so UI asks the user to confirm columns
  return {
  lines,
  confidence: conf === 'high' ? 'high' : 'low',
- layout
+ layout,
+ reason: layout.reason
  };
+ }
+ // Layout guessed lat/lon but values were metres → empty lines; still return layout for mapper
+ if (layout.isLatLon === false || layout.confidence < 0.7) {
+  return { lines: [], confidence: 'low', layout, reason: 'need_column_confirm' };
  }
  }
 
  const fallback = fallbackParseCSV(text);
- if (fallback.length > 0) return { lines: fallback, confidence: 'low', layout: layout || null };
+ if (fallback.length > 0) {
+  const plaus = assessPreplotPlausibility(fallback);
+  return { lines: fallback, confidence: 'low', layout: layout || null, reason: plaus.ok ? 'fallback' : plaus.reason };
+ }
 
  return { lines: [], confidence: 'none', layout: layout || null };
+}
+
+/**
+ * Reject globe-spanning garbage from bad column / UTM-as-degrees parses.
+ * Typical seismic lines are tens of km, not hundreds of thousands.
+ */
+function assessPreplotPlausibility(lines) {
+ if (!lines || !lines.length) return { ok: false, reason: 'no_lines' };
+ let maxLenM = 0, minLat = 90, maxLat = -90, minLon = 180, maxLon = -180;
+ let invalid = 0;
+ for (const l of lines) {
+  if (!l || !l.start || !l.end) { invalid++; continue; }
+  const lat1 = l.start[0], lon1 = l.start[1], lat2 = l.end[0], lon2 = l.end[1];
+  if (![lat1, lon1, lat2, lon2].every(isFinite) ||
+   Math.abs(lat1) > 90 || Math.abs(lat2) > 90 ||
+   Math.abs(lon1) > 180 || Math.abs(lon2) > 180) {
+   invalid++;
+   continue;
+  }
+  minLat = Math.min(minLat, lat1, lat2);
+  maxLat = Math.max(maxLat, lat1, lat2);
+  minLon = Math.min(minLon, lon1, lon2);
+  maxLon = Math.max(maxLon, lon1, lon2);
+  maxLenM = Math.max(maxLenM, haversine(l.start, l.end));
+ }
+ if (invalid === lines.length) return { ok: false, reason: 'coords_out_of_range' };
+ if (invalid > lines.length * 0.5) return { ok: false, reason: 'many_invalid_coords' };
+ // Single line longer than 500 km is almost never a valid preplot segment
+ if (maxLenM > 500000) {
+  return {
+   ok: false,
+   reason: 'line_too_long',
+   detail: `Longest line ${(maxLenM / 1000).toFixed(0)} km - likely wrong columns (UTM read as lat/lon)`
+  };
+ }
+ // Survey bbox diagonal beyond ~2500 km → ask user
+ const sw = [minLat, minLon], ne = [maxLat, maxLon];
+ const diagM = haversine(sw, ne);
+ if (diagM > 2500000) {
+  return {
+   ok: false,
+   reason: 'extent_too_large',
+   detail: `Survey span ${(diagM / 1000).toFixed(0)} km - confirm Line / X / Y columns and UTM vs lat/lon`
+  };
+ }
+ return { ok: true, maxLenM, diagM };
 }
 
 function parseWithKnownUtm(rows, zone, hemi) {
@@ -6568,15 +6701,45 @@ function inferDelimitedLayout(rows) {
  }
  }
 
- // Header-driven lat/lon hint
+ // Header-driven lat/lon hint — but NEVER override numeric magnitude.
+ // Headers saying "lon" while values are UTM metres (e.g. 500000) caused
+ // world-spanning preplots when metres were treated as degrees.
  const headerJoined = lc.join(' ');
+ const xs = (bestPair.x >= 0) ? colStats[bestPair.x] : null;
+ const ys = (bestPair.y >= 0) ? colStats[bestPair.y] : null;
+ const valuesLookGeographic = !!(xs && ys && xs.absMax <= 180 && ys.absMax <= 180);
+ const valuesLookUtm = !!(xs && ys && (xs.absMax > 180 || ys.absMax > 180) &&
+  (xs.absMax > 1000 || ys.absMax > 1000));
+
  let isLatLon = bestPair.isLatLon;
- if (headerJoined.includes('lat') || headerJoined.includes('lon') || headerJoined.includes('long')) isLatLon = true;
- if (headerJoined.includes('east') || headerJoined.includes('north') || headerJoined.includes('utm')) isLatLon = false;
+ if (valuesLookGeographic &&
+  (headerJoined.includes('lat') || headerJoined.includes('lon') || headerJoined.includes('long'))) {
+  isLatLon = true;
+ }
+ if (valuesLookUtm ||
+  headerJoined.includes('east') || headerJoined.includes('north') || headerJoined.includes('utm')) {
+  isLatLon = false;
+ }
+ // Magnitudes always win over header keywords
+ if (valuesLookUtm) isLatLon = false;
+ if (valuesLookGeographic && !valuesLookUtm && bestPair.isLatLon) isLatLon = true;
 
  let confidence = bestPair.score;
- if (colX >= 0 && colY >= 0 && findHeader(['east', 'north', 'lon', 'lat', 'x', 'y']) >= 0) confidence = Math.max(confidence, 0.75);
+ // Only boost confidence from headers when the numeric ranges agree
+ if (colX >= 0 && colY >= 0 && findHeader(['east', 'north', 'lon', 'lat', 'x', 'y']) >= 0) {
+  if ((isLatLon && valuesLookGeographic) || (!isLatLon && valuesLookUtm)) {
+   confidence = Math.max(confidence, 0.75);
+  } else {
+   // Header/value conflict — force user confirmation
+   confidence = Math.min(confidence, 0.4);
+  }
+ }
  if (colX === colY || colX < 0 || colY < 0) confidence = 0;
+ // UTM metres labeled as lon/lat is the classic globe-spanning failure mode
+ if (isLatLon && valuesLookUtm) {
+  isLatLon = false;
+  confidence = Math.min(confidence, 0.35);
+ }
 
  return {
  delimiter,
@@ -6611,6 +6774,23 @@ function parseDelimitedWithLayout(rows, layout, zone, hemi) {
  }
  if (!lineMap.size) return [];
 
+ // If layout claims lat/lon but sample values are clearly metre-scale, refuse
+ // silent conversion — caller must ask the user (UTM vs geographic).
+ if (layout.isLatLon) {
+  let absMax = 0, n = 0;
+  for (const pts of lineMap.values()) {
+   for (const p of pts) {
+    absMax = Math.max(absMax, Math.abs(p.x), Math.abs(p.y));
+    if (++n > 40) break;
+   }
+   if (n > 40) break;
+  }
+  if (absMax > 180) {
+   // Do not emit world-spanning garbage; return empty so confidence drops
+   return [];
+  }
+ }
+
  const lines = [];
  let idx = 0;
  for (const [name, pts] of lineMap) {
@@ -6635,6 +6815,9 @@ function parseDelimitedWithLayout(rows, layout, zone, hemi) {
  if (!Array.isArray(start)) start = [start.lat, start.lon];
  if (!Array.isArray(end)) end = [end.lat, end.lon];
  if (![start[0], start[1], end[0], end[1]].every(isFinite)) continue;
+ // Hard reject out-of-range geographic results
+ if (Math.abs(start[0]) > 90 || Math.abs(end[0]) > 90 ||
+  Math.abs(start[1]) > 180 || Math.abs(end[1]) > 180) continue;
  lines.push({
  id: idx++,
  name,
