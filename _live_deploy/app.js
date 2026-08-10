@@ -14123,7 +14123,7 @@ function resetWorkspaceForLogout() {
    });
    userLayers.length = 0;
    if (typeof selectedUserLayerIdx !== 'undefined') selectedUserLayerIdx = -1;
-   if (typeof renderUserLayersList === 'function') renderUserLayersList();
+   if (typeof updateUserLayersList === 'function') updateUserLayersList();
   }
  } catch (_) {}
 
