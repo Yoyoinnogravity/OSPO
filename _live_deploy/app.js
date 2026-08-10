@@ -12523,16 +12523,20 @@ function timeGradientColor(fraction) {
 }
 
 function _addRouteArrow(from, to, color, layer, opacity) {
- // Place an arrow at the midpoint of the segment pointing in direction of travel
+ // Place an arrow at the midpoint of the segment pointing in direction of travel.
+ // Use a filled triangle (same glyph as vessel heading markers), rotated by bearing.
  const midLat = (from[0] + to[0]) / 2;
  const midLon = (from[1] + to[1]) / 2;
- const angle = bearing(from, to);
- const op = opacity || 1;
+ const angle = bearing(from, to); // degrees clockwise from north
+ const op = opacity != null ? opacity : 1;
  const icon = L.divIcon({
  className: '',
- html: `<div style="width:16px;height:16px;display:flex;align-items:center;justify-content:center;transform:rotate(${angle}deg);transform-origin:center center;color:${color};font-size:14px;font-weight:900;opacity:${op};text-shadow:0 0 3px rgba(0,0,0,0.8);pointer-events:none;">-2</div>`,
- iconAnchor: [8, 8],
- iconSize: [16, 16]
+ html: `<div style="width:18px;height:18px;display:flex;align-items:center;justify-content:center;` +
+  `transform:rotate(${angle}deg);transform-origin:center center;` +
+  `color:${color};font-size:15px;line-height:1;font-weight:700;opacity:${op};` +
+  `text-shadow:0 0 3px rgba(0,0,0,0.85);pointer-events:none;">&#9650;</div>`,
+ iconAnchor: [9, 9],
+ iconSize: [18, 18]
  });
  L.marker([midLat, midLon], { icon, interactive: false }).addTo(layer);
 }
