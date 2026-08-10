@@ -205,6 +205,9 @@ const state = {
  runOut: 3050, // metres
  lineSpacing: 0, // metres (for sq km calc, 0 = auto-detect)
  spInterval: 25, // shot point interval in metres
+ // Cross-track offline (m) beyond which detour coverage is treated as no SP acquired.
+ // null = not set yet; user is prompted when an obstruction affects the plan.
+ offlineNoSpM: null,
  numStreamers: 6, // number of streamers
  streamerSeparation: 100, // metres between streamers
  swathWidth: 0, // metres (0 = auto-detect from line spacing)
@@ -4493,6 +4496,13 @@ function askSurveyCriteria({ zone, hemi }, callback) {
  style="width:80px;padding:5px 4px 5px 8px;border-radius:4px;border:1px solid #222222;background:#111111;color:#ffffff;font-size:13px;outline:none;"/>
  <span style="color:#8a9bb0;font-size:11px;margin-left:4px;">m</span>
  </div>
+ <div class="panel-row" style="margin-bottom:10px;">
+ <label style="width:140px; color:#ffffff;line-height:1.2;">No SP if offline &gt;</label>
+ <input id="crit-offline-nosp" type="number" min="1" step="10" value="${state.settings.offlineNoSpM != null ? state.settings.offlineNoSpM : ''}"
+ placeholder="e.g. 100"
+ style="width:80px;padding:5px 4px 5px 8px;border-radius:4px;border:1px solid #222222;background:#111111;color:#ffffff;font-size:13px;outline:none;"/>
+ <span style="color:#8a9bb0;font-size:11px;margin-left:4px;">m (obstacle detours)</span>
+ </div>
  <div style="border-top:1px solid #222;margin:10px 0 10px 0;"></div>
  <div style="font-size:10px;color:#ffd60a;margin-bottom:8px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">Fold of Coverage Parameters</div>
  <div class="panel-row" style="margin-bottom:10px;">
@@ -4958,6 +4968,10 @@ function askSurveyCriteria({ zone, hemi }, callback) {
  state.settings.numStreamers = parseInt(document.getElementById('crit-num-streamers')?.value) || 8;
  state.settings.streamerSeparation = parseInt(document.getElementById('crit-streamer-sep')?.value) || 100;
  state.settings.spInterval = parseFloat(document.getElementById('crit-sp-interval')?.value) || 12.5;
+ {
+  const off = parseFloat(document.getElementById('crit-offline-nosp')?.value);
+  if (isFinite(off) && off > 0) setOfflineNoSpThresholdM(off, false);
+ }
 
  // Extract Fold of Coverage Parameters
  state.settings.channelsPerStreamer = parseInt(document.getElementById('crit-channels-per-streamer')?.value) || 120;
@@ -5043,6 +5057,10 @@ function askSurveyCriteria({ zone, hemi }, callback) {
  state.settings.numStreamers = parseInt(document.getElementById('crit-num-streamers')?.value) || state.settings.numStreamers;
  state.settings.streamerSeparation = parseInt(document.getElementById('crit-streamer-sep')?.value) || state.settings.streamerSeparation;
  state.settings.spInterval = parseFloat(document.getElementById('crit-sp-interval')?.value) || state.settings.spInterval;
+ {
+  const off = parseFloat(document.getElementById('crit-offline-nosp')?.value);
+  if (isFinite(off) && off > 0) setOfflineNoSpThresholdM(off, false);
+ }
  // Persist Fold of Coverage parameters here too, so they aren't discarded when the
  // user exits via "View Preplot" instead of "Line Manager".
  state.settings.channelsPerStreamer = parseInt(document.getElementById('crit-channels-per-streamer')?.value) || state.settings.channelsPerStreamer || 120;
@@ -5347,6 +5365,7 @@ function askSurveyCriteria({ zone, hemi }, callback) {
  numStreamers: getInt('crit-num-streamers', 8),
  streamerSeparation: getInt('crit-streamer-sep', 100),
  spInterval: getFloat('crit-sp-interval', 12.5),
+ offlineNoSpM: getFloat('crit-offline-nosp', 0) || null,
  channelsPerStreamer: getInt('crit-channels-per-streamer', 120),
  channelSpacing: getFloat('crit-channel-spacing', 6.25),
  numSources: getInt('crit-num-sources', 1),
@@ -5488,6 +5507,11 @@ function askSurveyCriteria({ zone, hemi }, callback) {
  if (defaults.numStreamers) document.getElementById('crit-num-streamers').value = defaults.numStreamers;
  if (defaults.streamerSeparation) document.getElementById('crit-streamer-sep').value = defaults.streamerSeparation;
  if (defaults.spInterval) document.getElementById('crit-sp-interval').value = defaults.spInterval;
+ if (defaults.offlineNoSpM) {
+  const el = document.getElementById('crit-offline-nosp');
+  if (el) el.value = defaults.offlineNoSpM;
+  setOfflineNoSpThresholdM(defaults.offlineNoSpM, false);
+ }
  if (defaults.channelsPerStreamer) document.getElementById('crit-channels-per-streamer').value = defaults.channelsPerStreamer;
  if (defaults.channelSpacing) document.getElementById('crit-channel-spacing').value = defaults.channelSpacing;
  if (defaults.numSources) document.getElementById('crit-num-sources').value = defaults.numSources;
@@ -7822,6 +7846,119 @@ function getPreplotLineSeparationM() {
  return Math.max(1, nStr * strSep);
 }
 
+/** Suggested default for offline no-SP threshold (m): half line sep, min 50. */
+function suggestOfflineNoSpM() {
+ const sep = getPreplotLineSeparationM();
+ return Math.max(50, Math.round(sep / 2));
+}
+
+/**
+ * Cross-track offline (m) beyond which detour coverage is "no SP acquired".
+ * Reads live UI inputs, then settings, then localStorage.
+ */
+function getOfflineNoSpThresholdM() {
+ const fromObs = parseFloat(document.getElementById('input-offline-nosp')?.value);
+ if (isFinite(fromObs) && fromObs > 0) {
+  state.settings.offlineNoSpM = fromObs;
+  return fromObs;
+ }
+ const fromCrit = parseFloat(document.getElementById('crit-offline-nosp')?.value);
+ if (isFinite(fromCrit) && fromCrit > 0) {
+  state.settings.offlineNoSpM = fromCrit;
+  return fromCrit;
+ }
+ const s = parseFloat(state.settings.offlineNoSpM);
+ if (isFinite(s) && s > 0) return s;
+ const saved = parseFloat(localStorage.getItem(userKey('offline_nosp_m')));
+ if (isFinite(saved) && saved > 0) {
+  state.settings.offlineNoSpM = saved;
+  return saved;
+ }
+ return null;
+}
+
+function setOfflineNoSpThresholdM(metres, saveDefault) {
+ const v = parseFloat(metres);
+ if (!isFinite(v) || v <= 0) return null;
+ state.settings.offlineNoSpM = v;
+ const inp = document.getElementById('input-offline-nosp');
+ if (inp) inp.value = v;
+ const crit = document.getElementById('crit-offline-nosp');
+ if (crit) crit.value = v;
+ if (saveDefault) localStorage.setItem(userKey('offline_nosp_m'), String(v));
+ return v;
+}
+
+/**
+ * Ensure the user has specified the offline no-SP threshold before planning
+ * around obstructions. Prompts with a suggested default when unset.
+ * Returns a Promise that resolves to the threshold (metres) or null if cancelled.
+ */
+function ensureOfflineNoSpThreshold() {
+ return new Promise((resolve) => {
+  const existing = getOfflineNoSpThresholdM();
+  if (existing != null) { resolve(existing); return; }
+
+  const suggested = suggestOfflineNoSpM();
+  const overlay = document.createElement('div');
+  overlay.id = 'offline-nosp-dialog';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:10020;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;';
+  overlay.innerHTML = `
+   <div style="background:#0e0e16;border:1px solid #334;border-radius:8px;padding:18px 20px;max-width:420px;width:92%;box-shadow:0 16px 48px rgba(0,0,0,0.65);">
+    <div style="font-size:13px;font-weight:700;color:#ffd60a;margin-bottom:8px;">Offline no-SP threshold</div>
+    <div style="font-size:11px;color:#c0c8d4;line-height:1.45;margin-bottom:12px;">
+     When the vessel is more than <b style="color:#fff;">X metres</b> offline from the planned survey line
+     (obstacle detour), that along-line span is treated as <b style="color:#fff;">no SP acquired</b>
+     and is deducted from overall SP, line km, and sq km (3D).
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
+     <label style="font-size:11px;color:#a0aebb;white-space:nowrap;">No SP when offline &gt;</label>
+     <input id="dlg-offline-nosp" type="number" min="1" step="10" value="${suggested}"
+      style="width:100px;padding:6px 8px;border-radius:4px;border:1px solid #333;background:#111;color:#fff;font-size:13px;outline:none;"/>
+     <span style="font-size:11px;color:#8a9bb0;">m</span>
+    </div>
+    <div style="font-size:9px;color:#666;margin-bottom:12px;">Suggested from half line separation: ${suggested} m</div>
+    <div style="display:flex;gap:8px;">
+     <button id="dlg-offline-ok" style="flex:1.4;padding:8px;border:none;border-radius:4px;background:#1abc9c;color:#fff;font-weight:700;cursor:pointer;font-size:12px;">Use threshold</button>
+     <button id="dlg-offline-save" style="flex:1.2;padding:8px;border:none;border-radius:4px;background:#00d2ff;color:#000;font-weight:700;cursor:pointer;font-size:11px;">Save as default</button>
+     <button id="dlg-offline-cancel" style="flex:0.8;padding:8px;border:1px solid #333;border-radius:4px;background:#1a1a24;color:#9090c0;cursor:pointer;font-size:11px;">Cancel</button>
+    </div>
+   </div>`;
+  document.body.appendChild(overlay);
+  const inp = overlay.querySelector('#dlg-offline-nosp');
+  setTimeout(() => { try { inp.focus(); inp.select(); } catch (_) {} }, 40);
+
+  const finish = (saveDef) => {
+   const v = setOfflineNoSpThresholdM(inp.value, !!saveDef);
+   if (!v) { showToast('Enter a positive offline threshold in metres'); return; }
+   overlay.remove();
+   if (saveDef) showToast(`Offline no-SP threshold saved as default: ${v} m`);
+   else showToast(`Offline no-SP threshold: ${v} m`);
+   resolve(v);
+  };
+  overlay.querySelector('#dlg-offline-ok').onclick = () => finish(false);
+  overlay.querySelector('#dlg-offline-save').onclick = () => finish(true);
+  overlay.querySelector('#dlg-offline-cancel').onclick = () => {
+   overlay.remove();
+   resolve(null);
+  };
+  inp.addEventListener('keydown', (e) => {
+   if (e.key === 'Enter') finish(false);
+   if (e.key === 'Escape') { overlay.remove(); resolve(null); }
+  });
+ });
+}
+
+function syncOfflineNoSpUi() {
+ const v = getOfflineNoSpThresholdM();
+ if (v == null) return null;
+ const inp = document.getElementById('input-offline-nosp');
+ if (inp && String(inp.value) !== String(v)) inp.value = v;
+ const crit = document.getElementById('crit-offline-nosp');
+ if (crit && document.activeElement !== crit) crit.value = v;
+ return v;
+}
+
 // Fraction of point P along segment AB in local metres (may be outside 0..1).
 function projectFracOnSegment(p, a, b) {
  const midLat = (a[0] + b[0]) / 2;
@@ -8145,19 +8282,22 @@ function computeDetourPath(detourStart, detourEnd, obstructionIdx) {
 
 /* (duplicate legacy detour helpers removed — see densifyDetourWithMinTurnRadius / computeDetourPath above) */
 
-// Where the detour is more than 1x preplot line separation offline from the
-// planned survey line, that along-line span is sacrificed coverage.
-function sacrificedRangeFromDetour(lineStart, lineEnd, detourPts, lineSepM) {
+// Where the detour is more than offlineThresholdM metres offline from the
+// planned survey line, that along-line span is sacrificed (no SP acquired).
+function sacrificedRangeFromDetour(lineStart, lineEnd, detourPts, offlineThresholdM) {
  if (!detourPts || detourPts.length < 2) return null;
  const lineDistM = haversine(lineStart, lineEnd);
  if (lineDistM < 1) return null;
+ const thresh = (isFinite(offlineThresholdM) && offlineThresholdM > 0)
+  ? offlineThresholdM
+  : suggestOfflineNoSpM();
 
- // Sample along each detour segment
+ // Sample along each detour segment; mark online->offline and offline->online
  const samples = [];
  for (let i = 0; i < detourPts.length - 1; i++) {
  const a = detourPts[i], b = detourPts[i + 1];
  const segM = haversine(a, b);
- const steps = Math.max(2, Math.ceil(segM / Math.max(50, lineSepM / 4)));
+ const steps = Math.max(2, Math.ceil(segM / Math.max(25, thresh / 4)));
  for (let s = 0; s <= steps; s++) {
  const t = s / steps;
  const p = interpolatePoint(a, b, t);
@@ -8166,21 +8306,43 @@ function sacrificedRangeFromDetour(lineStart, lineEnd, detourPts, lineSepM) {
  samples.push({ frac, offline });
  }
  }
+ if (!samples.length) return null;
 
- let fromFrac = null, toFrac = null;
- for (const sm of samples) {
- if (sm.offline > lineSepM) {
+ // Contiguous spans where offline > threshold (along-line frac)
+ const spans = [];
+ let spanStart = null;
+ for (let i = 0; i < samples.length; i++) {
+ const sm = samples[i];
  const f = Math.max(0, Math.min(1, sm.frac));
- if (fromFrac === null || f < fromFrac) fromFrac = f;
- if (toFrac === null || f > toFrac) toFrac = f;
+ const off = sm.offline > thresh;
+ if (off && spanStart === null) spanStart = f;
+ if ((!off || i === samples.length - 1) && spanStart !== null) {
+  const spanEnd = off ? f : Math.max(0, Math.min(1, samples[Math.max(0, i - 1)].frac));
+  if (spanEnd > spanStart) spans.push({ fromFrac: spanStart, toFrac: spanEnd });
+  spanStart = null;
  }
  }
- if (fromFrac === null || toFrac === null || toFrac <= fromFrac) return null;
+ if (!spans.length) return null;
+
+ // Merge overlapping / adjacent spans into one envelope for this detour
+ let fromFrac = spans[0].fromFrac, toFrac = spans[0].toFrac;
+ for (let i = 1; i < spans.length; i++) {
+  fromFrac = Math.min(fromFrac, spans[i].fromFrac);
+  toFrac = Math.max(toFrac, spans[i].toFrac);
+ }
+ if (toFrac <= fromFrac) return null;
+
+ const distKm = ((toFrac - fromFrac) * lineDistM) / 1000;
+ const spInt = state.settings.spInterval || 12.5;
+ const spLost = Math.max(0, Math.round((toFrac - fromFrac) * lineDistM / spInt));
  return {
  fromFrac,
  toFrac,
- distKm: ((toFrac - fromFrac) * lineDistM) / 1000,
- maxOfflineM: Math.max(...samples.map(s => s.offline))
+ distKm,
+ spLost,
+ offlineThresholdM: thresh,
+ maxOfflineM: Math.max(...samples.map(s => s.offline)),
+ spans
  };
 }
 
@@ -8195,24 +8357,31 @@ function promptReroute() {
  if (!state.route || !state.route.length) {
   showToast('Obstruction saved - it will be avoided on the next Plan Route.', 5000);
   renderSurveyLines(); // gap preplot through the new exclusion immediately
+  // Still ask for offline threshold so it is ready for the next plan
+  ensureOfflineNoSpThreshold();
   return;
  }
 
- showToast('Obstruction saved - re-routing to avoid exclusion zones\u2026', 4000);
- // Drop prior solution so detours cannot reuse stale survey chords.
- hardResetRouteState();
- renderSurveyLines();
- // Defer so the toast/obstruction layer paint before the planning overlay.
- // Use executePlanRoute (not planRoute) so we do not re-ask 2D/3D confirm.
- setTimeout(() => {
-  try {
-   if (typeof executePlanRoute === 'function') executePlanRoute();
-   else if (typeof planRoute === 'function') planRoute();
-  } catch (err) {
-   console.error('Auto re-route failed:', err);
-   showToast('Auto re-route failed - use Plan Route to avoid the obstruction.', 6000);
+ // Ask for offline no-SP threshold, then auto re-route
+ ensureOfflineNoSpThreshold().then((thresh) => {
+  if (thresh == null) {
+   showToast('Re-route cancelled - set offline no-SP threshold in Obstructions, then Plan Route.', 6000);
+   renderSurveyLines();
+   return;
   }
- }, 80);
+  showToast('Obstruction saved - re-routing to avoid exclusion zones\u2026', 4000);
+  hardResetRouteState();
+  renderSurveyLines();
+  setTimeout(() => {
+   try {
+    if (typeof executePlanRoute === 'function') executePlanRoute();
+    else if (typeof planRoute === 'function') planRoute();
+   } catch (err) {
+    console.error('Auto re-route failed:', err);
+    showToast('Auto re-route failed - use Plan Route to avoid the obstruction.', 6000);
+   }
+  }, 80);
+ });
 }
 
 // ===== LAYER PANEL DRAWING (Add Features) =====
@@ -8538,13 +8707,23 @@ function getExclusionZoneInput() {
 
 function applyObstructionExclusion(saveAsDefault = false) {
  const v = parseFloat(document.getElementById('input-exclusion-zone').value) || 0;
+ const offline = parseFloat(document.getElementById('input-offline-nosp')?.value);
  if (isFinite(v) && v > 0) {
  if (saveAsDefault) {
  localStorage.setItem(userKey('default_exclusion'), v);
- showToast('Default Exclusion Zone saved as system default.');
- } else {
- showToast('Exclusion Zone size applied.');
  }
+ }
+ if (isFinite(offline) && offline > 0) {
+  setOfflineNoSpThresholdM(offline, saveAsDefault);
+  if (saveAsDefault) {
+   showToast(`Defaults saved: exclusion ${v || 0} m, offline no-SP ${offline} m`);
+  } else {
+   showToast(`Exclusion ${v || 0} m | No SP when offline > ${offline} m`);
+  }
+ } else if (saveAsDefault && isFinite(v) && v > 0) {
+  showToast('Default Exclusion Zone saved as system default.');
+ } else if (isFinite(v) && v > 0) {
+  showToast('Exclusion Zone size applied.');
  }
  hidePanel('obstructions');
 }
@@ -10559,8 +10738,10 @@ function planRoute() {
 function executePlanRoute() {
  if (state.lines.length === 0) return;
 
+ const run = () => {
  // Pull min turn radius from the open UI so Apply is not required for detours
  syncTurnRadiusUi();
+ syncOfflineNoSpUi();
  state._detourFailCount = 0;
 
  // Ensure replan does not blend with a previous solution.
@@ -10583,7 +10764,13 @@ function executePlanRoute() {
  showRouteStats(route);
  const nDetours = (route || []).filter(w => w.type === 'obsAvoidStart' || w.type === 'transit-detour').length;
  if ((state.obstructions || []).length && nDetours > 0) {
-  showToast(`Route rebuilt with ${nDetours} obstruction detour(s) at ${(getEffectiveTurnRadius() / 1000).toFixed(1)} km min turn radius`, 5000);
+  const th = getOfflineNoSpThresholdM();
+  showToast(
+   `Route rebuilt with ${nDetours} obstruction detour(s)` +
+   (th ? ` (no SP when offline > ${th} m)` : '') +
+   ` at ${(getEffectiveTurnRadius() / 1000).toFixed(1)} km min turn radius`,
+   5000
+  );
  }
  if (state._detourFailCount > 0) {
   showToast(
@@ -10633,6 +10820,20 @@ function executePlanRoute() {
  showPlanningOverlay(false);
  }
  }, 50);
+ };
+
+ // When exclusions exist, require the offline no-SP threshold before planning
+ if ((state.obstructions || []).length > 0 && getOfflineNoSpThresholdM() == null) {
+  ensureOfflineNoSpThreshold().then((thresh) => {
+   if (thresh == null) {
+    showToast('Plan cancelled - set offline no-SP threshold (Obstructions panel).', 6000);
+    return;
+   }
+   run();
+  });
+ } else {
+  run();
+ }
 }
 
 // Returns true when the user has explicitly fixed a line'acquisition direction
@@ -11903,6 +12104,8 @@ function computeRoute() {
  const lineDistM = haversine(s, e);
  const lineDistKm = lineDistM / 1000;
  const R = getEffectiveTurnRadius(); // min turn radius in metres
+ // User-specified cross-track offline (m) beyond which SP are not acquired
+ const offlineThresh = getOfflineNoSpThresholdM() || suggestOfflineNoSpM();
  // True preplot line separation (not swath width stored in settings.lineSpacing)
  const lineSep = getPreplotLineSeparationM();
 
@@ -11958,16 +12161,26 @@ function computeRoute() {
  });
  waypoints.push({ type: 'obsAvoidEnd', pt: detourEnd, lineName: line.name, obstructionIdx: rng.obstructionIdx, frac: rng.exitFrac });
 
- // Sacrifice coverage only where the vessel is more than 1x line separation
- // offline from the planned survey line.
- const sacrificed = sacrificedRangeFromDetour(s, e, detourPath, lineSep);
+ // Sacrifice coverage where vessel is more than the user offline threshold
+ // from the planned survey line (no SP acquired on that along-line span).
+ const sacrificed = sacrificedRangeFromDetour(s, e, detourPath, offlineThresh);
  if (sacrificed) {
+ // Prefer SP count from the line's SP records when available
+ let spLost = sacrificed.spLost;
+ const spInt = state.settings.spInterval || 12.5;
+ const lineSp = lineSpCount(line, spInt);
+ if (lineSp > 2) {
+  spLost = Math.max(0, Math.round((sacrificed.toFrac - sacrificed.fromFrac) * lineSp));
+ }
  state.skippedRanges.push({
  lineName: line.name,
+ lineId: line.id,
  fromFrac: sacrificed.fromFrac,
  toFrac: sacrificed.toFrac,
  distKm: sacrificed.distKm,
+ spLost,
  maxOfflineM: sacrificed.maxOfflineM,
+ offlineThresholdM: sacrificed.offlineThresholdM || offlineThresh,
  lineSepM: lineSep,
  obsEnterFrac: rng.obsEnterFrac,
  obsExitFrac: rng.obsExitFrac,
@@ -12580,11 +12793,18 @@ function showRouteStats(waypoints) {
  let primeAcquiredKm = primeAcquiredM / 1000;
  let primeRemainingKm = primeRemainingM / 1000;
 
- // Skipped km (from obstruction detours where vessel is >1x line sep offline)
+ // Skipped km / SP (from obstruction detours where vessel is > offline threshold)
  let skippedKm = 0;
- state.skippedRanges.forEach(r => { skippedKm += r.distKm; });
+ let skippedSP = 0;
+ let offlineThreshUsed = null;
+ state.skippedRanges.forEach(r => {
+  skippedKm += r.distKm || 0;
+  skippedSP += r.spLost || 0;
+  if (r.offlineThresholdM != null) offlineThreshUsed = r.offlineThresholdM;
+ });
+ if (offlineThreshUsed == null) offlineThreshUsed = getOfflineNoSpThresholdM();
 
- // Net full fold km / area: subtract sacrificed coverage
+ // Net full fold km / area / SP: subtract sacrificed coverage
  const netFullFoldKm = Math.max(0, primeKm - skippedKm);
  const sqKm = (netFullFoldKm * 1000) * crossLineM / 1000000;
 
@@ -12641,11 +12861,16 @@ function showRouteStats(waypoints) {
  }
  }
 
- if (skippedKm > 0) {
+ if (skippedKm > 0 || skippedSP > 0) {
+ const thLabel = offlineThreshUsed != null ? `offline > ${offlineThreshUsed} m` : 'offline threshold';
  document.getElementById('stat-skipped').textContent =
- `${skippedKm.toFixed(2)} km sacrificed (>1x line sep offline, ${state.skippedRanges.length} zone${state.skippedRanges.length > 1 ? 's' : ''})`;
+ `${skippedKm.toFixed(2)} km sacrificed (${thLabel}, ${state.skippedRanges.length} zone${state.skippedRanges.length > 1 ? 's' : ''})`;
+ const spEl = document.getElementById('stat-skipped-sp');
+ if (spEl) spEl.textContent = skippedSP > 0 ? `${skippedSP.toLocaleString()} SP not acquired` : '';
  } else {
  document.getElementById('stat-skipped').textContent = '';
+ const spEl = document.getElementById('stat-skipped-sp');
+ if (spEl) spEl.textContent = '';
  }
 
  // Obstruction avoidance stats
@@ -12745,7 +12970,10 @@ function showRouteStats(waypoints) {
  vesselCost: dayRate > 0 ? vesselCost : null,
  mobDemob: mobDemob > 0 ? mobDemob : null,
  dayRate: dayRate,
- skipped: skippedKm > 0 ? skippedKm.toFixed(1) + ' km sacrificed (>1x line sep)' : null
+ skipped: (skippedKm > 0 || skippedSP > 0)
+  ? `${skippedKm.toFixed(1)} km / ${skippedSP.toLocaleString()} SP sacrificed` +
+    (offlineThreshUsed != null ? ` (offline > ${offlineThreshUsed} m)` : '')
+  : null
  });
 
  // Show route step-through controls
@@ -13203,6 +13431,14 @@ if (geoProjectionEl && savedProjection) geoProjectionEl.value = savedProjection;
 const savedExclusion = localStorage.getItem(userKey('default_exclusion')) || "500";
 const exclusionEl = document.getElementById('input-exclusion-zone');
 if (exclusionEl) exclusionEl.value = savedExclusion;
+{
+ const savedOff = parseFloat(localStorage.getItem(userKey('offline_nosp_m')));
+ if (isFinite(savedOff) && savedOff > 0) {
+  state.settings.offlineNoSpM = savedOff;
+  const offEl = document.getElementById('input-offline-nosp');
+  if (offEl) offEl.value = savedOff;
+ }
+}
 
 // Update toolbar label defaults on startup
 const valTurnRadiusEl = document.getElementById('val-turn-radius');
@@ -18258,9 +18494,16 @@ function openReportsPanel() {
  const primeLineKmGross = primeFullFoldM / 1000;
  const infillLineKm = infillFullFoldM / 1000;
  let skippedKmRep = 0;
- (state.skippedRanges || []).forEach(r => { skippedKmRep += r.distKm || 0; });
+ let skippedSPRep = 0;
+ let offlineThreshRep = getOfflineNoSpThresholdM();
+ (state.skippedRanges || []).forEach(r => {
+  skippedKmRep += r.distKm || 0;
+  skippedSPRep += r.spLost || 0;
+  if (r.offlineThresholdM != null) offlineThreshRep = r.offlineThresholdM;
+ });
  const primeLineKm = Math.max(0, primeLineKmGross - skippedKmRep);
  const lineKm = (primeFullFoldM + infillFullFoldM) / 1000 - skippedKmRep;
+ const netPrimeSP = Math.max(0, primeTotalSP - skippedSPRep);
  const avgLineKm = primeLines.length > 0 ? primeLineKm / primeLines.length : 0;
 
  // Line bearing from first prime line (geographical + grid)
@@ -18274,7 +18517,7 @@ function openReportsPanel() {
  fmt('rep-longest-line', `${(maxLine / 1000).toFixed(3)} km (${(maxLine / 1852).toFixed(3)} nm)`);
  fmt('rep-avg-line', `${avgLineKm.toFixed(3)} km (${(avgLineKm / 1.852).toFixed(3)} nm)`);
  fmt('rep-line-km', skippedKmRep > 0
- ? `${primeLineKm.toFixed(3)} km (${(primeLineKm / 1.852).toFixed(3)} nm) prime (after ${skippedKmRep.toFixed(2)} km sacrificed)`
+ ? `${primeLineKm.toFixed(3)} km (${(primeLineKm / 1.852).toFixed(3)} nm) prime (after ${skippedKmRep.toFixed(2)} km / ${skippedSPRep.toLocaleString()} SP sacrificed)`
  : `${primeLineKm.toFixed(3)} km (${(primeLineKm / 1.852).toFixed(3)} nm) prime`);
 
  // Full fold area = net fullFoldLength x crossLineWidth / 1,000,000
@@ -18555,7 +18798,7 @@ function openReportsPanel() {
  const transitOverhead = totalRouteM > 0 ? (transitM / totalRouteM * 100) : 0;
  fmt('rep-productive-ratio', `${prodRatio.toFixed(1)}% on-line`);
  fmt('rep-transit-overhead', `${transitOverhead.toFixed(1)}% line changes`);
- const sourceDensity = sqKm > 0 ? (totalSP / sqKm) : 0;
+ const sourceDensity = sqKm > 0 ? ((Math.max(0, totalSP - skippedSPRep)) / sqKm) : 0;
  fmt('rep-density', pdfIs2D ? '' : (sourceDensity > 0 ? `${sourceDensity.toFixed(1)} SP/km2` : '-'));
  } else {
  ['rep-total-km','rep-online-km','rep-transit-km','rep-num-turns','rep-avg-transit',
@@ -18573,8 +18816,18 @@ function openReportsPanel() {
  const skipped = state.skippedRanges || [];
  fmt('rep-hazards', `${obs.length} zone${obs.length !== 1 ? 's' : ''}`);
  let skippedKm = 0;
- skipped.forEach(r => { skippedKm += r.distKm || 0; });
- fmt('rep-skipped', skippedKm > 0 ? `${skippedKm.toFixed(2)} km` : 'None');
+ let skippedSP = 0;
+ let offlineTh = getOfflineNoSpThresholdM();
+ skipped.forEach(r => {
+  skippedKm += r.distKm || 0;
+  skippedSP += r.spLost || 0;
+  if (r.offlineThresholdM != null) offlineTh = r.offlineThresholdM;
+ });
+ fmt('rep-skipped', skippedKm > 0
+  ? `${skippedKm.toFixed(2)} km` + (offlineTh != null ? ` (offline > ${offlineTh} m)` : '')
+  : 'None');
+ fmt('rep-skipped-sp', skippedSP > 0 ? `${skippedSP.toLocaleString()} SP` : 'None');
+ fmt('rep-offline-threshold', offlineTh != null ? `${offlineTh} m` : 'Not set');
  const affectedLines = new Set(skipped.map(r =>r.lineName)).size;
  fmt('rep-lines-affected', affectedLines > 0 ? `${affectedLines} line${affectedLines !== 1 ? 's' : ''}` : 'None');
 
@@ -19307,9 +19560,16 @@ async function _doGenerateReport() {
  });
  const lineKm = totalFullFoldM / 1000;
  let skippedKmPdf = 0;
- (state.skippedRanges || []).forEach(r => { skippedKmPdf += r.distKm || 0; });
+ let skippedSPPdf = 0;
+ let offlineThPdf = getOfflineNoSpThresholdM();
+ (state.skippedRanges || []).forEach(r => {
+  skippedKmPdf += r.distKm || 0;
+  skippedSPPdf += r.spLost || 0;
+  if (r.offlineThresholdM != null) offlineThPdf = r.offlineThresholdM;
+ });
  const primeLineKmGross = primeFullFoldM / 1000;
  const primeLineKm = Math.max(0, primeLineKmGross - skippedKmPdf);
+ const netPrimeSPPdf = Math.max(0, primeSP - skippedSPPdf);
  const infillLineKm = infillFullFoldM / 1000;
  const sqKm = Math.max(0, primeFullFoldM - skippedKmPdf * 1000) * crossLineM / 1000000;
  const infillSqKm = infillFullFoldM * crossLineM / 1000000;
@@ -19917,9 +20177,9 @@ async function _doGenerateReport() {
 <div class="row"><span class="label">Line Bearing (Grid)</span><span class="value">${brg.toFixed(2)} deg / ${gridRecip.toFixed(2)} deg</span></div>
 <div class="row"><span class="label">Line Bearing (Geo)</span><span class="value">${geoBrg.toFixed(2)} deg / ${geoRecip.toFixed(2)} deg</span></div>
 <div class="row"><span class="label">Streamers</span><span class="value">${nStr} x ${strSep}m</span></div>
-<div class="row"><span class="label">SP Interval</span><span class="value">${spInt}m (${primeSP.toLocaleString()} prime SP${infillSP > 0 ? ' + ' + infillSP.toLocaleString() + ' infill SP' : ''})</span></div>
+<div class="row"><span class="label">SP Interval</span><span class="value">${spInt}m (${(skippedSPPdf > 0 ? netPrimeSPPdf : primeSP).toLocaleString()} prime SP${skippedSPPdf > 0 ? ' after ' + skippedSPPdf.toLocaleString() + ' offline sacrificed' : ''}${infillSP > 0 ? ' + ' + infillSP.toLocaleString() + ' infill SP' : ''})</span></div>
 <div class="row"><span class="label">Fold of Coverage</span><span class="value">${calculateFoldOfCoverage().toFixed(1)}x</span></div>
-<div class="row"><span class="label">Prime Full Fold Line-km</span><span class="value">${primeLineKm.toFixed(3)} km</span></div>
+<div class="row"><span class="label">Prime Full Fold Line-km</span><span class="value">${primeLineKm.toFixed(3)} km${skippedKmPdf > 0 ? ' (after ' + skippedKmPdf.toFixed(2) + ' km / ' + skippedSPPdf.toLocaleString() + ' SP sacrificed' + (offlineThPdf != null ? ', offline > ' + offlineThPdf + ' m' : '') + ')' : ''}</span></div>
 ${pdfIs2D ? '' : `<div class="row"><span class="label">Prime Full Fold Area</span><span class="value">${sqKm > 0 ? sqKm.toFixed(4)+' km2' : '-'}</span></div>`}
 ${infillLineKm > 0 ? `<div class="row"><span class="label">Infill Full Fold Line-km</span><span class="value">${infillLineKm.toFixed(3)} km (${infillPctKm}% of prime)</span></div>
 ${pdfIs2D ? '' : `<div class="row"><span class="label">Infill Full Fold Area</span><span class="value">${infillSqKm.toFixed(4)} km2 (${infillPctArea}% of prime)</span></div>`}` : ''}

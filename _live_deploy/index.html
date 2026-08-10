@@ -374,6 +374,7 @@
  <span id="stat-sq-km"></span>
  <span id="stat-time"></span>
  <span id="stat-skipped"></span>
+ <span id="stat-skipped-sp" style="color:#ff9500;"></span>
  <span id="stat-obs-avoid" style="color:#ffd60a;"></span>
  <span id="stat-infill" style="color:#ff44ff;"></span>
  <span id="stat-acquired" style="color:#8a9bb0;"></span>
@@ -1210,6 +1211,8 @@
  <div style="border-bottom:1px solid #333; padding-bottom:5px; margin-bottom:8px; margin-top:14px; font-weight:700; color:#00d2ff; text-transform:uppercase; letter-spacing:0.5px; font-size:10px;">Hazards & Exclusions</div>
  <div style="display:flex; justify-content:space-between;"><span>Exclusion Zones:</span><strong id="rep-hazards">-</strong></div>
  <div style="display:flex; justify-content:space-between;"><span>Skipped Distance:</span><strong id="rep-skipped">-</strong></div>
+ <div style="display:flex; justify-content:space-between;"><span>Skipped SP (offline):</span><strong id="rep-skipped-sp">-</strong></div>
+ <div style="display:flex; justify-content:space-between;"><span>Offline no-SP threshold:</span><strong id="rep-offline-threshold">-</strong></div>
  <div style="display:flex; justify-content:space-between;"><span>Lines Affected:</span><strong id="rep-lines-affected">-</strong></div>
  <!-- Line Schedule -->
  <div style="border-bottom:1px solid #333; padding-bottom:5px; margin-bottom:8px; margin-top:14px; font-weight:700; color:#00d2ff; text-transform:uppercase; letter-spacing:0.5px; font-size:10px;">Line Schedule</div>
@@ -1429,6 +1432,12 @@
  <input type="number" id="input-exclusion-zone" value="500" min="0" step="50" placeholder="metres"/>
  <span>m</span>
  </div>
+ <div class="panel-row" style="margin-bottom:8px;">
+ <label style="width:auto;max-width:160px;line-height:1.25;">No SP when offline &gt;</label>
+ <input type="number" id="input-offline-nosp" value="" min="1" step="10" placeholder="e.g. 100" title="Cross-track metres offline from the preplot line. Beyond this, shot points are not acquired and are deducted from SP / line km / sq km."/>
+ <span>m</span>
+ </div>
+ <div style="font-size:9px;color:#666;margin:-4px 0 12px 0;line-height:1.35;">When the vessel is more than this many metres offline from the planned line (obstacle detour), that along-line span counts as no SP acquired and is deducted from SP, line km, and sq km.</div>
  <!-- Optional name & color -->
  <div class="panel-row" style="margin-bottom:8px;">
  <label style="width:60px;">Name</label>
@@ -1573,6 +1582,6 @@
  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
  <script src="https://unpkg.com/shpjs@latest/dist/shp.min.js"></script>
  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
- <script src="app.js?v=16.2"></script>
+ <script src="app.js?v=16.3"></script>
 </body>
 </html>
