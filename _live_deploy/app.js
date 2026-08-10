@@ -6902,6 +6902,7 @@ function renderSurveyLines() {
  // lines replaced by segments). Rendering that subset made acquired lines
  // vanish from the map on any redraw - draw from the cached full list instead.
  const allLines = (state._allLines && state._allLines.length) ? state._allLines : state.lines;
+ const hasObs = (state.obstructions || []).length > 0;
  allLines.forEach((line, idx) => {
  const ls = (state.lineStatus && state.lineStatus[line.id]) || { status: 'planned' };
  let lineColor = '#00ff88', lineOpacity = idx % 2 === 0 ? 0.9 : 0.7, lineWeight = 2.5, dashArr = null;
@@ -6911,9 +6912,47 @@ function renderSurveyLines() {
 
  const polyOpts = { color: lineColor, weight: lineWeight, opacity: lineOpacity };
  if (dashArr) polyOpts.dashArray = dashArr;
- const poly = L.polyline([line.start, line.end], polyOpts).addTo(layerSurveyLines);
- poly.on('click', () =>highlightLine(line.id));
 
+ // Gap the preplot where it crosses exclusions so the map never looks like
+ // acquisition runs straight through a hazard (route detours are separate).
+ let drawn = false;
+ if (hasObs && line.start && line.end) {
+  const hits = findLineObstructionIntersections(line.start, line.end);
+  if (hits && hits.length) {
+   hits.sort((a, b) => a.enterFrac - b.enterFrac);
+   let last = 0;
+   hits.forEach(h => {
+    const enter = Math.max(0, Math.min(1, h.enterFrac));
+    const exit = Math.max(0, Math.min(1, h.exitFrac));
+    if (enter > last + 1e-6) {
+     const a = interpolatePoint(line.start, line.end, last);
+     const b = interpolatePoint(line.start, line.end, enter);
+     const poly = L.polyline([a, b], polyOpts).addTo(layerSurveyLines);
+     poly.on('click', () => highlightLine(line.id));
+    }
+    // Sacrificed span through exclusion - faint red dashed remnant of preplot
+    if (exit > enter + 1e-6) {
+     const a = interpolatePoint(line.start, line.end, enter);
+     const b = interpolatePoint(line.start, line.end, exit);
+     L.polyline([a, b], {
+      color: '#e74c3c', weight: Math.max(1.5, lineWeight - 0.5),
+      opacity: 0.35, dashArray: '2,6', interactive: false
+     }).addTo(layerSurveyLines);
+    }
+    last = Math.max(last, exit);
+   });
+   if (last < 1 - 1e-6) {
+    const a = interpolatePoint(line.start, line.end, last);
+    const poly = L.polyline([a, line.end], polyOpts).addTo(layerSurveyLines);
+    poly.on('click', () => highlightLine(line.id));
+   }
+   drawn = true;
+  }
+ }
+ if (!drawn) {
+  const poly = L.polyline([line.start, line.end], polyOpts).addTo(layerSurveyLines);
+  poly.on('click', () =>highlightLine(line.id));
+ }
 
  // For partial lines, show the acquired portion as a dimmed overlay
  if (ls.status === 'partial' && ls.partialPct > 0) {
@@ -7905,21 +7944,41 @@ function densifyDetourWithMinTurnRadius(pathPts, joinHeadingDeg) {
  return out;
 }
 
-// Offset a closed polygon outward (or inward) by metres from its centroid.
-function offsetPolygonFromCentroid(poly, metres) {
+// Outward offset ring for routing clearance. Prefer proper edge-normal buffer
+// (works for irregular polygons); centroid push is a last-resort fallback.
+function offsetRingForClearance(poly, metres) {
  if (!poly || poly.length < 3 || !(metres > 0)) return poly ? poly.slice() : [];
- const cx = poly.reduce((s, p) => s + p[0], 0) / poly.length;
- const cy = poly.reduce((s, p) => s + p[1], 0) / poly.length;
- return poly.map(v => {
-  const brng = bearing([cx, cy], v);
-  return destinationPoint(v, brng, metres);
- });
+ let ring = null;
+ try { ring = bufferPolygon(poly, metres); } catch (_) { ring = null; }
+ if (!ring || ring.length < 3) {
+  const cx = poly.reduce((s, p) => s + p[0], 0) / poly.length;
+  const cy = poly.reduce((s, p) => s + p[1], 0) / poly.length;
+  ring = poly.map(v => destinationPoint(v, bearing([cx, cy], v), metres));
+ }
+ // Drop vertices that still sit inside the exclusion (bad miters / concave fails)
+ const cleaned = ring.filter(p => !pointInPolygon(p, poly));
+ return cleaned.length >= 3 ? cleaned : ring;
+}
+
+/** Densify a closed ring so the visibility graph has edge midpoints. */
+function densifyRing(ring, maxEdgeM) {
+ if (!ring || ring.length < 2) return ring || [];
+ const out = [];
+ const lim = Math.max(200, maxEdgeM || 800);
+ for (let i = 0; i < ring.length; i++) {
+  const a = ring[i], b = ring[(i + 1) % ring.length];
+  out.push(a);
+  const d = haversine(a, b);
+  const steps = Math.min(8, Math.floor(d / lim));
+  for (let s = 1; s <= steps; s++) out.push(interpolatePoint(a, b, s / (steps + 1)));
+ }
+ return out;
 }
 
 // Fallback walk around an obstruction: use vertices offset by clearance (>= R).
 function findClosestPolygonSide(start, end, poly, clearanceM) {
  const R = clearanceM != null ? clearanceM : getEffectiveTurnRadius();
- const ring = offsetPolygonFromCentroid(poly, Math.max(R, 500));
+ const ring = densifyRing(offsetRingForClearance(poly, Math.max(R, 500)), Math.max(R * 0.5, 400));
  // Try going "left" and "right" around the offset ring, pick shorter
  let nearStart = 0, nearEnd = 0;
  let dS = Infinity, dE = Infinity;
@@ -7981,12 +8040,10 @@ function computeDetourPath(detourStart, detourEnd, obstructionIdx) {
    const poly = getEffectivePolygon(state.obstructions[oi]);
    if (!poly || poly.length < 3) { allPolys.push(null); continue; }
    allPolys.push(poly);
-   const cx = poly.reduce((s, p) => s + p[0], 0) / poly.length;
-   const cy = poly.reduce((s, p) => s + p[1], 0) / poly.length;
-   poly.forEach((v, vi) => {
-    const brng = bearing([cx, cy], v);
-    const offset = destinationPoint(v, brng, clearance);
-    allVertices.push({ pt: offset, polyIdx: oi, vertIdx: vi });
+   const ring = densifyRing(offsetRingForClearance(poly, clearance), Math.max(clearance * 0.4, 400));
+   ring.forEach((pt, vi) => {
+    // Keep only vertices that are actually outside the exclusion
+    if (!pointInPolygon(pt, poly)) allVertices.push({ pt, polyIdx: oi, vertIdx: vi });
    });
   }
 
@@ -8067,15 +8124,23 @@ function computeDetourPath(detourStart, detourEnd, obstructionIdx) {
  const primary = (state.obstructions[obstructionIdx] && getEffectivePolygon(state.obstructions[obstructionIdx]))
   || (state.obstructions || []).map(getEffectivePolygon).find(p => p && p.length >= 3);
  if (primary) {
-  const alt = [detourStart, ...findClosestPolygonSide(detourStart, detourEnd, primary, Math.max(R, 500)), detourEnd];
-  if (!polylineHitsObstruction(alt) || alt.length > 3) return densifyDetourWithMinTurnRadius(alt);
+  // Try several clearances; pick the first clear walk
+  for (const c of [Math.max(R, 500), Math.max(R * 2, 1000), Math.max(R * 4, 2000)]) {
+   const walk = findClosestPolygonSide(detourStart, detourEnd, primary, c);
+   const alt = [detourStart, ...walk, detourEnd];
+   if (polylineHitsObstruction(alt)) continue;
+   const densified = densifyDetourWithMinTurnRadius(alt);
+   if (!polylineHitsObstruction(densified)) return densified;
+   return alt;
+  }
  }
 
  state._detourFailCount = (state._detourFailCount || 0) + 1;
- // Do NOT return a cutting start->end chord
- return [detourStart, ...findClosestPolygonSide(detourStart, detourEnd,
-  primary || [[detourStart[0], detourStart[1]], [detourEnd[0], detourEnd[1]], [detourStart[0], detourStart[1]]],
-  Math.max(R, 500)), detourEnd];
+ // Absolute last resort: still walk the offset ring (may graze) — never a bare chord
+ if (primary) {
+  return [detourStart, ...findClosestPolygonSide(detourStart, detourEnd, primary, Math.max(R, 500)), detourEnd];
+ }
+ return [detourStart, detourEnd];
 }
 
 /* (duplicate legacy detour helpers removed — see densifyDetourWithMinTurnRadius / computeDetourPath above) */
@@ -8119,41 +8184,35 @@ function sacrificedRangeFromDetour(lineStart, lineEnd, detourPts, lineSepM) {
  };
 }
 
-// ===== REROUTE PROMPT AFTER OBSTRUCTION CHANGE =====
+// ===== REROUTE AFTER OBSTRUCTION CHANGE =====
+// Always rebuild the route when an obstruction is installed. Optional toast
+// "Later" left the old acquisition path cutting straight through the new zone
+// (exactly what the map screenshot showed).
 function promptReroute() {
- // Only prompt if there'an existing route to update
- if (!state.route || state.lines.length === 0) return;
+ if (state.lines.length === 0) return;
 
- // Show a non-blocking confirmation toast with action button
- const toastEl = document.createElement('div');
- toastEl.style.cssText = `
- position: fixed; bottom: 60px; left: 50%; transform: translateX(-50%);
- background: #1e1e3a; border: 1px solid #e67e22; border-radius: 8px;
- padding: 14px 20px; z-index: 9999; box-shadow: 0 8px 32px rgba(0,0,0,0.6);
- display: flex; align-items: center; gap: 14px; max-width: 460px;
- `;
- toastEl.innerHTML = `
- <div style="font-size:12px;color:#e0e6f0;line-height:1.5">
- <strong style="color:#e67e22">Obstruction added.</strong><br>Re-route to avoid exclusion zones and update line/sq km stats?
- </div>
- <button id="btn-reroute-yes" style="background:#1abc9c;color:#fff;border:none;padding:8px 16px;border-radius:5px;cursor:pointer;font-size:12px;font-weight:600;white-space:nowrap">Re-route Now</button>
- <button id="btn-reroute-no" style="background:#2a2a50;color:#9090c0;border:1px solid #3a3a60;padding:8px 12px;border-radius:5px;cursor:pointer;font-size:11px;white-space:nowrap">Later</button>
- `;
- document.body.appendChild(toastEl);
+ // No existing plan yet - next Plan Route will apply exclusions.
+ if (!state.route || !state.route.length) {
+  showToast('Obstruction saved - it will be avoided on the next Plan Route.', 5000);
+  renderSurveyLines(); // gap preplot through the new exclusion immediately
+  return;
+ }
 
- document.getElementById('btn-reroute-yes').addEventListener('click', () => {
- document.body.removeChild(toastEl);
+ showToast('Obstruction saved - re-routing to avoid exclusion zones\u2026', 4000);
+ // Drop prior solution so detours cannot reuse stale survey chords.
  hardResetRouteState();
- planRoute();
- });
- document.getElementById('btn-reroute-no').addEventListener('click', () => {
- document.body.removeChild(toastEl);
- });
-
- // Auto-dismiss after 15 seconds
+ renderSurveyLines();
+ // Defer so the toast/obstruction layer paint before the planning overlay.
+ // Use executePlanRoute (not planRoute) so we do not re-ask 2D/3D confirm.
  setTimeout(() => {
- if (document.body.contains(toastEl)) document.body.removeChild(toastEl);
- }, 15000);
+  try {
+   if (typeof executePlanRoute === 'function') executePlanRoute();
+   else if (typeof planRoute === 'function') planRoute();
+  } catch (err) {
+   console.error('Auto re-route failed:', err);
+   showToast('Auto re-route failed - use Plan Route to avoid the obstruction.', 6000);
+  }
+ }, 80);
 }
 
 // ===== LAYER PANEL DRAWING (Add Features) =====
@@ -10520,7 +10579,12 @@ function executePlanRoute() {
  const route = computeRoute();
  state.route = route;
  renderRoute(route);
+ renderSurveyLines(); // refresh preplot gaps through exclusions
  showRouteStats(route);
+ const nDetours = (route || []).filter(w => w.type === 'obsAvoidStart' || w.type === 'transit-detour').length;
+ if ((state.obstructions || []).length && nDetours > 0) {
+  showToast(`Route rebuilt with ${nDetours} obstruction detour(s) at ${(getEffectiveTurnRadius() / 1000).toFixed(1)} km min turn radius`, 5000);
+ }
  if (state._detourFailCount > 0) {
   showToast(
    `Could not fully clear ${state._detourFailCount} obstruction detour(s) at ${(getEffectiveTurnRadius() / 1000).toFixed(1)} km min turn radius - check exclusion size vs turn radius`,
@@ -12309,6 +12373,7 @@ function renderRoute(waypoints) {
  layerAnnotations.clearLayers();
  if (layerArrows) layerArrows.clearLayers();
  if (!waypoints || waypoints.length === 0) return;
+ state._staleRouteObsHits = 0;
 
  const pts = waypoints.map(w =>w.pt);
 
@@ -12327,9 +12392,17 @@ function renderRoute(waypoints) {
  const col = timeGradientColor(frac);
 
  if (a.type === 'lineStart' && b.type === 'lineEnd' && a.lineName === b.lineName) {
- // Survey line segment - bold solid colour
- L.polyline([a.pt, b.pt], { color: col, weight: 3.5, opacity: 1.0 }).addTo(layerRoute);
- _addRouteArrow(a.pt, b.pt, col, layerArrows);
+ // Survey line segment - bold solid colour. Never paint acquisition through
+ // an exclusion (stale route before re-plan, or a missed intersection).
+ if ((state.obstructions || []).length && findLineObstructionIntersections(a.pt, b.pt).length) {
+  state._staleRouteObsHits = (state._staleRouteObsHits || 0) + 1;
+  L.polyline([a.pt, b.pt], {
+   color: '#e74c3c', weight: 2, opacity: 0.45, dashArray: '4,6'
+  }).addTo(layerRoute);
+ } else {
+  L.polyline([a.pt, b.pt], { color: col, weight: 3.5, opacity: 1.0 }).addTo(layerRoute);
+  _addRouteArrow(a.pt, b.pt, col, layerArrows);
+ }
  } else if (a.type === 'lineEnd' && b.type === 'runOutEnd' && a.lineName === b.lineName) {
  // Run-out - same colour as the survey line (part of acquisition)
  L.polyline([a.pt, b.pt], { color: col, weight: 3, opacity: 0.9, dashArray: '8,4' }).addTo(layerRoute);
@@ -12407,6 +12480,13 @@ function renderRoute(waypoints) {
  lineNum++;
  }
  });
+ }
+
+ if (state._staleRouteObsHits > 0) {
+  showToast(
+   `Route still crosses ${state._staleRouteObsHits} exclusion segment(s) - click Plan Route to rebuild detours`,
+   7000
+  );
  }
 }
 
