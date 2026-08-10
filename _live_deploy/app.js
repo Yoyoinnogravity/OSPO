@@ -7325,17 +7325,47 @@ function hideSurveyOverlay() {
 }
 
 // ===== SETTINGS APPLY =====
+/** Live min turn radius: prefer the open panel input so Apply is not required mid-plan. */
+function getEffectiveTurnRadius() {
+ const fromInput = parseFloat(document.getElementById('input-turn-radius')?.value);
+ if (isFinite(fromInput) && fromInput >= 100) {
+  if (state.settings.turnRadius !== fromInput) state.settings.turnRadius = fromInput;
+  return fromInput;
+ }
+ const fromCrit = parseFloat(document.getElementById('crit-radius')?.value);
+ if (isFinite(fromCrit) && fromCrit >= 100) {
+  if (state.settings.turnRadius !== fromCrit) state.settings.turnRadius = fromCrit;
+  return fromCrit;
+ }
+ const r = parseFloat(state.settings.turnRadius);
+ return (isFinite(r) && r >= 100) ? r : 3500;
+}
+
+function syncTurnRadiusUi() {
+ const r = getEffectiveTurnRadius();
+ state.settings.turnRadius = r;
+ const inp = document.getElementById('input-turn-radius');
+ if (inp && String(inp.value) !== String(r)) inp.value = r;
+ const val = document.getElementById('val-turn-radius');
+ if (val) val.textContent = (r / 1000).toFixed(1) + 'km';
+ const crit = document.getElementById('crit-radius');
+ if (crit && document.activeElement !== crit) crit.value = r;
+ return r;
+}
+
 function applyTurnRadius(saveAsDefault = false) {
  const v = parseFloat(document.getElementById('input-turn-radius').value);
  if (isFinite(v) && v > 0) {
  state.settings.turnRadius = v;
  document.getElementById('val-turn-radius').textContent = `${(v/1000).toFixed(1)} km`;
+ const crit = document.getElementById('crit-radius');
+ if (crit) crit.value = v;
  
  if (saveAsDefault) {
  localStorage.setItem('candooka_default_radius', v);
  showToast('Min Turn Radius saved as system default.');
  } else {
- showToast('Min Turn Radius applied.');
+ showToast('Min Turn Radius applied: ' + (v / 1000).toFixed(1) + ' km');
  }
  }
  hidePanel('turn-radius');
@@ -7781,43 +7811,274 @@ function crossTrackDistM(p, a, b) {
  return Math.abs(px * by - py * bx) / len;
 }
 
-// Densify a visibility-graph polyline with Dubins arcs so every turn
-// respects the vessel minimum turn radius (no sharp corners).
+// Densify a visibility-graph polyline so corners respect min turn radius R.
+// Fillet each interior vertex with a circular arc of radius R that stays on
+// the outside of the turn (same side as the path offset from the obstacle).
 function densifyDetourWithMinTurnRadius(pathPts, joinHeadingDeg) {
- const R = state.settings.turnRadius || 3500;
+ const R = getEffectiveTurnRadius();
  if (!pathPts || pathPts.length < 2) return pathPts || [];
  if (pathPts.length === 2) return [pathPts[0], pathPts[1]];
 
- const densified = [pathPts[0]];
- for (let i = 0; i < pathPts.length - 1; i++) {
- const a = pathPts[i];
- const b = pathPts[i + 1];
- const hdg1 = (i === 0)
- ? joinHeadingDeg
- : bearing(pathPts[i - 1], a);
- const hdg2 = (i === pathPts.length - 2)
- ? joinHeadingDeg
- : bearing(a, b);
+ const out = [pathPts[0]];
+ for (let i = 1; i < pathPts.length - 1; i++) {
+  const a = pathPts[i - 1];
+  const b = pathPts[i];
+  const c = pathPts[i + 1];
+  const dIn = haversine(a, b);
+  const dOut = haversine(b, c);
+  if (dIn < 5 || dOut < 5) { out.push(b); continue; }
 
- const midLat = (a[0] + b[0]) / 2;
- const midLon = (a[1] + b[1]) / 2;
- const mPerDegLat = 111320;
- const mPerDegLon = 111320 * Math.cos(midLat * Math.PI / 180);
- const x1 = (a[1] - midLon) * mPerDegLon;
- const y1 = (a[0] - midLat) * mPerDegLat;
- const x2 = (b[1] - midLon) * mPerDegLon;
- const y2 = (b[0] - midLat) * mPerDegLat;
- const th1 = (90 - hdg1) * Math.PI / 180;
- const th2 = (90 - hdg2) * Math.PI / 180;
- const local = dubinsShortestPath(x1, y1, th1, x2, y2, th2, R);
- const latLon = local.map(p => [
- midLat + p[1] / mPerDegLat,
- midLon + p[0] / mPerDegLon
- ]);
- for (let k = 1; k < latLon.length; k++) densified.push(latLon[k]);
+  const hdgIn = bearing(a, b);
+  const hdgOut = bearing(b, c);
+  let turn = ((hdgOut - hdgIn + 540) % 360) - 180; // -180..180
+  const absTurn = Math.abs(turn);
+  // Nearly straight: keep vertex
+  if (absTurn < 3) { out.push(b); continue; }
+
+  // Fillet geometry in local metres
+  const midLat = b[0], midLon = b[1];
+  const mPerDegLat = 111320;
+  const mPerDegLon = 111320 * Math.cos(midLat * Math.PI / 180);
+  const toXY = (p) => [(p[1] - midLon) * mPerDegLon, (p[0] - midLat) * mPerDegLat];
+  const toLL = (x, y) => [midLat + y / mPerDegLat, midLon + x / mPerDegLon];
+  const A = toXY(a), B = toXY(b), C = toXY(c);
+  const v1x = A[0] - B[0], v1y = A[1] - B[1];
+  const v2x = C[0] - B[0], v2y = C[1] - B[1];
+  const n1 = Math.hypot(v1x, v1y) || 1;
+  const n2 = Math.hypot(v2x, v2y) || 1;
+  const u1x = v1x / n1, u1y = v1y / n1;
+  const u2x = v2x / n2, u2y = v2y / n2;
+  // Half-angle for fillet distance along each edge: d = R / tan(theta/2)
+  const theta = absTurn * Math.PI / 180;
+  const half = theta / 2;
+  const tanHalf = Math.tan(half);
+  if (tanHalf < 1e-4) { out.push(b); continue; }
+  let d = R / tanHalf;
+  // Clamp so fillet stays on both edges
+  d = Math.min(d, n1 * 0.45, n2 * 0.45);
+  if (d < 2) { out.push(b); continue; }
+  const p1 = [B[0] + u1x * d, B[1] + u1y * d];
+  const p2 = [B[0] + u2x * d, B[1] + u2y * d];
+  // Arc centre: from p1, move R along inward normal of incoming edge
+  const left = turn > 0; // positive turn = clockwise in heading (north CW) => screen
+  // Incoming direction A->B in XY: -u1 (since u1 is B->A)
+  const ix = -u1x, iy = -u1y;
+  // Perp: left of travel = (-iy, ix), right = (iy, -ix) in CCW math coords
+  // Heading is CW from north; XY here is east=x, north=y. Travel A->B:
+  const tx = (B[0] - A[0]) / n1, ty = (B[1] - A[1]) / n1;
+  // Rotate 90 deg toward the INSIDE of the turn (toward C side)
+  // Cross product tx*u2y - ty*u2x tells which side C is on (CCW positive)
+  const cross = tx * u2y - ty * u2x; // u2 is B->C
+  // For a left (CCW) turn in XY, centre is to the left of travel: (-ty, tx)
+  const ccw = cross > 0;
+  const nx = ccw ? -ty : ty;
+  const ny = ccw ? tx : -tx;
+  const cx = p1[0] + nx * R;
+  const cy = p1[1] + ny * R;
+  const a0 = Math.atan2(p1[1] - cy, p1[0] - cx);
+  const a1 = Math.atan2(p2[1] - cy, p2[0] - cx);
+  let sweep = a1 - a0;
+  if (ccw) {
+   while (sweep < 0) sweep += Math.PI * 2;
+   while (sweep > Math.PI * 2) sweep -= Math.PI * 2;
+  } else {
+   while (sweep > 0) sweep -= Math.PI * 2;
+   while (sweep < -Math.PI * 2) sweep += Math.PI * 2;
+  }
+  // If sweep is wrong direction (reflex), flip
+  if (Math.abs(sweep) > Math.PI + 0.2) {
+   if (ccw) sweep -= Math.PI * 2;
+   else sweep += Math.PI * 2;
+  }
+  const steps = Math.max(4, Math.ceil(Math.abs(sweep) / (Math.PI / 18)));
+  out.push(toLL(p1[0], p1[1]));
+  for (let s = 1; s < steps; s++) {
+   const ang = a0 + sweep * (s / steps);
+   out.push(toLL(cx + Math.cos(ang) * R, cy + Math.sin(ang) * R));
+  }
+  out.push(toLL(p2[0], p2[1]));
  }
- return densified;
+ out.push(pathPts[pathPts.length - 1]);
+
+ // Prefer filleted path if clear; else fall back to original offset polyline
+ if (polylineHitsObstruction(out) && !polylineHitsObstruction(pathPts)) return pathPts;
+ return out;
 }
+
+// Offset a closed polygon outward (or inward) by metres from its centroid.
+function offsetPolygonFromCentroid(poly, metres) {
+ if (!poly || poly.length < 3 || !(metres > 0)) return poly ? poly.slice() : [];
+ const cx = poly.reduce((s, p) => s + p[0], 0) / poly.length;
+ const cy = poly.reduce((s, p) => s + p[1], 0) / poly.length;
+ return poly.map(v => {
+  const brng = bearing([cx, cy], v);
+  return destinationPoint(v, brng, metres);
+ });
+}
+
+// Fallback walk around an obstruction: use vertices offset by clearance (>= R).
+function findClosestPolygonSide(start, end, poly, clearanceM) {
+ const R = clearanceM != null ? clearanceM : getEffectiveTurnRadius();
+ const ring = offsetPolygonFromCentroid(poly, Math.max(R, 500));
+ // Try going "left" and "right" around the offset ring, pick shorter
+ let nearStart = 0, nearEnd = 0;
+ let dS = Infinity, dE = Infinity;
+ for (let i = 0; i < ring.length; i++) {
+ const ds = haversine(start, ring[i]);
+ const de = haversine(end, ring[i]);
+ if (ds < dS) { dS = ds; nearStart = i; }
+ if (de < dE) { dE = de; nearEnd = i; }
+ }
+
+ if (nearStart === nearEnd) return [ring[nearStart]];
+
+ const pathA = [];
+ let idx = nearStart;
+ while (idx !== nearEnd) {
+ pathA.push(ring[idx]);
+ idx = (idx + 1) % ring.length;
+ }
+ pathA.push(ring[nearEnd]);
+
+ const pathB = [];
+ idx = nearStart;
+ while (idx !== nearEnd) {
+ pathB.push(ring[idx]);
+ idx = (idx - 1 + ring.length) % ring.length;
+ }
+ pathB.push(ring[nearEnd]);
+
+ const lenA = pathLength(pathA);
+ const lenB = pathLength(pathB);
+ return lenA <= lenB ? pathA : pathB;
+}
+
+function pathLength(pts) {
+ let d = 0;
+ for (let i = 1; i < pts.length; i++) d += haversine(pts[i-1], pts[i]);
+ return d;
+}
+
+// Compute a detour path around obstructions using a multi-obstacle visibility graph
+// Routes around ALL active obstructions simultaneously, not just one.
+// Vertices are offset by at least the vessel min turn radius, then corners are
+// filleted to radius R so the path is physically feasible.
+function computeDetourPath(detourStart, detourEnd, obstructionIdx) {
+ const R = getEffectiveTurnRadius();
+ // Clearance must be >= R: a vessel with min turn radius R cannot hug a vertex
+ // at 0.15R without cutting an unrealistically sharp corner.
+ const clearances = [Math.max(R, 500), Math.max(R * 1.5, 750), Math.max(R * 2, 1000), Math.max(R * 3, 1500)];
+
+ let bestPath = null;
+ let bestLen = Infinity;
+ let anyAttempt = false;
+
+ for (const clearance of clearances) {
+  anyAttempt = true;
+  const allPolys = [];
+  const allVertices = [];
+  for (let oi = 0; oi < state.obstructions.length; oi++) {
+   const poly = getEffectivePolygon(state.obstructions[oi]);
+   if (!poly || poly.length < 3) { allPolys.push(null); continue; }
+   allPolys.push(poly);
+   const cx = poly.reduce((s, p) => s + p[0], 0) / poly.length;
+   const cy = poly.reduce((s, p) => s + p[1], 0) / poly.length;
+   poly.forEach((v, vi) => {
+    const brng = bearing([cx, cy], v);
+    const offset = destinationPoint(v, brng, clearance);
+    allVertices.push({ pt: offset, polyIdx: oi, vertIdx: vi });
+   });
+  }
+
+  if (allPolys.every(p => p === null)) return [detourStart, detourEnd];
+
+  const nodes = [detourStart, detourEnd, ...allVertices.map(v => v.pt)];
+  const nNodes = nodes.length;
+  const adjDist = Array.from({ length: nNodes }, () => new Array(nNodes).fill(Infinity));
+  for (let i = 0; i < nNodes; i++) {
+   for (let j = i + 1; j < nNodes; j++) {
+    if (segmentClearOfAllObstructions(nodes[i], nodes[j])) {
+     const d = haversine(nodes[i], nodes[j]);
+     adjDist[i][j] = d;
+     adjDist[j][i] = d;
+    }
+   }
+  }
+
+  const INF = Infinity;
+  const visited = new Array(nNodes).fill(false);
+  const best = new Array(nNodes).fill(INF);
+  const prev = new Array(nNodes).fill(-1);
+  best[0] = 0;
+
+  for (let step = 0; step < nNodes; step++) {
+   let u = -1, uDist = INF;
+   for (let i = 0; i < nNodes; i++) {
+    if (!visited[i] && best[i] < uDist) { u = i; uDist = best[i]; }
+   }
+   if (u === -1 || u === 1) break;
+   visited[u] = true;
+   for (let v = 0; v < nNodes; v++) {
+    if (!visited[v] && adjDist[u][v] < INF) {
+     const alt = best[u] + adjDist[u][v];
+     if (alt < best[v]) { best[v] = alt; prev[v] = u; }
+    }
+   }
+  }
+
+  let path;
+  if (best[1] === INF) {
+   const primaryPoly = allPolys[obstructionIdx] || allPolys.find(p => p);
+   if (primaryPoly) {
+    path = [detourStart, ...findClosestPolygonSide(detourStart, detourEnd, primaryPoly, clearance), detourEnd];
+   } else {
+    continue;
+   }
+  } else {
+   path = [];
+   let cur = 1;
+   while (cur !== -1) {
+    path.unshift(nodes[cur]);
+    cur = prev[cur];
+   }
+  }
+
+  // Ban pure chords that still cut exclusions
+  if (path.length === 2 && polylineHitsObstruction(path)) continue;
+  if (polylineHitsObstruction(path)) continue;
+
+  const densified = densifyDetourWithMinTurnRadius(path);
+  const usePath = (!polylineHitsObstruction(densified)) ? densified
+   : (!polylineHitsObstruction(path) ? path : null);
+  if (!usePath) continue;
+
+  const len = pathLength(usePath);
+  if (len < bestLen) {
+   bestLen = len;
+   bestPath = usePath;
+   // Prefer the smallest clearance that works (first success is fine)
+   break;
+  }
+ }
+
+ if (bestPath) return bestPath;
+
+ // Last resort: offset walk around primary obstacle — still R-aware, never a cutting chord
+ const primary = (state.obstructions[obstructionIdx] && getEffectivePolygon(state.obstructions[obstructionIdx]))
+  || (state.obstructions || []).map(getEffectivePolygon).find(p => p && p.length >= 3);
+ if (primary) {
+  const alt = [detourStart, ...findClosestPolygonSide(detourStart, detourEnd, primary, Math.max(R, 500)), detourEnd];
+  if (!polylineHitsObstruction(alt) || alt.length > 3) return densifyDetourWithMinTurnRadius(alt);
+ }
+
+ state._detourFailCount = (state._detourFailCount || 0) + 1;
+ // Do NOT return a cutting start->end chord
+ return [detourStart, ...findClosestPolygonSide(detourStart, detourEnd,
+  primary || [[detourStart[0], detourStart[1]], [detourEnd[0], detourEnd[1]], [detourStart[0], detourStart[1]]],
+  Math.max(R, 500)), detourEnd];
+}
+
+/* (duplicate legacy detour helpers removed — see densifyDetourWithMinTurnRadius / computeDetourPath above) */
 
 // Where the detour is more than 1x preplot line separation offline from the
 // planned survey line, that along-line span is sacrificed coverage.
@@ -7856,148 +8117,6 @@ function sacrificedRangeFromDetour(lineStart, lineEnd, detourPts, lineSepM) {
  distKm: ((toFrac - fromFrac) * lineDistM) / 1000,
  maxOfflineM: Math.max(...samples.map(s => s.offline))
  };
-}
-
-// Compute a detour path around obstructions using a multi-obstacle visibility graph
-// Routes around ALL active obstructions simultaneously, not just one.
-// Vertices are offset by at least the vessel min turn radius, then the polyline
-// is densified with Dubins arcs so turns are physically feasible.
-function computeDetourPath(detourStart, detourEnd, obstructionIdx) {
- const R = state.settings.turnRadius || 3500;
- // Clearance must be >= R: a vessel with min turn radius R cannot hug a vertex
- // at 0.15R without cutting an unrealistically sharp corner.
- const clearance = Math.max(R, 500);
-
- // Collect all effective polygons for the visibility graph
- const allPolys = [];
- const allVertices = []; // [{pt, polyIdx, vertIdx}]
- for (let oi = 0; oi < state.obstructions.length; oi++) {
- const poly = getEffectivePolygon(state.obstructions[oi]);
- if (!poly || poly.length < 3) { allPolys.push(null); continue; }
- allPolys.push(poly);
- const cx = poly.reduce((s, p) => s + p[0], 0) / poly.length;
- const cy = poly.reduce((s, p) => s + p[1], 0) / poly.length;
- poly.forEach((v, vi) => {
- const brng = bearing([cx, cy], v);
- const offset = destinationPoint(v, brng, clearance);
- allVertices.push({ pt: offset, polyIdx: oi, vertIdx: vi });
- });
- }
-
- if (allPolys.every(p => p === null)) return [detourStart, detourEnd];
-
- const nodes = [detourStart, detourEnd, ...allVertices.map(v => v.pt)];
- const nNodes = nodes.length;
-
- const adjDist = Array.from({ length: nNodes }, () => new Array(nNodes).fill(Infinity));
- for (let i = 0; i < nNodes; i++) {
- for (let j = i + 1; j < nNodes; j++) {
- if (segmentClearOfAllObstructions(nodes[i], nodes[j])) {
- const d = haversine(nodes[i], nodes[j]);
- adjDist[i][j] = d;
- adjDist[j][i] = d;
- }
- }
- }
-
- const INF = Infinity;
- const visited = new Array(nNodes).fill(false);
- const best = new Array(nNodes).fill(INF);
- const prev = new Array(nNodes).fill(-1);
- best[0] = 0;
-
- for (let step = 0; step < nNodes; step++) {
- let u = -1, uDist = INF;
- for (let i = 0; i < nNodes; i++) {
- if (!visited[i] && best[i] < uDist) { u = i; uDist = best[i]; }
- }
- if (u === -1 || u === 1) break;
- visited[u] = true;
- for (let v = 0; v < nNodes; v++) {
- if (!visited[v] && adjDist[u][v] < INF) {
- const alt = best[u] + adjDist[u][v];
- if (alt < best[v]) { best[v] = alt; prev[v] = u; }
- }
- }
- }
-
- let path;
- if (best[1] === INF) {
- const primaryPoly = allPolys[obstructionIdx];
- if (primaryPoly) {
- path = [detourStart, ...findClosestPolygonSide(detourStart, detourEnd, primaryPoly), detourEnd];
- } else {
- path = [detourStart, detourEnd];
- }
- } else {
- path = [];
- let cur = 1;
- while (cur !== -1) {
- path.unshift(nodes[cur]);
- cur = prev[cur];
- }
- }
-
- const joinHdg = bearing(detourStart, detourEnd);
- const densified = densifyDetourWithMinTurnRadius(path, joinHdg);
- // Never densify into an obstruction: Dubins short-cutting can re-enter the
- // exclusion zone. Prefer the clear visibility path when that happens.
- if (polylineHitsObstruction(densified) && !polylineHitsObstruction(path)) return path;
- // Absolute ban on pure start->end chords that still cut exclusion zones.
- if (path.length === 2 && polylineHitsObstruction(path)) {
-  const primaryPoly = allPolys[obstructionIdx] || allPolys.find(p => p);
-  if (primaryPoly) {
-   const side = findClosestPolygonSide(detourStart, detourEnd, primaryPoly);
-   const alt = [detourStart, ...side, detourEnd];
-   if (!polylineHitsObstruction(alt) || alt.length > 2) return alt;
-  }
- }
- return densified;
-}
-
-// Fallback: pick polygon vertices that form shortest walk around the obstruction
-function findClosestPolygonSide(start, end, poly) {
- // Try going "left" and "right" around the polygon, pick shorter
- // Find nearest vertex to start and end
- let nearStart = 0, nearEnd = 0;
- let dS = Infinity, dE = Infinity;
- for (let i = 0; i < poly.length; i++) {
- const ds = haversine(start, poly[i]);
- const de = haversine(end, poly[i]);
- if (ds < dS) { dS = ds; nearStart = i; }
- if (de < dE) { dE = de; nearEnd = i; }
- }
-
- if (nearStart === nearEnd) return [poly[nearStart]];
-
- // Path A: nearStart ' nearEnd clockwise
- const pathA = [];
- let idx = nearStart;
- while (idx !== nearEnd) {
- pathA.push(poly[idx]);
- idx = (idx + 1) % poly.length;
- }
- pathA.push(poly[nearEnd]);
-
- // Path B: nearStart ' nearEnd counter-clockwise
- const pathB = [];
- idx = nearStart;
- while (idx !== nearEnd) {
- pathB.push(poly[idx]);
- idx = (idx - 1 + poly.length) % poly.length;
- }
- pathB.push(poly[nearEnd]);
-
- // Pick shorter
- const lenA = pathLength(pathA);
- const lenB = pathLength(pathB);
- return lenA <= lenB ? pathA : pathB;
-}
-
-function pathLength(pts) {
- let d = 0;
- for (let i = 1; i < pts.length; i++) d += haversine(pts[i-1], pts[i]);
- return d;
 }
 
 // ===== REROUTE PROMPT AFTER OBSTRUCTION CHANGE =====
@@ -10381,6 +10500,10 @@ function planRoute() {
 function executePlanRoute() {
  if (state.lines.length === 0) return;
 
+ // Pull min turn radius from the open UI so Apply is not required for detours
+ syncTurnRadiusUi();
+ state._detourFailCount = 0;
+
  // Ensure replan does not blend with a previous solution.
  state.route = null;
  state.skippedRanges = [];
@@ -10398,6 +10521,12 @@ function executePlanRoute() {
  state.route = route;
  renderRoute(route);
  showRouteStats(route);
+ if (state._detourFailCount > 0) {
+  showToast(
+   `Could not fully clear ${state._detourFailCount} obstruction detour(s) at ${(getEffectiveTurnRadius() / 1000).toFixed(1)} km min turn radius - check exclusion size vs turn radius`,
+   8000
+  );
+ }
  // Report deep-optimizer performance (auto/2D optimizer only)
  const os = state._optimizerStats;
  if (os && os.mode === 'nn') {
@@ -10489,7 +10618,7 @@ function dubinsPathLengthM(x1, y1, th1, x2, y2, th2, R) {
 // TIME: a geometrically "close" adjacent line that needs a loop turn is
 // correctly costed as expensive.
 function buildTransitTimeModel(lines) {
- const R = state.settings.turnRadius || 3500;
+ const R = getEffectiveTurnRadius();
  const turnKn = state.settings.turnSpeed || state.settings.speed || 4.5;
  const turnSpeedMs = turnKn * 0.514444; // knots ' m/s
  const runIn = state.settings.runIn || 0;
@@ -10610,6 +10739,7 @@ function optimizeSwathInterleave(swaths, revOf, transitTimeSec, forceStartSwath)
 }
 
 function computeRoute() {
+ syncTurnRadiusUi();
  // Filter out acquired lines from route planning
  const originalCount = state.lines.length;
  const lines = state.lines.filter(l => {
@@ -11708,7 +11838,7 @@ function computeRoute() {
 
  const lineDistM = haversine(s, e);
  const lineDistKm = lineDistM / 1000;
- const R = state.settings.turnRadius || 3500; // min turn radius in metres
+ const R = getEffectiveTurnRadius(); // min turn radius in metres
  // True preplot line separation (not swath width stored in settings.lineSpacing)
  const lineSep = getPreplotLineSeparationM();
 
@@ -11867,7 +11997,7 @@ function computeArcTurn(waypoints, i) {
  if (dist < 10) return [a.pt, b.pt];
 
  // Use configured turn radius - vessel cannot turn tighter than this
- const R = state.settings.turnRadius || 3500; // metres
+ const R = getEffectiveTurnRadius(); // metres
 
  // Determine headings (in degrees, clockwise from north)
  let hdg1 = bearing(a.pt, b.pt); // fallback
@@ -12073,7 +12203,7 @@ function dubinsGeneratePoints(x1, y1, th1, segments, R, phi) {
 // Compute actual Dubins path distance (in metres) for a transit between two route segments
 function computeDubinsTransitDist(waypoints, startIdx, endIdx) {
  if (endIdx <= startIdx) return 0;
- const R = state.settings.turnRadius || 3500;
+ const R = getEffectiveTurnRadius();
  let totalDist = 0;
  for (let i = startIdx; i < endIdx; i++) {
  const a = waypoints[i], b = waypoints[i + 1];
@@ -12959,7 +13089,18 @@ if (savedInfillCostMode) {
 }
 
 const turnRadiusEl = document.getElementById('input-turn-radius');
-if (turnRadiusEl) turnRadiusEl.value = state.settings.turnRadius;
+if (turnRadiusEl) {
+ turnRadiusEl.value = state.settings.turnRadius;
+ turnRadiusEl.addEventListener('change', () => syncTurnRadiusUi());
+ turnRadiusEl.addEventListener('input', () => {
+  const v = parseFloat(turnRadiusEl.value);
+  if (isFinite(v) && v >= 100) {
+   state.settings.turnRadius = v;
+   const val = document.getElementById('val-turn-radius');
+   if (val) val.textContent = (v / 1000).toFixed(1) + 'km';
+  }
+ });
+}
 
 const speedEl = document.getElementById('input-speed');
 if (speedEl) speedEl.value = state.settings.speed;
