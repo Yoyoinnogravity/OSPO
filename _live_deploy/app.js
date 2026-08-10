@@ -22567,6 +22567,44 @@ var _foldOverlayOpacity = 0.7; // basemap overlay opacity
 var _foldOverlayLayer = null; // L.imageOverlay instance
 var _foldZoom = 1; // in-panel fold map zoom factor (1 = fit)
 var _foldFilesOpen = false; // files dropdown menu expanded
+var _foldBytesLoaded = 0; // cumulative P1 bytes loaded this fold session
+var FOLD_FREE_LIMIT_BYTES = 2 * 1024 * 1024 * 1024; // 2 GB unless upgraded
+
+function _foldHasUpgrade() {
+ const u = (typeof currentUser === 'object' && currentUser) ? currentUser : null;
+ const role = String((u && u.role) || '').toLowerCase();
+ // Paid / commercial roles unlock larger coverage-plot sessions
+ if (role.includes('enterprise') || role.includes('commercial') || role.includes('pro')) return true;
+ if (role.includes('senior surveyor') || role === 'admin') return true;
+ return false;
+}
+
+function _foldFmtBytes(n) {
+ if (!(n > 0)) return '0 MB';
+ if (n >= 1024 * 1024 * 1024) return (n / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
+ return (n / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+function _foldUpdateLimitBanner() {
+ const usageEl = document.getElementById('fold-limit-usage');
+ const banner = document.getElementById('fold-limit-banner');
+ if (!banner) return;
+ if (_foldHasUpgrade()) {
+  banner.style.borderColor = 'rgba(48,209,88,0.45)';
+  banner.style.background = 'rgba(48,209,88,0.08)';
+  if (usageEl) {
+   usageEl.innerHTML = ` Upgraded account - no 2 GB cap. Loaded this session: <strong style="color:#fff;">${_foldFmtBytes(_foldBytesLoaded)}</strong>.`;
+  }
+  return;
+ }
+ banner.style.borderColor = 'rgba(255,214,10,0.45)';
+ banner.style.background = 'rgba(255,214,10,0.08)';
+ const left = Math.max(0, FOLD_FREE_LIMIT_BYTES - _foldBytesLoaded);
+ if (usageEl) {
+  usageEl.innerHTML = ` Used <strong style="color:#fff;">${_foldFmtBytes(_foldBytesLoaded)}</strong> of 2 GB` +
+   (left > 0 ? ` (<strong style="color:#fff;">${_foldFmtBytes(left)}</strong> remaining).` : ' - limit reached.');
+ }
+}
 
 function foldToggleFileList() {
  _foldFilesOpen = !_foldFilesOpen;
@@ -22578,6 +22616,7 @@ function foldToggleFileList() {
 
 function showFoldCoverage() {
  togglePanel('fold-coverage');
+ _foldUpdateLimitBanner();
  _foldRender();
 }
 
@@ -22599,7 +22638,9 @@ function _foldLockUI(lock) {
 function foldReset() {
  _fold = null;
  _foldOverlayOn = false;
+ _foldBytesLoaded = 0;
  _foldLockUI(false);
+ _foldUpdateLimitBanner();
  _foldRender();
 }
 
@@ -23147,6 +23188,40 @@ async function foldAddFiles(event) {
  const files = Array.from(event.target.files || []);
  event.target.value = '';
  if (files.length === 0) return;
+
+ // Free tier: remind and enforce 2 GB cumulative P1 load unless upgraded
+ if (!_foldHasUpgrade()) {
+  const batchBytes = files.reduce((s, f) => s + (f.size || 0), 0);
+  const nextTotal = _foldBytesLoaded + batchBytes;
+  if (nextTotal > FOLD_FREE_LIMIT_BYTES) {
+   const over = nextTotal - FOLD_FREE_LIMIT_BYTES;
+   showToast(
+    `Coverage plots are limited to 2 GB unless you upgrade. ` +
+    `This batch would add ${_foldFmtBytes(batchBytes)} (session ${_foldFmtBytes(_foldBytesLoaded)} → ${_foldFmtBytes(nextTotal)}, ` +
+    `${_foldFmtBytes(over)} over). Open Licensing to upgrade.`,
+    9000
+   );
+   _foldUpdateLimitBanner();
+   // Still allow partial load of files that fit under the remaining budget
+   let remain = Math.max(0, FOLD_FREE_LIMIT_BYTES - _foldBytesLoaded);
+   if (remain <= 0) return;
+   const allowed = [];
+   for (const f of files) {
+    if ((f.size || 0) <= remain) {
+     allowed.push(f);
+     remain -= (f.size || 0);
+    } else {
+     showToast(`Skipped "${f.name}" (${_foldFmtBytes(f.size)}) - would exceed the 2 GB limit.`, 5000);
+    }
+   }
+   if (!allowed.length) return;
+   files.length = 0;
+   allowed.forEach(f => files.push(f));
+  } else if (_foldBytesLoaded === 0) {
+   showToast('Reminder: coverage plots handle up to 2 GB unless you upgrade.', 4500);
+  }
+ }
+
  // Sequential + streamed: one file (in 8 MB slices) in memory at a time,
  // so a large batch import cannot exhaust memory. Peak usage is O(bins).
  for (let k = 0; k < files.length; k++) {
@@ -23160,14 +23235,19 @@ async function foldAddFiles(event) {
  if (parser.err) { showToast(parser.err, 6000); continue; }
  await _foldReadLines(f, parser.line);
  const r = parser.finish(true); // defer rebuild to the end of the batch
- if (!r.ok) showToast(r.msg, 6000);
- else if (r.warn) showToast(r.warn, 6000);
+ if (!r.ok) {
+  showToast(r.msg, 6000);
+ } else {
+  _foldBytesLoaded += (f.size || 0);
+  if (r.warn) showToast(r.warn, 6000);
+ }
  } catch (err) {
  console.error('Fold parse error:', err);
  showToast(`Failed to process "${f.name}": ${err.message}`, 5000);
  }
  }
  _foldRebuild();
+ _foldUpdateLimitBanner();
  _foldRender();
  if (files.length > 1) showToast(`Batch import done - ${files.length} file(s) processed.`, 3500);
 }

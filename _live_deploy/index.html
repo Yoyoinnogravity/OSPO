@@ -731,7 +731,15 @@
  <div id="panel-fold-coverage" class="settings-panel" style="display:none; width:840px; max-width:94vw; max-height:88vh; overflow-y:auto;">
  <button class="panel-close-btn" onclick="hidePanel('fold-coverage')">&times;</button>
  <div class="panel-title">Fold of Coverage - CMP Bin Maps</div>
- <div style="font-size:11px;color:#a0aebb;margin-bottom:10px;line-height:1.4;">Builds CMP fold maps from P1 files containing shot (S) and receiver group (R) records. Each shot-channel midpoint is binned on the grid below, split into offset quarters of the cable (nears / near-mids / far-mids / fars / alls). Fold accumulates across every file you add - load the next sequence to build up coverage. Files are processed locally.
+ <div style="font-size:11px;color:#a0aebb;margin-bottom:8px;line-height:1.4;">Builds CMP fold maps from P1 files containing shot (S) and receiver group (R) records. Each shot-channel midpoint is binned on the grid below, split into offset quarters of the cable (nears / near-mids / far-mids / fars / alls). Fold accumulates across every file you add - load the next sequence to build up coverage. Files are processed locally.
+ </div>
+ <div id="fold-limit-banner" style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:10px;padding:8px 10px;border-radius:5px;border:1px solid rgba(255,214,10,0.45);background:rgba(255,214,10,0.08);">
+  <div style="font-size:11px;color:#e8e0b0;line-height:1.45;">
+   <strong style="color:#ffd60a;">Coverage plot limit:</strong>
+   This session can process up to <strong style="color:#fff;">2 GB</strong> of P1 / fold data unless you upgrade.
+   <span id="fold-limit-usage" style="color:#a0aebb;"></span>
+  </div>
+  <button type="button" onclick="hidePanel('fold-coverage'); togglePanel('licensing');" style="flex-shrink:0;padding:5px 10px;border-radius:4px;border:1px solid #00d2ff;background:#0a1a2a;color:#00d2ff;font-size:10px;font-weight:700;cursor:pointer;white-space:nowrap;">Upgrade</button>
  </div>
  <div style="display:flex; gap:12px; margin-bottom:10px; flex-wrap:wrap; align-items:center; font-size:10px; color:#8a9bb0;">
  <span style="font-weight:700;color:#a0aebb;">Bin grid:</span>
@@ -1583,6 +1591,6 @@
  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
  <script src="https://unpkg.com/shpjs@latest/dist/shp.min.js"></script>
  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
- <script src="app.js?v=16.6"></script>
+ <script src="app.js?v=16.7"></script>
 </body>
 </html>
