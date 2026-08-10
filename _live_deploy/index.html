@@ -279,8 +279,9 @@
  <div class="t1-right" style="flex-shrink: 0; display: flex; align-items: center; gap: 12px;">
  <!-- Secure Discreet Admin DB Access -->
  <button class="t1-admin" onclick="showAdminLogin()" style="background:transparent; border:none; color:#7c8c9e; font-size:9px; cursor:pointer; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; outline:none; transition:color 0.12s; margin-right:4px; font-family:inherit;">Admin DB</button>
- <span id="user-display" style="display:none; font-size:10px; color:#8a9bb0; font-weight:600; margin-right:4px;"></span>
- <button id="btn-logout" class="t1-logout" onclick="logoutUser()" style="display:none; background:transparent; border:none; color:#ff453a; font-size:9px; cursor:pointer; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; outline:none; transition:color 0.12s; font-family:inherit;">Logout</button>
+ <span id="user-display" style="display:none; font-size:10px; color:#8a9bb0; font-weight:600; margin-right:2px; max-width:140px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"></span>
+ <button id="btn-logout" class="t1-logout" onclick="logoutUser()" title="Log out and clear session"
+  style="display:none; align-items:center; gap:4px; background:#1a1a24; border:1px solid #ff453a; color:#ff453a; font-size:10px; cursor:pointer; font-weight:700; text-transform:uppercase; letter-spacing:0.4px; outline:none; font-family:inherit; padding:4px 10px; border-radius:3px; height:24px;">Logout</button>
  <span class="t1-status"><span class="dot-green"></span>ONLINE</span>
  <button class="t1-icon" onclick="togglePanel('settings-popup')" title="Settings" style="margin: 0;">&#9881;</button>
  </div>
@@ -1582,6 +1583,6 @@
  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
  <script src="https://unpkg.com/shpjs@latest/dist/shp.min.js"></script>
  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
- <script src="app.js?v=16.5"></script>
+ <script src="app.js?v=16.6"></script>
 </body>
 </html>

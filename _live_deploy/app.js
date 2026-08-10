@@ -14020,28 +14020,128 @@ function adminLogout() {
 }
 
 function logoutUser() {
- const user = state.currentUser || 'Guest';
- if (user === 'Guest') {
- showToast('No active session to log out');
- return;
+ // Confirm: logout clears the workspace so the next sign-in starts clean
+ const hasWork = (state.lines && state.lines.length > 0) ||
+  (state.route && state.route.length > 0) ||
+  (state.obstructions && state.obstructions.length > 0);
+ if (hasWork) {
+  if (confirm('Save your current plan before logging out?')) {
+   const user = state.currentUser || 'Guest';
+   const defaultName = `${user} ${fmtD24(new Date())}`;
+   const name = (prompt('Plan name:', defaultName) || '').trim();
+   if (name) {
+    try { saveCurrentPlanAs(name); } catch (err) { console.warn('Save before logout failed:', err); }
+   }
+  }
+  if (!confirm('Log out and clear the current session (lines, route, obstructions)?\n\nYou can sign back in to start fresh.')) {
+   return;
+  }
  }
 
- // Prompt to save the current session before signing out
- if (state.lines && state.lines.length > 0) {
- if (confirm('Save your current plan before logging out?')) {
- const defaultName = `${user} ${fmtD24(new Date())}`;
- const name = (prompt('Plan name:', defaultName) || '').trim();
- if (name) saveCurrentPlanAs(name);
- }
- }
+ resetWorkspaceForLogout();
 
  state.currentUser = 'Guest';
+ window.currentUser = null;
  adminLoggedIn = false;
  updateAdminButton();
  updateUserDisplay();
+
+ // Clear sign-in form and show overlay for a fresh login
+ const userEl = document.getElementById('signin-username');
+ const passEl = document.getElementById('signin-password');
+ const errEl = document.getElementById('signin-error');
+ if (userEl) userEl.value = '';
+ if (passEl) passEl.value = '';
+ if (errEl) { errEl.textContent = ''; errEl.style.display = 'none'; }
+ if (typeof switchSignInTab === 'function') {
+  try { switchSignInTab('login'); } catch (_) {}
+ }
+
  const overlay = document.getElementById('signin-overlay');
- if (overlay) overlay.style.display = 'flex';
- showToast('Logged out');
+ if (overlay) {
+  overlay.style.display = 'flex';
+  overlay.style.zIndex = '9999';
+ }
+ // Bring sign-in to front above any leftover panels
+ document.querySelectorAll('.settings-panel').forEach(p => {
+  if (p.style.display !== 'none') p.style.display = 'none';
+ });
+
+ showToast('Logged out - sign in again to continue', 4000);
+ setTimeout(() => {
+  try { if (passEl) passEl.blur(); if (userEl) userEl.focus(); } catch (_) {}
+ }, 80);
+}
+
+/** Wipe in-memory survey session so the next login starts clean. */
+function resetWorkspaceForLogout() {
+ try {
+  if (typeof hardResetRouteState === 'function') hardResetRouteState();
+ } catch (_) {}
+
+ state.lines = [];
+ state._allLines = null;
+ state.route = null;
+ state.obstructions = [];
+ state.userFeatures = [];
+ state.skippedRanges = [];
+ state.lineStatus = {};
+ state.rawText = null;
+ state.rawRows = null;
+ state._optimizerStats = null;
+ state._plannedDir = null;
+ state._detourFailCount = 0;
+ state._staleRouteObsHits = 0;
+ if (state.settings) {
+  state.settings.startConfigured = false;
+  state.settings.startPoint = null;
+  state.settings.startLineId = null;
+  state.settings.startLineIdx = null;
+ }
+ _startLineChooserShown = false;
+
+ // Clear map layers
+ try {
+  if (layerSurveyLines) layerSurveyLines.clearLayers();
+  if (layerRoute) layerRoute.clearLayers();
+  if (layerLabels) layerLabels.clearLayers();
+  if (layerAnnotations) layerAnnotations.clearLayers();
+  if (layerObstructions) layerObstructions.clearLayers();
+  if (layerArrows) layerArrows.clearLayers();
+  if (typeof layerSwaths !== 'undefined' && layerSwaths) layerSwaths.clearLayers();
+  if (typeof layerStartPoint !== 'undefined' && layerStartPoint) layerStartPoint.clearLayers();
+  if (typeof layerAcqRoute !== 'undefined' && layerAcqRoute) layerAcqRoute.clearLayers();
+ } catch (_) {}
+
+ // Clear user overlay layers list if present
+ try {
+  if (typeof userLayers !== 'undefined' && Array.isArray(userLayers)) {
+   userLayers.forEach(ul => {
+    try {
+     if (ul && ul.leafletLayer && map) map.removeLayer(ul.leafletLayer);
+    } catch (_) {}
+   });
+   userLayers.length = 0;
+   if (typeof selectedUserLayerIdx !== 'undefined') selectedUserLayerIdx = -1;
+   if (typeof renderUserLayersList === 'function') renderUserLayersList();
+  }
+ } catch (_) {}
+
+ // Hide route stats / survey summary chrome
+ try {
+  const stats = document.getElementById('route-stats');
+  if (stats) stats.style.display = 'none';
+  const sum = document.getElementById('survey-summary');
+  if (sum) sum.style.display = 'none';
+  if (typeof updateSurveyList === 'function') updateSurveyList();
+  if (typeof updateSurveySummary === 'function') updateSurveySummary();
+  if (typeof updateObstructionList === 'function') updateObstructionList();
+ } catch (_) {}
+
+ // Clear file inputs so the same file can be re-chosen after re-login
+ try {
+  document.querySelectorAll('input[type="file"]').forEach(inp => { try { inp.value = ''; } catch (_) {} });
+ } catch (_) {}
 }
 
 function updateAdminButton() {
@@ -14061,16 +14161,23 @@ function updateAdminButton() {
 function updateUserDisplay() {
  const el = document.getElementById('user-display');
  const logoutBtn = document.getElementById('btn-logout');
+ const overlay = document.getElementById('signin-overlay');
+ const signedIn = overlay && overlay.style.display === 'none';
  const user = state.currentUser || 'Guest';
  if (!el || !logoutBtn) return;
- if (user === 'Guest') {
- el.style.display = 'none';
- logoutBtn.style.display = 'none';
+
+ // Always show Logout once the sign-in overlay is dismissed (including Guest)
+ if (signedIn) {
+  const name = (typeof currentUser === 'object' && currentUser && currentUser.name)
+   ? currentUser.name
+   : (user === 'Guest' ? 'Guest' : user);
+  el.textContent = name;
+  el.style.display = 'inline';
+  logoutBtn.style.display = 'inline-flex';
+  logoutBtn.setAttribute('title', 'Log out and clear session - sign back in to start fresh');
  } else {
- const name = (typeof currentUser === 'object' && currentUser && currentUser.name) ? currentUser.name : user;
- el.textContent = name;
- el.style.display = 'inline';
- logoutBtn.style.display = 'inline';
+  el.style.display = 'none';
+  logoutBtn.style.display = 'none';
  }
 }
 
