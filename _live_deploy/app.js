@@ -196,6 +196,7 @@ const state = {
  lines: [], // { id, name, start: [lat,lon], end: [lat,lon] }
  obstructions: [], // { id, name, polygon: [[lat,lon],...] }
  userFeatures: [], // { id, name, type, polygon/center, exclusionZone } (non-obstruction reference)
+ obnNodes: [], // OBN seabed nodes { id, name, lat, lon }
  skippedRanges: [], // { lineName, fromFrac, toFrac, distKm }
  settings: {
  turnRadius: 3500, // metres
@@ -439,7 +440,7 @@ function getBathymetry(lat, lon) {
 
 // ===== MAP SETUP (Leaflet - initially hidden) =====
 var map = null;
-var layerSurveyLines, layerRoute, layerLabels, layerAnnotations, layerObstructions, layerArrows, layerSwaths, layerStartPoint, layerRayTrace;
+var layerSurveyLines, layerRoute, layerLabels, layerAnnotations, layerObstructions, layerArrows, layerSwaths, layerStartPoint, layerRayTrace, layerObnNodes;
 
 // Dates and times are shown one way only, so a date can never be read the
 // wrong way round and a time can never be mistaken for am/pm: the month is
@@ -525,6 +526,7 @@ function initLeafletMap() {
  layerSwaths = L.layerGroup().addTo(map);
  layerStartPoint = L.layerGroup().addTo(map);
  layerRayTrace = L.layerGroup().addTo(map);
+ layerObnNodes = L.layerGroup().addTo(map);
 
  // Map events
  map.on('mousemove', e => {
@@ -791,6 +793,82 @@ var _ppgDrawing = false;
 var _ppgDrawPoints = [];
 var _ppgDrawMarkers = [];
 var _ppgDrawPolyline = null;
+var _ppgEditNodes = []; // OBN node patch [{id,name,lat,lon}]
+var layerObnNodes = null;
+
+/** Build a regular OBN node grid inside the current AOI / centre patch. */
+function _ppgComputeObnNodes() {
+ const dx = Math.max(10, parseFloat(document.getElementById('ppg-obn-dx')?.value) || 400);
+ const dy = Math.max(10, parseFloat(document.getElementById('ppg-obn-dy')?.value) || 400);
+ const prefix = document.getElementById('ppg-obn-prefix')?.value || 'N-';
+ const startNum = parseInt(document.getElementById('ppg-obn-start')?.value, 10) || 1;
+ const mode = document.getElementById('ppg-mode')?.value || 'polygon';
+ const nodes = [];
+
+ let south, north, west, east, cLat, cLon;
+ if (mode === 'polygon') {
+  if (!_ppgPolygon || _ppgPolygon.length < 3) return [];
+  const lats = _ppgPolygon.map(p => p[0]);
+  const lons = _ppgPolygon.map(p => p[1]);
+  south = Math.min(...lats); north = Math.max(...lats);
+  west = Math.min(...lons); east = Math.max(...lons);
+  cLat = (south + north) / 2;
+  cLon = (west + east) / 2;
+ } else {
+  cLat = parseFloat(document.getElementById('ppg-lat')?.value);
+  cLon = parseFloat(document.getElementById('ppg-lon')?.value);
+  const length = parseFloat(document.getElementById('ppg-length')?.value) || 10000;
+  const count = parseInt(document.getElementById('ppg-count')?.value, 10) || 20;
+  const spacing = parseFloat(document.getElementById('ppg-spacing')?.value) || 300;
+  if (!isFinite(cLat) || !isFinite(cLon)) return [];
+  const halfLen = length / 2;
+  const halfW = ((count - 1) * spacing) / 2;
+  // Approximate lat/lon box around centre
+  const mPerDegLat = 111320;
+  const mPerDegLon = 111320 * Math.cos(cLat * Math.PI / 180);
+  south = cLat - halfLen / mPerDegLat;
+  north = cLat + halfLen / mPerDegLat;
+  west = cLon - halfW / mPerDegLon;
+  east = cLon + halfW / mPerDegLon;
+ }
+
+ const mPerDegLat = 111320;
+ const mPerDegLon = Math.max(1e-6, 111320 * Math.cos(cLat * Math.PI / 180));
+ const nRows = Math.max(1, Math.floor(((north - south) * mPerDegLat) / dy) + 1);
+ const nCols = Math.max(1, Math.floor(((east - west) * mPerDegLon) / dx) + 1);
+ // Cap runaway grids
+ if (nRows * nCols > 50000) {
+  showToast('Node grid too dense - increase node spacing (max 50,000 nodes)', 6000);
+  return [];
+ }
+
+ let num = startNum;
+ for (let r = 0; r < nRows; r++) {
+  const lat = south + (r * dy) / mPerDegLat;
+  for (let c = 0; c < nCols; c++) {
+   const lon = west + (c * dx) / mPerDegLon;
+   if (mode === 'polygon' && typeof pointInPolygon === 'function') {
+    if (!pointInPolygon([lat, lon], _ppgPolygon)) continue;
+   }
+   const name = sanitizeLineName(
+    prefix + String(num).padStart(Math.max(3, String(startNum + nRows * nCols).length), '0'),
+    'N' + String(num).padStart(3, '0')
+   );
+   nodes.push({ id: nodes.length, name, lat, lon });
+   num++;
+  }
+ }
+ return nodes;
+}
+
+function _ppgDrawNodesOnLayer(layer, nodes) {
+ if (!layer || !nodes || !nodes.length) return;
+ nodes.forEach(n => {
+  L.circleMarker([n.lat, n.lon], {
+   radius: 3, color: '#0ea5e9', weight: 1, fillColor: '#38bdf8', fillOpacity: 0.95
+  }).bindTooltip(n.name, { permanent: false, direction: 'top' }).addTo(layer);
+ });
+}
 
 function generatePreplot() {
  // Ensure map is initialized synchronously so polygon drawing works
@@ -818,7 +896,7 @@ function generatePreplot() {
  <div style="font-size:13px;font-weight:700;color:#00d2ff;letter-spacing:0.5px;">GENERATE PREPLOT</div>
  <button onclick="document.getElementById('preplot-gen-dialog').style.display='none';_ppgClearPreview()" style="background:none;border:none;color:#666;font-size:16px;cursor:pointer;">x</button>
  </div>
- <div style="font-size:10px;color:#a0aebb;margin-bottom:14px;line-height:1.5;">Define a survey area boundary and line parameters. Lines are generated within the polygon and clipped to its edges.</div>
+ <div style="font-size:10px;color:#a0aebb;margin-bottom:14px;line-height:1.5;" id="ppg-intro">Define a survey area boundary and line parameters. Lines are generated within the polygon and clipped to its edges.</div>
  <!-- Survey Type -->
  <div style="font-size:9px;color:#5a6a7a;font-weight:600;letter-spacing:0.4px;margin-bottom:6px;text-transform:uppercase;">Survey Type</div>
  <div class="panel-row" style="margin-bottom:12px;">
@@ -826,6 +904,7 @@ function generatePreplot() {
  <select id="ppg-dimension" onchange="_ppgToggleDimension()" style="flex:1;padding:5px 8px;border-radius:4px;border:1px solid #222;background:#111;color:#fff;font-size:12px;outline:none;cursor:pointer;">
  <option value="2D">2D</option>
  <option value="3D" selected>3D</option>
+ <option value="OBN">OBN (Ocean Bottom Nodes)</option>
  </select>
  </div>
  <!-- Preplot Header Info -->
@@ -953,6 +1032,33 @@ function generatePreplot() {
  <input id="ppg-spacing" type="number" min="10" step="10" value="300" style="flex:1;padding:5px 8px;border-radius:4px;border:1px solid #222;background:#111;color:#fff;font-size:12px;outline:none;"/>
  </div>
  </div>
+ <!-- OBN node patch (Ocean Bottom Nodes) -->
+ <div id="ppg-obn-section" style="display:none;">
+ <div style="font-size:9px;color:#fbbf24;font-weight:600;letter-spacing:0.4px;margin:8px 0 6px 0;text-transform:uppercase;">OBN Node Patch</div>
+ <div style="font-size:10px;color:#a0aebb;margin-bottom:8px;line-height:1.4;">Generates seabed receivers on a regular grid inside the survey area, plus optional source sail lines (Line Parameters above).</div>
+ <div class="panel-row" style="margin-bottom:8px;">
+ <label style="width:120px;color:#fff;">Node Spacing E-W</label>
+ <input id="ppg-obn-dx" type="number" min="10" step="10" value="400" style="flex:1;padding:5px 8px;border-radius:4px;border:1px solid #222;background:#111;color:#fff;font-size:12px;outline:none;"/>
+ <span style="font-size:9px;color:#666;margin-left:6px;">m</span>
+ </div>
+ <div class="panel-row" style="margin-bottom:8px;">
+ <label style="width:120px;color:#fff;">Node Spacing N-S</label>
+ <input id="ppg-obn-dy" type="number" min="10" step="10" value="400" style="flex:1;padding:5px 8px;border-radius:4px;border:1px solid #222;background:#111;color:#fff;font-size:12px;outline:none;"/>
+ <span style="font-size:9px;color:#666;margin-left:6px;">m</span>
+ </div>
+ <div class="panel-row" style="margin-bottom:8px;">
+ <label style="width:120px;color:#fff;">Node Prefix</label>
+ <input id="ppg-obn-prefix" type="text" value="N-" style="flex:1;padding:5px 8px;border-radius:4px;border:1px solid #222;background:#111;color:#fff;font-size:12px;outline:none;" placeholder="e.g. N-"/>
+ </div>
+ <div class="panel-row" style="margin-bottom:8px;">
+ <label style="width:120px;color:#fff;">First Node No.</label>
+ <input id="ppg-obn-start" type="number" min="1" step="1" value="1" style="flex:1;padding:5px 8px;border-radius:4px;border:1px solid #222;background:#111;color:#fff;font-size:12px;outline:none;"/>
+ </div>
+ <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:8px;font-size:11px;color:#c0c8d4;">
+ <label style="display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="checkbox" id="ppg-obn-gen-nodes" checked style="accent-color:#f59e0b;"/>Generate node patch</label>
+ <label style="display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="checkbox" id="ppg-obn-gen-sources" checked style="accent-color:#30d158;"/>Generate source sail lines</label>
+ </div>
+ </div>
  <div class="panel-row" style="margin-bottom:8px;">
  <label style="width:120px;color:#fff;">Line Prefix</label>
  <input id="ppg-prefix" type="text" value="SL-" oninput="_ppgUpdateAzimuthFields()" style="flex:1;padding:5px 8px;border-radius:4px;border:1px solid #222;background:#111;color:#fff;font-size:12px;outline:none;" placeholder="e.g. SL-"/>
@@ -994,13 +1100,13 @@ function generatePreplot() {
  <span style="font-size:9px;color:#666;margin-left:6px;">beyond boundary</span>
  </div>
  <!-- Acquisition Parameters -->
- <div style="font-size:9px;color:#5a6a7a;font-weight:600;letter-spacing:0.4px;margin:8px 0 6px 0;text-transform:uppercase;">Acquisition Parameters</div>
+ <div style="font-size:9px;color:#5a6a7a;font-weight:600;letter-spacing:0.4px;margin:8px 0 6px 0;text-transform:uppercase;" id="ppg-acq-heading">Acquisition Parameters</div>
  <div style="display:grid;grid-template-columns:130px 1fr;gap:4px 8px;margin-bottom:12px;font-size:10px;">
  <label style="color:#a0aebb;">SP Interval (m)</label>
  <input id="ppg-sp-interval" type="number" min="1" step="1" value="25" style="padding:4px 6px;border-radius:3px;border:1px solid #222;background:#0a0a12;color:#fff;font-size:10px;outline:none;"/>
  <label id="ppg-streamers-label" style="color:#a0aebb;">Streamers</label>
  <input id="ppg-streamers" type="number" min="1" step="1" value="6" style="padding:4px 6px;border-radius:3px;border:1px solid #222;background:#0a0a12;color:#fff;font-size:10px;outline:none;"/>
- <label style="color:#a0aebb;">Streamer Length (m)</label>
+ <label id="ppg-streamer-length-label" style="color:#a0aebb;">Streamer Length (m)</label>
  <input id="ppg-streamer-length" type="number" min="100" step="100" value="6000" style="padding:4px 6px;border-radius:3px;border:1px solid #222;background:#0a0a12;color:#fff;font-size:10px;outline:none;"/>
  <label id="ppg-streamer-sep-label" style="color:#a0aebb;">Streamer Sep. (m)</label>
  <input id="ppg-streamer-sep" type="number" min="10" step="10" value="100" style="padding:4px 6px;border-radius:3px;border:1px solid #222;background:#0a0a12;color:#fff;font-size:10px;outline:none;"/>
@@ -1014,16 +1120,16 @@ function generatePreplot() {
  <option value="simultaneous">Simultaneous</option>
  <option value="sequential">Sequential</option>
  </select>
- <label style="color:#a0aebb;">Channels / Streamer</label>
+ <label id="ppg-channels-label" style="color:#a0aebb;">Channels / Streamer</label>
  <input id="ppg-channels" type="number" min="1" step="1" value="480" style="padding:4px 6px;border-radius:3px;border:1px solid #222;background:#0a0a12;color:#fff;font-size:10px;outline:none;"/>
- <label style="color:#a0aebb;">Receiver Length (m)</label>
+ <label id="ppg-receiver-length-label" style="color:#a0aebb;">Receiver Length (m)</label>
  <input id="ppg-receiver-length" type="number" min="1" step="0.5" value="12.5" style="padding:4px 6px;border-radius:3px;border:1px solid #222;background:#0a0a12;color:#fff;font-size:10px;outline:none;"/>
  <label style="color:#a0aebb;">Run-out Distance (m)</label>
  <input id="ppg-runout-dist" type="number" min="0" step="50" value="3050" style="padding:4px 6px;border-radius:3px;border:1px solid #222;background:#0a0a12;color:#fff;font-size:10px;outline:none;"/>
  </div>
  <div id="ppg-summary" style="font-size:10px;color:#a0aebb;margin-bottom:10px;padding:8px;background:#0a0a12;border:1px solid #1a1a24;border-radius:4px;display:none;"></div>
  <div style="display:flex;gap:8px;margin-top:14px;">
- <button onclick="_executePreplotGen()" style="flex:2;padding:10px;border-radius:4px;border:none;background:#30d158;color:#000;font-weight:700;cursor:pointer;font-size:12px;">Generate Lines</button>
+ <button id="ppg-btn-generate" onclick="_executePreplotGen()" style="flex:2;padding:10px;border-radius:4px;border:none;background:#30d158;color:#000;font-weight:700;cursor:pointer;font-size:12px;">Generate Lines</button>
  <button onclick="_ppgPreview()" style="flex:1;padding:10px;border-radius:4px;border:1px solid #00d2ff;background:#0a1a2a;color:#00d2ff;cursor:pointer;font-size:12px;font-weight:600;">Preview</button>
  </div>
  <div style="display:flex;gap:8px;margin-top:8px;">
@@ -1051,7 +1157,8 @@ function _ppgToggleMode() {
 // source, so a single-source (or 2D) survey greys them out and marks them N/A.
 function _ppgToggleSourceFields() {
  const srcInput = document.getElementById('ppg-sources');
- const is2D = document.getElementById('ppg-dimension')?.value === '2D';
+ const dim = document.getElementById('ppg-dimension')?.value;
+ const is2D = dim === '2D';
  const nSources = parseInt(srcInput?.value) || 1;
  const na = is2D || nSources <= 1;
  [['ppg-source-sep', 'ppg-source-sep-label'], ['ppg-firing-mode', 'ppg-firing-mode-label']].forEach(([inId, lblId]) => {
@@ -1072,25 +1179,62 @@ function _ppgToggleDimension() {
  const dim = document.getElementById('ppg-dimension').value;
  const multiAz = document.getElementById('ppg-multi-azimuth-section');
  const singleBrg = document.getElementById('ppg-single-bearing-section');
+ const obnSec = document.getElementById('ppg-obn-section');
  const is2D = dim === '2D';
+ const isObn = dim === 'OBN';
  if (is2D) {
- multiAz.style.display = '';
- singleBrg.style.display = 'none';
- _ppgUpdateAzimuthFields();
+  if (multiAz) multiAz.style.display = '';
+  if (singleBrg) singleBrg.style.display = 'none';
+  _ppgUpdateAzimuthFields();
  } else {
- multiAz.style.display = 'none';
- singleBrg.style.display = '';
+  if (multiAz) multiAz.style.display = 'none';
+  if (singleBrg) singleBrg.style.display = '';
  }
- // Hide streamers count and streamer separation for 2D (1 streamer, no sep)
- const strLabel = document.getElementById('ppg-streamers-label');
- const strInput = document.getElementById('ppg-streamers');
- const sepLabel = document.getElementById('ppg-streamer-sep-label');
- const sepInput = document.getElementById('ppg-streamer-sep');
- if (strLabel) strLabel.style.display = is2D ? 'none' : '';
- if (strInput) strInput.style.display = is2D ? 'none' : '';
- if (sepLabel) sepLabel.style.display = is2D ? 'none' : '';
- if (sepInput) sepInput.style.display = is2D ? 'none' : '';
- if (is2D && strInput) strInput.value = '1';
+ if (obnSec) obnSec.style.display = isObn ? '' : 'none';
+
+ // Streamer / cable fields: 3D only. OBN uses nodes; 2D is single-streamer style.
+ const streamerIds = [
+  'ppg-streamers-label', 'ppg-streamers',
+  'ppg-streamer-length-label', 'ppg-streamer-length',
+  'ppg-streamer-sep-label', 'ppg-streamer-sep',
+  'ppg-channels-label', 'ppg-channels',
+  'ppg-receiver-length-label', 'ppg-receiver-length'
+ ];
+ streamerIds.forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.style.display = (is2D || isObn) ? 'none' : '';
+ });
+ if (is2D) {
+  const strInput = document.getElementById('ppg-streamers');
+  if (strInput) strInput.value = '1';
+ }
+
+ const intro = document.getElementById('ppg-intro');
+ if (intro) {
+  intro.textContent = isObn
+   ? 'OBN: define the patch area, node grid spacing, and optional source sail lines. Nodes are clipped to the polygon.'
+   : 'Define a survey area boundary and line parameters. Lines are generated within the polygon and clipped to its edges.';
+ }
+ const genBtn = document.getElementById('ppg-btn-generate');
+ if (genBtn) genBtn.textContent = isObn ? 'Generate OBN Preplot' : 'Generate Lines';
+ const acqHead = document.getElementById('ppg-acq-heading');
+ if (acqHead) acqHead.textContent = isObn ? 'Source Acquisition Parameters' : 'Acquisition Parameters';
+
+ // OBN does not use "2D lines from shapefile" mode
+ if (isObn) {
+  const modeEl = document.getElementById('ppg-mode');
+  if (modeEl && modeEl.value === 'lines') {
+   modeEl.value = 'polygon';
+   _ppgToggleMode();
+  }
+  const linesOpt = modeEl && modeEl.querySelector('option[value="lines"]');
+  if (linesOpt) linesOpt.disabled = true;
+ } else {
+  const modeEl = document.getElementById('ppg-mode');
+  const linesOpt = modeEl && modeEl.querySelector('option[value="lines"]');
+  if (linesOpt) linesOpt.disabled = false;
+ }
+
  _ppgToggleSourceFields();
 }
 
@@ -1218,7 +1362,8 @@ const _ppgDefaultFields = [
  'ppg-line-dir','ppg-sp-dir','ppg-first-sp','ppg-extension','ppg-sp-interval','ppg-streamers',
  'ppg-streamer-length','ppg-streamer-sep','ppg-sources','ppg-source-sep','ppg-firing-mode',
  'ppg-channels','ppg-receiver-length','ppg-runout-dist','ppg-utm-zone','ppg-utm-hemi','ppg-utm-datum',
- 'ppg-paste-fmt','ppg-length','ppg-count','ppg-num-azimuths','ppg-az-numbering','ppg-az-block'
+ 'ppg-paste-fmt','ppg-length','ppg-count','ppg-num-azimuths','ppg-az-numbering','ppg-az-block',
+ 'ppg-obn-dx','ppg-obn-dy','ppg-obn-prefix','ppg-obn-start'
 ];
 
 function _ppgSaveDefaults() {
@@ -1664,21 +1809,56 @@ function _ppgPreview() {
  }
  // Draw preview lines (color by azimuth group for 2D multi-azimuth)
  const azColors = ['#30d158', '#ff9500', '#00d2ff', '#ff44ff', '#ffd60a', '#5ba3d9'];
- result.lines.forEach(l => {
+ (result.lines || []).forEach(l => {
  const color = l._azGroup != null ? azColors[l._azGroup % azColors.length] : '#30d158';
  L.polyline([l.start, l.end], { color, weight: 1.5, opacity: 0.7 }).addTo(_ppgPreviewLayer);
  });
+ if (result.nodes && result.nodes.length) {
+  _ppgDrawNodesOnLayer(_ppgPreviewLayer, result.nodes);
+ }
  const summaryEl = document.getElementById('ppg-summary');
  if (summaryEl) {
  const fold = calculateFoldOfCoverage();
  summaryEl.style.display = '';
- summaryEl.innerHTML = `<strong>${result.lines.length}</strong>lines | Total: <strong>${result.totalKm.toFixed(2)} km</strong> | Spacing: ${typeof result.spacing === 'number' ? result.spacing + 'm' : result.spacing} | <span style="color:#ffd60a;">Fold: ${fold.toFixed(1)}x</span>`;
+ const nodeBit = result.nodes && result.nodes.length
+  ? ` | <strong style="color:#38bdf8;">${result.nodes.length}</strong> nodes`
+  : '';
+ summaryEl.innerHTML = `<strong>${(result.lines || []).length}</strong> lines | Total: <strong>${(result.totalKm || 0).toFixed(2)} km</strong> | Spacing: ${typeof result.spacing === 'number' ? result.spacing + 'm' : result.spacing}${nodeBit}` +
+  (document.getElementById('ppg-dimension')?.value === 'OBN' ? '' : ` | <span style="color:#ffd60a;">Fold: ${fold.toFixed(1)}x</span>`);
  }
- showToast(`Preview: ${result.lines.length} lines`);
+ const nMsg = result.nodes && result.nodes.length ? ` + ${result.nodes.length} nodes` : '';
+ showToast(`Preview: ${(result.lines || []).length} lines${nMsg}`);
  } catch (err) { console.error('Preview error:', err); showToast('Error: ' + err.message); }
 }
 
 function _ppgComputeLines() {
+ const dim = document.getElementById('ppg-dimension')?.value;
+ if (dim === 'OBN') {
+  const genNodes = document.getElementById('ppg-obn-gen-nodes')?.checked !== false;
+  const genSources = document.getElementById('ppg-obn-gen-sources')?.checked !== false;
+  let raw = { lines: [], totalKm: 0, spacing: 'obn', nodes: [] };
+  if (genSources) {
+   raw = _ppgComputeLinesBody() || { lines: [], totalKm: 0, spacing: 'obn' };
+  }
+  if (genNodes) {
+   raw.nodes = _ppgComputeObnNodes();
+  } else {
+   raw.nodes = [];
+  }
+  if ((!raw.lines || !raw.lines.length) && (!raw.nodes || !raw.nodes.length)) {
+   showToast('OBN: enable node patch and/or source sail lines, and define the survey area');
+   return null;
+  }
+  if (genNodes && (!raw.nodes || !raw.nodes.length)) {
+   showToast('No nodes inside the area - check polygon / node spacing');
+   return null;
+  }
+  return raw;
+ }
+ return _ppgComputeLinesBody();
+}
+
+function _ppgComputeLinesBody() {
  const mode = document.getElementById('ppg-mode').value;
  const dimension = document.getElementById('ppg-dimension').value;
  const brg = parseFloat(document.getElementById('ppg-bearing').value) || 0;
@@ -2037,7 +2217,8 @@ function _executePreplotGen() {
  try {
  const result = _ppgComputeLines();
  if (!result) return;
- _ppgEditLines = result.lines;
+ _ppgEditLines = result.lines || [];
+ _ppgEditNodes = result.nodes || [];
  _ppgClearPreview();
  document.getElementById('preplot-gen-dialog').style.display = 'none';
  _ppgEnterEditMode();
@@ -2200,7 +2381,14 @@ function _ppgEnterEditMode() {
 
 function _ppgEditUpdateStats() {
  const el = document.getElementById('ppg-edit-summary');
- if (!el || !_ppgEditLines || _ppgEditLines.length === 0) return;
+ if (!el) return;
+ const nNodes = (_ppgEditNodes && _ppgEditNodes.length) || 0;
+ if (!_ppgEditLines || _ppgEditLines.length === 0) {
+  if (nNodes) {
+   el.innerHTML = `<div><b style="color:#38bdf8;">${nNodes}</b> OBN nodes · no source sail lines</div>`;
+  }
+  return;
+ }
  const n = _ppgEditLines.length;
  const spInterval = parseFloat(document.getElementById('ppg-sp-interval')?.value) || 25;
  const firstSP = parseInt(document.getElementById('ppg-first-sp')?.value) || 1001;
@@ -2223,11 +2411,12 @@ function _ppgEditUpdateStats() {
  const lastSP = firstSP + avgSP;
  const dimension = document.getElementById('ppg-dimension')?.value || '3D';
  const is2D = dimension === '2D';
- const nStreamers = is2D ? 1 : (parseInt(document.getElementById('ppg-streamers')?.value) || 1);
- const strSepVal = is2D ? 0 : (parseFloat(document.getElementById('ppg-streamer-sep')?.value) || 100);
+ const isObn = dimension === 'OBN';
+ const nStreamers = (is2D || isObn) ? 1 : (parseInt(document.getElementById('ppg-streamers')?.value) || 1);
+ const strSepVal = (is2D || isObn) ? 0 : (parseFloat(document.getElementById('ppg-streamer-sep')?.value) || 100);
  const crossLineM = (nStreamers * strSepVal) / 2;
- const sqKm = is2D ? 0 : fullFoldM * crossLineM / 1000000;
- const fold = _ppgEditFold();
+ const sqKm = (is2D || isObn) ? 0 : fullFoldM * crossLineM / 1000000;
+ const fold = isObn ? NaN : _ppgEditFold();
  // Bounding polygon: the AOI when one was used, otherwise the convex hull of
  // the line endpoints so a value is always available.
  const areaPts = (_ppgPolygon && _ppgPolygon.length >= 3)
@@ -2253,10 +2442,11 @@ function _ppgEditUpdateStats() {
  // First and last line names
  const firstName = _ppgEditLines[0].name || '-';
  const lastName = _ppgEditLines[n - 1].name || '-';
+ const nodeBit = nNodes ? `<span><b style="color:#38bdf8;">${nNodes}</b> OBN nodes</span>` : '';
 
  el.innerHTML = `
  <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px 12px;">
- <span><b style="color:#fff;">${n}</b>lines</span>
+ <span><b style="color:#fff;">${n}</b> ${isObn ? 'source lines' : 'lines'}</span>
  <span>Bearing: <b style="color:#fff;">${brgStr}</b></span>
  <span>Total km: <b style="color:#fff;">${geomKm.toFixed(4)} km</b></span>
  <span>Full-fold km: <b style="color:#30d158;">${fullFoldKm.toFixed(4)} km</b></span>
@@ -2267,8 +2457,10 @@ function _ppgEditUpdateStats() {
  <span>Min: ${(minLen/1000).toFixed(4)} km</span>
  <span>Max: ${(maxLen/1000).toFixed(4)} km</span>
  <span>Total SP: <b style="color:#fff;">${totalSP.toLocaleString()}</b></span>
- ${is2D ? '' : `<span>Full-fold area: <b style="color:#30d158;">${sqKm.toFixed(4)} km2</b></span>`}
- ${(!is2D && polyKm2 != null) ? `<span>${polyLabel}: <b style="color:#30d158;">${polyKm2.toFixed(4)} km2</b></span>` : ''}
+ ${nodeBit}
+ ${(is2D || isObn) ? '' : `<span>Full-fold area: <b style="color:#30d158;">${sqKm.toFixed(4)} km2</b></span>`}
+ ${(!is2D && !isObn && polyKm2 != null) ? `<span>${polyLabel}: <b style="color:#30d158;">${polyKm2.toFixed(4)} km2</b></span>` : ''}
+ ${(isObn && polyKm2 != null) ? `<span>${polyLabel}: <b style="color:#30d158;">${polyKm2.toFixed(4)} km2</b></span>` : ''}
  ${azDetail}
  <span style="grid-column:1/-1;margin-top:4px;color:#5a6a7a;">First: <b style="color:#60a5fa;">${firstName}</b> - Last: <b style="color:#60a5fa;">${lastName}</b></span>
  </div>`;
@@ -2490,11 +2682,20 @@ function _ppgLabelIcon(text, color, width, dropPx) {
 
 function _ppgRenderEditLines() {
  _ppgClearPreview();
- if (!_ppgEditLines || _ppgEditLines.length === 0) return;
+ const hasLines = _ppgEditLines && _ppgEditLines.length > 0;
+ const hasNodes = _ppgEditNodes && _ppgEditNodes.length > 0;
+ if (!hasLines && !hasNodes) return;
  _ppgEnsureMap();
  _ppgPreviewLayer = L.layerGroup().addTo(map);
  if (_ppgPolygon && _ppgPolygon.length >= 3) {
  L.polygon(_ppgPolygon, { color: '#00d2ff', weight: 1.5, fillColor: '#00d2ff', fillOpacity: 0.03, dashArray: '6,4' }).addTo(_ppgPreviewLayer);
+ }
+ if (hasNodes) _ppgDrawNodesOnLayer(_ppgPreviewLayer, _ppgEditNodes);
+ if (!hasLines) {
+  if (hasNodes && !_ppgSuppressFit) {
+   map.fitBounds(L.latLngBounds(_ppgEditNodes.map(n => [n.lat, n.lon])).pad(0.1));
+  }
+  return;
  }
  const range = (document.getElementById('ppg-edit-range-from')) ? _ppgGetEditRange() : { startIdx: 0, endIdx: _ppgEditLines.length };
  const spInterval = parseFloat(document.getElementById('ppg-sp-interval')?.value) || 25;
@@ -2541,6 +2742,19 @@ function _ppgRenderEditLines() {
  // Fit map to lines
  const allPts = _ppgEditLines.flatMap(l => [l.start, l.end]);
  if (allPts.length > 0 && !_ppgSuppressFit) map.fitBounds(L.latLngBounds(allPts).pad(0.1));
+}
+
+function renderObnNodes() {
+ if (!map) return;
+ if (!layerObnNodes) layerObnNodes = L.layerGroup().addTo(map);
+ layerObnNodes.clearLayers();
+ const nodes = state.obnNodes || [];
+ if (!nodes.length) return;
+ nodes.forEach(n => {
+  L.circleMarker([n.lat, n.lon], {
+   radius: 3.5, color: '#0284c7', weight: 1, fillColor: '#38bdf8', fillOpacity: 0.95
+  }).bindTooltip(n.name || ('N' + n.id), { permanent: false, direction: 'top' }).addTo(layerObnNodes);
+ });
 }
 
 // Map selection: click picks one line, shift/ctrl-click adds or removes.
@@ -3025,24 +3239,46 @@ function _ppgEditDuplicateLine(direction) {
 }
 
 function _ppgEditCommit() {
- if (!_ppgEditLines || _ppgEditLines.length === 0) { showToast('No lines to commit.'); return; }
+ if ((!_ppgEditLines || _ppgEditLines.length === 0) && (!_ppgEditNodes || !_ppgEditNodes.length)) {
+  showToast('No lines or nodes to commit.'); return;
+ }
  // Transfer preplot generator settings to route planner state
  const ppgDim = document.getElementById('ppg-dimension')?.value || '3D';
- const ppgStreamers = ppgDim === '2D' ? 1 : (parseInt(document.getElementById('ppg-streamers')?.value) || state.settings.numStreamers);
- const ppgStrSep = ppgDim === '2D' ? 0 : (parseFloat(document.getElementById('ppg-streamer-sep')?.value) || state.settings.streamerSeparation);
+ const isObn = ppgDim === 'OBN';
+ const ppgStreamers = (ppgDim === '2D' || isObn) ? 1 : (parseInt(document.getElementById('ppg-streamers')?.value) || state.settings.numStreamers);
+ const ppgStrSep = (ppgDim === '2D' || isObn) ? 0 : (parseFloat(document.getElementById('ppg-streamer-sep')?.value) || state.settings.streamerSeparation);
  const ppgSpInt = parseFloat(document.getElementById('ppg-sp-interval')?.value) || state.settings.spInterval;
  const ppgSpacing = parseFloat(document.getElementById('ppg-spacing')?.value) || 0;
  state.settings.numStreamers = ppgStreamers;
  state.settings.streamerSeparation = ppgStrSep;
  state.settings.spInterval = ppgSpInt;
  if (ppgSpacing > 0) state.settings.lineSpacing = ppgSpacing;
+ if (isObn) {
+  state.settings.surveyType = 'obn';
+  state.settings.obnNodeDx = parseFloat(document.getElementById('ppg-obn-dx')?.value) || 400;
+  state.settings.obnNodeDy = parseFloat(document.getElementById('ppg-obn-dy')?.value) || 400;
+  if (typeof updateSurveyTypeIndicator === 'function') updateSurveyTypeIndicator('obn');
+ } else if (ppgDim === '2D') {
+  state.settings.surveyType = '2d';
+  if (typeof updateSurveyTypeIndicator === 'function') updateSurveyTypeIndicator('2d');
+ } else {
+  state.settings.surveyType = '3d';
+  if (typeof updateSurveyTypeIndicator === 'function') updateSurveyTypeIndicator('3d');
+ }
  // Renumber IDs
- _ppgEditLines.forEach((l, i) => { l.id = i; });
- setLines(_ppgEditLines);
+ (_ppgEditLines || []).forEach((l, i) => { l.id = i; });
+ if (_ppgEditLines && _ppgEditLines.length) setLines(_ppgEditLines);
+ else setLines([]);
+ state.obnNodes = (_ppgEditNodes || []).map((n, i) => ({
+  id: i, name: n.name, lat: n.lat, lon: n.lon
+ }));
+ if (typeof renderObnNodes === 'function') renderObnNodes();
  _ppgClearPreview();
  document.getElementById('ppg-edit-dialog').style.display = 'none';
- showToast(`Committed ${_ppgEditLines.length} lines to route planner.`);
+ const nNodes = state.obnNodes.length;
+ showToast(`Committed ${(_ppgEditLines || []).length} source line(s)` + (nNodes ? ` + ${nNodes} OBN nodes` : '') + ' to planner.');
  _ppgEditLines = null;
+ _ppgEditNodes = [];
 }
 
 function _ppgEditCancel() {
@@ -3259,7 +3495,7 @@ function _ppgDoExportP190() {
 
  // H2600 general info
  out += hRec('2600', ' 01 Vessel Id', vessel || '1') + '\r\n';
- out += hRec('2600', ' 02 Preplot Dimension', dimension === '2D' ? '2' : '3') + '\r\n';
+ out += hRec('2600', ' 02 Preplot Dimension', dimension === '2D' ? '2' : (dimension === 'OBN' ? 'OBN' : '3')) + '\r\n';
  out += hRec('2600', 'NUMBER OF SOURCES', String(nSources)) + '\r\n';
  out += hRec('2600', 'SOURCE SEPERATION', srcSep.toFixed(2) + ' m') + '\r\n';
  out += hRec('2600', 'NUMBER OF STREAMERS', String(nStreamers)) + '\r\n';
@@ -4236,10 +4472,18 @@ function toggleSurveyTypeOptions() {
  const type = document.getElementById('crit-survey-type').value;
  const opts3d = document.getElementById('crit-3d-options');
  const opts2d = document.getElementById('crit-2d-options');
+ const optsObn = document.getElementById('crit-obn-options');
  if (opts3d) opts3d.style.display = (type === '3d') ? '' : 'none';
  if (opts2d) opts2d.style.display = (type === '2d') ? '' : 'none';
+ if (optsObn) optsObn.style.display = (type === 'obn') ? '' : 'none';
  updateSurveyTypeIndicator(type);
  setAreaStatsVisible(type !== '2d');
+ const hint = document.getElementById('survey-type-hint');
+ if (hint) {
+  if (type === 'obn') hint.textContent = 'OBN: Ocean Bottom Nodes - node patch + source sail lines (no streamer swaths)';
+  else if (type === '2d') hint.textContent = '2D: Plans the quickest route';
+  else hint.textContent = '3D: Interleaves swaths for coverage overlap | 2D: Plans the quickest route';
+ }
 }
 
 function updateSurveyTypeIndicator(type) {
@@ -4250,6 +4494,10 @@ function updateSurveyTypeIndicator(type) {
  indicator.textContent = '2D SURVEY';
  indicator.style.borderColor = '#ff9500';
  indicator.style.color = '#ff9500';
+ } else if (type === 'obn') {
+ indicator.textContent = 'OBN SURVEY';
+ indicator.style.borderColor = '#f59e0b';
+ indicator.style.color = '#fbbf24';
  } else {
  indicator.textContent = '3D SURVEY';
  indicator.style.borderColor = '#00d2ff';
@@ -4292,6 +4540,10 @@ function setAreaStatsVisible(show) {
 
 function isSurvey2D() {
  return (state.settings.surveyType || '3d') === '2d';
+}
+
+function isSurveyObn() {
+ return (state.settings.surveyType || '3d') === 'obn';
 }
 
 // Default per-swath acquisition direction. Swaths run in pairs (unless the user
@@ -4488,10 +4740,13 @@ function askSurveyCriteria({ zone, hemi }, callback) {
  <select id="crit-survey-type" onchange="toggleSurveyTypeOptions()" style="flex:1;padding:5px 8px;border-radius:4px;border:1px solid #222222;background:#111111;color:#ffffff;font-size:13px;outline:none;cursor:pointer;">
  <option value="3d" ${(state.settings.surveyType || '3d') === '3d' ? 'selected' : ''}>3D</option>
  <option value="2d" ${state.settings.surveyType === '2d' ? 'selected' : ''}>2D</option>
+ <option value="obn" ${state.settings.surveyType === 'obn' ? 'selected' : ''}>OBN (Ocean Bottom Nodes)</option>
  </select>
  </div>
  <div id="survey-type-hint" style="font-size:9px;color:#a0aebb;margin-bottom:10px;margin-left:144px;">
- 3D: Interleaves swaths for coverage overlap &nbsp;|&nbsp; 2D: Plans the quickest route
+ ${state.settings.surveyType === 'obn'
+  ? 'OBN: Ocean Bottom Nodes - node patch + source sail lines (no streamer swaths)'
+  : '3D: Interleaves swaths for coverage overlap &nbsp;|&nbsp; 2D: Plans the quickest route'}
  </div>
  <div class="panel-row" style="margin-bottom:10px;">
  <label style="width:140px; color:#ffffff;">Min Turn Radius (m)</label>
@@ -4613,6 +4868,36 @@ function askSurveyCriteria({ zone, hemi }, callback) {
  </div>
  </div>
  </div><!-- /Swath Width & Direction highlight panel -->
+ </div>
+ <!-- OBN options -->
+ <div id="crit-obn-options" style="${state.settings.surveyType === 'obn' ? '' : 'display:none;'}">
+ <div style="border-top:1px solid #222;margin:10px 0 10px 0;"></div>
+ <div style="font-size:10px;color:#fbbf24;margin-bottom:8px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">OBN Node Patch</div>
+ <div class="panel-row" style="margin-bottom:10px;">
+ <label style="width:140px; color:#ffffff;">Node Spacing E-W</label>
+ <input id="crit-obn-dx" type="number" min="10" step="10" value="${state.settings.obnNodeDx || 400}"
+ style="width:80px;padding:5px 4px 5px 8px;border-radius:4px;border:1px solid #222222;background:#111111;color:#ffffff;font-size:13px;outline:none;"/>
+ <span style="color:#8a9bb0;font-size:11px;margin-left:4px;">m</span>
+ </div>
+ <div class="panel-row" style="margin-bottom:10px;">
+ <label style="width:140px; color:#ffffff;">Node Spacing N-S</label>
+ <input id="crit-obn-dy" type="number" min="10" step="10" value="${state.settings.obnNodeDy || 400}"
+ style="width:80px;padding:5px 4px 5px 8px;border-radius:4px;border:1px solid #222222;background:#111111;color:#ffffff;font-size:13px;outline:none;"/>
+ <span style="color:#8a9bb0;font-size:11px;margin-left:4px;">m</span>
+ </div>
+ <div style="font-size:10px;color:#8a9bb0;margin-bottom:8px;line-height:1.4;">Source sail-line progression uses the 2D planner (no streamer interleave). Generate the node patch + sail lines from <b style="color:#fbbf24;">Generate Preplot → OBN</b>.</div>
+ <div class="panel-row" style="margin-bottom:10px;">
+ <label style="width:140px; color:#ffffff;">Progression</label>
+ <select id="crit-progression-obn" style="flex:1;padding:5px 8px;border-radius:4px;border:1px solid #222222;background:#111111;color:#ffffff;font-size:13px;outline:none;cursor:pointer;">
+ <option value="auto" ${(state.settings.progression || 'auto') === 'auto' ? 'selected' : ''}>Auto (shortest found)</option>
+ <option value="west-east" ${state.settings.progression === 'west-east' ? 'selected' : ''}>West → East</option>
+ <option value="east-west" ${state.settings.progression === 'east-west' ? 'selected' : ''}>East → West</option>
+ <option value="south-north" ${state.settings.progression === 'south-north' ? 'selected' : ''}>South → North</option>
+ <option value="north-south" ${state.settings.progression === 'north-south' ? 'selected' : ''}>North → South</option>
+ <option value="low-high" ${state.settings.progression === 'low-high' ? 'selected' : ''}>Low → High line numbers</option>
+ <option value="high-low" ${state.settings.progression === 'high-low' ? 'selected' : ''}>High → Low line numbers</option>
+ </select>
+ </div>
  </div>
  <!-- 2D Progression (hidden for 3D) -->
  <div id="crit-2d-options" style="${state.settings.surveyType === '2d' ? '' : 'display:none;'}">
@@ -4967,6 +5252,8 @@ function askSurveyCriteria({ zone, hemi }, callback) {
  let progression;
  if (surveyType === '3d') {
  progression = document.getElementById('crit-progression').value;
+ } else if (surveyType === 'obn') {
+ progression = document.getElementById('crit-progression-obn')?.value || 'auto';
  } else {
  progression = document.getElementById('crit-progression-2d').value;
  }
@@ -4996,6 +5283,10 @@ function askSurveyCriteria({ zone, hemi }, callback) {
  state.settings.surveyType = surveyType;
  state.settings.numSwaths = numSwaths;
  state.settings.swathDirections = swathDirections;
+ if (surveyType === 'obn') {
+  state.settings.obnNodeDx = parseFloat(document.getElementById('crit-obn-dx')?.value) || 400;
+  state.settings.obnNodeDy = parseFloat(document.getElementById('crit-obn-dy')?.value) || 400;
+ }
  // Remember these directions as this user'default for the next round.
  _persistSwathDefaults(swathDirections);
  updateSurveyTypeIndicator(surveyType);
@@ -9500,7 +9791,8 @@ function confirmSurveyPlanTypeThen(continueFn) {
  const existing = document.getElementById('survey-plan-type-dialog');
  if (existing) existing.remove();
 
- const current = (state.settings.surveyType || '3d') === '2d' ? '2d' : '3d';
+ const current = (state.settings.surveyType === '2d') ? '2d'
+  : (state.settings.surveyType === 'obn') ? 'obn' : '3d';
  const overlay = document.createElement('div');
  overlay.id = 'survey-plan-type-dialog';
  overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(6,6,12,0.88);z-index:9500;display:flex;align-items:center;justify-content:center;';
@@ -9508,8 +9800,8 @@ function confirmSurveyPlanTypeThen(continueFn) {
  <div style="background:#0e0e16;border:1px solid #1a1a24;border-radius:8px;padding:22px 24px;width:100%;max-width:440px;box-shadow:0 16px 64px rgba(0,0,0,0.7);font-family:inherit;" onclick="event.stopPropagation()">
  <div style="font-size:14px;font-weight:700;color:#e0e8f0;margin-bottom:6px;text-align:center;">Confirm survey plan type</div>
  <div style="font-size:11px;color:#8a9bb0;margin-bottom:14px;text-align:center;line-height:1.45;">
- Survey Criteria currently says <strong style="color:${current === '2d' ? '#67e8f9' : '#ffd60a'};">${current === '2d' ? '2D' : '3D'}</strong>.
- Confirm before routing - a 3D swath plan on a 2D survey looks wrong.
+ Survey Criteria currently says <strong style="color:${current === '2d' ? '#67e8f9' : current === 'obn' ? '#fbbf24' : '#ffd60a'};">${current === '2d' ? '2D' : current === 'obn' ? 'OBN' : '3D'}</strong>.
+ Confirm before routing.
  </div>
  <label style="display:flex;gap:10px;align-items:flex-start;padding:10px 12px;margin-bottom:8px;border-radius:6px;border:1px solid ${current === '2d' ? '#22d3ee' : '#1e293b'};background:${current === '2d' ? 'rgba(8,47,73,0.45)' : '#111'};cursor:pointer;">
  <input type="radio" name="survey-plan-type" value="2d"${current === '2d' ? ' checked' : ''} style="margin-top:3px;accent-color:#00d2ff;" />
@@ -9518,11 +9810,18 @@ function confirmSurveyPlanTypeThen(continueFn) {
  <span style="display:block;color:#94a3b8;font-size:10px;line-height:1.35;margin-top:2px;">Free optimizer or W/E/N/S / line-number order. No swath interleave.</span>
  </span>
  </label>
- <label style="display:flex;gap:10px;align-items:flex-start;padding:10px 12px;margin-bottom:14px;border-radius:6px;border:1px solid ${current === '3d' ? '#fbbf24' : '#1e293b'};background:${current === '3d' ? 'rgba(66,32,6,0.35)' : '#111'};cursor:pointer;">
+ <label style="display:flex;gap:10px;align-items:flex-start;padding:10px 12px;margin-bottom:8px;border-radius:6px;border:1px solid ${current === '3d' ? '#fbbf24' : '#1e293b'};background:${current === '3d' ? 'rgba(66,32,6,0.35)' : '#111'};cursor:pointer;">
  <input type="radio" name="survey-plan-type" value="3d"${current === '3d' ? ' checked' : ''} style="margin-top:3px;accent-color:#fbbf24;" />
  <span>
  <span style="display:block;color:#e2e8f0;font-size:12px;font-weight:700;">3D - swath plan</span>
  <span style="display:block;color:#94a3b8;font-size:10px;line-height:1.35;margin-top:2px;">Progressive adjacent lines / interleaved swaths for geophysical coverage.</span>
+ </span>
+ </label>
+ <label style="display:flex;gap:10px;align-items:flex-start;padding:10px 12px;margin-bottom:14px;border-radius:6px;border:1px solid ${current === 'obn' ? '#f59e0b' : '#1e293b'};background:${current === 'obn' ? 'rgba(66,32,6,0.4)' : '#111'};cursor:pointer;">
+ <input type="radio" name="survey-plan-type" value="obn"${current === 'obn' ? ' checked' : ''} style="margin-top:3px;accent-color:#f59e0b;" />
+ <span>
+ <span style="display:block;color:#e2e8f0;font-size:12px;font-weight:700;">OBN - Ocean Bottom Nodes</span>
+ <span style="display:block;color:#94a3b8;font-size:10px;line-height:1.35;margin-top:2px;">Source sail lines over a seabed node patch. No streamer swath interleave.</span>
  </span>
  </label>
  <div style="display:flex;gap:8px;">
@@ -9539,9 +9838,11 @@ function confirmSurveyPlanTypeThen(continueFn) {
     const inp = lab.querySelector('input[name="survey-plan-type"]');
     if (!inp) return;
     const on = inp.checked;
-    const is2d = inp.value === '2d';
-    lab.style.borderColor = on ? (is2d ? '#22d3ee' : '#fbbf24') : '#1e293b';
-    lab.style.background = on ? (is2d ? 'rgba(8,47,73,0.45)' : 'rgba(66,32,6,0.35)') : '#111';
+    const v = inp.value;
+    lab.style.borderColor = on ? (v === '2d' ? '#22d3ee' : v === 'obn' ? '#f59e0b' : '#fbbf24') : '#1e293b';
+    lab.style.background = on
+     ? (v === '2d' ? 'rgba(8,47,73,0.45)' : 'rgba(66,32,6,0.35)')
+     : '#111';
    });
   });
  });
@@ -9563,20 +9864,17 @@ function confirmSurveyPlanTypeThen(continueFn) {
 
 function applyConfirmedSurveyPlanType(type) {
  const is2d = type === '2d';
- state.settings.surveyType = is2d ? '2d' : '3d';
- let prog = state.settings.progression || (is2d ? 'auto' : 'interleaved');
- if (is2d) {
-  // Swath-interleave strategies are 3D-only - force a 2D-safe progression.
+ const isObn = type === 'obn';
+ state.settings.surveyType = isObn ? 'obn' : (is2d ? '2d' : '3d');
+ let prog = state.settings.progression || ((is2d || isObn) ? 'auto' : 'interleaved');
+ if (is2d || isObn) {
+  // Swath-interleave strategies are 3D-only - force a 2D/OBN-safe progression.
   if (prog === 'interleaved' || prog === 'interleaved-reverse') {
    prog = 'auto';
    state.settings.optimizerMode = state.settings.optimizerMode || 'deep';
   }
  } else {
   if (prog === 'auto' || prog === 'auto-nn') {
-   // Keep auto for 3D only if user explicitly wants deep search later;
-   // default progressive adjacency for classic 3D.
-   // Do not silently rewrite auto -> interleaved here if they chose auto in criteria;
-   // computeRoute already enforces interleaved when 3d+auto.
   }
  }
  state.settings.progression = prog;
@@ -9586,30 +9884,37 @@ function applyConfirmedSurveyPlanType(type) {
   const el = document.getElementById('crit-survey-type');
   if (el) { el.value = state.settings.surveyType; if (typeof toggleSurveyTypeOptions === 'function') toggleSurveyTypeOptions(); }
  } catch (_) {}
- showToast(is2d
+ showToast(isObn
+  ? 'Route plan locked to OBN - source sail lines (no streamer swaths)'
+  : is2d
   ? 'Route plan locked to 2D - any direction (no swath interleave)'
   : 'Route plan locked to 3D - swath / progressive adjacency', 4000);
 }
 
-/** Show/hide start-plan options that only apply to 3D swath surveys. */
+ /** Show/hide start-plan options that only apply to 3D swath surveys. */
 function _syncStartPlanSelectForSurveyType() {
  const planSel = document.getElementById('start-plan-select');
  const banner = document.getElementById('start-plan-type-banner');
- const is2d = (state.settings.surveyType || '3d') === '2d';
+ const st = state.settings.surveyType || '3d';
+ const is2d = st === '2d';
+ const isObn = st === 'obn';
+ const noSwath = is2d || isObn;
  if (banner) {
-  banner.textContent = is2d
+  banner.textContent = isObn
+   ? 'Plan type: OBN - source sail lines'
+   : is2d
    ? 'Plan type: 2D - any direction'
    : 'Plan type: 3D - swath plan';
-  banner.style.borderColor = is2d ? '#155e75' : '#92400e';
-  banner.style.color = is2d ? '#67e8f9' : '#fbbf24';
-  banner.style.background = is2d ? 'rgba(8,47,73,0.45)' : 'rgba(66,32,6,0.35)';
+  banner.style.borderColor = isObn ? '#92400e' : is2d ? '#155e75' : '#92400e';
+  banner.style.color = isObn ? '#fbbf24' : is2d ? '#67e8f9' : '#fbbf24';
+  banner.style.background = isObn ? 'rgba(66,32,6,0.4)' : is2d ? 'rgba(8,47,73,0.45)' : 'rgba(66,32,6,0.35)';
  }
  if (!planSel) return;
  const swathOnly = new Set(['interleaved', 'interleaved-reverse']);
  Array.from(planSel.options).forEach(opt => {
   if (swathOnly.has(opt.value)) {
-   opt.disabled = is2d;
-   opt.hidden = is2d;
+   opt.disabled = noSwath;
+   opt.hidden = noSwath;
   } else {
    opt.disabled = false;
    opt.hidden = false;
@@ -14113,11 +14418,14 @@ function resetWorkspaceForLogout() {
   if (typeof layerStartPoint !== 'undefined' && layerStartPoint) layerStartPoint.clearLayers();
   if (typeof layerAcqRoute !== 'undefined' && layerAcqRoute) layerAcqRoute.clearLayers();
   if (typeof layerRayTrace !== 'undefined' && layerRayTrace) layerRayTrace.clearLayers();
+  if (typeof layerObnNodes !== 'undefined' && layerObnNodes) layerObnNodes.clearLayers();
   if (typeof _rayState !== 'undefined' && _rayState) {
    _rayState.source = null;
    _rayState.nodes = [];
    _rayState.results = [];
   }
+  state.obnNodes = [];
+  _ppgEditNodes = [];
   if (typeof rayTraceStopPick === 'function') {
    try { rayTraceStopPick(); } catch (_) {}
   }
