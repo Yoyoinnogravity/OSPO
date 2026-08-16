@@ -16115,6 +16115,98 @@ async function refreshAisInView() {
  }
 }
 
+// ===== Seismic fleet on AIS (global MMSI roster) =====
+let aisSeismicLayer = null;
+let aisSeismicTimer = null;
+let aisSeismicMarkers = {};
+
+function setSeismicAisStatus(msg) {
+ const el = document.getElementById('ais-seismic-status');
+ if (el) el.textContent = msg || '';
+}
+
+function toggleSeismicFleetAis(on) {
+ if (on) {
+ if (typeof map === 'undefined' || !map || typeof map.getCenter !== 'function') {
+ showToast('AIS needs the 2D map - switch to 2D first');
+ const cb = document.getElementById('ais-show-seismic');
+ if (cb) cb.checked = false;
+ return;
+ }
+ if (!aisSeismicLayer) aisSeismicLayer = L.layerGroup().addTo(map);
+ refreshSeismicFleetAis(true);
+ if (aisSeismicTimer) clearInterval(aisSeismicTimer);
+ aisSeismicTimer = setInterval(() => refreshSeismicFleetAis(false), 30000);
+ showToast('Seismic fleet AIS: watching curated streamer vessels');
+ } else {
+ stopSeismicFleetAis();
+ }
+}
+
+function stopSeismicFleetAis() {
+ if (aisSeismicTimer) { clearInterval(aisSeismicTimer); aisSeismicTimer = null; }
+ Object.values(aisSeismicMarkers).forEach(m => { try { aisSeismicLayer.removeLayer(m); } catch (_) {} });
+ aisSeismicMarkers = {};
+ if (aisSeismicLayer && map) { map.removeLayer(aisSeismicLayer); aisSeismicLayer = null; }
+ const cb = document.getElementById('ais-show-seismic');
+ if (cb) cb.checked = false;
+ fetch('api/ais-seismic.php?enable=0', { cache: 'no-store' }).catch(() => {});
+ setSeismicAisStatus('');
+}
+
+async function refreshSeismicFleetAis(enable) {
+ if (!map || !aisSeismicLayer) return;
+ try {
+ const q = enable ? 'enable=1' : 'ping=1';
+ const res = await fetch('api/ais-seismic.php?' + q, { cache: 'no-store' });
+ const data = await res.json();
+ if (!data.configured) {
+ setSeismicAisStatus(data.error || 'AIS not configured — add free AISStream key');
+ showToast(data.error || 'AISStream key required for seismic fleet');
+ return;
+ }
+ const working = Array.isArray(data.working) ? data.working : [];
+ const seen = {};
+ working.forEach(v => {
+ if (v.lat == null || v.lon == null) return;
+ const id = String(v.mmsi);
+ seen[id] = true;
+ const heading = (typeof v.heading === 'number') ? v.heading : (typeof v.cog === 'number' ? v.cog : 0);
+ const icon = L.divIcon({
+ className: 'ais-vessel-icon',
+ html: '<div style="width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-bottom:16px solid #fbbf24;transform:rotate(' + heading + 'deg);filter:drop-shadow(0 0 3px rgba(0,0,0,0.8));"></div>',
+ iconSize: [14, 16], iconAnchor: [7, 8]
+ });
+ const name = (v.name || ('MMSI ' + id)) + (v.operator ? (' · ' + v.operator) : '');
+ const sog = (v.sog != null) ? (Number(v.sog).toFixed(1) + ' kn') : '';
+ if (aisSeismicMarkers[id]) {
+ aisSeismicMarkers[id].setLatLng([v.lat, v.lon]);
+ aisSeismicMarkers[id].setIcon(icon);
+ } else {
+ aisSeismicMarkers[id] = L.marker([v.lat, v.lon], { icon, zIndexOffset: 600 }).addTo(aisSeismicLayer);
+ }
+ aisSeismicMarkers[id].bindTooltip(
+ '<b style="color:#fbbf24">SEISMIC</b> ' + name + (sog ? '<br>' + sog : ''),
+ { direction: 'top', opacity: 0.95 }
+ );
+ });
+ Object.keys(aisSeismicMarkers).forEach(id => {
+ if (!seen[id]) {
+ aisSeismicLayer.removeLayer(aisSeismicMarkers[id]);
+ delete aisSeismicMarkers[id];
+ }
+ });
+ setSeismicAisStatus(
+ 'Working on AIS: ' + (data.workingCount || 0)
+ + ' / roster ' + (data.rosterCount || 0)
+ + (data.silentCount ? (' · ' + data.silentCount + ' silent') : '')
+ + (data.feed ? (' · feed ' + data.feed) : '')
+ );
+ } catch (e) {
+ setSeismicAisStatus('Seismic fleet AIS request failed');
+ }
+}
+
 // Self-hosted World Bank / IMF Global Shipping Traffic Density: AIS position
 // counts in 0.005 deg cells, Jan-2015 to Feb-2021, baked to XYZ tiles on our own
 // server per vessel category (see tools/README-ais-tiles.md).

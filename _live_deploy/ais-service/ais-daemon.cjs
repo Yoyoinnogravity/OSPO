@@ -18,18 +18,55 @@ const DATA_DIR = '/var/www/candooka/data';
 const LIVE_FILE = path.join(DATA_DIR, 'ais-live.json');
 const WANTED_FILE = path.join(DATA_DIR, 'ais-wanted.json');
 const BBOX_FILE = path.join(DATA_DIR, 'ais-bbox.json');
+const SEISMIC_ON_FILE = path.join(DATA_DIR, 'ais-seismic-on.json');
 const STATUS_FILE = path.join(DATA_DIR, 'ais-status.json');
 const ENV_FILE = '/etc/candooka/ais.env';
+const FLEET_FILE = path.join(__dirname, 'seismic-fleet.json');
 const WS_URL = 'wss://stream.aisstream.io/v0/stream';
 const AISHUB_URL = 'https://data.aishub.net/ws.php';
 
 const positions = new Map();
+let seismicFleet = new Map(); // mmsi -> meta
 let ws = null;
 let lastSubKey = '';
 let reconnectTimer = null;
 let lastStreamMsgAt = 0;
 let activeSource = 'none'; // aisstream | aishub | none
 let hubTimer = null;
+
+/** Name patterns for dedicated marine seismic acquisition vessels. */
+const SEISMIC_NAME_RE = /\b(RAMFORM|GEO\s?(CARIBBEAN|CORAL|CASPIAN|CELTIC|PACIFIC)|OCEANIC\s?(SIRIUS|VEGA|ENDEAVOUR|CHAMPION)|AMAZON\s?(WARRIOR|CONQUEROR)|SW\s?(EMPRESS|DUKE|DUCHESS|GALLIEN|TASMAN|BLY|BARET|MIKKELSEN|AMUNDSEN|COLUMBUS|MAGELLAN|VESPUCCI|COOK|THURIDUR)|BGP\s?(PROSPECTOR|CHALLENGER|EXPLORER|PIONEER)|SANCO\s?(SWIFT|SWORD)|POLARCUS|GEOWAVE|HAI YANG SHI YOU\s?7|VYACHESLAV TIKHONOV|VOYAGER EXPLORER|OSPREY EXPLORER|HARRIER EXPLORER|SEABIRD EXPLORER)\b/i;
+
+function loadSeismicFleet() {
+  seismicFleet = new Map();
+  try {
+    const raw = JSON.parse(fs.readFileSync(FLEET_FILE, 'utf8'));
+    const list = Array.isArray(raw) ? raw : (raw.vessels || []);
+    for (const v of list) {
+      const mmsi = String(v.mmsi || '').replace(/\D/g, '');
+      if (mmsi.length === 9) seismicFleet.set(mmsi, v);
+    }
+  } catch (e) {
+    console.error('[ais] seismic fleet load failed', e.message);
+  }
+  console.log('[ais] seismic fleet roster:', seismicFleet.size);
+}
+
+function seismicModeOn() {
+  const b = readJson(SEISMIC_ON_FILE, null);
+  if (!b || !b.on) return false;
+  // Keep warm for 30 min after last UI ping
+  if (Date.now() - Number(b.at || 0) > 30 * 60 * 1000) return false;
+  return true;
+}
+
+function seismicMmsis() {
+  return [...seismicFleet.keys()];
+}
+
+function isSeismicName(name) {
+  return !!(name && SEISMIC_NAME_RE.test(String(name)));
+}
 
 function loadEnv() {
   const env = {};
@@ -114,15 +151,24 @@ function defaultBbox() {
 }
 
 function buildSubscription(apiKey) {
-  const bbox = wantedBbox() || defaultBbox();
-  const mmsi = wantedMmsis();
+  const seismic = seismicModeOn();
+  // Global box when tracking the seismic fleet; otherwise map-view / default SE Asia box
+  const bbox = seismic
+    ? { minlat: -80, minlon: -180, maxlat: 80, maxlon: 180 }
+    : (wantedBbox() || defaultBbox());
+  const mmsiSet = new Set(wantedMmsis());
+  if (seismic) {
+    for (const m of seismicMmsis()) mmsiSet.add(m);
+  }
+  const mmsi = [...mmsiSet].slice(0, 50);
   const sub = {
     APIKey: apiKey,
     BoundingBoxes: [[[bbox.minlat, bbox.minlon], [bbox.maxlat, bbox.maxlon]]],
     FilterMessageTypes: ['PositionReport', 'StandardClassBPositionReport', 'ExtendedClassBPositionReport', 'ShipStaticData'],
   };
-  if (mmsi.length) sub.FiltersShipMMSI = mmsi.slice(0, 50);
-  return { sub, key: JSON.stringify({ bbox, mmsi }), bbox, mmsi };
+  // MMSI filter when we have a roster / track list (keeps global stream tractable)
+  if (mmsi.length) sub.FiltersShipMMSI = mmsi;
+  return { sub, key: JSON.stringify({ bbox, mmsi, seismic }), bbox, mmsi, seismic };
 }
 
 function upsertVessel(rec) {
@@ -132,6 +178,9 @@ function upsertVessel(rec) {
   if (typeof rec.lat !== 'number' || typeof rec.lon !== 'number') return;
   if (!Number.isFinite(rec.lat) || !Number.isFinite(rec.lon)) return;
   const prev = positions.get(mmsi) || { mmsi };
+  const name = rec.name || prev.name || null;
+  const roster = seismicFleet.get(mmsi);
+  const seismic = !!(roster || prev.seismic || isSeismicName(name));
   positions.set(mmsi, {
     mmsi,
     lat: rec.lat,
@@ -139,7 +188,10 @@ function upsertVessel(rec) {
     sog: typeof rec.sog === 'number' ? rec.sog : (prev.sog ?? null),
     cog: typeof rec.cog === 'number' ? rec.cog : (prev.cog ?? null),
     heading: typeof rec.heading === 'number' ? rec.heading : (prev.heading ?? null),
-    name: rec.name || prev.name || null,
+    name: name || (roster && roster.name) || null,
+    operator: (roster && roster.operator) || prev.operator || null,
+    imo: (roster && roster.imo) || prev.imo || null,
+    seismic,
     timestamp: rec.timestamp || new Date().toISOString(),
     source: rec.source || prev.source || 'unknown',
   });
@@ -248,8 +300,15 @@ async function pollAisHub() {
   // Prefer live stream when it is healthy; still allow hub when stream idle/down
   if (streamFresh && positions.size > 0) return false;
 
-  const bbox = wantedBbox() || defaultBbox();
+  const bbox = seismicModeOn()
+    ? { minlat: -80, minlon: -180, maxlat: 80, maxlon: 180 }
+    : (wantedBbox() || defaultBbox());
   const mmsiList = wantedMmsis();
+  if (seismicModeOn()) {
+    for (const m of seismicMmsis()) {
+      if (!mmsiList.includes(m)) mmsiList.push(m);
+    }
+  }
   const params = new URLSearchParams({
     username: user,
     format: '1',
@@ -259,9 +318,14 @@ async function pollAisHub() {
     latmax: String(bbox.maxlat),
     lonmin: String(bbox.minlon),
     lonmax: String(bbox.maxlon),
-    interval: '60',
+    interval: '180',
   });
-  if (mmsiList.length === 1) params.set('mmsi', mmsiList[0]);
+  // AISHub accepts comma-separated MMSIs — prefer roster when in seismic mode
+  if (seismicModeOn() && mmsiList.length) {
+    params.set('mmsi', mmsiList.slice(0, 40).join(','));
+  } else if (mmsiList.length === 1) {
+    params.set('mmsi', mmsiList[0]);
+  }
 
   try {
     const data = await httpGetJson(AISHUB_URL + '?' + params.toString());
@@ -396,7 +460,8 @@ hubTimer = setInterval(() => {
 }, 45000);
 
 ensureDataDir();
+loadSeismicFleet();
 writeLive();
 connect();
 setTimeout(() => { pollAisHub().catch(() => {}); }, 3000);
-console.log('[ais] daemon started (AISStream primary, AISHub optional fallback)');
+console.log('[ais] daemon started (AISStream primary, AISHub fallback, seismic fleet roster)');
