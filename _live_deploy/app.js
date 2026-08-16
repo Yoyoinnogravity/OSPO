@@ -439,7 +439,7 @@ function getBathymetry(lat, lon) {
 
 // ===== MAP SETUP (Leaflet - initially hidden) =====
 var map = null;
-var layerSurveyLines, layerRoute, layerLabels, layerAnnotations, layerObstructions, layerArrows, layerSwaths, layerStartPoint;
+var layerSurveyLines, layerRoute, layerLabels, layerAnnotations, layerObstructions, layerArrows, layerSwaths, layerStartPoint, layerRayTrace;
 
 // Dates and times are shown one way only, so a date can never be read the
 // wrong way round and a time can never be mistaken for am/pm: the month is
@@ -524,6 +524,7 @@ function initLeafletMap() {
  layerObstructions = L.layerGroup().addTo(map);
  layerSwaths = L.layerGroup().addTo(map);
  layerStartPoint = L.layerGroup().addTo(map);
+ layerRayTrace = L.layerGroup().addTo(map);
 
  // Map events
  map.on('mousemove', e => {
@@ -14111,6 +14112,15 @@ function resetWorkspaceForLogout() {
   if (typeof layerSwaths !== 'undefined' && layerSwaths) layerSwaths.clearLayers();
   if (typeof layerStartPoint !== 'undefined' && layerStartPoint) layerStartPoint.clearLayers();
   if (typeof layerAcqRoute !== 'undefined' && layerAcqRoute) layerAcqRoute.clearLayers();
+  if (typeof layerRayTrace !== 'undefined' && layerRayTrace) layerRayTrace.clearLayers();
+  if (typeof _rayState !== 'undefined' && _rayState) {
+   _rayState.source = null;
+   _rayState.nodes = [];
+   _rayState.results = [];
+  }
+  if (typeof rayTraceStopPick === 'function') {
+   try { rayTraceStopPick(); } catch (_) {}
+  }
  } catch (_) {}
 
  // Clear user overlay layers list if present

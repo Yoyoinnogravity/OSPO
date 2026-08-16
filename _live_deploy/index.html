@@ -306,6 +306,7 @@
  <button class="t2-btn btn-obstruct" onclick="togglePanel('obstructions')" style="text-align: center; justify-content: center; margin: 0; height: 28px; padding: 4px 12px;">OBSTRUCTIONS</button>
  <button class="t2-btn btn-postplot-qc" onclick="showPostplotQC()" style="text-align: center; justify-content: center; margin: 0; height: 28px; padding: 4px 12px; border: 1px solid #a855f7; color: #c084fc; font-weight: 700;">POSTPLOT QC</button>
  <button class="t2-btn btn-fold-coverage" onclick="showFoldCoverage()" style="text-align: center; justify-content: center; margin: 0; height: 28px; padding: 4px 12px; border: 1px solid #2dd4bf; color: #5eead4; font-weight: 700;">FOLD COVERAGE</button>
+ <button class="t2-btn btn-ray-trace" onclick="showRayTracing()" title="Acoustic ray tracing for OBN / water-column paths" style="text-align: center; justify-content: center; margin: 0; height: 28px; padding: 4px 12px; border: 1px solid #f59e0b; color: #fbbf24; font-weight: 700;">RAY TRACING</button>
  <button class="t2-btn" onclick="planRoute()" style="text-align: center; justify-content: center; margin: 0; height: 28px; padding: 4px 12px; border: 1px solid #30d158; color: #4ef5a3; font-weight: 700;">ROUTE PLANNING</button>
  <button class="t2-btn btn-reset" id="btn-reset-route" onclick="resetRoute()" style="text-align: center; justify-content: center; margin: 0; height: 28px; padding: 4px 12px;">RESET ROUTE</button>
  <div style="position:relative;display:inline-block;flex-shrink:0;">
@@ -805,6 +806,73 @@
  </div>
  </div>
  <div id="fold-maps"></div>
+ </div>
+ <!-- Ray Tracing (OBN / water-column acoustic paths) -->
+ <div id="panel-ray-tracing" class="settings-panel" style="display:none; width:720px; max-width:94vw; max-height:88vh; overflow-y:auto;">
+ <button class="panel-close-btn" onclick="hidePanel('ray-tracing'); rayTraceStopPick();">&times;</button>
+ <div class="panel-title">Ray Tracing - OBN / Water Column</div>
+ <div style="font-size:11px;color:#a0aebb;margin-bottom:10px;line-height:1.45;">
+ Acoustic paths from a source to seabed nodes through a layered velocity model (Snell's law).
+ First slice for OBN planning: place a source, place or generate a node patch, then trace rays for travel time and emergence angle.
+ </div>
+ <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+  <div style="background:#0a0a12;border:1px solid #1a1a24;border-radius:6px;padding:10px;">
+   <div style="font-size:10px;color:#fbbf24;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;margin-bottom:8px;">Geometry</div>
+   <div class="panel-row" style="margin-bottom:6px;">
+    <label style="width:110px;font-size:11px;color:#c0c8d4;">Source depth</label>
+    <input id="ray-src-z" type="number" min="0" step="1" value="8" style="width:80px;padding:4px 6px;border-radius:3px;border:1px solid #333;background:#111;color:#fff;font-size:11px;outline:none;"/>
+    <span style="font-size:10px;color:#666;margin-left:4px;">m</span>
+   </div>
+   <div class="panel-row" style="margin-bottom:6px;">
+    <label style="width:110px;font-size:11px;color:#c0c8d4;">Node / seabed</label>
+    <input id="ray-rcv-z" type="number" min="1" step="1" value="1000" style="width:80px;padding:4px 6px;border-radius:3px;border:1px solid #333;background:#111;color:#fff;font-size:11px;outline:none;"/>
+    <span style="font-size:10px;color:#666;margin-left:4px;">m</span>
+   </div>
+   <div class="panel-row" style="margin-bottom:6px;">
+    <label style="width:110px;font-size:11px;color:#c0c8d4;">Max offset</label>
+    <input id="ray-max-off" type="number" min="100" step="100" value="8000" style="width:80px;padding:4px 6px;border-radius:3px;border:1px solid #333;background:#111;color:#fff;font-size:11px;outline:none;"/>
+    <span style="font-size:10px;color:#666;margin-left:4px;">m</span>
+   </div>
+   <div class="panel-row" style="margin-bottom:6px;">
+    <label style="width:110px;font-size:11px;color:#c0c8d4;">Max rays drawn</label>
+    <input id="ray-max-draw" type="number" min="1" max="500" step="1" value="80" style="width:80px;padding:4px 6px;border-radius:3px;border:1px solid #333;background:#111;color:#fff;font-size:11px;outline:none;"/>
+   </div>
+  </div>
+  <div style="background:#0a0a12;border:1px solid #1a1a24;border-radius:6px;padding:10px;">
+   <div style="font-size:10px;color:#fbbf24;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;margin-bottom:8px;">Velocity model (1D layers)</div>
+   <div style="font-size:9px;color:#666;margin-bottom:6px;">Bottom depth (m) and P-velocity (m/s) per layer, top to bottom.</div>
+   <div id="ray-vmodel-rows" style="max-height:120px;overflow-y:auto;margin-bottom:6px;"></div>
+   <div style="display:flex;gap:6px;flex-wrap:wrap;">
+    <button type="button" onclick="rayAddLayer()" style="padding:4px 8px;border-radius:3px;border:1px solid #333;background:#1a1a2e;color:#e0e8f0;font-size:10px;cursor:pointer;">+ Layer</button>
+    <button type="button" onclick="rayPresetWater()" style="padding:4px 8px;border-radius:3px;border:1px solid #333;background:#1a1a2e;color:#5eead4;font-size:10px;cursor:pointer;">Water only 1500</button>
+    <button type="button" onclick="rayPresetGradient()" style="padding:4px 8px;border-radius:3px;border:1px solid #333;background:#1a1a2e;color:#5eead4;font-size:10px;cursor:pointer;">Water gradient</button>
+   </div>
+  </div>
+ </div>
+ <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center;">
+  <button type="button" id="ray-btn-src" onclick="rayTracePickSource()" style="padding:7px 12px;border-radius:4px;border:none;background:#f59e0b;color:#111;font-weight:700;cursor:pointer;font-size:11px;">1. Place Source</button>
+  <button type="button" id="ray-btn-node" onclick="rayTracePickNode()" style="padding:7px 12px;border-radius:4px;border:1px solid #f59e0b;background:#1a1205;color:#fbbf24;font-weight:700;cursor:pointer;font-size:11px;">2. Place Node</button>
+  <button type="button" onclick="rayGeneratePatch()" style="padding:7px 12px;border-radius:4px;border:1px solid #333;background:#1a1a2e;color:#e0e8f0;font-weight:700;cursor:pointer;font-size:11px;">Generate Node Patch</button>
+  <button type="button" onclick="rayTraceRun()" style="padding:7px 14px;border-radius:4px;border:none;background:#30d158;color:#000;font-weight:700;cursor:pointer;font-size:11px;">Trace Rays</button>
+  <button type="button" onclick="rayTraceClear()" style="padding:7px 12px;border-radius:4px;border:1px solid #333;background:#1a1a2e;color:#ff453a;font-weight:700;cursor:pointer;font-size:11px;">Clear</button>
+ </div>
+ <div style="display:flex;gap:10px;margin-bottom:8px;font-size:10px;color:#8a9bb0;flex-wrap:wrap;">
+  <label style="display:flex;align-items:center;gap:4px;">Patch nx
+   <input id="ray-patch-nx" type="number" min="1" max="40" value="5" style="width:44px;padding:3px 4px;border-radius:3px;border:1px solid #333;background:#111;color:#fff;font-size:10px;outline:none;"/>
+  </label>
+  <label style="display:flex;align-items:center;gap:4px;">ny
+   <input id="ray-patch-ny" type="number" min="1" max="40" value="5" style="width:44px;padding:3px 4px;border-radius:3px;border:1px solid #333;background:#111;color:#fff;font-size:10px;outline:none;"/>
+  </label>
+  <label style="display:flex;align-items:center;gap:4px;">Spacing
+   <input id="ray-patch-dx" type="number" min="10" step="10" value="400" style="width:56px;padding:3px 4px;border-radius:3px;border:1px solid #333;background:#111;color:#fff;font-size:10px;outline:none;"/> m
+  </label>
+ </div>
+ <div id="ray-summary" style="font-size:10px;color:#8a9bb0;padding:8px 10px;background:#0a0a12;border:1px solid #1a1a24;border-radius:4px;margin-bottom:10px;">
+  No rays yet - place a source and at least one node, then Trace Rays.
+ </div>
+ <div style="font-size:10px;color:#fbbf24;font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.4px;">Vertical profile (offset vs depth)</div>
+ <canvas id="ray-profile-canvas" width="680" height="260" style="width:100%;max-width:680px;height:260px;background:#07070c;border:1px solid #1a1a24;border-radius:4px;display:block;margin-bottom:8px;"></canvas>
+ <div style="font-size:9px;color:#556;line-height:1.4;">Rays are coloured by travel time on the map. Profile shows depth downward; source at top. Critical / turning rays that cannot reach the node depth are skipped.</div>
  </div>
  <!-- Layers Panel -->
  <div id="panel-layers" class="settings-panel" style="display:none; min-width:280px; max-height:90vh; overflow-y:auto;">
@@ -1591,6 +1659,7 @@
  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
  <script src="https://unpkg.com/shpjs@latest/dist/shp.min.js"></script>
  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
- <script src="app.js?v=16.7"></script>
+ <script src="app.js?v=16.8"></script>
+ <script src="ray_tracing_module.js?v=16.8"></script>
 </body>
 </html>
