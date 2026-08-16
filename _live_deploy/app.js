@@ -16120,6 +16120,29 @@ let aisSeismicLayer = null;
 let aisSeismicTimer = null;
 let aisSeismicMarkers = {};
 
+async function openAisPanel() {
+ togglePanel('ais');
+ const el = document.getElementById('ais-feed-status');
+ if (!el) return;
+ try {
+  const res = await fetch('api/ais-status.php', { cache: 'no-store' });
+  const data = await res.json();
+  const bits = [];
+  if (data.ok) bits.push('Feed online');
+  else bits.push('Feed starting / limited');
+  if (data.vesselCount != null) bits.push(data.vesselCount + ' vessels cached');
+  if (data.activeSource) bits.push('source ' + data.activeSource);
+  if (data.norwayConnected) bits.push('Norway TCP connected');
+  el.innerHTML = '<div style="color:#7dd3fc;font-weight:600;margin-bottom:4px;">'
+   + bits.join(' · ')
+   + '</div><div style="color:#64748b;">'
+   + (data.coverage || data.source || 'Free Nordic/Baltic coastal AIS')
+   + '</div>';
+ } catch (_) {
+  el.textContent = 'Could not reach AIS status API';
+ }
+}
+
 function setSeismicAisStatus(msg) {
  const el = document.getElementById('ais-seismic-status');
  if (el) el.textContent = msg || '';

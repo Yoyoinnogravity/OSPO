@@ -263,6 +263,8 @@
  <button class="corp-btn" onclick="togglePanel('measure')" style="flex: 1; text-align: center; margin: 0;">MEASURE</button>
  <!-- Layers -->
  <button class="corp-btn" onclick="togglePanel('layers')" style="flex: 1; text-align: center; margin: 0;">LAYERS</button>
+ <!-- AIS -->
+ <button class="corp-btn" id="nav-ais" onclick="openAisPanel()" title="Live AIS vessel traffic" style="flex: 1; text-align: center; margin: 0; border-color:#38bdf8; color:#7dd3fc;">AIS</button>
  <!-- Save Plan -->
  <button class="corp-btn" onclick="togglePanel('save-plan')" style="flex: 1; text-align: center; margin: 0;">SAVE PLAN</button>
  <!-- Restore Plan -->
@@ -905,6 +907,41 @@
  <canvas id="ray-profile-canvas" width="680" height="260" style="width:100%;max-width:680px;height:260px;background:#07070c;border:1px solid #1a1a24;border-radius:4px;display:block;margin-bottom:8px;"></canvas>
  <div style="font-size:9px;color:#556;line-height:1.4;">Rays are coloured by travel time on the map. Profile shows depth downward; source at top. Critical / turning rays that cannot reach the node depth are skipped.</div>
  </div>
+ <!-- AIS Panel (tier-1) -->
+ <div id="panel-ais" class="settings-panel" style="display:none; min-width:340px; max-width:420px; max-height:90vh; overflow-y:auto;">
+ <button class="panel-close-btn" onclick="hidePanel('ais')">&times;</button>
+ <div class="panel-title">Live AIS</div>
+ <div id="ais-feed-status" style="font-size:11px;color:#94a3b8;margin-bottom:12px;line-height:1.45;">Loading feed status…</div>
+
+ <div style="border:1px solid #1e293b;border-radius:8px;padding:10px 12px;margin-bottom:12px;background:#0a0a12;">
+ <div style="font-size:10px;color:#7dd3fc;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;margin-bottom:8px;">Free coastal feeds</div>
+ <label style="display:flex; align-items:center; gap:8px; font-size:12px; color:#e2e8f0; cursor:pointer; margin-bottom:8px;">
+ <input type="checkbox" id="ais-show-bbox" onchange="toggleAisInView(this.checked)" style="accent-color:#00d2ff;"/>Show vessels in map view
+ </label>
+ <div style="font-size:10px;color:#64748b;line-height:1.4;">Digitraffic (Finnish/Baltic) + Kystverket Norway open AIS. Pan the map into those waters to see traffic.</div>
+ </div>
+
+ <div style="border:1px solid #422006;border-radius:8px;padding:10px 12px;margin-bottom:12px;background:rgba(120,53,15,0.15);">
+ <div style="font-size:10px;color:#fbbf24;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;margin-bottom:8px;">Seismic fleet</div>
+ <label style="display:flex; align-items:center; gap:8px; font-size:12px; color:#e2e8f0; cursor:pointer; margin-bottom:8px;">
+ <input type="checkbox" id="ais-show-seismic" onchange="toggleSeismicFleetAis(this.checked)" style="accent-color:#fbbf24;"/>Show working seismic fleet on AIS
+ </label>
+ <div id="ais-seismic-status" style="font-size:10px; color:#a0aebb; margin-bottom:8px; line-height:1.35;"></div>
+ <div style="font-size:10px;color:#fcd34d;line-height:1.45;border-top:1px solid #78350f;padding-top:8px;">
+ Worldwide offshore seismic ships are mostly beyond coastal AIS. Mapping the global working fleet needs <b style="color:#fde68a;">paid satellite AIS</b> (e.g. Kpler / MarineTraffic). Free feeds only catch them when they are in Nordic/Baltic coverage.
+ </div>
+ </div>
+
+ <div style="border:1px solid #1e293b;border-radius:8px;padding:10px 12px;margin-bottom:4px;background:#0a0a12;">
+ <div style="font-size:10px;color:#a0aebb;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;margin-bottom:8px;">Track one vessel (MMSI)</div>
+ <div style="display:flex; gap:6px;">
+ <input type="text" id="ais-track-mmsi" placeholder="9-digit MMSI" maxlength="9" style="flex:1; min-width:0; padding:5px 8px; background:#05050a; border:1px solid #1a1a24; border-radius:3px; color:#e2e8f0; font-size:11px; outline:none;"/>
+ <button onclick="startVesselTracking()" style="padding:5px 10px; background:#0a0a12; border:1px solid #00d2ff; border-radius:3px; color:#00d2ff; font-size:10px; cursor:pointer;">TRACK</button>
+ <button onclick="stopVesselTracking()" style="padding:5px 10px; background:#0a0a12; border:1px solid #1a1a24; border-radius:3px; color:#a0aebb; font-size:10px; cursor:pointer;">STOP</button>
+ </div>
+ <div id="ais-track-status" style="font-size:10px; color:#a0aebb; margin-top:6px;"></div>
+ </div>
+ </div>
  <!-- Layers Panel -->
  <div id="panel-layers" class="settings-panel" style="display:none; min-width:280px; max-height:90vh; overflow-y:auto;">
  <button class="panel-close-btn" onclick="hidePanel('layers')">&times;</button>
@@ -1043,22 +1080,9 @@
  <input type="checkbox" id="layer-overlay-acqroute" onchange="toggleAcquiredRoute(this.checked)" style="accent-color:#ffd60a;"/>Acquired Route (sequences)
  </label>
  <div style="margin-top:10px; padding-top:10px; border-top:1px solid #1a1a24;">
- <div style="font-size:10px; color:#a0aebb; margin-bottom:6px; font-weight:700; letter-spacing:0.5px;">LIVE AIS (FREE — NO TRANSCEIVER)</div>
- <label style="display:flex; align-items:center; gap:8px; font-size:11px; color:#ccc; cursor:pointer; margin-bottom:8px;">
- <input type="checkbox" id="ais-show-bbox" onchange="toggleAisInView(this.checked)" style="accent-color:#00d2ff;"/>Show vessels in map view
- </label>
- <label style="display:flex; align-items:center; gap:8px; font-size:11px; color:#ccc; cursor:pointer; margin-bottom:8px;">
- <input type="checkbox" id="ais-show-seismic" onchange="toggleSeismicFleetAis(this.checked)" style="accent-color:#fbbf24;"/>Show working seismic fleet on AIS
- </label>
- <div id="ais-seismic-status" style="font-size:10px; color:#a0aebb; margin-bottom:8px; line-height:1.35;"></div>
- <div style="font-size:10px; color:#a0aebb; margin-bottom:6px; font-weight:700; letter-spacing:0.5px;">TRACK ONE VESSEL (MMSI)</div>
- <div style="display:flex; gap:6px;">
- <input type="text" id="ais-track-mmsi" placeholder="9-digit MMSI" maxlength="9" style="flex:1; min-width:0; padding:5px 8px; background:#0a0a12; border:1px solid #1a1a24; border-radius:3px; color:#e2e8f0; font-size:11px; outline:none;"/>
- <button onclick="startVesselTracking()" style="padding:5px 10px; background:#0a0a12; border:1px solid #00d2ff; border-radius:3px; color:#00d2ff; font-size:10px; cursor:pointer;">TRACK</button>
- <button onclick="stopVesselTracking()" style="padding:5px 10px; background:#0a0a12; border:1px solid #1a1a24; border-radius:3px; color:#a0aebb; font-size:10px; cursor:pointer;">STOP</button>
- </div>
- <div id="ais-track-status" style="font-size:10px; color:#a0aebb; margin-top:6px;"></div>
- <div style="font-size:9px; color:#556; margin-top:6px; line-height:1.35;">Free feeds (no transceiver): Digitraffic Finnish/Baltic + Kystverket Norway open AIS. Global offshore seismic ships still need paid satellite AIS (e.g. Kpler).</div>
+ <div style="font-size:10px; color:#a0aebb; margin-bottom:6px; font-weight:700; letter-spacing:0.5px;">LIVE AIS</div>
+ <button type="button" onclick="openAisPanel()" style="width:100%;padding:8px 10px;border-radius:4px;border:1px solid #155e75;background:#0c1929;color:#7dd3fc;font-weight:700;cursor:pointer;font-size:11px;font-family:inherit;text-align:left;">Open AIS panel →</button>
+ <div style="font-size:9px; color:#556; margin-top:6px; line-height:1.35;">Free coastal AIS (Nordic/Baltic). Worldwide seismic fleet needs paid satellite AIS.</div>
  </div>
  </div>
  </div>
@@ -1708,9 +1732,9 @@
  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
  <script src="https://unpkg.com/shpjs@latest/dist/shp.min.js"></script>
  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
- <script src="app.js?v=16.21"></script>
- <script src="ray_tracing_module.js?v=16.21"></script>
- <script src="wmm_declination.js?v=16.21"></script>
- <script src="magnetic_isogones.js?v=16.21"></script>
+ <script src="app.js?v=16.22"></script>
+ <script src="ray_tracing_module.js?v=16.22"></script>
+ <script src="wmm_declination.js?v=16.22"></script>
+ <script src="magnetic_isogones.js?v=16.22"></script>
 </body>
 </html>
