@@ -9786,7 +9786,7 @@ var _startLineChooserShown = false;
 var _pendingStartReversed = false;
 var _pendingPlanRouteContinue = null;
 
-/** Ask 2D (any direction) vs 3D (swath) before planning so Survey Criteria cannot silently flip. */
+/** Ask 2D / 3D / OBN before every route plan so the wrong acquisition mode is never silent. */
 function confirmSurveyPlanTypeThen(continueFn) {
  const existing = document.getElementById('survey-plan-type-dialog');
  if (existing) existing.remove();
@@ -9795,38 +9795,39 @@ function confirmSurveyPlanTypeThen(continueFn) {
   : (state.settings.surveyType === 'obn') ? 'obn' : '3d';
  const overlay = document.createElement('div');
  overlay.id = 'survey-plan-type-dialog';
- overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(6,6,12,0.88);z-index:9500;display:flex;align-items:center;justify-content:center;';
+ overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(6,6,12,0.92);z-index:12000;display:flex;align-items:center;justify-content:center;';
  overlay.innerHTML = `
- <div style="background:#0e0e16;border:1px solid #1a1a24;border-radius:8px;padding:22px 24px;width:100%;max-width:440px;box-shadow:0 16px 64px rgba(0,0,0,0.7);font-family:inherit;" onclick="event.stopPropagation()">
- <div style="font-size:14px;font-weight:700;color:#e0e8f0;margin-bottom:6px;text-align:center;">Confirm survey plan type</div>
+ <div style="background:#0e0e16;border:1px solid #2a2a3a;border-radius:10px;padding:24px 26px;width:100%;max-width:460px;box-shadow:0 20px 64px rgba(0,0,0,0.75);font-family:inherit;" onclick="event.stopPropagation()">
+ <div style="font-size:11px;font-weight:700;color:#30d158;letter-spacing:0.6px;text-transform:uppercase;text-align:center;margin-bottom:6px;">Before route planning</div>
+ <div style="font-size:15px;font-weight:700;color:#e0e8f0;margin-bottom:8px;text-align:center;">Choose 2D, 3D, or OBN</div>
  <div style="font-size:11px;color:#8a9bb0;margin-bottom:14px;text-align:center;line-height:1.45;">
- Survey Criteria currently says <strong style="color:${current === '2d' ? '#67e8f9' : current === 'obn' ? '#fbbf24' : '#ffd60a'};">${current === '2d' ? '2D' : current === 'obn' ? 'OBN' : '3D'}</strong>.
- Confirm before routing.
+ Pick the acquisition type for this plan. Current setting:
+ <strong style="color:${current === '2d' ? '#67e8f9' : current === 'obn' ? '#fbbf24' : '#ffd60a'};">${current === '2d' ? '2D' : current === 'obn' ? 'OBN' : '3D'}</strong>.
  </div>
- <label style="display:flex;gap:10px;align-items:flex-start;padding:10px 12px;margin-bottom:8px;border-radius:6px;border:1px solid ${current === '2d' ? '#22d3ee' : '#1e293b'};background:${current === '2d' ? 'rgba(8,47,73,0.45)' : '#111'};cursor:pointer;">
+ <label style="display:flex;gap:10px;align-items:flex-start;padding:12px 14px;margin-bottom:8px;border-radius:8px;border:1px solid ${current === '2d' ? '#22d3ee' : '#1e293b'};background:${current === '2d' ? 'rgba(8,47,73,0.45)' : '#111'};cursor:pointer;">
  <input type="radio" name="survey-plan-type" value="2d"${current === '2d' ? ' checked' : ''} style="margin-top:3px;accent-color:#00d2ff;" />
  <span>
- <span style="display:block;color:#e2e8f0;font-size:12px;font-weight:700;">2D - any direction</span>
- <span style="display:block;color:#94a3b8;font-size:10px;line-height:1.35;margin-top:2px;">Free optimizer or W/E/N/S / line-number order. No swath interleave.</span>
+ <span style="display:block;color:#e2e8f0;font-size:13px;font-weight:700;">2D</span>
+ <span style="display:block;color:#94a3b8;font-size:10px;line-height:1.35;margin-top:2px;">Streamer / towed lines - free optimizer or compass / line-number order. No swath interleave.</span>
  </span>
  </label>
- <label style="display:flex;gap:10px;align-items:flex-start;padding:10px 12px;margin-bottom:8px;border-radius:6px;border:1px solid ${current === '3d' ? '#fbbf24' : '#1e293b'};background:${current === '3d' ? 'rgba(66,32,6,0.35)' : '#111'};cursor:pointer;">
+ <label style="display:flex;gap:10px;align-items:flex-start;padding:12px 14px;margin-bottom:8px;border-radius:8px;border:1px solid ${current === '3d' ? '#fbbf24' : '#1e293b'};background:${current === '3d' ? 'rgba(66,32,6,0.35)' : '#111'};cursor:pointer;">
  <input type="radio" name="survey-plan-type" value="3d"${current === '3d' ? ' checked' : ''} style="margin-top:3px;accent-color:#fbbf24;" />
  <span>
- <span style="display:block;color:#e2e8f0;font-size:12px;font-weight:700;">3D - swath plan</span>
- <span style="display:block;color:#94a3b8;font-size:10px;line-height:1.35;margin-top:2px;">Progressive adjacent lines / interleaved swaths for geophysical coverage.</span>
+ <span style="display:block;color:#e2e8f0;font-size:13px;font-weight:700;">3D</span>
+ <span style="display:block;color:#94a3b8;font-size:10px;line-height:1.35;margin-top:2px;">Multi-streamer swath plan - progressive / interleaved coverage.</span>
  </span>
  </label>
- <label style="display:flex;gap:10px;align-items:flex-start;padding:10px 12px;margin-bottom:14px;border-radius:6px;border:1px solid ${current === 'obn' ? '#f59e0b' : '#1e293b'};background:${current === 'obn' ? 'rgba(66,32,6,0.4)' : '#111'};cursor:pointer;">
+ <label style="display:flex;gap:10px;align-items:flex-start;padding:12px 14px;margin-bottom:16px;border-radius:8px;border:1px solid ${current === 'obn' ? '#f59e0b' : '#1e293b'};background:${current === 'obn' ? 'rgba(66,32,6,0.4)' : '#111'};cursor:pointer;">
  <input type="radio" name="survey-plan-type" value="obn"${current === 'obn' ? ' checked' : ''} style="margin-top:3px;accent-color:#f59e0b;" />
  <span>
- <span style="display:block;color:#e2e8f0;font-size:12px;font-weight:700;">OBN - Ocean Bottom Nodes</span>
- <span style="display:block;color:#94a3b8;font-size:10px;line-height:1.35;margin-top:2px;">Source sail lines over a seabed node patch. No streamer swath interleave.</span>
+ <span style="display:block;color:#e2e8f0;font-size:13px;font-weight:700;">OBN - Ocean Bottom Nodes</span>
+ <span style="display:block;color:#94a3b8;font-size:10px;line-height:1.35;margin-top:2px;">Source sail lines over a seabed node patch. No streamer swaths.</span>
  </span>
  </label>
  <div style="display:flex;gap:8px;">
- <button type="button" id="spt-cancel" style="flex:1;padding:10px;border-radius:5px;border:1px solid #333;background:#1a1a2e;color:#a0aebb;font-weight:700;cursor:pointer;font-size:12px;">Cancel</button>
- <button type="button" id="spt-continue" style="flex:1.4;padding:10px;border-radius:5px;border:none;background:#30d158;color:#000;font-weight:700;cursor:pointer;font-size:12px;">Continue to plan</button>
+ <button type="button" id="spt-cancel" style="flex:1;padding:11px;border-radius:6px;border:1px solid #333;background:#1a1a2e;color:#a0aebb;font-weight:700;cursor:pointer;font-size:12px;">Cancel</button>
+ <button type="button" id="spt-continue" style="flex:1.5;padding:11px;border-radius:6px;border:none;background:#30d158;color:#000;font-weight:700;cursor:pointer;font-size:12px;">Continue to plan</button>
  </div>
  </div>`;
  document.body.appendChild(overlay);
@@ -9853,7 +9854,8 @@ function confirmSurveyPlanTypeThen(continueFn) {
  };
  overlay.onclick = (e) => { if (e.target === overlay) { overlay.remove(); _pendingPlanRouteContinue = null; } };
  document.getElementById('spt-continue').onclick = () => {
-  const picked = (overlay.querySelector('input[name="survey-plan-type"]:checked') || {}).value || current;
+  const picked = (overlay.querySelector('input[name="survey-plan-type"]:checked') || {}).value;
+  if (!picked) { showToast('Select 2D, 3D, or OBN before planning'); return; }
   applyConfirmedSurveyPlanType(picked);
   overlay.remove();
   const next = continueFn || _pendingPlanRouteContinue;
