@@ -16116,6 +16116,14 @@ function toggleMapLayer(layerName) {
  }
  mapLayers.grid.addTo(map);
  }
+ } else if (layerName === 'declination') {
+ // Isogonic curves (equal magnetic declination) from WMM
+ if (typeof magIsoToggle === 'function') {
+  const cb = document.getElementById('layer-overlay-declination');
+  magIsoToggle(!!(cb && cb.checked));
+ } else {
+  showToast('Magnetic declination module not loaded');
+ }
  } else if (layerName === 'vessel-density') {
  // Vessel route density heatmap: EMODnet Human Activities WMS (AIS-derived,
  // annual-average density of all ship types). Plain WMS image tiles - // Leaflet tile layers are NON-INTERACTIVE, so the heatmap never captures
