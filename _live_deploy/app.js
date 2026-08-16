@@ -23993,7 +23993,7 @@ function foldExportImages() {
  showToast(`Exporting ${nOut} PNG image(s)...`, 3000);
 }
 
-// ===== Weather: Sea temp (NOAA) / Wind / Waves (6h cache) =====
+// ===== Weather: Sea temp / Wind / Waves — NOAA public domain (6h cache) =====
 const WEATHER_CACHE_MS = 6 * 60 * 60 * 1000;
 window._weatherMode = 'sst';
 
@@ -24148,63 +24148,106 @@ async function openWeatherMode(mode, force) {
  const c = map.getCenter();
  const lat = c.lat;
  const lon = c.lng;
- const zoom = Math.round(map.getZoom ? map.getZoom() : 7) || 7;
  panel.style.display = 'block';
  const title = document.getElementById('weather-panel-title');
- if (title) title.textContent = (window._weatherMode === 'waves' ? 'Waves' : 'Wind') + ' | 6h cache';
+ if (title) title.textContent = (window._weatherMode === 'waves' ? 'Waves' : 'Wind') + ' | NOAA | 6h cache';
  const meta = document.getElementById('weather-meta');
  if (meta) meta.textContent = lat.toFixed(3) + ' deg, ' + lon.toFixed(3) + ' deg';
 
- const cached = !force ? _readWeatherCache(window._weatherMode, lat, lon) : null;
- const sstEl = document.getElementById('weather-sst');
+ // NOAA text readout replaces the commercial Windy embed
  const iframe = document.getElementById('weather-iframe');
- if (iframe) iframe.style.display = 'block';
-
- const product = window._weatherMode === 'waves' ? 'gfsWave' : 'ecmwf';
- const overlay = window._weatherMode;
- // Freeze coords in iframe URL so pan/zoom does not reload every few seconds
  if (iframe) {
- iframe.src = 'https://embed.windy.com/embed2.html?lat=' + lat.toFixed(4)
- + '&lon=' + lon.toFixed(4)
- + '&detailLat=' + lat.toFixed(4)
- + '&detailLon=' + lon.toFixed(4)
- + '&zoom=' + zoom
- + '&level=surface&overlay=' + overlay
- + '&product=' + product
- + '&menu=&message=&marker=true&calendar=now&pressure=&type=map&location=coordinates&detail=&metricWind=kt&metricTemp=%C2%B0C&radarRange=-1';
+  iframe.style.display = 'none';
+  iframe.removeAttribute('src');
  }
 
- if (cached) {
- _applySst(sstEl, cached.sst);
- showToast((window._weatherMode === 'waves' ? 'Waves' : 'Wind') + ' (cached 6h)');
- return;
+ const sstEl = document.getElementById('weather-sst');
+ const cached = !force ? _readWeatherCache(window._weatherMode, lat, lon) : null;
+ if (cached && cached.marine && cached.marine.ok) {
+  _applyNoaaMarine(sstEl, cached.marine);
+  showToast((window._weatherMode === 'waves' ? 'Waves' : 'Wind') + ' (NOAA, cached 6h)');
+  return;
  }
 
  if (sstEl) {
- sstEl.style.display = 'block';
- sstEl.innerHTML = '<div style="font-size:11px;color:#94a3b8;">Loading NOAA sea water temperature...</div>';
+  sstEl.style.display = 'block';
+  sstEl.innerHTML = '<div style="font-size:11px;color:#94a3b8;">Loading NOAA '
+   + (window._weatherMode === 'waves' ? 'WAVEWATCH III waves' : 'GFS wind') + '...</div>';
  }
+
  try {
- const res = await fetch('/api/sst.php?lat=' + encodeURIComponent(lat.toFixed(4)) + '&lon=' + encodeURIComponent(lon.toFixed(4)));
- const sst = res.ok ? await res.json() : null;
- const ok = sst && typeof sst.sstC === 'number';
- _applySst(sstEl, ok ? sst : null);
- _writeWeatherCache(window._weatherMode, lat, lon, {
-  sst: ok ? {
-   sstC: sst.sstC,
-   time: sst.time || '',
-   source: sst.source || 'NOAA',
-   fallback: sst.fallback || null,
-   history: Array.isArray(sst.history) ? sst.history : []
-  } : null
- });
- showToast(ok
- ? ((window._weatherMode === 'waves' ? 'Waves' : 'Wind') + ' | Sea water ' + sst.sstC.toFixed(1) + ' degC (NOAA)')
- : ((window._weatherMode === 'waves' ? 'Waves' : 'Wind') + ' loaded (SST unavailable)'));
+  const url = '/api/noaa-marine.php?mode=' + encodeURIComponent(window._weatherMode)
+   + '&lat=' + encodeURIComponent(lat.toFixed(4))
+   + '&lon=' + encodeURIComponent(lon.toFixed(4));
+  const res = await fetch(url);
+  const marine = res.ok ? await res.json() : null;
+  const ok = marine && marine.ok;
+  _applyNoaaMarine(sstEl, ok ? marine : null);
+  if (!ok && sstEl) {
+   sstEl.style.display = 'block';
+   sstEl.innerHTML = '<div style="font-size:11px;color:#fbbf24;">'
+    + ((marine && marine.error) ? marine.error : 'NOAA data unavailable at this location')
+    + '</div>'
+    + '<div style="font-size:9px;color:#64748b;margin-top:6px;">Source: NOAA public domain (CoastWatch ERDDAP)</div>';
+  }
+  _writeWeatherCache(window._weatherMode, lat, lon, { marine: ok ? marine : null });
+  showToast(ok
+   ? ((window._weatherMode === 'waves'
+    ? ('Waves Hs ' + Number(marine.hsM).toFixed(1) + ' m (NOAA WW3)')
+    : ('Wind ' + Number(marine.speedKt).toFixed(0) + ' kt ' + (marine.dirCardinal || '') + ' (NOAA GFS)')))
+   : ((window._weatherMode === 'waves' ? 'Waves' : 'Wind') + ' unavailable'));
  } catch (e) {
- _applySst(sstEl, null);
- showToast('Weather loaded (SST request failed)');
+  if (sstEl) {
+   sstEl.style.display = 'block';
+   sstEl.innerHTML = '<div style="font-size:11px;color:#f87171;">NOAA request failed</div>';
+  }
+  showToast('NOAA weather request failed');
  }
+}
+
+function _applyNoaaMarine(el, data) {
+ if (!el) return;
+ if (!data || !data.ok) {
+  el.style.display = 'none';
+  el.innerHTML = '';
+  return;
+ }
+ el.style.display = 'block';
+ const t = (data.time || '').replace('T', ' ').replace('Z', ' UTC');
+ if (data.mode === 'waves') {
+  const dir = (data.peakDirDeg != null)
+   ? (data.peakDirDeg + '\u00b0 ' + (data.peakDirCardinal || ''))
+   : '--';
+  const per = (data.peakPeriodSec != null) ? (Number(data.peakPeriodSec).toFixed(1) + ' s') : '--';
+  el.innerHTML =
+   '<div style="font-size:9px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.5px;">Significant wave height</div>'
+   + '<div style="font-size:20px;font-weight:700;color:#7dd3fc;font-family:ui-monospace,monospace;">'
+   + Number(data.hsM).toFixed(1) + ' m'
+   + '<span style="font-size:12px;color:#94a3b8;font-weight:600;margin-left:8px;">'
+   + Number(data.hsFt).toFixed(1) + ' ft</span></div>'
+   + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;margin-top:8px;font-size:11px;color:#cbd5e1;">'
+   + '<div>Peak period<br><b style="color:#fff;">' + per + '</b></div>'
+   + '<div>Peak direction<br><b style="color:#fff;">' + dir + '</b></div>'
+   + '</div>'
+   + '<div style="font-size:9px;color:#64748b;margin-top:8px;line-height:1.35;">'
+   + 'NOAA WAVEWATCH III (public domain) | ' + t
+   + '<br><a href="' + (data.datasetUrl || 'https://coastwatch.pfeg.noaa.gov/erddap/') + '" target="_blank" rel="noopener" style="color:#38bdf8;">CoastWatch ERDDAP dataset</a>'
+   + '</div>';
+  return;
+ }
+ // Wind
+ el.innerHTML =
+  '<div style="font-size:9px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.5px;">10 m wind (NOAA GFS)</div>'
+  + '<div style="font-size:20px;font-weight:700;color:#7dd3fc;font-family:ui-monospace,monospace;">'
+  + Number(data.speedKt).toFixed(0) + ' kt'
+  + '<span style="font-size:12px;color:#94a3b8;font-weight:600;margin-left:8px;">'
+  + Number(data.speedMs).toFixed(1) + ' m/s</span></div>'
+  + '<div style="margin-top:6px;font-size:13px;color:#e2e8f0;">From <b style="color:#fff;">'
+  + Number(data.dirDeg).toFixed(0) + '\u00b0 ' + (data.dirCardinal || '') + '</b></div>'
+  + '<div style="font-size:9px;color:#64748b;margin-top:8px;line-height:1.35;">'
+  + 'NOAA/NCEP GFS (public domain) | ' + t
+  + '<br><a href="' + (data.datasetUrl || 'https://coastwatch.pfeg.noaa.gov/erddap/') + '" target="_blank" rel="noopener" style="color:#38bdf8;">CoastWatch ERDDAP dataset</a>'
+  + '</div>';
 }
 
 // Ensure sign-in unlocks even if earlier mid-file init paths were skipped.
