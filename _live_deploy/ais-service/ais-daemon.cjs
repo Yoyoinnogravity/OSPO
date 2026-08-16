@@ -1,20 +1,21 @@
 #!/usr/bin/env node
 /**
  * Candooka coastal AIS daemon
- * Primary:  Digitraffic Finland (free, no key, no transceiver) — Baltic / Finnish waters
- * Optional: AISHub (needs shared receiver username)
- * Optional: AISStream (free key; often unreliable)
+ * Free feeds (no transceiver):
+ *   1. Digitraffic Finland — Baltic / Finnish waters (HTTP)
+ *   2. Kystverket Norway open AIS — Norwegian EEZ / Svalbard (TCP NMEA)
+ * Optional: AISHub / AISStream if credentials exist
  *
- * Config: /etc/candooka/ais.env
- *   AISHUB_USERNAME=...      (optional)
- *   AISSTREAM_API_KEY=...    (optional)
+ * Config: /etc/candooka/ais.env (optional keys only)
  */
 const fs = require('fs');
 const path = require('path');
+const net = require('net');
 const https = require('https');
 const http = require('http');
 const zlib = require('zlib');
 const WebSocket = require('ws');
+const { AisDecode } = require('ais-decoder');
 
 const DATA_DIR = '/var/www/candooka/data';
 const LIVE_FILE = path.join(DATA_DIR, 'ais-live.json');
@@ -28,6 +29,8 @@ const WS_URL = 'wss://stream.aisstream.io/v0/stream';
 const AISHUB_URL = 'https://data.aishub.net/ws.php';
 const DIGITRAFFIC_LOC = 'https://meri.digitraffic.fi/api/ais/v1/locations';
 const DIGITRAFFIC_VES = 'https://meri.digitraffic.fi/api/ais/v1/vessels';
+const NORWAY_AIS_HOST = '153.44.253.27';
+const NORWAY_AIS_PORT = 5631;
 
 const positions = new Map();
 const vesselMeta = new Map(); // mmsi -> { name, imo, shipType }
@@ -39,6 +42,13 @@ let lastStreamMsgAt = 0;
 let activeSource = 'none';
 let hubTimer = null;
 let digitrafficTimer = null;
+let norwaySocket = null;
+let norwayReconnectTimer = null;
+let norwayBuf = '';
+let norwayMsgCount = 0;
+let norwayUpsertCount = 0;
+let norwayLastAt = 0;
+const aisSessions = {}; // multipart reassembly
 
 const SEISMIC_NAME_RE = /\b(RAMFORM|GEO\s?(CARIBBEAN|CORAL|CASPIAN|CELTIC|PACIFIC)|OCEANIC\s?(SIRIUS|VEGA|ENDEAVOUR|CHAMPION)|AMAZON\s?(WARRIOR|CONQUEROR)|SW\s?(EMPRESS|DUKE|DUCHESS|GALLIEN|TASMAN|BLY|BARET|MIKKELSEN|AMUNDSEN|COLUMBUS|MAGELLAN|VESPUCCI|COOK|THURIDUR)|BGP\s?(PROSPECTOR|CHALLENGER|EXPLORER|PIONEER)|SANCO\s?(SWIFT|SWORD)|POLARCUS|GEOWAVE|HAI YANG SHI YOU\s?7|VYACHESLAV TIKHONOV|VOYAGER EXPLORER|OSPREY EXPLORER|HARRIER EXPLORER|SEABIRD EXPLORER)\b/i;
 
@@ -153,6 +163,32 @@ function wantedBbox() {
 function defaultBbox() {
   // Digitraffic coverage is Baltic / Finnish waters — default near Helsinki
   return { minlat: 59.0, minlon: 21.0, maxlat: 61.5, maxlon: 28.5 };
+}
+
+function norwayDefaultBbox() {
+  // Norwegian EEZ / coast + Svalbard approaches
+  return { minlat: 57.0, minlon: 4.0, maxlat: 72.0, maxlon: 32.0 };
+}
+
+function interestBboxes() {
+  const b = wantedBbox();
+  if (b) return [b];
+  return [defaultBbox(), norwayDefaultBbox()];
+}
+
+function inAnyBbox(lat, lon, boxes) {
+  for (const b of boxes) {
+    if (lat >= b.minlat && lat <= b.maxlat && lon >= b.minlon && lon <= b.maxlon) return true;
+  }
+  return false;
+}
+
+function shouldKeepVessel(mmsi, lat, lon) {
+  if (seismicFleet.has(mmsi)) return true;
+  if (wantedMmsis().includes(mmsi)) return true;
+  if (seismicModeOn()) return seismicFleet.has(mmsi); // roster only when seismic watch
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return false;
+  return inAnyBbox(lat, lon, interestBboxes());
 }
 
 function buildSubscription(apiKey) {
@@ -388,15 +424,16 @@ async function pollDigitraffic() {
       } catch (_) {}
     }
 
-    activeSource = 'digitraffic';
+    activeSource = activeSource === 'norway' ? 'norway' : 'digitraffic';
     writeStatus({
       ok: true,
       configured: true,
-      primary: 'digitraffic',
+      primary: 'digitraffic+norway',
       error: null,
       digitrafficVessels: n,
       bbox,
-      coverage: 'Digitraffic open AIS — Finnish / Baltic coastal waters (no transceiver required)',
+      coverage: 'Digitraffic (Finnish/Baltic) + Kystverket Norway open AIS — no transceiver',
+      norwayConnected: !!(norwaySocket && !norwaySocket.destroyed),
     });
     writeLive();
     if (n > 0) console.log('[ais] Digitraffic:', n, 'vessels');
@@ -533,6 +570,129 @@ function maybeResubscribe() {
   try { ws.send(JSON.stringify(sub)); } catch (_) {}
 }
 
+/** Normalize Kystverket talkers (!BSVDM / !B1VDM) to !AIVDM and strip \s:… tags. */
+function normalizeNmeaLine(raw) {
+  let s = String(raw || '').trim();
+  if (!s) return null;
+  const bang = s.lastIndexOf('!');
+  if (bang >= 0) s = s.slice(bang);
+  s = s.replace(/^![A-Z0-9]{2}VDM/, '!AIVDM').replace(/^![A-Z0-9]{2}VDO/, '!AIVDO');
+  if (!s.startsWith('!AIVDM') && !s.startsWith('!AIVDO')) return null;
+  return s;
+}
+
+function handleNorwayNmea(line) {
+  const nmea = normalizeNmeaLine(line);
+  if (!nmea) return;
+  norwayMsgCount++;
+  let dec;
+  try {
+    dec = new AisDecode(nmea, aisSessions);
+  } catch (_) {
+    return;
+  }
+  if (!dec || !dec.mmsi) return;
+
+  const mmsi = String(dec.mmsi).replace(/\D/g, '');
+  if (mmsi.length !== 9) return;
+
+  // Type 5 static data — store name for later position reports
+  if (dec.aistype === 5 && dec.shipname) {
+    const name = String(dec.shipname).replace(/@+$/g, '').trim();
+    if (name) {
+      const prev = vesselMeta.get(mmsi) || {};
+      vesselMeta.set(mmsi, { ...prev, name, imo: dec.imo || prev.imo || null });
+      const pos = positions.get(mmsi);
+      if (pos) {
+        pos.name = pos.name || name;
+        positions.set(mmsi, pos);
+      }
+    }
+    return;
+  }
+
+  const lat = typeof dec.lat === 'number' ? dec.lat : null;
+  const lon = typeof dec.lon === 'number' ? dec.lon : null;
+  if (lat == null || lon == null || !Number.isFinite(lat) || !Number.isFinite(lon)) return;
+  if (Math.abs(lat) > 90 || Math.abs(lon) > 180) return;
+  if (!shouldKeepVessel(mmsi, lat, lon)) return;
+
+  let sog = typeof dec.sog === 'number' ? dec.sog : null;
+  let cog = typeof dec.cog === 'number' ? dec.cog : null;
+  let heading = typeof dec.hdg === 'number' ? dec.hdg : (typeof dec.heading === 'number' ? dec.heading : null);
+  if (heading === 511) heading = null;
+  if (cog != null && cog > 360) cog = null;
+  if (sog != null && sog > 100) sog = null;
+
+  const meta = vesselMeta.get(mmsi) || {};
+  upsertVessel({
+    mmsi,
+    lat,
+    lon,
+    sog,
+    cog,
+    heading,
+    name: meta.name || null,
+    timestamp: new Date().toISOString(),
+    source: 'norway',
+  });
+  norwayUpsertCount++;
+  norwayLastAt = Date.now();
+  activeSource = 'norway';
+}
+
+function scheduleNorwayReconnect(ms) {
+  if (norwayReconnectTimer) clearTimeout(norwayReconnectTimer);
+  norwayReconnectTimer = setTimeout(connectNorwayAis, ms);
+}
+
+function connectNorwayAis() {
+  if (norwaySocket) {
+    try { norwaySocket.destroy(); } catch (_) {}
+    norwaySocket = null;
+  }
+  norwayBuf = '';
+  console.log('[ais] connecting Kystverket Norway AIS', NORWAY_AIS_HOST + ':' + NORWAY_AIS_PORT);
+  const sock = net.connect({ host: NORWAY_AIS_HOST, port: NORWAY_AIS_PORT });
+  norwaySocket = sock;
+
+  sock.setKeepAlive(true, 30000);
+  sock.setEncoding('utf8');
+
+  sock.on('connect', () => {
+    console.log('[ais] Norway AIS TCP connected');
+    writeStatus({
+      ok: true,
+      configured: true,
+      norwayConnected: true,
+      coverage: 'Digitraffic (Finnish/Baltic) + Kystverket Norway open AIS (EEZ/Svalbard) — no transceiver',
+    });
+  });
+
+  sock.on('data', (chunk) => {
+    norwayBuf += chunk;
+    let idx;
+    while ((idx = norwayBuf.indexOf('\n')) >= 0) {
+      const line = norwayBuf.slice(0, idx);
+      norwayBuf = norwayBuf.slice(idx + 1);
+      handleNorwayNmea(line.replace(/\r/g, ''));
+    }
+    // Prevent unbounded buffer
+    if (norwayBuf.length > 1e6) norwayBuf = norwayBuf.slice(-10000);
+  });
+
+  sock.on('error', (err) => {
+    console.error('[ais] Norway AIS error', err.message);
+    writeStatus({ norwayConnected: false, error: 'Norway AIS: ' + err.message });
+  });
+
+  sock.on('close', () => {
+    console.error('[ais] Norway AIS socket closed — reconnecting');
+    writeStatus({ norwayConnected: false });
+    scheduleNorwayReconnect(8000);
+  });
+}
+
 setInterval(() => {
   const cutoff = Date.now() - 30 * 60 * 1000;
   for (const [mmsi, rec] of positions) {
@@ -541,6 +701,18 @@ setInterval(() => {
   }
   writeLive();
   maybeResubscribe();
+  if (norwayLastAt && Date.now() - norwayLastAt < 60000) {
+    writeStatus({
+      ok: true,
+      configured: true,
+      primary: 'digitraffic+norway',
+      norwayConnected: !!(norwaySocket && !norwaySocket.destroyed),
+      norwayMsgCount,
+      norwayUpsertCount,
+      coverage: 'Digitraffic (Finnish/Baltic) + Kystverket Norway open AIS — no transceiver',
+      error: null,
+    });
+  }
 }, 10000);
 
 digitrafficTimer = setInterval(() => { pollDigitraffic().catch(() => {}); }, 30000);
@@ -552,13 +724,14 @@ writeLive();
 writeStatus({
   ok: false,
   configured: true,
-  primary: 'digitraffic',
-  error: 'Digitraffic starting…',
-  coverage: 'Digitraffic open AIS — Finnish / Baltic coastal waters (no transceiver required)',
+  primary: 'digitraffic+norway',
+  error: 'Starting Digitraffic + Norway AIS…',
+  coverage: 'Digitraffic (Finnish/Baltic) + Kystverket Norway open AIS — no transceiver',
 });
 refreshDigitrafficMeta()
   .then(() => pollDigitraffic())
   .catch(() => pollDigitraffic());
+connectNorwayAis();
 connectOptionalStream();
 setTimeout(() => { pollAisHub().catch(() => {}); }, 5000);
-console.log('[ais] daemon started (Digitraffic primary — no transceiver required)');
+console.log('[ais] daemon started (Digitraffic + Norway open AIS — no transceiver required)');

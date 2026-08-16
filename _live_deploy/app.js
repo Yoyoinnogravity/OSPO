@@ -16048,7 +16048,7 @@ function toggleAisInView(on) {
  if (aisBboxTimer) clearInterval(aisBboxTimer);
  aisBboxTimer = setInterval(refreshAisInView, 25000);
  map.on('moveend', _aisMoveRefresh);
- showToast('Coastal AIS: Digitraffic (Baltic)');
+ showToast('Coastal AIS: Digitraffic + Norway');
 }
 
 function _aisMoveRefresh() {
