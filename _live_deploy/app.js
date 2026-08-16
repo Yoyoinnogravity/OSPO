@@ -16048,7 +16048,7 @@ function toggleAisInView(on) {
  if (aisBboxTimer) clearInterval(aisBboxTimer);
  aisBboxTimer = setInterval(refreshAisInView, 25000);
  map.on('moveend', _aisMoveRefresh);
- showToast('Coastal AIS: showing vessels in view');
+ showToast('Coastal AIS: AISStream + AISHub fallback');
 }
 
 function _aisMoveRefresh() {
@@ -16108,7 +16108,8 @@ async function refreshAisInView() {
  delete aisBboxMarkers[id];
  }
  });
- setVesselTrackStatus('AIS in view: ' + (data.count || 0) + ' vessels (coastal)');
+ const feed = (data.feed || (data.status && data.status.activeSource)) || 'coastal';
+ setVesselTrackStatus('AIS in view: ' + (data.count || 0) + ' vessels (' + feed + ')');
  } catch (e) {
  setVesselTrackStatus('AIS bbox request failed');
  }
