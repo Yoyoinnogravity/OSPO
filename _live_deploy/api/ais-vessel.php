@@ -19,7 +19,7 @@ $status = is_readable($statusFile) ? (json_decode(@file_get_contents($statusFile
 if (empty($status['configured'])) {
     http_response_code(503);
     echo json_encode([
-        'error' => 'Live AIS not configured. Add free AISSTREAM_API_KEY to /etc/candooka/ais.env (https://aisstream.io). Optional AISHUB_USERNAME for fallback.',
+        'error' => 'Live AIS not configured. Add AISHUB_USERNAME to /etc/candooka/ais.env (https://www.aishub.net).',
         'configured' => false,
     ]);
     exit;

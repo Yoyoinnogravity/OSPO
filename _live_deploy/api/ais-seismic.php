@@ -112,7 +112,7 @@ echo json_encode([
     'configured' => !empty($status['configured']),
     'ok' => !empty($status['ok']),
     'error' => $status['error'] ?? (empty($status['configured'])
-        ? 'Add free AISSTREAM_API_KEY to /etc/candooka/ais.env (https://aisstream.io) to locate working seismic vessels on AIS'
+        ? 'Add AISHUB_USERNAME to /etc/candooka/ais.env (join https://www.aishub.net and share a terrestrial AIS feed)'
         : null),
     'modeOn' => $modeOn,
     'rosterCount' => count($roster),
@@ -122,5 +122,5 @@ echo json_encode([
     'silent' => $silent,
     'feed' => $status['activeSource'] ?? null,
     'updatedAt' => $status['updatedAt'] ?? null,
-    'note' => 'Working = AIS position received in the last 6 hours. Offshore vessels need satellite AIS coverage.',
+    'note' => 'Working = AIS position received in the last 6 hours via AISHub (primary). Offshore vessels may still need satellite AIS.',
 ]);

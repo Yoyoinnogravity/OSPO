@@ -7,19 +7,19 @@ $statusFile = '/var/www/candooka/data/ais-status.json';
 $status = is_readable($statusFile) ? (json_decode(@file_get_contents($statusFile), true) ?: []) : [];
 
 $src = $status['activeSource'] ?? null;
-$label = 'AISStream primary + AISHub fallback (coastal). Density layers for planning. Offshore needs satellite (e.g. Kpler).';
-if ($src === 'aishub') $label = 'AISHub fallback active (coastal). Add AISStream key for live stream.';
-if ($src === 'aisstream') $label = 'AISStream live (coastal). AISHub used if stream drops.';
+$label = 'AISHub primary (coastal). Optional AISStream secondary. Density layers for planning. Offshore needs satellite (e.g. Kpler).';
+if ($src === 'aishub') $label = 'AISHub live (coastal).';
+if ($src === 'aisstream') $label = 'AISStream secondary active; AISHub remains primary poll.';
 
 echo json_encode([
     'configured' => !empty($status['configured']),
     'ok' => !empty($status['ok']),
     'error' => $status['error'] ?? (empty($status['configured'])
-        ? 'Add free AISSTREAM_API_KEY at /etc/candooka/ais.env (https://aisstream.io); optional AISHUB_USERNAME'
+        ? 'Add AISHUB_USERNAME at /etc/candooka/ais.env — join https://www.aishub.net and share a terrestrial AIS feed'
         : null),
     'vesselCount' => $status['vesselCount'] ?? 0,
     'updatedAt' => $status['updatedAt'] ?? null,
     'activeSource' => $src,
-    'fallback' => !empty($status['fallback']),
+    'primary' => $status['primary'] ?? 'aishub',
     'source' => $label,
 ]);

@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 /**
  * Candooka coastal AIS daemon
- * Primary:  AISStream WebSocket (free key — https://aisstream.io)
- * Fallback: AISHub HTTP poll (when AISHUB_USERNAME set — https://www.aishub.net/api)
+ * Primary:  AISHub HTTP poll (AISHUB_USERNAME — https://www.aishub.net/api)
+ * Optional: AISStream WebSocket if AISSTREAM_API_KEY is set (often down)
  *
  * Config: /etc/candooka/ais.env
- *   AISSTREAM_API_KEY=...
- *   AISHUB_USERNAME=...   (optional fallback)
+ *   AISHUB_USERNAME=...      (required for live AIS)
+ *   AISSTREAM_API_KEY=...    (optional secondary)
  */
 const fs = require('fs');
 const path = require('path');
@@ -295,10 +295,10 @@ async function pollAisHub() {
   const user = hubUser(env);
   if (!user) return false;
 
+  // AISHub is primary. Only skip a poll if AISStream is freshly delivering.
   const streamFresh = hasStreamKey(env) && ws && ws.readyState === WebSocket.OPEN
-    && (Date.now() - lastStreamMsgAt) < 90 * 1000 && lastStreamMsgAt > 0;
-  // Prefer live stream when it is healthy; still allow hub when stream idle/down
-  if (streamFresh && positions.size > 0) return false;
+    && (Date.now() - lastStreamMsgAt) < 45 * 1000 && lastStreamMsgAt > 0;
+  if (streamFresh && positions.size > 0 && !seismicModeOn()) return false;
 
   const bbox = seismicModeOn()
     ? { minlat: -80, minlon: -180, maxlat: 80, maxlon: 180 }
@@ -341,26 +341,29 @@ async function pollAisHub() {
         ok: true,
         configured: true,
         error: null,
-        fallback: true,
+        primary: 'aishub',
         hubVessels: n,
         bbox,
       });
       writeLive();
-      console.log('[ais] AISHub fallback:', n, 'vessels');
+      console.log('[ais] AISHub:', n, 'vessels');
     } else {
       writeStatus({
-        ok: hasStreamKey(env) ? !!(ws && ws.readyState === WebSocket.OPEN) : false,
+        ok: false,
         configured: true,
-        error: hasStreamKey(env) ? null : 'AISHub returned 0 vessels in view',
+        primary: 'aishub',
+        error: 'AISHub returned 0 vessels for current view/roster',
         hubVessels: 0,
+        bbox,
       });
     }
     return n > 0;
   } catch (e) {
     console.error('[ais] AISHub error', e.message);
     writeStatus({
-      ok: !!(ws && ws.readyState === WebSocket.OPEN),
+      ok: false,
       configured: true,
+      primary: 'aishub',
       error: 'AISHub: ' + e.message,
     });
     return false;
@@ -369,28 +372,41 @@ async function pollAisHub() {
 
 function connect() {
   const env = loadEnv();
-  const apiKey = env.AISSTREAM_API_KEY || process.env.AISSTREAM_API_KEY || '';
   const hub = hubUser(env);
 
-  if (!hasStreamKey(env)) {
-    const configured = !!hub;
+  // AISHub is the configured primary source
+  if (!hub) {
     writeStatus({
       ok: false,
-      configured,
-      error: configured
-        ? 'AISStream key missing — using AISHub fallback only. Free key: https://aisstream.io'
-        : 'Missing AISSTREAM_API_KEY in /etc/candooka/ais.env — free key at https://aisstream.io (optional AISHUB_USERNAME for fallback)',
-      activeSource: configured ? 'aishub' : 'none',
+      configured: false,
+      primary: 'aishub',
+      error: 'Missing AISHUB_USERNAME in /etc/candooka/ais.env — join https://www.aishub.net and share a terrestrial AIS feed to get a username',
+      activeSource: 'none',
     });
-    activeSource = configured ? 'aishub' : 'none';
-    console.error('[ais] No AISStream API key' + (configured ? ' (AISHub fallback enabled)' : ''));
-    if (!configured) scheduleReconnect(30000);
+    activeSource = 'none';
+    console.error('[ais] No AISHUB_USERNAME — join https://www.aishub.net');
+    scheduleReconnect(60000);
     return;
   }
 
+  activeSource = 'aishub';
+  writeStatus({
+    ok: false,
+    configured: true,
+    primary: 'aishub',
+    error: 'AISHub configured — waiting for first poll',
+  });
+  console.log('[ais] AISHub primary enabled for user', hub.slice(0, 2) + '…');
+
+  // Optional secondary: AISStream (often unavailable)
+  if (!hasStreamKey(env)) {
+    return;
+  }
+
+  const apiKey = env.AISSTREAM_API_KEY || process.env.AISSTREAM_API_KEY || '';
   if (ws) { try { ws.terminate(); } catch (_) {} ws = null; }
 
-  console.log('[ais] connecting to AISStream…');
+  console.log('[ais] also connecting optional AISStream…');
   ws = new WebSocket(WS_URL);
   const connectTimeout = setTimeout(() => { try { ws.terminate(); } catch (_) {} }, 8000);
 
@@ -400,15 +416,15 @@ function connect() {
     ws.send(JSON.stringify(sub));
     clearTimeout(connectTimeout);
     activeSource = 'aisstream';
-    writeStatus({ ok: true, configured: true, error: null, bbox, trackedMmsi: mmsi, fallback: false });
-    console.log('[ais] subscribed', JSON.stringify(bbox), 'mmsi', mmsi.length);
+    writeStatus({ ok: true, configured: true, error: null, bbox, trackedMmsi: mmsi, primary: 'aishub', secondary: 'aisstream' });
+    console.log('[ais] AISStream subscribed', JSON.stringify(bbox), 'mmsi', mmsi.length);
   });
 
   ws.on('message', (raw) => {
     try {
       const msg = JSON.parse(raw.toString());
       if (msg.error || msg.Error) {
-        writeStatus({ ok: false, configured: true, error: String(msg.error || msg.Error) });
+        writeStatus({ ok: !!hub, configured: true, error: 'AISStream: ' + String(msg.error || msg.Error), primary: 'aishub' });
         return;
       }
       upsertFromMessage(msg);
@@ -417,14 +433,12 @@ function connect() {
 
   ws.on('error', (err) => {
     clearTimeout(connectTimeout);
-    writeStatus({ ok: false, configured: true, error: err.message });
-    console.error('[ais] error', err.message);
+    console.error('[ais] AISStream error', err.message);
   });
 
   ws.on('close', () => {
     clearTimeout(connectTimeout);
-    writeStatus({ ok: false, configured: true, error: 'websocket closed — reconnecting' + (hub ? ' (AISHub fallback active)' : '') });
-    scheduleReconnect(5000);
+    scheduleReconnect(15000);
   });
 }
 
@@ -454,14 +468,14 @@ setInterval(() => {
   maybeResubscribe();
 }, 10000);
 
-// AISHub poll every 45s when username configured
+// AISHub poll every 25s (primary feed)
 hubTimer = setInterval(() => {
   pollAisHub().catch(() => {});
-}, 45000);
+}, 25000);
 
 ensureDataDir();
 loadSeismicFleet();
 writeLive();
 connect();
-setTimeout(() => { pollAisHub().catch(() => {}); }, 3000);
-console.log('[ais] daemon started (AISStream primary, AISHub fallback, seismic fleet roster)');
+setTimeout(() => { pollAisHub().catch(() => {}); }, 1500);
+console.log('[ais] daemon started (AISHub primary, optional AISStream, seismic fleet roster)');

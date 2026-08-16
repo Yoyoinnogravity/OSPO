@@ -16161,8 +16161,8 @@ async function refreshSeismicFleetAis(enable) {
  const res = await fetch('api/ais-seismic.php?' + q, { cache: 'no-store' });
  const data = await res.json();
  if (!data.configured) {
- setSeismicAisStatus(data.error || 'AIS not configured — add free AISStream key');
- showToast(data.error || 'AISStream key required for seismic fleet');
+ setSeismicAisStatus(data.error || 'AIS not configured — add AISHub username');
+ showToast(data.error || 'AISHub username required');
  return;
  }
  const working = Array.isArray(data.working) ? data.working : [];
