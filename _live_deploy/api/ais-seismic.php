@@ -112,7 +112,7 @@ echo json_encode([
     'configured' => !empty($status['configured']),
     'ok' => !empty($status['ok']),
     'error' => $status['error'] ?? (empty($status['configured'])
-        ? 'Add AISHUB_USERNAME to /etc/candooka/ais.env (join https://www.aishub.net and share a terrestrial AIS feed)'
+        ? 'AIS daemon not ready'
         : null),
     'modeOn' => $modeOn,
     'rosterCount' => count($roster),
@@ -122,5 +122,5 @@ echo json_encode([
     'silent' => $silent,
     'feed' => $status['activeSource'] ?? null,
     'updatedAt' => $status['updatedAt'] ?? null,
-    'note' => 'Working = AIS position received in the last 6 hours via AISHub (primary). Offshore vessels may still need satellite AIS.',
+    'note' => 'Working = AIS hit in last 6 hours. Free Digitraffic covers Finnish/Baltic waters only; global offshore seismic ships need satellite AIS (e.g. Kpler).',
 ]);

@@ -1,17 +1,19 @@
 #!/usr/bin/env node
 /**
  * Candooka coastal AIS daemon
- * Primary:  AISHub HTTP poll (AISHUB_USERNAME — https://www.aishub.net/api)
- * Optional: AISStream WebSocket if AISSTREAM_API_KEY is set (often down)
+ * Primary:  Digitraffic Finland (free, no key, no transceiver) — Baltic / Finnish waters
+ * Optional: AISHub (needs shared receiver username)
+ * Optional: AISStream (free key; often unreliable)
  *
  * Config: /etc/candooka/ais.env
- *   AISHUB_USERNAME=...      (required for live AIS)
- *   AISSTREAM_API_KEY=...    (optional secondary)
+ *   AISHUB_USERNAME=...      (optional)
+ *   AISSTREAM_API_KEY=...    (optional)
  */
 const fs = require('fs');
 const path = require('path');
 const https = require('https');
 const http = require('http');
+const zlib = require('zlib');
 const WebSocket = require('ws');
 
 const DATA_DIR = '/var/www/candooka/data';
@@ -24,17 +26,20 @@ const ENV_FILE = '/etc/candooka/ais.env';
 const FLEET_FILE = path.join(__dirname, 'seismic-fleet.json');
 const WS_URL = 'wss://stream.aisstream.io/v0/stream';
 const AISHUB_URL = 'https://data.aishub.net/ws.php';
+const DIGITRAFFIC_LOC = 'https://meri.digitraffic.fi/api/ais/v1/locations';
+const DIGITRAFFIC_VES = 'https://meri.digitraffic.fi/api/ais/v1/vessels';
 
 const positions = new Map();
-let seismicFleet = new Map(); // mmsi -> meta
+const vesselMeta = new Map(); // mmsi -> { name, imo, shipType }
+let seismicFleet = new Map();
 let ws = null;
 let lastSubKey = '';
 let reconnectTimer = null;
 let lastStreamMsgAt = 0;
-let activeSource = 'none'; // aisstream | aishub | none
+let activeSource = 'none';
 let hubTimer = null;
+let digitrafficTimer = null;
 
-/** Name patterns for dedicated marine seismic acquisition vessels. */
 const SEISMIC_NAME_RE = /\b(RAMFORM|GEO\s?(CARIBBEAN|CORAL|CASPIAN|CELTIC|PACIFIC)|OCEANIC\s?(SIRIUS|VEGA|ENDEAVOUR|CHAMPION)|AMAZON\s?(WARRIOR|CONQUEROR)|SW\s?(EMPRESS|DUKE|DUCHESS|GALLIEN|TASMAN|BLY|BARET|MIKKELSEN|AMUNDSEN|COLUMBUS|MAGELLAN|VESPUCCI|COOK|THURIDUR)|BGP\s?(PROSPECTOR|CHALLENGER|EXPLORER|PIONEER)|SANCO\s?(SWIFT|SWORD)|POLARCUS|GEOWAVE|HAI YANG SHI YOU\s?7|VYACHESLAV TIKHONOV|VOYAGER EXPLORER|OSPREY EXPLORER|HARRIER EXPLORER|SEABIRD EXPLORER)\b/i;
 
 function loadSeismicFleet() {
@@ -55,7 +60,6 @@ function loadSeismicFleet() {
 function seismicModeOn() {
   const b = readJson(SEISMIC_ON_FILE, null);
   if (!b || !b.on) return false;
-  // Keep warm for 30 min after last UI ping
   if (Date.now() - Number(b.at || 0) > 30 * 60 * 1000) return false;
   return true;
 }
@@ -147,12 +151,12 @@ function wantedBbox() {
 }
 
 function defaultBbox() {
-  return { minlat: -2, minlon: 100, maxlat: 8, maxlon: 110 };
+  // Digitraffic coverage is Baltic / Finnish waters — default near Helsinki
+  return { minlat: 59.0, minlon: 21.0, maxlat: 61.5, maxlon: 28.5 };
 }
 
 function buildSubscription(apiKey) {
   const seismic = seismicModeOn();
-  // Global box when tracking the seismic fleet; otherwise map-view / default SE Asia box
   const bbox = seismic
     ? { minlat: -80, minlon: -180, maxlat: 80, maxlon: 180 }
     : (wantedBbox() || defaultBbox());
@@ -166,7 +170,6 @@ function buildSubscription(apiKey) {
     BoundingBoxes: [[[bbox.minlat, bbox.minlon], [bbox.maxlat, bbox.maxlon]]],
     FilterMessageTypes: ['PositionReport', 'StandardClassBPositionReport', 'ExtendedClassBPositionReport', 'ShipStaticData'],
   };
-  // MMSI filter when we have a roster / track list (keeps global stream tractable)
   if (mmsi.length) sub.FiltersShipMMSI = mmsi;
   return { sub, key: JSON.stringify({ bbox, mmsi, seismic }), bbox, mmsi, seismic };
 }
@@ -178,7 +181,8 @@ function upsertVessel(rec) {
   if (typeof rec.lat !== 'number' || typeof rec.lon !== 'number') return;
   if (!Number.isFinite(rec.lat) || !Number.isFinite(rec.lon)) return;
   const prev = positions.get(mmsi) || { mmsi };
-  const name = rec.name || prev.name || null;
+  const meta = vesselMeta.get(mmsi) || {};
+  const name = rec.name || prev.name || meta.name || null;
   const roster = seismicFleet.get(mmsi);
   const seismic = !!(roster || prev.seismic || isSeismicName(name));
   positions.set(mmsi, {
@@ -190,7 +194,7 @@ function upsertVessel(rec) {
     heading: typeof rec.heading === 'number' ? rec.heading : (prev.heading ?? null),
     name: name || (roster && roster.name) || null,
     operator: (roster && roster.operator) || prev.operator || null,
-    imo: (roster && roster.imo) || prev.imo || null,
+    imo: (roster && roster.imo) || prev.imo || meta.imo || null,
     seismic,
     timestamp: rec.timestamp || new Date().toISOString(),
     source: rec.source || prev.source || 'unknown',
@@ -203,11 +207,9 @@ function upsertFromMessage(msg) {
   const body = (msg.Message && (msg.Message[type] || msg.Message.PositionReport || msg.Message.StandardClassBPositionReport)) || {};
   const mmsi = String(meta.MMSI || body.UserID || '').replace(/\D/g, '');
   if (mmsi.length !== 9) return;
-
   const lat = meta.latitude;
   const lon = meta.longitude;
   if (typeof lat !== 'number' || typeof lon !== 'number') return;
-
   const prev = positions.get(mmsi) || { mmsi };
   let sog = prev.sog, cog = prev.cog, heading = prev.heading;
   let name = prev.name || String(meta.ShipName || '').trim() || null;
@@ -216,7 +218,6 @@ function upsertFromMessage(msg) {
   if (typeof body.TrueHeading === 'number' && body.TrueHeading !== 511) heading = body.TrueHeading;
   else if (typeof cog === 'number') heading = cog;
   if (type === 'ShipStaticData' && body.Name) name = String(body.Name).trim();
-
   upsertVessel({
     mmsi, lat, lon, sog, cog, heading, name,
     timestamp: meta.time_utc || new Date().toISOString(),
@@ -228,20 +229,29 @@ function upsertFromMessage(msg) {
 
 function scheduleReconnect(ms) {
   if (reconnectTimer) clearTimeout(reconnectTimer);
-  reconnectTimer = setTimeout(connect, ms);
+  reconnectTimer = setTimeout(connectOptionalStream, ms);
 }
 
-function httpGetJson(url, timeoutMs = 20000) {
+function httpGetJson(url, timeoutMs = 25000) {
   return new Promise((resolve, reject) => {
     const lib = url.startsWith('https') ? https : http;
-    const req = lib.get(url, { headers: { 'User-Agent': 'CandookaOSPO/1.0', Accept: 'application/json' } }, (res) => {
+    const req = lib.get(url, {
+      headers: {
+        'User-Agent': 'CandookaOSPO/1.0 (admin@candooka.world)',
+        Accept: 'application/json',
+        'Accept-Encoding': 'gzip',
+      },
+    }, (res) => {
       if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
         res.resume();
         return httpGetJson(res.headers.location, timeoutMs).then(resolve, reject);
       }
+      const enc = (res.headers['content-encoding'] || '').toLowerCase();
+      const stream = enc.includes('gzip') ? res.pipe(zlib.createGunzip()) : res;
       const chunks = [];
-      res.on('data', (c) => chunks.push(c));
-      res.on('end', () => {
+      stream.on('data', (c) => chunks.push(c));
+      stream.on('error', reject);
+      stream.on('end', () => {
         const raw = Buffer.concat(chunks).toString('utf8');
         if (res.statusCode < 200 || res.statusCode >= 300) {
           reject(new Error('HTTP ' + res.statusCode + ': ' + raw.slice(0, 120)));
@@ -256,13 +266,157 @@ function httpGetJson(url, timeoutMs = 20000) {
   });
 }
 
-/** AISHub human-readable JSON: either [{...}] or [ [meta], [rows...] ]. */
+function haversineKm(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const toR = Math.PI / 180;
+  const dLat = (lat2 - lat1) * toR;
+  const dLon = (lon2 - lon1) * toR;
+  const a = Math.sin(dLat / 2) ** 2
+    + Math.cos(lat1 * toR) * Math.cos(lat2 * toR) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
+async function refreshDigitrafficMeta() {
+  try {
+    const list = await httpGetJson(DIGITRAFFIC_VES);
+    if (!Array.isArray(list)) return;
+    for (const v of list) {
+      const mmsi = String(v.mmsi || '').replace(/\D/g, '');
+      if (mmsi.length !== 9) continue;
+      vesselMeta.set(mmsi, {
+        name: (v.name || '').toString().trim() || null,
+        imo: v.imo || null,
+        shipType: v.shipType || null,
+      });
+    }
+    console.log('[ais] Digitraffic vessel meta:', vesselMeta.size);
+  } catch (e) {
+    console.error('[ais] Digitraffic meta error', e.message);
+  }
+}
+
+async function pollDigitraffic() {
+  const bbox = wantedBbox() || defaultBbox();
+  const seismic = seismicModeOn();
+  const wanted = new Set(wantedMmsis());
+  if (seismic) for (const m of seismicMmsis()) wanted.add(m);
+
+  const clat = (bbox.minlat + bbox.maxlat) / 2;
+  const clon = (bbox.minlon + bbox.maxlon) / 2;
+  const cornerKm = haversineKm(clat, clon, bbox.maxlat, bbox.maxlon);
+  const radius = Math.min(200, Math.max(30, Math.ceil(cornerKm * 1.15)));
+
+  try {
+    // Radius query for map view; also full dump when seismic/wanted (filter client-side)
+    let url = DIGITRAFFIC_LOC + '?latitude=' + clat.toFixed(4)
+      + '&longitude=' + clon.toFixed(4)
+      + '&radius=' + radius;
+    if (wanted.size === 1) {
+      url = DIGITRAFFIC_LOC + '?mmsi=' + [...wanted][0];
+    }
+    const data = await httpGetJson(url);
+    const feats = (data && data.features) || [];
+    let n = 0;
+    for (const f of feats) {
+      const mmsi = String(f.mmsi || (f.properties && f.properties.mmsi) || '').replace(/\D/g, '');
+      if (mmsi.length !== 9) continue;
+      const coords = f.geometry && f.geometry.coordinates;
+      if (!coords || coords.length < 2) continue;
+      const lon = Number(coords[0]);
+      const lat = Number(coords[1]);
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+
+      // Always keep wanted/seismic; otherwise keep if inside bbox
+      const inWanted = wanted.has(mmsi);
+      const inBox = lat >= bbox.minlat && lat <= bbox.maxlat && lon >= bbox.minlon && lon <= bbox.maxlon;
+      if (!inWanted && !inBox && !seismic) continue;
+      if (seismic && !inWanted && !isSeismicName((vesselMeta.get(mmsi) || {}).name)) {
+        // when seismic mode, also keep name matches from Digitraffic dump
+        if (!inBox) continue;
+      }
+
+      const p = f.properties || {};
+      let heading = typeof p.heading === 'number' ? p.heading : null;
+      if (heading === 511) heading = null;
+      const tsExt = p.timestampExternal ? Number(p.timestampExternal) : null;
+      const timestamp = tsExt && tsExt > 1e12
+        ? new Date(tsExt).toISOString()
+        : (tsExt ? new Date(tsExt * 1000).toISOString() : new Date().toISOString());
+      upsertVessel({
+        mmsi,
+        lat,
+        lon,
+        sog: typeof p.sog === 'number' ? p.sog : null,
+        cog: typeof p.cog === 'number' ? p.cog : null,
+        heading,
+        name: (vesselMeta.get(mmsi) || {}).name || null,
+        timestamp,
+        source: 'digitraffic',
+      });
+      n++;
+    }
+
+    // If seismic mode, also pull full locations once and filter roster (Baltic-only hits)
+    if (seismic && wanted.size > 1) {
+      try {
+        const all = await httpGetJson(DIGITRAFFIC_LOC);
+        for (const f of (all.features || [])) {
+          const mmsi = String(f.mmsi || (f.properties && f.properties.mmsi) || '').replace(/\D/g, '');
+          if (!wanted.has(mmsi)) continue;
+          const coords = f.geometry && f.geometry.coordinates;
+          if (!coords) continue;
+          const lon = Number(coords[0]);
+          const lat = Number(coords[1]);
+          const p = f.properties || {};
+          let heading = typeof p.heading === 'number' ? p.heading : null;
+          if (heading === 511) heading = null;
+          const tsExt = p.timestampExternal ? Number(p.timestampExternal) : null;
+          const timestamp = tsExt && tsExt > 1e12
+            ? new Date(tsExt).toISOString()
+            : new Date().toISOString();
+          upsertVessel({
+            mmsi, lat, lon,
+            sog: typeof p.sog === 'number' ? p.sog : null,
+            cog: typeof p.cog === 'number' ? p.cog : null,
+            heading,
+            name: (vesselMeta.get(mmsi) || {}).name || (seismicFleet.get(mmsi) || {}).name || null,
+            timestamp,
+            source: 'digitraffic',
+          });
+          n++;
+        }
+      } catch (_) {}
+    }
+
+    activeSource = 'digitraffic';
+    writeStatus({
+      ok: true,
+      configured: true,
+      primary: 'digitraffic',
+      error: null,
+      digitrafficVessels: n,
+      bbox,
+      coverage: 'Digitraffic open AIS — Finnish / Baltic coastal waters (no transceiver required)',
+    });
+    writeLive();
+    if (n > 0) console.log('[ais] Digitraffic:', n, 'vessels');
+    return n > 0;
+  } catch (e) {
+    console.error('[ais] Digitraffic error', e.message);
+    writeStatus({
+      ok: false,
+      configured: true,
+      primary: 'digitraffic',
+      error: 'Digitraffic: ' + e.message,
+    });
+    return false;
+  }
+}
+
 function parseAisHubPayload(data) {
   if (!data) return [];
   let rows = data;
-  if (Array.isArray(data) && data.length >= 2 && Array.isArray(data[1])) {
-    rows = data[1];
-  }
+  if (Array.isArray(data) && data.length >= 2 && Array.isArray(data[1])) rows = data[1];
   if (!Array.isArray(rows)) return [];
   const out = [];
   for (const r of rows) {
@@ -270,7 +424,6 @@ function parseAisHubPayload(data) {
     const mmsi = String(r.MMSI || r.mmsi || '').replace(/\D/g, '');
     let lat = r.LATITUDE != null ? Number(r.LATITUDE) : Number(r.lat);
     let lon = r.LONGITUDE != null ? Number(r.LONGITUDE) : Number(r.lon);
-    // Some AISHub formats use 1/600000 deg
     if (Number.isFinite(lat) && Math.abs(lat) > 90) lat = lat / 600000;
     if (Number.isFinite(lon) && Math.abs(lon) > 180) lon = lon / 600000;
     if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
@@ -295,11 +448,6 @@ async function pollAisHub() {
   const user = hubUser(env);
   if (!user) return false;
 
-  // AISHub is primary. Only skip a poll if AISStream is freshly delivering.
-  const streamFresh = hasStreamKey(env) && ws && ws.readyState === WebSocket.OPEN
-    && (Date.now() - lastStreamMsgAt) < 45 * 1000 && lastStreamMsgAt > 0;
-  if (streamFresh && positions.size > 0 && !seismicModeOn()) return false;
-
   const bbox = seismicModeOn()
     ? { minlat: -80, minlon: -180, maxlat: 80, maxlon: 180 }
     : (wantedBbox() || defaultBbox());
@@ -320,93 +468,34 @@ async function pollAisHub() {
     lonmax: String(bbox.maxlon),
     interval: '180',
   });
-  // AISHub accepts comma-separated MMSIs — prefer roster when in seismic mode
-  if (seismicModeOn() && mmsiList.length) {
-    params.set('mmsi', mmsiList.slice(0, 40).join(','));
-  } else if (mmsiList.length === 1) {
-    params.set('mmsi', mmsiList[0]);
-  }
+  if (seismicModeOn() && mmsiList.length) params.set('mmsi', mmsiList.slice(0, 40).join(','));
+  else if (mmsiList.length === 1) params.set('mmsi', mmsiList[0]);
 
   try {
     const data = await httpGetJson(AISHUB_URL + '?' + params.toString());
     const vessels = parseAisHubPayload(data);
     let n = 0;
-    for (const v of vessels) {
-      upsertVessel(v);
-      n++;
-    }
+    for (const v of vessels) { upsertVessel(v); n++; }
     if (n > 0) {
       activeSource = 'aishub';
-      writeStatus({
-        ok: true,
-        configured: true,
-        error: null,
-        primary: 'aishub',
-        hubVessels: n,
-        bbox,
-      });
+      writeStatus({ ok: true, configured: true, error: null, hubVessels: n, bbox });
       writeLive();
-      console.log('[ais] AISHub:', n, 'vessels');
-    } else {
-      writeStatus({
-        ok: false,
-        configured: true,
-        primary: 'aishub',
-        error: 'AISHub returned 0 vessels for current view/roster',
-        hubVessels: 0,
-        bbox,
-      });
+      console.log('[ais] AISHub optional:', n, 'vessels');
     }
     return n > 0;
   } catch (e) {
     console.error('[ais] AISHub error', e.message);
-    writeStatus({
-      ok: false,
-      configured: true,
-      primary: 'aishub',
-      error: 'AISHub: ' + e.message,
-    });
     return false;
   }
 }
 
-function connect() {
+function connectOptionalStream() {
   const env = loadEnv();
-  const hub = hubUser(env);
-
-  // AISHub is the configured primary source
-  if (!hub) {
-    writeStatus({
-      ok: false,
-      configured: false,
-      primary: 'aishub',
-      error: 'Missing AISHUB_USERNAME in /etc/candooka/ais.env — join https://www.aishub.net and share a terrestrial AIS feed to get a username',
-      activeSource: 'none',
-    });
-    activeSource = 'none';
-    console.error('[ais] No AISHUB_USERNAME — join https://www.aishub.net');
-    scheduleReconnect(60000);
-    return;
-  }
-
-  activeSource = 'aishub';
-  writeStatus({
-    ok: false,
-    configured: true,
-    primary: 'aishub',
-    error: 'AISHub configured — waiting for first poll',
-  });
-  console.log('[ais] AISHub primary enabled for user', hub.slice(0, 2) + '…');
-
-  // Optional secondary: AISStream (often unavailable)
-  if (!hasStreamKey(env)) {
-    return;
-  }
-
+  if (!hasStreamKey(env)) return;
   const apiKey = env.AISSTREAM_API_KEY || process.env.AISSTREAM_API_KEY || '';
   if (ws) { try { ws.terminate(); } catch (_) {} ws = null; }
 
-  console.log('[ais] also connecting optional AISStream…');
+  console.log('[ais] optional AISStream connecting…');
   ws = new WebSocket(WS_URL);
   const connectTimeout = setTimeout(() => { try { ws.terminate(); } catch (_) {} }, 8000);
 
@@ -415,30 +504,22 @@ function connect() {
     lastSubKey = key;
     ws.send(JSON.stringify(sub));
     clearTimeout(connectTimeout);
-    activeSource = 'aisstream';
-    writeStatus({ ok: true, configured: true, error: null, bbox, trackedMmsi: mmsi, primary: 'aishub', secondary: 'aisstream' });
     console.log('[ais] AISStream subscribed', JSON.stringify(bbox), 'mmsi', mmsi.length);
   });
-
   ws.on('message', (raw) => {
     try {
       const msg = JSON.parse(raw.toString());
-      if (msg.error || msg.Error) {
-        writeStatus({ ok: !!hub, configured: true, error: 'AISStream: ' + String(msg.error || msg.Error), primary: 'aishub' });
-        return;
-      }
+      if (msg.error || msg.Error) return;
       upsertFromMessage(msg);
     } catch (_) {}
   });
-
   ws.on('error', (err) => {
     clearTimeout(connectTimeout);
     console.error('[ais] AISStream error', err.message);
   });
-
   ws.on('close', () => {
     clearTimeout(connectTimeout);
-    scheduleReconnect(15000);
+    scheduleReconnect(30000);
   });
 }
 
@@ -449,13 +530,7 @@ function maybeResubscribe() {
   const { sub, key } = buildSubscription(apiKey);
   if (key === lastSubKey) return;
   lastSubKey = key;
-  try {
-    ws.send(JSON.stringify(sub));
-    writeStatus({ ok: true, configured: true, error: null, resubscribedAt: new Date().toISOString() });
-    console.log('[ais] resubscribed');
-  } catch (e) {
-    console.error('[ais] resubscribe failed', e.message);
-  }
+  try { ws.send(JSON.stringify(sub)); } catch (_) {}
 }
 
 setInterval(() => {
@@ -468,14 +543,22 @@ setInterval(() => {
   maybeResubscribe();
 }, 10000);
 
-// AISHub poll every 25s (primary feed)
-hubTimer = setInterval(() => {
-  pollAisHub().catch(() => {});
-}, 25000);
+digitrafficTimer = setInterval(() => { pollDigitraffic().catch(() => {}); }, 30000);
+hubTimer = setInterval(() => { pollAisHub().catch(() => {}); }, 60000);
 
 ensureDataDir();
 loadSeismicFleet();
 writeLive();
-connect();
-setTimeout(() => { pollAisHub().catch(() => {}); }, 1500);
-console.log('[ais] daemon started (AISHub primary, optional AISStream, seismic fleet roster)');
+writeStatus({
+  ok: false,
+  configured: true,
+  primary: 'digitraffic',
+  error: 'Digitraffic starting…',
+  coverage: 'Digitraffic open AIS — Finnish / Baltic coastal waters (no transceiver required)',
+});
+refreshDigitrafficMeta()
+  .then(() => pollDigitraffic())
+  .catch(() => pollDigitraffic());
+connectOptionalStream();
+setTimeout(() => { pollAisHub().catch(() => {}); }, 5000);
+console.log('[ais] daemon started (Digitraffic primary — no transceiver required)');

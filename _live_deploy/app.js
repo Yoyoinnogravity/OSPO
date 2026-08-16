@@ -16048,7 +16048,7 @@ function toggleAisInView(on) {
  if (aisBboxTimer) clearInterval(aisBboxTimer);
  aisBboxTimer = setInterval(refreshAisInView, 25000);
  map.on('moveend', _aisMoveRefresh);
- showToast('Coastal AIS: AISStream + AISHub fallback');
+ showToast('Coastal AIS: Digitraffic (Baltic)');
 }
 
 function _aisMoveRefresh() {
@@ -16161,8 +16161,8 @@ async function refreshSeismicFleetAis(enable) {
  const res = await fetch('api/ais-seismic.php?' + q, { cache: 'no-store' });
  const data = await res.json();
  if (!data.configured) {
- setSeismicAisStatus(data.error || 'AIS not configured — add AISHub username');
- showToast(data.error || 'AISHub username required');
+ setSeismicAisStatus(data.error || 'AIS daemon not ready');
+ showToast(data.error || 'AIS not ready');
  return;
  }
  const working = Array.isArray(data.working) ? data.working : [];

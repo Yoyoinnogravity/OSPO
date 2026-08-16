@@ -1043,7 +1043,7 @@
  <input type="checkbox" id="layer-overlay-acqroute" onchange="toggleAcquiredRoute(this.checked)" style="accent-color:#ffd60a;"/>Acquired Route (sequences)
  </label>
  <div style="margin-top:10px; padding-top:10px; border-top:1px solid #1a1a24;">
- <div style="font-size:10px; color:#a0aebb; margin-bottom:6px; font-weight:700; letter-spacing:0.5px;">LIVE AIS (COASTAL)</div>
+ <div style="font-size:10px; color:#a0aebb; margin-bottom:6px; font-weight:700; letter-spacing:0.5px;">LIVE AIS (FREE — NO TRANSCEIVER)</div>
  <label style="display:flex; align-items:center; gap:8px; font-size:11px; color:#ccc; cursor:pointer; margin-bottom:8px;">
  <input type="checkbox" id="ais-show-bbox" onchange="toggleAisInView(this.checked)" style="accent-color:#00d2ff;"/>Show vessels in map view
  </label>
@@ -1058,7 +1058,7 @@
  <button onclick="stopVesselTracking()" style="padding:5px 10px; background:#0a0a12; border:1px solid #1a1a24; border-radius:3px; color:#a0aebb; font-size:10px; cursor:pointer;">STOP</button>
  </div>
  <div id="ais-track-status" style="font-size:10px; color:#a0aebb; margin-top:6px;"></div>
- <div style="font-size:9px; color:#556; margin-top:6px; line-height:1.35;">Primary feed: AISHub (share a shore AIS receiver to get a free username). Seismic fleet uses the same feed by MMSI. Offshore sat AIS still needs Kpler.</div>
+ <div style="font-size:9px; color:#556; margin-top:6px; line-height:1.35;">Free feed: Digitraffic (Finnish/Baltic coastal — no AIS transceiver). AISHub needs a receiver we do not have. Global offshore seismic ships need paid satellite AIS (e.g. Kpler).</div>
  </div>
  </div>
  </div>
@@ -1708,9 +1708,9 @@
  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
  <script src="https://unpkg.com/shpjs@latest/dist/shp.min.js"></script>
  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
- <script src="app.js?v=16.19"></script>
- <script src="ray_tracing_module.js?v=16.19"></script>
- <script src="wmm_declination.js?v=16.19"></script>
- <script src="magnetic_isogones.js?v=16.19"></script>
+ <script src="app.js?v=16.20"></script>
+ <script src="ray_tracing_module.js?v=16.20"></script>
+ <script src="wmm_declination.js?v=16.20"></script>
+ <script src="magnetic_isogones.js?v=16.20"></script>
 </body>
 </html>

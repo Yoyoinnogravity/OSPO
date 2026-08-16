@@ -19,7 +19,7 @@ $status = is_readable($statusFile) ? (json_decode(@file_get_contents($statusFile
 if (empty($status['configured'])) {
     http_response_code(503);
     echo json_encode([
-        'error' => 'Live AIS not configured. Add AISHUB_USERNAME to /etc/candooka/ais.env (https://www.aishub.net).',
+        'error' => 'Live AIS daemon not ready. Digitraffic is the default free feed (no transceiver).',
         'configured' => false,
     ]);
     exit;
