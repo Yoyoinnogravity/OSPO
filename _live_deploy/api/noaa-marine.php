@@ -6,12 +6,12 @@
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
-header('Cache-Control: public, max-age=21600'); // 6 hours
+header('Cache-Control: public, max-age=3600'); // 1 hour — latest WW3 / GFS model fields
 
 $mode = isset($_GET['mode']) ? strtolower(trim($_GET['mode'])) : 'wind';
-if ($mode !== 'wind' && $mode !== 'waves') {
+if ($mode !== 'wind' && $mode !== 'waves' && $mode !== 'swell') {
     http_response_code(400);
-    echo json_encode(['error' => 'mode must be wind or waves']);
+    echo json_encode(['error' => 'mode must be wind, waves, or swell']);
     exit;
 }
 
@@ -144,43 +144,105 @@ if ($mode === 'wind') {
     exit;
 }
 
-// Waves — WAVEWATCH III global (NOAA public domain)
+// Waves / Swell — WAVEWATCH III global (NOAA public domain via PacIOOS)
+// Combined sea: Thgt / Tper / Tdir
+// Swell (surf): shgt / sper / sdir
+// Wind sea: whgt / wper / wdir
 $q = sprintf(
-    '?Thgt%%5B(last)%%5D%%5B(0.0)%%5D%%5B(%.1f)%%5D%%5B(%.1f)%%5D,Tdir%%5B(last)%%5D%%5B(0.0)%%5D%%5B(%.1f)%%5D%%5B(%.1f)%%5D,Tper%%5B(last)%%5D%%5B(0.0)%%5D%%5B(%.1f)%%5D%%5B(%.1f)%%5D',
+    '?Thgt%%5B(last)%%5D%%5B(0.0)%%5D%%5B(%.1f)%%5D%%5B(%.1f)%%5D'
+    . ',Tdir%%5B(last)%%5D%%5B(0.0)%%5D%%5B(%.1f)%%5D%%5B(%.1f)%%5D'
+    . ',Tper%%5B(last)%%5D%%5B(0.0)%%5D%%5B(%.1f)%%5D%%5B(%.1f)%%5D'
+    . ',shgt%%5B(last)%%5D%%5B(0.0)%%5D%%5B(%.1f)%%5D%%5B(%.1f)%%5D'
+    . ',sper%%5B(last)%%5D%%5B(0.0)%%5D%%5B(%.1f)%%5D%%5B(%.1f)%%5D'
+    . ',sdir%%5B(last)%%5D%%5B(0.0)%%5D%%5B(%.1f)%%5D%%5B(%.1f)%%5D'
+    . ',whgt%%5B(last)%%5D%%5B(0.0)%%5D%%5B(%.1f)%%5D%%5B(%.1f)%%5D'
+    . ',wper%%5B(last)%%5D%%5B(0.0)%%5D%%5B(%.1f)%%5D%%5B(%.1f)%%5D'
+    . ',wdir%%5B(last)%%5D%%5B(0.0)%%5D%%5B(%.1f)%%5D%%5B(%.1f)%%5D',
+    $qlat, $qlon, $qlat, $qlon, $qlat, $qlon,
+    $qlat, $qlon, $qlat, $qlon, $qlat, $qlon,
     $qlat, $qlon, $qlat, $qlon, $qlat, $qlon
 );
 $csv = fetchMarineCsv([
     'https://pae-paha.pacioos.hawaii.edu/erddap/griddap/ww3_global.csv' . $q,
-    'https://coastwatch.pfeg.noaa.gov/erddap/griddap/NWW3_Global_Best.csv' . $q,
+    // CoastWatch legacy may lack swell split — fall back to combined only
+    'https://coastwatch.pfeg.noaa.gov/erddap/griddap/NWW3_Global_Best.csv' . sprintf(
+        '?Thgt%%5B(last)%%5D%%5B(0.0)%%5D%%5B(%.1f)%%5D%%5B(%.1f)%%5D,Tdir%%5B(last)%%5D%%5B(0.0)%%5D%%5B(%.1f)%%5D%%5B(%.1f)%%5D,Tper%%5B(last)%%5D%%5B(0.0)%%5D%%5B(%.1f)%%5D%%5B(%.1f)%%5D',
+        $qlat, $qlon, $qlat, $qlon, $qlat, $qlon
+    ),
 ]);
 $row = $csv ? parseErddapCsv($csv) : null;
-if (!$row || !isset($row['Thgt']) || !is_numeric($row['Thgt'])) {
+if (!$row || ((!isset($row['Thgt']) || !is_numeric($row['Thgt']))
+    && (!isset($row['shgt']) || !is_numeric($row['shgt'])))) {
     http_response_code(502);
     echo json_encode([
-        'error' => 'NOAA WAVEWATCH III waves unavailable at this location',
+        'error' => 'NOAA WAVEWATCH III swell/waves unavailable at this location',
         'lat' => $qlat,
         'lon' => $lon,
-        'source' => 'NOAA WAVEWATCH III (CoastWatch ERDDAP)',
+        'source' => 'NOAA WAVEWATCH III (PacIOOS / CoastWatch ERDDAP)',
     ]);
     exit;
 }
 
-$hs = floatval($row['Thgt']);
-$tdir = isset($row['Tdir']) && is_numeric($row['Tdir']) ? floatval($row['Tdir']) : null;
-$tper = isset($row['Tper']) && is_numeric($row['Tper']) ? floatval($row['Tper']) : null;
+function numOrNull($row, $key) {
+    return (isset($row[$key]) && is_numeric($row[$key]) && strcasecmp((string)$row[$key], 'NaN') !== 0)
+        ? floatval($row[$key]) : null;
+}
 
-echo json_encode([
+$hs = numOrNull($row, 'Thgt');
+$tdir = numOrNull($row, 'Tdir');
+$tper = numOrNull($row, 'Tper');
+$shgt = numOrNull($row, 'shgt');
+$sper = numOrNull($row, 'sper');
+$sdir = numOrNull($row, 'sdir');
+$whgt = numOrNull($row, 'whgt');
+$wper = numOrNull($row, 'wper');
+$wdir = numOrNull($row, 'wdir');
+
+// Surf-oriented summary: prefer dedicated swell fields; fall back to combined sea
+$surfHs = $shgt !== null ? $shgt : $hs;
+$surfPer = $sper !== null ? $sper : $tper;
+$surfDir = $sdir !== null ? $sdir : $tdir;
+
+// Rough surfability hint from period (public WW3 model guidance, not a forecast product)
+$surfHint = null;
+if ($surfPer !== null) {
+    if ($surfPer >= 14) $surfHint = 'Long-period swell — typically more organised / powerful for surfing';
+    else if ($surfPer >= 10) $surfHint = 'Medium-period swell — often rideable depending on height & local bathymetry';
+    else if ($surfPer >= 7) $surfHint = 'Shorter-period energy — can be choppier / windier feel';
+    else $surfHint = 'Short period — often wind-sea dominated; less ideal for clean surf';
+}
+
+$payload = [
     'ok' => true,
-    'mode' => 'waves',
+    'mode' => $mode === 'swell' ? 'swell' : 'waves',
     'lat' => $qlat,
     'lon' => $lon,
     'time' => $row['time'] ?? '',
-    'hsM' => round($hs, 2),
-    'hsFt' => round($hs * 3.28084, 1),
+    'hsM' => $hs !== null ? round($hs, 2) : null,
+    'hsFt' => $hs !== null ? round($hs * 3.28084, 1) : null,
     'peakDirDeg' => $tdir !== null ? round($tdir, 0) : null,
     'peakDirCardinal' => $tdir !== null ? cardinal($tdir) : null,
     'peakPeriodSec' => $tper !== null ? round($tper, 1) : null,
-    'source' => 'NOAA WAVEWATCH III (CoastWatch ERDDAP NWW3_Global_Best)',
+    'swellHsM' => $shgt !== null ? round($shgt, 2) : null,
+    'swellHsFt' => $shgt !== null ? round($shgt * 3.28084, 1) : null,
+    'swellPeriodSec' => $sper !== null ? round($sper, 1) : null,
+    'swellDirDeg' => $sdir !== null ? round($sdir, 0) : null,
+    'swellDirCardinal' => $sdir !== null ? cardinal($sdir) : null,
+    'windSeaHsM' => $whgt !== null ? round($whgt, 2) : null,
+    'windSeaPeriodSec' => $wper !== null ? round($wper, 1) : null,
+    'windSeaDirDeg' => $wdir !== null ? round($wdir, 0) : null,
+    'windSeaDirCardinal' => $wdir !== null ? cardinal($wdir) : null,
+    // Surfer-facing aliases (latest WW3 model time)
+    'surfHsM' => $surfHs !== null ? round($surfHs, 2) : null,
+    'surfHsFt' => $surfHs !== null ? round($surfHs * 3.28084, 1) : null,
+    'surfPeriodSec' => $surfPer !== null ? round($surfPer, 1) : null,
+    'surfDirDeg' => $surfDir !== null ? round($surfDir, 0) : null,
+    'surfDirCardinal' => $surfDir !== null ? cardinal($surfDir) : null,
+    'surfHint' => $surfHint,
+    'source' => 'NOAA WAVEWATCH III via PacIOOS ERDDAP (public domain)',
     'attribution' => 'NOAA / NCEP WAVEWATCH III — public domain U.S. Government work',
-    'datasetUrl' => 'https://coastwatch.pfeg.noaa.gov/erddap/griddap/NWW3_Global_Best.html',
-]);
+    'datasetUrl' => 'https://pae-paha.pacioos.hawaii.edu/erddap/griddap/ww3_global.html',
+    'realtimeNote' => 'Latest WW3 model analysis/forecast field (typically hourly). Not a buoy observation.',
+];
+
+echo json_encode($payload);
