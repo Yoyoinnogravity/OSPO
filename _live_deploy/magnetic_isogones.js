@@ -17,6 +17,28 @@ function magIsoFmtDecl(d) {
  return abs.toFixed(1) + '\u00b0' + hemi;
 }
 
+/** Annual rate of change of declination (deg/year). Eastward positive. */
+function magIsoFmtAnnual(dPerYr) {
+ if (!isFinite(dPerYr)) return '--';
+ const abs = Math.abs(dPerYr);
+ const hemi = dPerYr >= 0 ? 'E' : 'W';
+ const sign = dPerYr >= 0 ? '+' : '\u2212';
+ return sign + abs.toFixed(2) + '\u00b0' + hemi + '/yr';
+}
+
+function magIsoPointField(lat, lon, date) {
+ if (typeof WMMDeclination === 'undefined') return null;
+ try {
+  if (typeof WMMDeclination.field === 'function') {
+   return WMMDeclination.field(lat, lon, date || new Date());
+  }
+  const decl = WMMDeclination.declination(lat, lon, date || new Date());
+  return { decl, decldot: NaN, annualChange: NaN };
+ } catch (_) {
+  return null;
+ }
+}
+
 function magIsoGetInterval() {
  const el = document.getElementById('mag-iso-interval');
  const v = el ? parseFloat(el.value) : _magIsoState.intervalDeg;
@@ -234,15 +256,20 @@ function magIsoRebuild() {
     className: 'mag-isogone'
    }).addTo(layer);
 
-   // Label near midpoint of longest-ish stretch
+   // Label near midpoint: declination value + local annual rate of change
    const mid = latlngs[Math.floor(latlngs.length / 2)];
+   const midField = magIsoPointField(mid[0], mid[1], date);
+   const annualTxt = midField && isFinite(midField.decldot)
+    ? ' ' + magIsoFmtAnnual(midField.decldot)
+    : '';
+   const labelHtml = `<span style="color:${color};font-size:10px;font-weight:700;text-shadow:0 0 3px #000,0 1px 2px #000;white-space:nowrap;">${magIsoFmtDecl(level)}${annualTxt ? `<span style="font-weight:600;opacity:0.9;"> · ${annualTxt.trim()}</span>` : ''}</span>`;
    L.marker(mid, {
     interactive: false,
     icon: L.divIcon({
      className: 'mag-iso-label',
-     html: `<span style="color:${color};font-size:10px;font-weight:700;text-shadow:0 0 3px #000,0 1px 2px #000;white-space:nowrap;">${magIsoFmtDecl(level)}</span>`,
-     iconSize: [48, 14],
-     iconAnchor: [24, 7]
+     html: labelHtml,
+     iconSize: [110, 14],
+     iconAnchor: [55, 7]
     })
    }).addTo(layer);
   });
@@ -250,9 +277,14 @@ function magIsoRebuild() {
 
  if (!map.hasLayer(layer)) layer.addTo(map);
 
+ const centre = map.getCenter();
+ const cField = magIsoPointField(centre.lat, centre.lng, date);
  const hint = document.getElementById('mag-iso-status');
  if (hint) {
-  hint.textContent = `WMM · ${magIsoFmtDecl(minV)} to ${magIsoFmtDecl(maxV)} · every ${interval}\u00b0 · ${date.getFullYear()}`;
+  const annualCentre = cField && isFinite(cField.decldot)
+   ? ` · centre ${magIsoFmtDecl(cField.decl)} ${magIsoFmtAnnual(cField.decldot)}`
+   : '';
+  hint.textContent = `WMM · ${magIsoFmtDecl(minV)} to ${magIsoFmtDecl(maxV)} · every ${interval}\u00b0 · ${date.getFullYear()}${annualCentre}`;
  }
 }
 
@@ -268,14 +300,12 @@ function magIsoScheduleRebuild() {
 function magIsoOnClick(e) {
  if (!_magIsoState.enabled || typeof WMMDeclination === 'undefined') return;
  try {
-  const d = WMMDeclination.declination(e.latlng.lat, e.latlng.lng, new Date());
-  const f = typeof WMMDeclination.field === 'function'
-   ? WMMDeclination.field(e.latlng.lat, e.latlng.lng, new Date())
-   : null;
-  const tip = f && isFinite(f.incl)
-   ? `Declination ${magIsoFmtDecl(d)} · Inclination ${f.incl.toFixed(1)}\u00b0`
-   : `Declination ${magIsoFmtDecl(d)}`;
-  showToast(tip, 4500);
+  const f = magIsoPointField(e.latlng.lat, e.latlng.lng, new Date());
+  if (!f || !isFinite(f.decl)) return;
+  let tip = `Declination ${magIsoFmtDecl(f.decl)}`;
+  if (isFinite(f.decldot)) tip += ` · Annual change ${magIsoFmtAnnual(f.decldot)}`;
+  if (isFinite(f.incl)) tip += ` · Incl ${f.incl.toFixed(1)}\u00b0`;
+  showToast(tip, 5500);
  } catch (_) {}
 }
 
@@ -300,7 +330,7 @@ function magIsoEnable() {
   _magIsoState.clickHandler = magIsoOnClick;
   map.on('click', _magIsoState.clickHandler);
  }
- showToast('Magnetic declination isogones on - click map for local value', 4500);
+ showToast('Magnetic declination isogones on - click for declination + annual change', 4500);
 }
 
 function magIsoDisable() {
