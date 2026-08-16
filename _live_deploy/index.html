@@ -390,7 +390,13 @@
  <button class="map-ctrl-btn" onclick="zoomInView()" title="Zoom In">+</button>
  <button class="map-ctrl-btn" onclick="zoomOutView()" title="Zoom Out">-</button>
  <div class="ctrl-divider"></div>
- <button class="map-ctrl-btn" onclick="openWeatherChooser()" title="Wind / Waves + NOAA sea temperature (6h cache)" style="font-size:11px;font-weight:700;">Wx</button>
+ <button class="map-ctrl-btn" id="ctrl-weather" onclick="openWeatherChooser()" title="Wind &amp; Waves (and sea temperature)" aria-label="Wind and Waves" style="display:flex;align-items:center;justify-content:center;padding:0;">
+ <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <path d="M4 7h11a2.5 2.5 0 1 0-2.5-2.5" stroke="#7dd3fc" stroke-width="1.8" stroke-linecap="round"/>
+  <path d="M4 12h14a2.5 2.5 0 1 1-2.5 2.5" stroke="#38bdf8" stroke-width="1.8" stroke-linecap="round"/>
+  <path d="M3 18.5c1.6-1.2 3.2-1.2 4.8 0s3.2 1.2 4.8 0 3.2-1.2 4.8 0 3.2 1.2 4.8 0" stroke="#94a3b8" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+ </svg>
+ </button>
  <button class="map-ctrl-btn" onclick="toggleAnnotations()" title="Arrows">&#8679;</button>
  <button class="map-ctrl-btn" onclick="toggleLabels()" title="Labels">A</button>
  </div>
@@ -403,18 +409,41 @@
  </div>
  <div style="padding:12px;">
  <p style="font-size:10px;color:#94a3b8;margin:0 0 10px 0;">Fetched once and cached for 6 hours. Sea temp uses free NOAA SST.</p>
- <button onclick="openSeaTemp()" style="width:100%;height:36px;margin-bottom:8px;border:none;border-radius:8px;background:#0891b2;color:#fff;font-weight:700;font-size:12px;cursor:pointer;">Sea temp (NOAA)</button>
- <button onclick="openWeatherMode('wind')" style="width:100%;height:36px;margin-bottom:8px;border:1px solid #475569;border-radius:8px;background:#1e293b;color:#fff;font-weight:700;font-size:12px;cursor:pointer;">Wind</button>
- <button onclick="openWeatherMode('waves')" style="width:100%;height:36px;border:1px solid #475569;border-radius:8px;background:#1e293b;color:#fff;font-weight:700;font-size:12px;cursor:pointer;">Waves</button>
+ <button onclick="openSeaTemp()" style="width:100%;height:40px;margin-bottom:8px;border:none;border-radius:8px;background:#0891b2;color:#fff;font-weight:700;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="4" stroke="#fff" stroke-width="1.8"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M5.6 18.4L7 17M17 7l1.4-1.4" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/></svg>
+  Sea temp (NOAA)
+ </button>
+ <button onclick="openWeatherMode('wind')" style="width:100%;height:40px;margin-bottom:8px;border:1px solid #475569;border-radius:8px;background:#1e293b;color:#fff;font-weight:700;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+   <path d="M4 8h12a2.5 2.5 0 1 0-2.5-2.5" stroke="#7dd3fc" stroke-width="1.8" stroke-linecap="round"/>
+   <path d="M4 13h14a2.5 2.5 0 1 1-2.5 2.5" stroke="#38bdf8" stroke-width="1.8" stroke-linecap="round"/>
+   <path d="M4 18h8" stroke="#64748b" stroke-width="1.8" stroke-linecap="round"/>
+  </svg>
+  Wind
+ </button>
+ <button onclick="openWeatherMode('waves')" style="width:100%;height:40px;border:1px solid #475569;border-radius:8px;background:#1e293b;color:#fff;font-weight:700;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+   <path d="M3 10c1.8-1.4 3.6-1.4 5.4 0s3.6 1.4 5.4 0 3.6-1.4 5.4 0" stroke="#38bdf8" stroke-width="1.8" stroke-linecap="round"/>
+   <path d="M3 15c1.8-1.4 3.6-1.4 5.4 0s3.6 1.4 5.4 0 3.6-1.4 5.4 0" stroke="#94a3b8" stroke-width="1.8" stroke-linecap="round"/>
+   <path d="M3 20c1.8-1.4 3.6-1.4 5.4 0s3.6 1.4 5.4 0 3.6-1.4 5.4 0" stroke="#64748b" stroke-width="1.8" stroke-linecap="round"/>
+  </svg>
+  Waves
+ </button>
  </div>
  </div>
  <div id="weather-panel" style="display:none;position:fixed;bottom:80px;right:24px;z-index:10050;width:360px;max-height:70vh;background:#0d1526;border:1px solid #334155;border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,0.55);overflow:hidden;font-family:inherit;">
  <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid #1e293b;gap:8px;">
  <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
  <span id="weather-panel-title" style="font-size:12px;font-weight:700;color:#fff;">Sea temp | 6h cache</span>
- <button onclick="openSeaTemp()" style="font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid #475569;background:#164e63;color:#fff;cursor:pointer;">SST</button>
- <button onclick="openWeatherMode('wind')" style="font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid #475569;background:#1e293b;color:#cbd5e1;cursor:pointer;">Wind</button>
- <button onclick="openWeatherMode('waves')" style="font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid #475569;background:#1e293b;color:#cbd5e1;cursor:pointer;">Waves</button>
+ <button onclick="openSeaTemp()" style="font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid #475569;background:#164e63;color:#fff;cursor:pointer;" title="Sea temperature">SST</button>
+ <button onclick="openWeatherMode('wind')" style="font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid #475569;background:#1e293b;color:#cbd5e1;cursor:pointer;display:inline-flex;align-items:center;gap:4px;" title="Wind">
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 9h11a2 2 0 1 0-2-2" stroke="#7dd3fc" stroke-width="2" stroke-linecap="round"/><path d="M3 14h13a2 2 0 1 1-2 2" stroke="#38bdf8" stroke-width="2" stroke-linecap="round"/></svg>
+  Wind
+ </button>
+ <button onclick="openWeatherMode('waves')" style="font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid #475569;background:#1e293b;color:#cbd5e1;cursor:pointer;display:inline-flex;align-items:center;gap:4px;" title="Waves">
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M2 12c1.5-1 3-1 4.5 0s3 1 4.5 0 3-1 4.5 0 3 1 4.5 0" stroke="#94a3b8" stroke-width="2" stroke-linecap="round"/></svg>
+  Waves
+ </button>
  </div>
  <div style="display:flex;gap:4px;">
  <button onclick="(window._weatherMode==='sst'?openSeaTemp(true):openWeatherMode(window._weatherMode||'wind', true))" title="Force refresh" style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:12px;"></button>
@@ -1673,9 +1702,9 @@
  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
  <script src="https://unpkg.com/shpjs@latest/dist/shp.min.js"></script>
  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
- <script src="app.js?v=16.13"></script>
- <script src="ray_tracing_module.js?v=16.13"></script>
- <script src="wmm_declination.js?v=16.13"></script>
- <script src="magnetic_isogones.js?v=16.13"></script>
+ <script src="app.js?v=16.14"></script>
+ <script src="ray_tracing_module.js?v=16.14"></script>
+ <script src="wmm_declination.js?v=16.14"></script>
+ <script src="magnetic_isogones.js?v=16.14"></script>
 </body>
 </html>
