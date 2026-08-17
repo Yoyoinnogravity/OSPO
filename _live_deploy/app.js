@@ -15662,39 +15662,63 @@ var _appWorkspace = null; // 'planning' | 'database'
 var _tdbActiveProjectId = null;
 var _tdbActiveDay = null; // YYYY-MM-DD
 
-/** Timing taxonomy: Category → Activities (CheckPoint-style). */
+/** Timing taxonomy: Category → Activities (aligned to Mid Point Geo CheckPoint).
+ *  CheckPoint typical categories: Mobilisation / Operational / Chargeable Standby /
+ *  Non Chargeable Standby / Technical Downtime. HSE + Other kept for Candooka extras.
+ *  Ref: https://www.midpointgeo.com/news/activity-in-checkpoint
+ */
 const TDB_CATEGORIES = [
- { id: 'PRODUCTION', label: 'Production', color: '#30d158' },
- { id: 'STANDBY', label: 'Standby', color: '#a78bfa' },
- { id: 'DOWNTIME', label: 'Downtime', color: '#f97316' },
  { id: 'MOBILISATION', label: 'Mobilisation', color: '#eab308' },
+ { id: 'OPERATIONAL', label: 'Operational', color: '#30d158' },
+ { id: 'CHARGEABLE_STANDBY', label: 'Chargeable Standby', color: '#a78bfa' },
+ { id: 'NON_CHARGEABLE_STANDBY', label: 'Non Chargeable Standby', color: '#818cf8' },
+ { id: 'TECHNICAL_DOWNTIME', label: 'Technical Downtime', color: '#f97316' },
  { id: 'HSE', label: 'HSE', color: '#f43f5e' },
  { id: 'OTHER', label: 'Other', color: '#94a3b8' }
 ];
 
+/** Old category ids → CheckPoint categories. */
+const TDB_CATEGORY_LEGACY = {
+ PRODUCTION: 'OPERATIONAL',
+ STANDBY: 'CHARGEABLE_STANDBY',
+ DOWNTIME: 'TECHNICAL_DOWNTIME'
+};
+
 const TDB_ACTIVITIES = [
- { id: 'ONLINE', categoryId: 'PRODUCTION', label: 'Online acquisition', color: '#30d158' },
- { id: 'LINECHANGE', categoryId: 'PRODUCTION', label: 'Line change / transit', color: '#00d2ff' },
- { id: 'INFILL', categoryId: 'PRODUCTION', label: 'Infill / reshoot', color: '#34d399' },
- { id: 'TEST_PROD', categoryId: 'PRODUCTION', label: 'Test / calibration (production)', color: '#5eead4' },
- { id: 'STANDBY_CLIENT', categoryId: 'STANDBY', label: 'Waiting on client', color: '#a78bfa' },
- { id: 'STANDBY_PERMIT', categoryId: 'STANDBY', label: 'Waiting on permit / access', color: '#c4b5fd' },
- { id: 'STANDBY_OTHER', categoryId: 'STANDBY', label: 'Standby — other', color: '#8b5cf6' },
- { id: 'WEATHER', categoryId: 'DOWNTIME', label: 'Weather (WOW)', color: '#60a5fa' },
- { id: 'TECH', categoryId: 'DOWNTIME', label: 'Technical / equipment', color: '#f97316' },
- { id: 'STREAMER', categoryId: 'DOWNTIME', label: 'Streamer / cable work', color: '#fb923c' },
+ // Mobilisation
+ { id: 'DEPLOY', categoryId: 'MOBILISATION', label: 'Deployment', color: '#fde047' },
  { id: 'MOB', categoryId: 'MOBILISATION', label: 'Mobilisation', color: '#eab308' },
  { id: 'DEMOB', categoryId: 'MOBILISATION', label: 'Demobilisation', color: '#facc15' },
  { id: 'PORT', categoryId: 'MOBILISATION', label: 'Port / logistics', color: '#ca8a04' },
+ // Operational (CheckPoint: Prime / Infill / Line Change …)
+ { id: 'ONLINE', categoryId: 'OPERATIONAL', label: 'Prime production', color: '#30d158' },
+ { id: 'INFILL', categoryId: 'OPERATIONAL', label: 'Infill production', color: '#34d399' },
+ { id: 'LINECHANGE', categoryId: 'OPERATIONAL', label: 'Line change', color: '#00d2ff' },
+ { id: 'TEST_PROD', categoryId: 'OPERATIONAL', label: 'Test / calibration', color: '#5eead4' },
+ // Chargeable Standby
+ { id: 'WEATHER', categoryId: 'CHARGEABLE_STANDBY', label: 'Weather standby', color: '#60a5fa' },
+ { id: 'STANDBY_CLIENT', categoryId: 'CHARGEABLE_STANDBY', label: 'Waiting on client', color: '#a78bfa' },
+ { id: 'STANDBY_OTHER', categoryId: 'CHARGEABLE_STANDBY', label: 'Chargeable standby — other', color: '#8b5cf6' },
+ // Non Chargeable Standby
+ { id: 'STANDBY_PERMIT', categoryId: 'NON_CHARGEABLE_STANDBY', label: 'Waiting on permit / access', color: '#c4b5fd' },
+ { id: 'FAUNA', categoryId: 'NON_CHARGEABLE_STANDBY', label: 'Fauna / MMO / PAM standby', color: '#6366f1' },
+ { id: 'STANDBY_NON', categoryId: 'NON_CHARGEABLE_STANDBY', label: 'Non-chargeable standby — other', color: '#4f46e5' },
+ // Technical Downtime
+ { id: 'TECH', categoryId: 'TECHNICAL_DOWNTIME', label: 'Technical / equipment', color: '#f97316' },
+ { id: 'STREAMER', categoryId: 'TECHNICAL_DOWNTIME', label: 'Streamer downtime', color: '#fb923c' },
+ { id: 'SOURCE', categoryId: 'TECHNICAL_DOWNTIME', label: 'Source downtime', color: '#fdba74' },
+ { id: 'OBN_DT', categoryId: 'TECHNICAL_DOWNTIME', label: 'OBN / seabed downtime', color: '#ea580c' },
+ // HSE (Candooka — CheckPoint QHSE is a separate module)
  { id: 'HSE_TOOLBOX', categoryId: 'HSE', label: 'Toolbox talk / briefing', color: '#fb7185' },
  { id: 'HSE_DRILL', categoryId: 'HSE', label: 'Emergency drill / exercise', color: '#f43f5e' },
  { id: 'HSE_STANDDOWN', categoryId: 'HSE', label: 'Safety stand-down', color: '#e11d48' },
  { id: 'HSE_INVESTIGATION', categoryId: 'HSE', label: 'Incident investigation', color: '#be123c' },
  { id: 'HSE_TRAINING', categoryId: 'HSE', label: 'HSE training', color: '#9f1239' },
  { id: 'HSE_OTHER', categoryId: 'HSE', label: 'HSE — other time', color: '#881337' },
- { id: 'OTHER', categoryId: 'OTHER', label: 'Other / misc', color: '#94a3b8' },
+ // Other
  { id: 'MEETING', categoryId: 'OTHER', label: 'Meetings', color: '#7dd3fc' },
- { id: 'MEAL', categoryId: 'OTHER', label: 'Meal / crew change', color: '#64748b' }
+ { id: 'MEAL', categoryId: 'OTHER', label: 'Meal / crew change', color: '#64748b' },
+ { id: 'OTHER', categoryId: 'OTHER', label: 'Other / misc', color: '#94a3b8' }
 ];
 
 const TDB_HSE_DEFAULT = {
@@ -15712,16 +15736,19 @@ const TDB_HSE_DEFAULT = {
  note: ''
 };
 
-/** Map legacy flat codes → category/activity. */
+/** Map legacy flat codes → category/activity (post CheckPoint alignment). */
 const TDB_LEGACY_MAP = {
- ONLINE: { categoryId: 'PRODUCTION', activityId: 'ONLINE' },
- LINECHANGE: { categoryId: 'PRODUCTION', activityId: 'LINECHANGE' },
- STANDBY: { categoryId: 'STANDBY', activityId: 'STANDBY_OTHER' },
- WEATHER: { categoryId: 'DOWNTIME', activityId: 'WEATHER' },
- TECH: { categoryId: 'DOWNTIME', activityId: 'TECH' },
+ ONLINE: { categoryId: 'OPERATIONAL', activityId: 'ONLINE' },
+ LINECHANGE: { categoryId: 'OPERATIONAL', activityId: 'LINECHANGE' },
+ STANDBY: { categoryId: 'CHARGEABLE_STANDBY', activityId: 'STANDBY_OTHER' },
+ WEATHER: { categoryId: 'CHARGEABLE_STANDBY', activityId: 'WEATHER' },
+ TECH: { categoryId: 'TECHNICAL_DOWNTIME', activityId: 'TECH' },
  MOB: { categoryId: 'MOBILISATION', activityId: 'MOB' },
  OTHER: { categoryId: 'OTHER', activityId: 'OTHER' },
- GAP: { categoryId: 'OTHER', activityId: 'OTHER' }
+ GAP: { categoryId: 'OTHER', activityId: 'OTHER' },
+ // Old category-as-code leftovers
+ PRODUCTION: { categoryId: 'OPERATIONAL', activityId: 'ONLINE' },
+ DOWNTIME: { categoryId: 'TECHNICAL_DOWNTIME', activityId: 'TECH' }
 };
 
 function _tdbCat(id) {
@@ -15745,7 +15772,15 @@ function _tdbNormalizeSeg(s) {
  }
  if (!activityId) activityId = 'OTHER';
  const act = _tdbAct(activityId);
+ if (categoryId && TDB_CATEGORY_LEGACY[categoryId]) {
+  categoryId = TDB_CATEGORY_LEGACY[categoryId];
+ }
  if (!categoryId) categoryId = act.categoryId;
+ // Prefer activity's CheckPoint category when stored category is obsolete/mismatched
+ if (act && act.categoryId && categoryId !== act.categoryId) {
+  const known = TDB_CATEGORIES.some(c => c.id === categoryId);
+  if (!known || TDB_CATEGORY_LEGACY[s.categoryId]) categoryId = act.categoryId;
+ }
  return {
   ...s,
   categoryId,
@@ -15758,12 +15793,13 @@ function tdbInitCategoryActivityUi() {
  const catEl = document.getElementById('tdb-category');
  const actEl = document.getElementById('tdb-activity');
  if (!catEl || !actEl) return;
- if (!catEl.options.length) {
-  catEl.innerHTML = TDB_CATEGORIES.map(c =>
-   `<option value="${c.id}">${c.label}</option>`
-  ).join('');
- }
- if (!catEl.value) catEl.value = 'PRODUCTION';
+ const prevCat = catEl.value;
+ catEl.innerHTML = TDB_CATEGORIES.map(c =>
+  `<option value="${c.id}">${c.label}</option>`
+ ).join('');
+ if (prevCat && TDB_CATEGORIES.some(c => c.id === prevCat)) catEl.value = prevCat;
+ else if (prevCat && TDB_CATEGORY_LEGACY[prevCat]) catEl.value = TDB_CATEGORY_LEGACY[prevCat];
+ else catEl.value = 'OPERATIONAL';
  tdbOnCategoryChanged();
 }
 
@@ -15771,7 +15807,7 @@ function tdbOnCategoryChanged() {
  const catEl = document.getElementById('tdb-category');
  const actEl = document.getElementById('tdb-activity');
  if (!catEl || !actEl) return;
- const catId = catEl.value || 'PRODUCTION';
+ const catId = catEl.value || 'OPERATIONAL';
  const acts = _tdbActsForCategory(catId);
  const prev = actEl.value;
  actEl.innerHTML = acts.map(a =>
@@ -15784,7 +15820,7 @@ function tdbOnCategoryChanged() {
 function _tdbSelectedCatAct() {
  const catEl = document.getElementById('tdb-category');
  const actEl = document.getElementById('tdb-activity');
- let categoryId = (catEl && catEl.value) || 'PRODUCTION';
+ let categoryId = (catEl && catEl.value) || 'OPERATIONAL';
  let activityId = (actEl && actEl.value) || 'ONLINE';
  const act = _tdbAct(activityId);
  if (act.categoryId !== categoryId) {
@@ -16219,7 +16255,7 @@ function enterWorkspace(mode) {
   }
   tdbInitCategoryActivityUi();
   tdbRender();
-  showToast('Timing Database — Category → Activity + daily HSE metrics', 3000);
+  showToast('Timing Database — CheckPoint categories + HSE / man-hours', 3000);
   return;
  }
 
