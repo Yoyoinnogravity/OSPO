@@ -14434,6 +14434,9 @@ function resetWorkspaceForLogout() {
    _rayState.source = null;
    _rayState.nodes = [];
    _rayState.results = [];
+   _rayState.allResults = [];
+   _rayState.skipped = { maxOffset: 0, critical: 0, failed: 0 };
+   _rayState.busy = false;
   }
   state.obnNodes = [];
   _ppgEditNodes = [];
