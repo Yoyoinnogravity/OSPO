@@ -15656,34 +15656,152 @@ function geoBatchCopy() {
 let mapLayers = {};
 let currentBaseLayer = null;
 
-const TDB_STORAGE_KEY = 'candooka_timing_db_v1';
+const TDB_STORAGE_KEY = 'candooka_timing_db_v2';
+const TDB_DAY_MINUTES = 1440;
 var _appWorkspace = null; // 'planning' | 'database'
 var _tdbActiveProjectId = null;
+var _tdbActiveDay = null; // YYYY-MM-DD
+
+const TDB_CODE_COLORS = {
+ ONLINE: '#30d158',
+ LINECHANGE: '#00d2ff',
+ STANDBY: '#a78bfa',
+ WEATHER: '#60a5fa',
+ TECH: '#f97316',
+ MOB: '#eab308',
+ OTHER: '#94a3b8',
+ GAP: '#ef4444'
+};
+
+function _tdbTodayIso() {
+ const d = new Date();
+ const m = String(d.getMonth() + 1).padStart(2, '0');
+ const day = String(d.getDate()).padStart(2, '0');
+ return d.getFullYear() + '-' + m + '-' + day;
+}
 
 function _tdbLoadStore() {
  try {
-  const raw = localStorage.getItem(TDB_STORAGE_KEY);
-  if (!raw) return { projects: [] };
+  let raw = localStorage.getItem(TDB_STORAGE_KEY);
+  if (!raw) {
+   // Migrate v1 hour-based store if present
+   const legacy = localStorage.getItem('candooka_timing_db_v1');
+   if (legacy) {
+    const old = JSON.parse(legacy);
+    const projects = (old.projects || []).map(p => ({
+     id: p.id,
+     name: p.name,
+     createdAt: p.createdAt || new Date().toISOString(),
+     days: {}
+    }));
+    const store = { version: 2, projects };
+    _tdbSaveStore(store);
+    return store;
+   }
+   return { version: 2, projects: [] };
+  }
   const d = JSON.parse(raw);
-  if (!d || !Array.isArray(d.projects)) return { projects: [] };
+  if (!d || !Array.isArray(d.projects)) return { version: 2, projects: [] };
+  d.projects.forEach(p => { if (!p.days) p.days = {}; });
   return d;
  } catch (_) {
-  return { projects: [] };
+  return { version: 2, projects: [] };
  }
 }
 
 function _tdbSaveStore(store) {
  try {
+  store.version = 2;
   localStorage.setItem(TDB_STORAGE_KEY, JSON.stringify(store));
  } catch (e) {
   showToast('Could not save timing database locally (storage full?)', 5000);
  }
 }
 
+function _tdbParseHm(str, allowMidnightEnd) {
+ if (str == null || str === '') return null;
+ const m = String(str).trim().match(/^(\d{1,2}):(\d{2})$/);
+ if (!m) return null;
+ const h = parseInt(m[1], 10);
+ const min = parseInt(m[2], 10);
+ if (!isFinite(h) || !isFinite(min) || min < 0 || min > 59) return null;
+ if (allowMidnightEnd && h === 0 && min === 0) return TDB_DAY_MINUTES; // 24:00
+ if (h < 0 || h > 23) return null;
+ return h * 60 + min;
+}
+
+function _tdbFmtMin(m) {
+ if (m >= TDB_DAY_MINUTES) return '24:00';
+ const h = Math.floor(m / 60);
+ const mm = m % 60;
+ return String(h).padStart(2, '0') + ':' + String(mm).padStart(2, '0');
+}
+
+function _tdbGetDaySegs(proj, day) {
+ if (!proj || !day) return [];
+ if (!proj.days) proj.days = {};
+ if (!proj.days[day]) proj.days[day] = { segments: [] };
+ return proj.days[day].segments || [];
+}
+
+/** Analyse coverage of a day's segments. Returns gaps, overlaps, covered minutes. */
+function _tdbAnalyseDay(segments) {
+ const segs = (segments || [])
+  .map(s => ({
+   ...s,
+   startMin: Math.max(0, Math.min(TDB_DAY_MINUTES, Number(s.startMin) || 0)),
+   endMin: Math.max(0, Math.min(TDB_DAY_MINUTES, Number(s.endMin) || 0))
+  }))
+  .filter(s => s.endMin > s.startMin)
+  .sort((a, b) => a.startMin - b.startMin || a.endMin - b.endMin);
+
+ const overlaps = [];
+ for (let i = 0; i < segs.length; i++) {
+  for (let j = i + 1; j < segs.length; j++) {
+   if (segs[j].startMin >= segs[i].endMin) break;
+   if (segs[j].startMin < segs[i].endMin) {
+    overlaps.push({
+     a: segs[i], b: segs[j],
+     from: Math.max(segs[i].startMin, segs[j].startMin),
+     to: Math.min(segs[i].endMin, segs[j].endMin)
+    });
+   }
+  }
+ }
+
+ // Covered via merge (union)
+ const merged = [];
+ segs.forEach(s => {
+  if (!merged.length || s.startMin > merged[merged.length - 1].endMin) {
+   merged.push({ startMin: s.startMin, endMin: s.endMin });
+  } else {
+   merged[merged.length - 1].endMin = Math.max(merged[merged.length - 1].endMin, s.endMin);
+  }
+ });
+ let covered = 0;
+ merged.forEach(m => { covered += m.endMin - m.startMin; });
+
+ const gaps = [];
+ let cursor = 0;
+ merged.forEach(m => {
+  if (m.startMin > cursor) gaps.push({ startMin: cursor, endMin: m.startMin });
+  cursor = Math.max(cursor, m.endMin);
+ });
+ if (cursor < TDB_DAY_MINUTES) gaps.push({ startMin: cursor, endMin: TDB_DAY_MINUTES });
+
+ const byCode = {};
+ segs.forEach(s => {
+  const c = s.code || 'OTHER';
+  byCode[c] = (byCode[c] || 0) + (s.endMin - s.startMin);
+ });
+
+ const complete = gaps.length === 0 && overlaps.length === 0 && covered === TDB_DAY_MINUTES;
+ return { segs, gaps, overlaps, covered, gapMinutes: TDB_DAY_MINUTES - covered, byCode, complete };
+}
+
 function showWorkspaceChooser() {
  const el = document.getElementById('workspace-chooser');
  if (el) el.style.display = 'flex';
- // Hide other full-screen choosers while picking
  const base = document.getElementById('baselayer-chooser');
  if (base) base.style.display = 'none';
 }
@@ -15702,18 +15820,27 @@ function enterWorkspace(mode) {
  if (m === 'database') {
   if (app) app.style.visibility = 'hidden';
   if (dbWs) dbWs.style.display = 'block';
+  if (!_tdbActiveDay) {
+   _tdbActiveDay = _tdbTodayIso();
+   const dayEl = document.getElementById('tdb-day');
+   if (dayEl) dayEl.value = _tdbActiveDay;
+  }
   tdbRender();
-  showToast('Timing Database workspace', 2500);
+  showToast('Timing Database — account every minute of the day', 3000);
   return;
  }
 
- // Planning
  if (dbWs) dbWs.style.display = 'none';
  if (app) app.style.visibility = 'visible';
  showToast('Planning workspace', 2500);
- // Only prompt for basemap if none saved yet
  const saved = localStorage.getItem('candooka_baseLayer');
  if (!saved) setTimeout(showBaseLayerChooser, 200);
+}
+
+function tdbOnDayChanged() {
+ const dayEl = document.getElementById('tdb-day');
+ _tdbActiveDay = (dayEl && dayEl.value) || _tdbTodayIso();
+ tdbRender();
 }
 
 function tdbRender() {
@@ -15721,25 +15848,37 @@ function tdbRender() {
  if (!_tdbActiveProjectId && store.projects.length) {
   _tdbActiveProjectId = store.projects[0].id;
  }
+ if (!_tdbActiveDay) _tdbActiveDay = _tdbTodayIso();
+ const dayEl = document.getElementById('tdb-day');
+ if (dayEl && !dayEl.value) dayEl.value = _tdbActiveDay;
+ if (dayEl && dayEl.value) _tdbActiveDay = dayEl.value;
+
  const list = document.getElementById('tdb-project-list');
  const label = document.getElementById('tdb-project-label');
  if (list) {
   if (!store.projects.length) {
-   list.innerHTML = '<div style="color:#64748b;font-size:11px;padding:8px 0;">No projects yet — create one to start time accounting.</div>';
+   list.innerHTML = '<div style="color:#64748b;font-size:11px;padding:8px 0;">No projects yet — create one to start full-day time accounting.</div>';
   } else {
    list.innerHTML = store.projects.map(p => {
     const active = p.id === _tdbActiveProjectId;
-    const hrs = (p.activities || []).reduce((s, a) => s + (Number(a.hours) || 0), 0);
+    const dayKeys = Object.keys(p.days || {});
+    let completeDays = 0;
+    dayKeys.forEach(d => {
+     const a = _tdbAnalyseDay((p.days[d] && p.days[d].segments) || []);
+     if (a.complete) completeDays++;
+    });
     return `<button type="button" onclick="tdbSelectProject('${p.id}')" style="display:block;width:100%;text-align:left;padding:8px 10px;margin-bottom:6px;border-radius:5px;border:1px solid ${active ? '#f59e0b' : '#1a1a24'};background:${active ? '#1a1205' : '#0a0a12'};color:#e2e8f0;cursor:pointer;font-family:inherit;">
       <div style="font-size:12px;font-weight:700;color:${active ? '#fbbf24' : '#e2e8f0'};">${_escHtml(p.name)}</div>
-      <div style="font-size:10px;color:#64748b;margin-top:2px;">${(p.activities || []).length} activities · ${hrs.toFixed(1)} h</div>
+      <div style="font-size:10px;color:#64748b;margin-top:2px;">${dayKeys.length} day(s) · ${completeDays} complete (1,440 min)</div>
      </button>`;
    }).join('');
   }
  }
  const proj = store.projects.find(p => p.id === _tdbActiveProjectId);
- if (label) label.textContent = proj ? ('Project: ' + proj.name) : 'No project selected';
- tdbRenderRollup(proj);
+ if (label) label.textContent = proj
+  ? ('Project: ' + proj.name + ' · ' + _tdbActiveDay)
+  : 'No project selected';
+ tdbRenderDay(proj);
 }
 
 function _escHtml(s) {
@@ -15760,7 +15899,7 @@ function tdbCreateProject() {
  const store = _tdbLoadStore();
  const id = 'p_' + Date.now().toString(36);
  store.projects.unshift({
-  id, name, createdAt: new Date().toISOString(), activities: []
+  id, name, createdAt: new Date().toISOString(), days: {}
  });
  _tdbSaveStore(store);
  _tdbActiveProjectId = id;
@@ -15771,62 +15910,217 @@ function tdbCreateProject() {
 
 function tdbAddActivity() {
  if (!_tdbActiveProjectId) { showToast('Create or select a project first'); return; }
+ const day = _tdbActiveDay || _tdbTodayIso();
  const code = (document.getElementById('tdb-act-code') || {}).value || 'OTHER';
- const hours = parseFloat((document.getElementById('tdb-act-hours') || {}).value);
+ if (code === 'GAP') {
+  showToast('GAP is for unaccounted time — pick a real time code, or use Fill all gaps');
+  return;
+ }
+ const startStr = (document.getElementById('tdb-act-start') || {}).value || '00:00';
+ const endStr = (document.getElementById('tdb-act-end') || {}).value || '01:00';
  const note = ((document.getElementById('tdb-act-note') || {}).value || '').trim();
- if (!(hours > 0)) { showToast('Enter hours greater than 0'); return; }
+ const startMin = _tdbParseHm(startStr, false);
+ let endMin = _tdbParseHm(endStr, true);
+ if (startMin == null || endMin == null) {
+  showToast('Enter valid start/end times (HH:MM)');
+  return;
+ }
+ if (endMin <= startMin) {
+  showToast('End must be after start (use 00:00 end for midnight / 24:00)');
+  return;
+ }
+
  const store = _tdbLoadStore();
  const proj = store.projects.find(p => p.id === _tdbActiveProjectId);
  if (!proj) { showToast('Project not found'); return; }
- proj.activities = proj.activities || [];
- proj.activities.unshift({
+ const segs = _tdbGetDaySegs(proj, day);
+ const overlap = segs.find(s => startMin < s.endMin && endMin > s.startMin);
+ if (overlap) {
+  showToast(
+   'Overlaps existing ' + overlap.code + ' (' + _tdbFmtMin(overlap.startMin) + '–' + _tdbFmtMin(overlap.endMin) + ')',
+   6000
+  );
+  return;
+ }
+ segs.push({
   id: 'a_' + Date.now().toString(36),
-  code, hours, note,
-  at: new Date().toISOString()
+  code, startMin, endMin, note
  });
+ segs.sort((a, b) => a.startMin - b.startMin);
+ proj.days[day].segments = segs;
  _tdbSaveStore(store);
  const noteEl = document.getElementById('tdb-act-note');
  if (noteEl) noteEl.value = '';
+ // Suggest next start = this end
+ const startEl = document.getElementById('tdb-act-start');
+ const endEl = document.getElementById('tdb-act-end');
+ if (startEl) startEl.value = _tdbFmtMin(endMin === TDB_DAY_MINUTES ? 0 : endMin);
+ if (endEl && endMin < TDB_DAY_MINUTES) {
+  const nextEnd = Math.min(TDB_DAY_MINUTES, endMin + 60);
+  endEl.value = nextEnd === TDB_DAY_MINUTES ? '00:00' : _tdbFmtMin(nextEnd);
+ }
  tdbRender();
- showToast('Activity logged: ' + code + ' ' + hours + ' h', 2500);
+ const mins = endMin - startMin;
+ showToast('Logged ' + code + ' ' + _tdbFmtMin(startMin) + '–' + _tdbFmtMin(endMin) + ' (' + mins + ' min)', 3000);
 }
 
-function tdbRenderRollup(proj) {
+function tdbFillGaps() {
+ if (!_tdbActiveProjectId) { showToast('Select a project first'); return; }
+ const code = (document.getElementById('tdb-act-code') || {}).value || 'STANDBY';
+ if (code === 'GAP') { showToast('Pick a real time code to fill gaps with'); return; }
+ const day = _tdbActiveDay || _tdbTodayIso();
+ const store = _tdbLoadStore();
+ const proj = store.projects.find(p => p.id === _tdbActiveProjectId);
+ if (!proj) return;
+ const segs = _tdbGetDaySegs(proj, day);
+ const analysis = _tdbAnalyseDay(segs);
+ if (!analysis.gaps.length) {
+  showToast(analysis.complete ? 'Day already fully accounted (1,440 min)' : 'No gaps to fill (check overlaps)', 4000);
+  return;
+ }
+ if (analysis.overlaps.length) {
+  showToast('Resolve overlaps before filling gaps', 5000);
+  return;
+ }
+ analysis.gaps.forEach(g => {
+  segs.push({
+   id: 'a_' + Date.now().toString(36) + '_' + g.startMin,
+   code, startMin: g.startMin, endMin: g.endMin,
+   note: 'Auto-filled gap'
+  });
+ });
+ segs.sort((a, b) => a.startMin - b.startMin);
+ proj.days[day].segments = segs;
+ _tdbSaveStore(store);
+ tdbRender();
+ showToast('Filled ' + analysis.gaps.length + ' gap(s) with ' + code + ' (' + analysis.gapMinutes + ' min)', 4000);
+}
+
+function tdbClearDay() {
+ if (!_tdbActiveProjectId) return;
+ const day = _tdbActiveDay || _tdbTodayIso();
+ if (!confirm('Clear all time blocks for ' + day + '?')) return;
+ const store = _tdbLoadStore();
+ const proj = store.projects.find(p => p.id === _tdbActiveProjectId);
+ if (!proj) return;
+ if (!proj.days) proj.days = {};
+ proj.days[day] = { segments: [] };
+ _tdbSaveStore(store);
+ tdbRender();
+ showToast('Day cleared: ' + day, 2500);
+}
+
+function tdbDeleteSegment(segId) {
+ if (!_tdbActiveProjectId) return;
+ const day = _tdbActiveDay || _tdbTodayIso();
+ const store = _tdbLoadStore();
+ const proj = store.projects.find(p => p.id === _tdbActiveProjectId);
+ if (!proj) return;
+ const segs = _tdbGetDaySegs(proj, day).filter(s => s.id !== segId);
+ proj.days[day].segments = segs;
+ _tdbSaveStore(store);
+ tdbRender();
+}
+
+function tdbRenderDay(proj) {
+ const status = document.getElementById('tdb-day-status');
+ const timeline = document.getElementById('tdb-day-timeline');
  const roll = document.getElementById('tdb-rollup');
  const list = document.getElementById('tdb-activity-list');
- if (!roll) return;
  if (!proj) {
-  roll.textContent = 'Select or create a project to see hours by time code.';
+  if (status) status.textContent = 'Select or create a project, then pick a day.';
+  if (timeline) timeline.innerHTML = '';
+  if (roll) roll.textContent = 'Select or create a project to see minutes by time code.';
   if (list) list.innerHTML = '';
   return;
  }
- const sums = {};
- (proj.activities || []).forEach(a => {
-  const c = a.code || 'OTHER';
-  sums[c] = (sums[c] || 0) + (Number(a.hours) || 0);
- });
- const total = Object.values(sums).reduce((s, v) => s + v, 0);
- const order = ['ONLINE', 'LINECHANGE', 'STANDBY', 'WEATHER', 'TECH', 'MOB', 'OTHER'];
- const keys = order.filter(k => sums[k] > 0).concat(Object.keys(sums).filter(k => !order.includes(k)));
- roll.innerHTML = keys.length
-  ? keys.map(k => `<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #14141c;"><span style="color:#94a3b8;">${k}</span><span style="color:#e2e8f0;font-weight:700;">${sums[k].toFixed(2)} h</span></div>`).join('')
-    + `<div style="display:flex;justify-content:space-between;padding:8px 0 0;margin-top:4px;"><span style="color:#fbbf24;font-weight:700;">TOTAL</span><span style="color:#fbbf24;font-weight:800;">${total.toFixed(2)} h</span></div>`
-  : 'No activities yet — log hours above.';
+ const day = _tdbActiveDay || _tdbTodayIso();
+ const segs = _tdbGetDaySegs(proj, day);
+ const a = _tdbAnalyseDay(segs);
+
+ if (status) {
+  if (a.complete) {
+   status.style.borderColor = 'rgba(48,209,88,0.5)';
+   status.style.background = 'rgba(48,209,88,0.08)';
+   status.innerHTML = `<strong style="color:#30d158;">Day complete</strong> — all <strong style="color:#fff;">1,440</strong> minutes accounted for on ${_escHtml(day)}.`;
+  } else {
+   status.style.borderColor = a.overlaps.length ? 'rgba(255,69,58,0.55)' : 'rgba(255,214,10,0.45)';
+   status.style.background = a.overlaps.length ? 'rgba(255,69,58,0.10)' : 'rgba(255,214,10,0.08)';
+   status.innerHTML = `<strong style="color:${a.overlaps.length ? '#ff453a' : '#ffd60a'};">Incomplete day</strong> — `
+    + `covered <strong style="color:#fff;">${a.covered}</strong> / 1,440 min`
+    + ` · gaps <strong style="color:#fff;">${a.gapMinutes}</strong> min (${a.gaps.length})`
+    + (a.overlaps.length ? ` · <strong style="color:#ff453a;">${a.overlaps.length} overlap(s)</strong>` : '')
+    + `.`;
+  }
+ }
+
+ if (timeline) {
+  // Paint covered segments + gap stripes
+  const bits = [];
+  let cursor = 0;
+  const sorted = a.segs.slice().sort((x, y) => x.startMin - y.startMin);
+  sorted.forEach(s => {
+   if (s.startMin > cursor) {
+    const gPct = ((s.startMin - cursor) / TDB_DAY_MINUTES) * 100;
+    bits.push(`<div title="GAP ${_tdbFmtMin(cursor)}–${_tdbFmtMin(s.startMin)}" style="width:${gPct}%;height:100%;background:repeating-linear-gradient(135deg,#3f1d1d,#3f1d1d 4px,#1a0a0a 4px,#1a0a0a 8px);flex-shrink:0;"></div>`);
+   }
+   const pct = ((s.endMin - s.startMin) / TDB_DAY_MINUTES) * 100;
+   const col = TDB_CODE_COLORS[s.code] || TDB_CODE_COLORS.OTHER;
+   bits.push(`<div title="${_escHtml(s.code)} ${_tdbFmtMin(s.startMin)}–${_tdbFmtMin(s.endMin)}" style="width:${pct}%;height:100%;background:${col};flex-shrink:0;opacity:0.9;"></div>`);
+   cursor = Math.max(cursor, s.endMin);
+  });
+  if (cursor < TDB_DAY_MINUTES) {
+   const gPct = ((TDB_DAY_MINUTES - cursor) / TDB_DAY_MINUTES) * 100;
+   bits.push(`<div title="GAP ${_tdbFmtMin(cursor)}–24:00" style="width:${gPct}%;height:100%;background:repeating-linear-gradient(135deg,#3f1d1d,#3f1d1d 4px,#1a0a0a 4px,#1a0a0a 8px);flex-shrink:0;"></div>`);
+  }
+  timeline.innerHTML = bits.join('') || '<div style="width:100%;height:100%;background:#111;"></div>';
+ }
+
+ if (roll) {
+  const order = ['ONLINE', 'LINECHANGE', 'STANDBY', 'WEATHER', 'TECH', 'MOB', 'OTHER'];
+  const keys = order.filter(k => a.byCode[k] > 0).concat(Object.keys(a.byCode).filter(k => !order.includes(k)));
+  if (!keys.length && a.gapMinutes === TDB_DAY_MINUTES) {
+   roll.textContent = 'No blocks yet — add time blocks until 1,440 minutes are covered.';
+  } else {
+   roll.innerHTML = keys.map(k => {
+    const mins = a.byCode[k];
+    return `<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #14141c;">
+      <span style="color:${TDB_CODE_COLORS[k] || '#94a3b8'};font-weight:700;">${k}</span>
+      <span style="color:#e2e8f0;font-weight:700;">${mins} min <span style="color:#64748b;font-weight:500;">(${(mins / 60).toFixed(2)} h)</span></span>
+     </div>`;
+   }).join('')
+    + (a.gapMinutes > 0
+     ? `<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #14141c;"><span style="color:#ef4444;font-weight:700;">UNACCOUNTED</span><span style="color:#ef4444;font-weight:700;">${a.gapMinutes} min</span></div>`
+     : '')
+    + `<div style="display:flex;justify-content:space-between;padding:8px 0 0;margin-top:4px;"><span style="color:#fbbf24;font-weight:700;">DAY TOTAL</span><span style="color:#fbbf24;font-weight:800;">${a.covered} / 1,440 min</span></div>`;
+  }
+ }
 
  if (list) {
-  const acts = proj.activities || [];
-  if (!acts.length) {
+  if (!a.segs.length) {
    list.innerHTML = '';
   } else {
-   list.innerHTML = '<div style="font-size:10px;color:#64748b;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.4px;">Recent activity</div>'
-    + acts.slice(0, 40).map(a =>
-     `<div style="display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid #14141c;font-size:11px;">
-       <div style="min-width:0;"><span style="color:#fbbf24;font-weight:700;">${_escHtml(a.code)}</span>`
-       + (a.note ? ` <span style="color:#64748b;">· ${_escHtml(a.note)}</span>` : '')
-       + `<div style="font-size:9px;color:#475569;margin-top:2px;">${_escHtml((a.at || '').replace('T', ' ').slice(0, 19))}</div></div>
-       <div style="color:#e2e8f0;font-weight:700;flex-shrink:0;">${Number(a.hours).toFixed(2)} h</div>
-      </div>`
-    ).join('');
+   list.innerHTML = '<div style="font-size:10px;color:#64748b;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.4px;">Blocks (chronological)</div>'
+    + a.segs.map(s => {
+     const mins = s.endMin - s.startMin;
+     return `<div style="display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid #14141c;font-size:11px;align-items:center;">
+       <div style="min-width:0;">
+        <span style="color:${TDB_CODE_COLORS[s.code] || '#94a3b8'};font-weight:700;">${_escHtml(s.code)}</span>
+        <span style="color:#94a3b8;"> · ${_tdbFmtMin(s.startMin)}–${_tdbFmtMin(s.endMin)}</span>
+        ${s.note ? ` <span style="color:#64748b;">· ${_escHtml(s.note)}</span>` : ''}
+       </div>
+       <div style="display:flex;align-items:center;gap:10px;flex-shrink:0;">
+        <span style="color:#e2e8f0;font-weight:700;">${mins} min</span>
+        <button type="button" onclick="tdbDeleteSegment('${s.id}')" style="background:none;border:none;color:#f87171;cursor:pointer;font-size:11px;padding:0;">Remove</button>
+       </div>
+      </div>`;
+    }).join('');
+   if (a.gaps.length) {
+    list.innerHTML += '<div style="font-size:10px;color:#ef4444;margin:12px 0 6px;text-transform:uppercase;letter-spacing:0.4px;">Gaps still open</div>'
+     + a.gaps.map(g =>
+      `<div style="font-size:11px;color:#fca5a5;padding:4px 0;border-bottom:1px solid #1a0a0a;">${_tdbFmtMin(g.startMin)}–${_tdbFmtMin(g.endMin)} · ${g.endMin - g.startMin} min unaccounted</div>`
+     ).join('');
+   }
   }
  }
 }
@@ -15836,13 +16130,23 @@ function tdbExportJson() {
  const store = _tdbLoadStore();
  const proj = store.projects.find(p => p.id === _tdbActiveProjectId);
  if (!proj) { showToast('Project not found'); return; }
- const blob = new Blob([JSON.stringify({ type: 'candooka-timing-db', version: 1, project: proj }, null, 2)], { type: 'application/json' });
+ const day = _tdbActiveDay || _tdbTodayIso();
+ const analysis = _tdbAnalyseDay(_tdbGetDaySegs(proj, day));
+ const blob = new Blob([JSON.stringify({
+  type: 'candooka-timing-db',
+  version: 2,
+  dayMinutes: TDB_DAY_MINUTES,
+  exportDay: day,
+  dayComplete: analysis.complete,
+  dayCoveredMinutes: analysis.covered,
+  project: proj
+ }, null, 2)], { type: 'application/json' });
  const a = document.createElement('a');
  a.href = URL.createObjectURL(blob);
- a.download = 'timing_' + (proj.name || 'project').replace(/[^\w\-]+/g, '_') + '.json';
+ a.download = 'timing_' + (proj.name || 'project').replace(/[^\w\-]+/g, '_') + '_' + day + '.json';
  a.click();
  URL.revokeObjectURL(a.href);
- showToast('Timing project exported', 2500);
+ showToast(analysis.complete ? 'Exported (day complete)' : 'Exported (day still has gaps)', 2500);
 }
 
 function showBaseLayerChooser() {
