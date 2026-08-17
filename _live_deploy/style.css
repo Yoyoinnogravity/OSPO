@@ -591,6 +591,12 @@ body {
   padding: 20px 24px;
   z-index: 200;
   min-width: 260px;
+  max-width: min(96vw, 920px);
+  max-height: min(90vh, calc(100vh - 24px));
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
   box-shadow: 0 16px 64px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.02);
 }
 

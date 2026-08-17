@@ -69,7 +69,7 @@
 </script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script>if(!/Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)&&window.innerWidth>768){document.write('<link rel="stylesheet" href="https://cesium.com/downloads/cesiumjs/releases/1.119/Build/Cesium/Widgets/widgets.css"/>')}</script>
-<link rel="stylesheet" href="style.css?v=3.7"/>
+<link rel="stylesheet" href="style.css?v=3.8"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
 <body>
@@ -446,7 +446,7 @@
  <div style="font-size:9px;color:#556;margin-top:10px;line-height:1.4;">Swell: height + <b style="color:#94a3b8;">period</b> + direction · Wind sea split when available · SST: NOAA MUR/OISST</div>
  </div>
  </div>
- <div id="weather-panel" style="display:none;position:fixed;bottom:80px;right:24px;z-index:10050;width:360px;max-height:70vh;background:#0d1526;border:1px solid #334155;border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,0.55);overflow:hidden;font-family:inherit;">
+ <div id="weather-panel" style="display:none;position:fixed;bottom:80px;right:24px;z-index:10050;width:360px;max-height:70vh;background:#0d1526;border:1px solid #334155;border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,0.55);overflow-x:hidden;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;font-family:inherit;">
  <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid #1e293b;gap:8px;">
  <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
  <span id="weather-panel-title" style="font-size:12px;font-weight:700;color:#fff;">Sea temp | 6h cache</span>
@@ -1858,7 +1858,7 @@
  <button class="panel-cancel" onclick="hidePanel('admin-login')">Cancel</button>
  </div>
  <!-- Admin User Management Panel -->
- <div id="panel-admin-panel" class="settings-panel" style="display:none;min-width:400px;max-width:500px;max-height:90vh;overflow-y:auto;-webkit-overflow-scrolling:touch;">
+ <div id="panel-admin-panel" class="settings-panel" style="display:none;min-width:400px;max-width:520px;max-height:min(90vh, calc(100vh - 24px));overflow-x:hidden;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;">
  <button class="panel-close-btn" onclick="hidePanel('admin-panel')">&times;</button>
  <div class="panel-title" style="display:flex;justify-content:space-between;align-items:center;padding-right:24px;">User Management
  <button onclick="adminLogout()" style="background:none;border:1px solid #445;color:#8a9bb8;padding:3px 10px;border-radius:4px;cursor:pointer;font-size:10px">Logout</button>
@@ -1952,9 +1952,9 @@
  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
  <script src="https://unpkg.com/shpjs@latest/dist/shp.min.js"></script>
  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
- <script src="app.js?v=16.46"></script>
- <script src="ray_tracing_module.js?v=16.46"></script>
- <script src="wmm_declination.js?v=16.46"></script>
- <script src="magnetic_isogones.js?v=16.46"></script>
+ <script src="app.js?v=16.47"></script>
+ <script src="ray_tracing_module.js?v=16.47"></script>
+ <script src="wmm_declination.js?v=16.47"></script>
+ <script src="magnetic_isogones.js?v=16.47"></script>
 </body>
 </html>

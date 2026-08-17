@@ -53,19 +53,48 @@ function sanitizeAllLineNames(lines) {
 }
 
 // ===== DIALOG WINDOW CONTROLS (Drag, Minimize, Maximize, Scroll) =====
+function ensureDialogScrollable(dlg) {
+ if (!dlg || !dlg.style) return;
+ // Cap height so overflow-y can create a scrollbar (admin + all windows)
+ if (!dlg.style.maxHeight || dlg.style.maxHeight === 'none') {
+  dlg.style.maxHeight = 'min(90vh, calc(100vh - 24px))';
+ }
+ dlg.style.overflowX = 'hidden';
+ dlg.style.overflowY = 'auto';
+ dlg.style.webkitOverflowScrolling = 'touch';
+ try { dlg.style.overscrollBehavior = 'contain'; } catch (_) {}
+ // Stop map / page from stealing the wheel while scrolling the panel
+ if (!dlg._scrollGuardBound) {
+  dlg._scrollGuardBound = true;
+  const stopWheel = (e) => { e.stopPropagation(); };
+  dlg.addEventListener('wheel', stopWheel, { passive: true });
+  dlg.addEventListener('touchmove', stopWheel, { passive: true });
+  try {
+   if (typeof L !== 'undefined' && L.DomEvent) {
+    L.DomEvent.disableScrollPropagation(dlg);
+    L.DomEvent.disableClickPropagation(dlg);
+   }
+  } catch (_) {}
+ }
+}
+
 function makeDialogInteractive(dlg, opts = {}) {
- if (!dlg || dlg._interactive) return;
+ if (!dlg || dlg._interactive) {
+  // Re-open: still re-assert scroll even if already interactive
+  ensureDialogScrollable(dlg);
+  return;
+ }
  dlg._interactive = true;
  dlg._minimized = false;
  dlg._maximized = false;
 
- // Ensure scroll
- dlg.style.overflowY = 'auto';
+ ensureDialogScrollable(dlg);
 
  // Store original styles for restore
  dlg._origStyle = {
  top: dlg.style.top, left: dlg.style.left, width: dlg.style.width, height: dlg.style.height,
- maxWidth: dlg.style.maxWidth, maxHeight: dlg.style.maxHeight, minWidth: dlg.style.minWidth,
+ maxWidth: dlg.style.maxWidth, maxHeight: dlg.style.maxHeight || 'min(90vh, calc(100vh - 24px))',
+ minWidth: dlg.style.minWidth,
  transform: dlg.style.transform, borderRadius: dlg.style.borderRadius
  };
 
@@ -125,8 +154,8 @@ function makeDialogInteractive(dlg, opts = {}) {
  if (dlg._minimized) {
  // Restore
  Array.from(dlg.children).forEach(ch => { if (ch !== header) ch.style.display = ''; });
- dlg.style.maxHeight = dlg._origStyle.maxHeight || '';
- dlg.style.overflow = 'auto';
+ dlg.style.maxHeight = dlg._origStyle.maxHeight || 'min(90vh, calc(100vh - 24px))';
+ ensureDialogScrollable(dlg);
  dlg._minimized = false;
  } else {
  // Collapse to header only
@@ -143,12 +172,14 @@ function makeDialogInteractive(dlg, opts = {}) {
  e.stopPropagation();
  if (dlg._maximized) {
  _dlgRestoreSize(dlg);
+ ensureDialogScrollable(dlg);
  dlg._maximized = false;
  } else {
  dlg.style.top = '5px'; dlg.style.left = '5px'; dlg.style.right = '5px'; dlg.style.bottom = '5px';
  dlg.style.width = 'calc(100vw - 10px)'; dlg.style.height = 'calc(100vh - 10px)';
- dlg.style.maxWidth = 'none'; dlg.style.maxHeight = 'none';
+ dlg.style.maxWidth = 'none'; dlg.style.maxHeight = 'calc(100vh - 10px)';
  dlg.style.transform = 'none'; dlg.style.borderRadius = '4px';
+ dlg.style.overflowY = 'auto';
  dlg._maximized = true;
  if (dlg._minimized) {
  Array.from(dlg.children).forEach(ch => { if (ch !== header) ch.style.display = ''; });
@@ -14705,7 +14736,7 @@ function updateUserDisplay() {
   el.textContent = name;
   el.style.display = 'inline';
   logoutBtn.style.display = 'inline-flex';
-  logoutBtn.setAttribute('title', 'Log out and clear session - sign back in to start fresh');
+  logoutBtn.setAttribute('title', 'Log out — save first if you want, then session clears');
  } else {
   el.style.display = 'none';
   logoutBtn.style.display = 'none';
@@ -14716,8 +14747,10 @@ function showAdminPanel() {
  togglePanel('admin-panel');
  const panel = document.getElementById('panel-admin-panel');
  const overlay = document.getElementById('signin-overlay');
- if (panel && overlay && overlay.style.display !== 'none') {
- panel.style.zIndex = '10000';
+ if (panel) {
+  if (overlay && overlay.style.display !== 'none') panel.style.zIndex = '10000';
+  ensureDialogScrollable(panel);
+  if (typeof makeDialogInteractive === 'function') makeDialogInteractive(panel);
  }
  setTimeout(function() {
  var fields = ['admin-user-name','admin-user-email','admin-user-phone','admin-user-password','admin-user-valid-from','admin-user-valid-to'];
