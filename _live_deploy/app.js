@@ -14458,24 +14458,90 @@ function adminLogout() {
 }
 
 function logoutUser() {
- // Confirm: logout clears the workspace so the next sign-in starts clean
  const hasWork = (state.lines && state.lines.length > 0) ||
   (state.route && state.route.length > 0) ||
   (state.obstructions && state.obstructions.length > 0);
+
  if (hasWork) {
-  if (confirm('Save your current plan before logging out?')) {
-   const user = state.currentUser || 'Guest';
-   const defaultName = `${user} ${fmtD24(new Date())}`;
-   const name = (prompt('Plan name:', defaultName) || '').trim();
-   if (name) {
-    try { saveCurrentPlanAs(name); } catch (err) { console.warn('Save before logout failed:', err); }
-   }
-  }
-  if (!confirm('Log out and clear the current session (lines, route, obstructions)?\n\nYou can sign back in to start fresh.')) {
+  offerSaveThenLogout();
+  return;
+ }
+ finishLogout();
+}
+
+/** Logout with work in progress: always ends in logout; offer save first with how-to. */
+function offerSaveThenLogout() {
+ const existing = document.getElementById('logout-save-dialog');
+ if (existing) existing.remove();
+
+ const user = state.currentUser || 'Guest';
+ const defaultName = `${user} ${fmtD24(new Date())}`;
+
+ const overlay = document.createElement('div');
+ overlay.id = 'logout-save-dialog';
+ overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:10040;display:flex;align-items:center;justify-content:center;padding:16px;';
+ overlay.innerHTML = `
+ <div style="background:#0a0a12;border:1px solid #7f1d1d;border-radius:10px;padding:22px 24px;max-width:440px;width:100%;box-shadow:0 16px 48px rgba(0,0,0,0.9);color:#e2e8f0;font-family:inherit;">
+  <div style="font-size:15px;font-weight:800;color:#f87171;margin-bottom:8px;letter-spacing:0.2px;">Log out</div>
+  <div style="font-size:11px;color:#94a3b8;line-height:1.45;margin-bottom:12px;">
+   You will always be logged out. The session (lines, route, obstructions) is cleared after this.
+  </div>
+  <div style="font-size:11px;color:#a5f3fc;background:rgba(8,47,73,0.45);border:1px solid #155e75;border-radius:6px;padding:10px 12px;margin-bottom:14px;line-height:1.45;">
+   <strong style="color:#67e8f9;">How to save</strong><br/>
+   Same as the top-bar <strong style="color:#e2e8f0;">SAVE PLAN</strong> button: store lines, route and obstructions in your shared directory under a name. Later use <strong style="color:#e2e8f0;">RESTORE PLAN</strong> to open it again.
+  </div>
+  <label style="display:block;font-size:10px;color:#a0aebb;font-weight:700;margin-bottom:6px;letter-spacing:0.3px;">PLAN NAME</label>
+  <input id="logout-save-name" type="text" value="${String(defaultName).replace(/"/g, '&quot;')}"
+   style="width:100%;box-sizing:border-box;padding:9px 10px;border-radius:5px;border:1px solid #334155;background:#111;color:#fff;font-size:12px;outline:none;margin-bottom:14px;font-family:inherit;" />
+  <button type="button" id="logout-save-and-go" style="width:100%;padding:11px 14px;margin-bottom:8px;border-radius:6px;border:1px solid #0e7490;background:#164e63;color:#ecfeff;font-weight:700;cursor:pointer;font-size:12px;font-family:inherit;">
+   Save &amp; log out
+  </button>
+  <button type="button" id="logout-skip-save" style="width:100%;padding:11px 14px;margin-bottom:8px;border-radius:6px;border:1px solid #7f1d1d;background:#1c0a0a;color:#fca5a5;font-weight:700;cursor:pointer;font-size:12px;font-family:inherit;">
+   Log out without saving
+  </button>
+  <button type="button" id="logout-cancel" style="width:100%;padding:8px 14px;border-radius:6px;border:1px solid #334155;background:transparent;color:#94a3b8;font-weight:600;cursor:pointer;font-size:11px;font-family:inherit;">
+   Stay signed in
+  </button>
+ </div>`;
+ document.body.appendChild(overlay);
+
+ const close = () => { try { overlay.remove(); } catch (_) {} };
+ const nameEl = () => document.getElementById('logout-save-name');
+
+ overlay.querySelector('#logout-cancel').onclick = close;
+ overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+
+ overlay.querySelector('#logout-save-and-go').onclick = () => {
+  const name = ((nameEl() && nameEl().value) || '').trim();
+  if (!name) {
+   showToast('Enter a plan name to save, or choose Log out without saving');
+   if (nameEl()) nameEl().focus();
    return;
   }
- }
+  try {
+   if (!saveCurrentPlanAs(name)) return; // e.g. empty lines or overwrite cancelled
+  } catch (err) {
+   console.warn('Save before logout failed:', err);
+   showToast('Save failed — try SAVE PLAN in the top bar, then log out again');
+   return;
+  }
+  close();
+  finishLogout();
+ };
 
+ overlay.querySelector('#logout-skip-save').onclick = () => {
+  close();
+  finishLogout();
+ };
+
+ setTimeout(() => {
+  const el = nameEl();
+  if (el) { el.focus(); el.select(); }
+ }, 50);
+}
+
+/** Clear session and return to the sign-in screen. Always completes. */
+function finishLogout() {
  resetWorkspaceForLogout();
 
  state.currentUser = 'Guest';
@@ -14512,8 +14578,10 @@ function logoutUser() {
  document.querySelectorAll('.settings-panel').forEach(p => {
   if (p.style.display !== 'none') p.style.display = 'none';
  });
+ const logoutDlg = document.getElementById('logout-save-dialog');
+ if (logoutDlg) try { logoutDlg.remove(); } catch (_) {}
 
- showToast('Logged out - sign in again to continue', 4000);
+ showToast('Logged out — sign in again to continue', 4000);
  setTimeout(() => {
   try { if (passEl) passEl.blur(); if (userEl) userEl.focus(); } catch (_) {}
  }, 80);
