@@ -12,6 +12,7 @@ var _rayState = {
  skipped: { maxOffset: 0, critical: 0, failed: 0 },
  pickMode: null, // 'source' | 'node' | null
  velMode: 'layered', // constant | gradient | layered | mackenzie
+ pathMethod: 'snell', // snell (default) | straight | cmp
  layers: [{ zBot: 200, v: 1480 }, { zBot: 600, v: 1500 }, { zBot: 1200, v: 1520 }],
  velConfirmed: false, // user accepted a velocity field via ask dialog
  busy: false,
@@ -20,10 +21,77 @@ var _rayState = {
 var _rayPickHandler = null;
 var _rayTraceToken = 0;
 
+/** Path / imaging method: snell (default), straight-ray, or classic CMP. */
+function rayGetPathMethod() {
+ const ids = ['ray-path-method', 'fold-synth-path'];
+ for (let i = 0; i < ids.length; i++) {
+  const el = document.getElementById(ids[i]);
+  if (el && el.value) {
+   const m = el.value;
+   if (m === 'snell' || m === 'straight' || m === 'cmp') return m;
+  }
+ }
+ const s = _rayState.pathMethod || 'snell';
+ return (s === 'straight' || s === 'cmp') ? s : 'snell';
+}
+
+function raySetPathMethod(method, fromId) {
+ const m = (method === 'straight' || method === 'cmp') ? method : 'snell';
+ _rayState.pathMethod = m;
+ ['ray-path-method', 'fold-synth-path'].forEach(id => {
+  if (fromId && id === fromId) return;
+  const el = document.getElementById(id);
+  if (el) el.value = m;
+ });
+ const hint = document.getElementById('ray-path-hint');
+ if (hint) {
+  const hints = {
+   snell: 'Default. Refracts through V(z) with conserved ray parameter p (Snell’s law).',
+   straight: 'Straight geometric ray at a single effective velocity (thickness-weighted mean of the field).',
+   cmp: 'Classic CMP midpoint for imaging; rays use straight-path travel times at mean V.'
+  };
+  hint.textContent = hints[m] || hints.snell;
+ }
+ const fh = document.getElementById('fold-path-hint');
+ if (fh) {
+  const hints = {
+   snell: 'Specular image point via Snell’s law through V(z).',
+   straight: 'Depth-weighted image point (constant-V / straight ray).',
+   cmp: 'Classic surface CMP midpoint (ignores depth for bin location).'
+  };
+  fh.textContent = hints[m] || hints.snell;
+ }
+}
+
+function rayPathMethodChanged(el) {
+ raySetPathMethod(el ? el.value : rayGetPathMethod(), el ? el.id : null);
+}
+
+function rayMeanVelocity(layers) {
+ const L = layers || [];
+ if (!L.length) return 1500;
+ let num = 0, den = 0;
+ L.forEach(layer => {
+  const th = Math.max(0, (layer.zBot || 0) - (layer.zTop || 0));
+  const t = th > 0 ? th : 1;
+  num += (layer.v || 1500) * t;
+  den += t;
+ });
+ return den > 0 ? num / den : (L[0].v || 1500);
+}
+
+function rayPathNeedsVelocityField(method) {
+ const m = method || rayGetPathMethod();
+ return m !== 'cmp';
+}
+
 function showRayTracing() {
  if (typeof togglePanel === 'function') togglePanel('ray-tracing');
  const modeEl = document.getElementById('ray-vel-mode');
  if (modeEl && _rayState.velMode) modeEl.value = _rayState.velMode;
+ const pathEl = document.getElementById('ray-path-method');
+ if (pathEl) pathEl.value = _rayState.pathMethod || 'snell';
+ raySetPathMethod(_rayState.pathMethod || 'snell');
  raySyncVelocityModeUi();
  rayRenderVModel();
  rayUpdateVelStatus();
@@ -259,15 +327,19 @@ function rayVAtDepth(layers, z) {
 /**
  * Flat-horizon specular image point through a 1D V(z) field (Snell p shared on both legs).
  * Falls back to CMP when the target coincides with a station depth.
+ * method: 'snell' (default) | 'straight' | 'cmp'
  */
-function raySpecularImagePoint(sx, sy, zs, rx, ry, zr, Z, layers) {
+function raySpecularImagePoint(sx, sy, zs, rx, ry, zr, Z, layers, method) {
  const off = Math.hypot(rx - sx, ry - sy);
+ const pathMethod = (method === 'straight' || method === 'cmp') ? method : 'snell';
  if (!(isFinite(off))) return { x: sx, y: sy, offset: 0, method: 'bad', p: 0, incDeg: 0 };
- // Classic CMP when target ≈ receiver depth, or stations at same depth with tiny offset
- if (Math.abs(Z - zr) < 1 || (Math.abs(zs - zr) < 0.5 && Math.abs(Z - zs) < 1)) {
+
+ if (pathMethod === 'cmp' || Math.abs(Z - zr) < 1 || (Math.abs(zs - zr) < 0.5 && Math.abs(Z - zs) < 1)) {
   return { x: (sx + rx) / 2, y: (sy + ry) / 2, offset: off, method: 'cmp', p: 0, incDeg: 0 };
  }
- if (!(Z > zs + 0.5) || !(Z > zr + 0.5)) {
+
+ // Straight-ray / constant-V: depth-weighted geometric image point
+ if (pathMethod === 'straight' || !(Z > zs + 0.5) || !(Z > zr + 0.5)) {
   const h1 = Math.max(1e-3, Math.abs(Z - zs));
   const h2 = Math.max(1e-3, Math.abs(Z - zr));
   const w = h1 / (h1 + h2);
@@ -275,7 +347,7 @@ function raySpecularImagePoint(sx, sy, zs, rx, ry, zr, Z, layers) {
    x: sx + (rx - sx) * w,
    y: sy + (ry - sy) * w,
    offset: off,
-   method: 'depth_weight',
+   method: pathMethod === 'straight' ? 'straight' : 'depth_weight',
    p: 0,
    incDeg: Math.atan2(off / 2, Math.max(1e-3, Z - Math.min(zs, zr))) * 180 / Math.PI
   };
@@ -727,9 +799,18 @@ function rayShootConstant(v, zs, zr, targetOffsetM) {
 }
 
 /** Shoot a ray from zs to hit horizontal offset X at depth zr. */
-function rayShoot(layers, zs, zr, targetOffsetM) {
+function rayShoot(layers, zs, zr, targetOffsetM, method) {
  const X = Math.abs(targetOffsetM);
- if (!(zr > zs)) return { ok: false, reason: 'receiver_above_source' };
+ if (!(zr > zs)) return { ok: false, reason: 'bad_geometry' };
+ const pathMethod = (method === 'straight' || method === 'cmp') ? method : (method || rayGetPathMethod());
+
+ // Straight / CMP: single effective velocity, geometric path
+ if (pathMethod === 'straight' || pathMethod === 'cmp') {
+  const v = rayMeanVelocity(layers);
+  const r = rayShootConstant(v, zs, zr, X);
+  if (r.ok) r.method = pathMethod === 'cmp' ? 'cmp' : 'straight';
+  return r;
+ }
 
  // Fast exact path for homogeneous water
  if (layers.length === 1 || (layers.length && layers.every(L => Math.abs(L.v - layers[0].v) < 1e-6))) {
@@ -828,13 +909,17 @@ async function rayTraceRun() {
   return;
  }
 
+ const pathMethod = rayGetPathMethod();
+ raySetPathMethod(pathMethod);
  const zs0 = Math.max(0, parseFloat(document.getElementById('ray-src-z')?.value) || 8);
  const zr0 = Math.max(zs0 + 1, parseFloat(document.getElementById('ray-rcv-z')?.value) || 1000);
- if (typeof velFieldAsk === 'function') {
+ if (rayPathNeedsVelocityField(pathMethod) && typeof velFieldAsk === 'function') {
   const ok = await velFieldAsk({
    title: 'Velocity field for ray tracing',
    coverZ: zr0,
-   reason: 'Snell paths from source to nodes use this 1D V(z) field.'
+   reason: pathMethod === 'straight'
+    ? 'Straight-ray paths use a single effective velocity from this V(z) field.'
+    : 'Snell paths from source to nodes use this 1D V(z) field.'
   });
   if (!ok) { showToast('Ray trace cancelled — no velocity field', 3500); return; }
  } else if (rayGetVelMode() !== 'layered') {
@@ -889,7 +974,7 @@ async function rayTraceRun() {
    const node = nodes[i];
    const off = haversine(source, [node.lat, node.lon]);
    if (off > maxOff) { skipped.maxOffset++; continue; }
-   const shot = rayShoot(layers, zs, zr, off);
+   const shot = rayShoot(layers, zs, zr, off, pathMethod);
    if (!shot.ok) {
     if (shot.reason === 'critical' || shot.reason === 'horizontal') skipped.critical++;
     else skipped.failed++;
@@ -992,6 +1077,7 @@ function rayUpdateSummary() {
  }
  let html = `<strong style="color:#fbbf24;">${nSrc}</strong> source · <strong style="color:#38bdf8;">${nNodes}</strong> node(s) · <strong style="color:#30d158;">${nRays}</strong> ray(s)`
   + (nDraw < nRays ? ` <span style="color:#64748b;">(drawing ${nDraw})</span>` : '')
+  + ` · path <strong style="color:#5eead4;">${_rayState.pathMethod || rayGetPathMethod()}</strong>`
   + ` · vel <strong style="color:#fbbf24;">${_rayState.velMode || rayGetVelMode()}</strong>`;
  const sk = _rayState.skipped || {};
  if (sk.maxOffset || sk.critical || sk.failed) {

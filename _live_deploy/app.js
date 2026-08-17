@@ -24468,9 +24468,14 @@ function _foldImagePointXY(sx, sy, zs, rx, ry, zr, Z) {
  };
 }
 
-function _foldImagePointWithVel(sx, sy, zs, rx, ry, zr, Z, layers) {
- if (typeof raySpecularImagePoint === 'function' && layers && layers.length) {
-  return raySpecularImagePoint(sx, sy, zs, rx, ry, zr, Z, layers);
+function _foldImagePointWithVel(sx, sy, zs, rx, ry, zr, Z, layers, method) {
+ const pathMethod = method || (typeof rayGetPathMethod === 'function' ? rayGetPathMethod() : 'snell');
+ if (typeof raySpecularImagePoint === 'function') {
+  return raySpecularImagePoint(sx, sy, zs, rx, ry, zr, Z, layers, pathMethod);
+ }
+ if (pathMethod === 'cmp') {
+  const off = Math.hypot(rx - sx, ry - sy);
+  return { x: (sx + rx) / 2, y: (sy + ry) / 2, offset: off, method: 'cmp', incDeg: 0 };
  }
  return _foldImagePointXY(sx, sy, zs, rx, ry, zr, Z);
 }
@@ -24520,6 +24525,8 @@ async function foldBuildSyntheticAtDepth() {
  const zs = Math.max(0, parseFloat(document.getElementById('fold-synth-src-z')?.value) || 8);
  const nodeZ = Math.max(0, parseFloat(document.getElementById('fold-synth-node-z')?.value) || Z);
  const modeSel = (document.getElementById('fold-synth-mode') || {}).value || 'auto';
+ const pathMethod = (typeof rayGetPathMethod === 'function') ? rayGetPathMethod() : 'snell';
+ if (typeof raySetPathMethod === 'function') raySetPathMethod(pathMethod);
  const spInt = parseFloat(document.getElementById('ppg-sp-interval')?.value)
   || state.settings.spInterval || 25;
  const maxOff = Math.max(100, parseFloat(document.getElementById('fold-synth-max-off')?.value)
@@ -24527,24 +24534,34 @@ async function foldBuildSyntheticAtDepth() {
  const maxInc = parseFloat(document.getElementById('fold-synth-max-inc')?.value);
  const hasInc = isFinite(maxInc) && maxInc > 0 && maxInc < 90;
 
- // Ask for velocity field (shared with ray tracing)
- if (typeof velFieldAsk !== 'function') {
-  showToast('Velocity field UI not loaded — refresh the page', 5000);
-  return;
+ // Ask for velocity field unless classic CMP (location ignores V)
+ let layers = [];
+ const needsVel = (typeof rayPathNeedsVelocityField === 'function')
+  ? rayPathNeedsVelocityField(pathMethod)
+  : pathMethod !== 'cmp';
+ if (needsVel) {
+  if (typeof velFieldAsk !== 'function') {
+   showToast('Velocity field UI not loaded — refresh the page', 5000);
+   return;
+  }
+  const velOk = await velFieldAsk({
+   title: 'Velocity field for fold at depth',
+   coverZ: Math.max(Z, nodeZ, zs) + 50,
+   reason: pathMethod === 'straight'
+    ? 'Straight-ray / constant-V image points use an effective velocity from this V(z) field.'
+    : 'Snell specular image points at depth Z use this 1D V(z) field (same model as ray tracing).'
+  });
+  if (!velOk) {
+   showToast('Fold build cancelled — no velocity field', 3500);
+   return;
+  }
+  layers = (typeof velFieldGetLayers === 'function')
+   ? velFieldGetLayers(Math.max(Z, nodeZ) + 50)
+   : [];
+  if (typeof velFieldSyncStatusUi === 'function') velFieldSyncStatusUi();
+ } else if (typeof velFieldGetLayers === 'function') {
+  layers = velFieldGetLayers(Math.max(Z, nodeZ) + 50);
  }
- const velOk = await velFieldAsk({
-  title: 'Velocity field for fold at depth',
-  coverZ: Math.max(Z, nodeZ, zs) + 50,
-  reason: 'Snell specular image points at depth Z use this 1D V(z) field (same model as ray tracing).'
- });
- if (!velOk) {
-  showToast('Fold build cancelled — no velocity field', 3500);
-  return;
- }
- const layers = (typeof velFieldGetLayers === 'function')
-  ? velFieldGetLayers(Math.max(Z, nodeZ) + 50)
-  : [];
- if (typeof velFieldSyncStatusUi === 'function') velFieldSyncStatusUi();
 
  const dim = (document.getElementById('ppg-dimension') || {}).value || '';
  const obnNodes = (state.obnNodes && state.obnNodes.length) ? state.obnNodes : [];
@@ -24578,7 +24595,7 @@ async function foldBuildSyntheticAtDepth() {
  if (cableEl && mode === 'streamer') cableEl.value = String(Math.round(strLen + nearOff));
  if (cableEl && mode === 'obn') cableEl.value = String(Math.round(maxOff));
 
- const velLabel = (typeof _rayState !== 'undefined' && _rayState.velMode) ? _rayState.velMode : 'V(z)';
+ const velLabel = pathMethod + ((typeof _rayState !== 'undefined' && _rayState.velMode) ? ('/' + _rayState.velMode) : '');
  showToast('Building synthetic fold @ ' + Z + ' m (' + mode + ', ' + velLabel + ')…', 2500);
 
  const anchor = { lat: lines[0].start[0], lon: lines[0].start[1] };
@@ -24609,7 +24626,7 @@ async function foldBuildSyntheticAtDepth() {
    if (mode === 'obn') {
     for (const nd of obnNodes) {
      const rxy = _foldLatLonToXY(nd.lat, nd.lon, anchor);
-     const ip = _foldImagePointWithVel(sxy.x, sxy.y, zs, rxy.x, rxy.y, zrRcv, Z, layers);
+     const ip = _foldImagePointWithVel(sxy.x, sxy.y, zs, rxy.x, rxy.y, zrRcv, Z, layers, pathMethod);
      if (ip.offset > maxOff) { nSkipOff++; continue; }
      if (hasInc) {
       const inc = (ip.incDeg != null && isFinite(ip.incDeg))
@@ -24633,7 +24650,7 @@ async function foldBuildSyntheticAtDepth() {
       const along = nearOff + c * chSp;
       const rp = destinationPoint(strRef, aft, along);
       const rxy = _foldLatLonToXY(rp[0], rp[1], anchor);
-      const ip = _foldImagePointWithVel(sxy.x, sxy.y, zs, rxy.x, rxy.y, 0, Z, layers);
+      const ip = _foldImagePointWithVel(sxy.x, sxy.y, zs, rxy.x, rxy.y, 0, Z, layers, pathMethod);
       if (ip.offset > maxOff) { nSkipOff++; continue; }
       if (hasInc) {
        const inc = (ip.incDeg != null && isFinite(ip.incDeg))
@@ -24673,6 +24690,7 @@ async function foldBuildSyntheticAtDepth() {
   synthetic: true,
   targetDepthM: Z,
   synthMode: mode,
+  pathMethod,
   velMode: (typeof _rayState !== 'undefined' && _rayState.velMode) || null,
   velLayers: layers.length
  };

@@ -997,15 +997,25 @@
  <button class="panel-close-btn" onclick="hidePanel('fold-coverage')">&times;</button>
  <div class="panel-title">Fold of Coverage - CMP Bin Maps</div>
  <div style="font-size:11px;color:#a0aebb;margin-bottom:8px;line-height:1.4;">
- Builds CMP fold maps from P1 shot (S) + receiver (R) records, <b style="color:#e2e8f0;">or a synthetic survey from Design</b> showing <b style="color:#5eead4;">fold at a target depth</b> (Snell image points through your velocity field). Offset quarters: nears / near-mids / far-mids / fars / alls. Files processed locally.
+ Builds CMP fold maps from P1 shot (S) + receiver (R) records, <b style="color:#e2e8f0;">or a synthetic survey from Design</b> showing <b style="color:#5eead4;">fold at a target depth</b> (path method: Snell default). Offset quarters: nears / near-mids / far-mids / fars / alls. Files processed locally.
  </div>
  <div style="background:#0a1210;border:1px solid #134e4a;border-radius:6px;padding:10px 12px;margin-bottom:10px;">
   <div style="font-size:10px;color:#5eead4;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;margin-bottom:8px;">Synthetic survey → fold at depth</div>
   <div style="font-size:10px;color:#94a3b8;line-height:1.4;margin-bottom:8px;">
-   Asks for a <b style="color:#fbbf24;">velocity field</b>, then builds specular image points on a flat horizon at depth Z (Snell’s law through V(z)). Uses Design preplot + streamer geometry, or OBN nodes. Planning fold — not NORSAR illumination.
+   Asks for a <b style="color:#fbbf24;">velocity field</b> (when needed), then builds image points at depth Z. Path method defaults to <b style="color:#5eead4;">Snell’s law</b>; straight-ray and classic CMP are also available. Planning fold — not NORSAR illumination.
   </div>
   <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px;">
-   <button type="button" onclick="velFieldAsk({title:'Velocity field for fold at depth',coverZ:parseFloat(document.getElementById('fold-synth-depth')?.value)||1000,reason:'Snell specular image points for fold maps use this 1D V(z) field.'}).then(function(ok){if(ok&amp;&amp;typeof velFieldSyncStatusUi==='function')velFieldSyncStatusUi();})" style="padding:6px 12px;border-radius:4px;border:1px solid #f59e0b;background:#1a1205;color:#fbbf24;font-weight:800;cursor:pointer;font-size:10px;">Set velocity field…</button>
+   <label style="display:flex;align-items:center;gap:4px;font-size:10px;color:#8a9bb0;">Path
+    <select id="fold-synth-path" onchange="rayPathMethodChanged(this)" style="background:#111;border:1px solid #5eead4;color:#5eead4;padding:4px 6px;border-radius:4px;font-size:10px;font-weight:700;outline:none;">
+     <option value="snell" selected>Snell’s law (default)</option>
+     <option value="straight">Straight ray / constant V</option>
+     <option value="cmp">Classic CMP midpoint</option>
+    </select>
+   </label>
+   <span id="fold-path-hint" style="font-size:9px;color:#64748b;">Specular image point via Snell’s law through V(z).</span>
+  </div>
+  <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px;">
+   <button type="button" onclick="velFieldAsk({title:'Velocity field for fold at depth',coverZ:parseFloat(document.getElementById('fold-synth-depth')?.value)||1000,reason:'Image points / rays use this 1D V(z) field.'}).then(function(ok){if(ok&amp;&amp;typeof velFieldSyncStatusUi==='function')velFieldSyncStatusUi();})" style="padding:6px 12px;border-radius:4px;border:1px solid #f59e0b;background:#1a1205;color:#fbbf24;font-weight:800;cursor:pointer;font-size:10px;">Set velocity field…</button>
    <span id="fold-vel-status" style="font-size:9px;color:#64748b;line-height:1.35;">No velocity field confirmed yet</span>
   </div>
   <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:10px;color:#8a9bb0;margin-bottom:8px;">
@@ -1121,7 +1131,7 @@
  <button class="panel-close-btn" onclick="hidePanel('ray-tracing'); rayTraceStopPick();">&times;</button>
  <div class="panel-title">Ray Tracing — OBN / Water Column</div>
  <div style="font-size:11px;color:#a0aebb;margin-bottom:10px;line-height:1.45;">
- Acoustic paths from a source to seabed nodes through a <b style="color:#e2e8f0;">Velocity Mode</b> (constant, gradient, layered, or Mackenzie SSP) using Snell’s law.
+ Acoustic paths from a source to seabed nodes through a <b style="color:#e2e8f0;">velocity field</b>. Path method defaults to <b style="color:#5eead4;">Snell’s law</b> (also: straight ray, classic CMP travel times).
  <b style="color:#fbbf24;">Water-column only</b> — not subsurface illumination (NORSAR / ACTeQ Z-Design). Use for OBN travel times and path visualisation.
  </div>
  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
@@ -1146,6 +1156,15 @@
     <label style="width:110px;font-size:11px;color:#c0c8d4;">Max rays drawn</label>
     <input id="ray-max-draw" type="number" min="1" max="2000" step="1" value="200" style="width:80px;padding:4px 6px;border-radius:3px;border:1px solid #333;background:#111;color:#fff;font-size:11px;outline:none;"/>
    </div>
+   <div class="panel-row" style="margin-bottom:6px;align-items:center;">
+    <label style="width:110px;font-size:11px;color:#c0c8d4;">Path method</label>
+    <select id="ray-path-method" onchange="rayPathMethodChanged(this)" style="flex:1;min-width:0;padding:5px 8px;border-radius:3px;border:1px solid #5eead4;background:#111;color:#5eead4;font-size:11px;font-weight:700;outline:none;">
+     <option value="snell" selected>Snell’s law (default)</option>
+     <option value="straight">Straight ray</option>
+     <option value="cmp">CMP / mean-V TT</option>
+    </select>
+   </div>
+   <div id="ray-path-hint" style="font-size:9px;color:#666;line-height:1.35;margin-top:2px;">Default. Refracts through V(z) with conserved ray parameter p (Snell’s law).</div>
   </div>
   <div style="background:#0a0a12;border:1px solid #1a1a24;border-radius:6px;padding:10px;">
    <div style="font-size:10px;color:#fbbf24;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;margin-bottom:8px;">Velocity field</div>
@@ -2127,9 +2146,9 @@
  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
  <script src="https://unpkg.com/shpjs@latest/dist/shp.min.js"></script>
  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
- <script src="app.js?v=16.39"></script>
- <script src="ray_tracing_module.js?v=16.39"></script>
- <script src="wmm_declination.js?v=16.39"></script>
- <script src="magnetic_isogones.js?v=16.39"></script>
+ <script src="app.js?v=16.40"></script>
+ <script src="ray_tracing_module.js?v=16.40"></script>
+ <script src="wmm_declination.js?v=16.40"></script>
+ <script src="magnetic_isogones.js?v=16.40"></script>
 </body>
 </html>
