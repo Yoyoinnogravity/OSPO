@@ -24447,6 +24447,262 @@ function foldReset() {
  if (crash) crash.style.display = 'none';
 }
 
+/**
+ * Flat-horizon specular image point (constant V).
+ * Divides the S→R horizontal offset by vertical travel legs to depth Z.
+ * When zs ≈ zr, this is the CMP midpoint. Used for fold-at-depth maps.
+ */
+function _foldImagePointXY(sx, sy, zs, rx, ry, zr, Z) {
+ const h1 = Math.max(1e-3, Z - zs);
+ const h2 = Math.max(1e-3, Z - zr);
+ const w = h1 / (h1 + h2);
+ return {
+  x: sx + (rx - sx) * w,
+  y: sy + (ry - sy) * w,
+  offset: Math.hypot(rx - sx, ry - sy)
+ };
+}
+
+function _foldLatLonToXY(lat, lon, anchor) {
+ return {
+  x: (lon - anchor.lon) * 111320 * Math.cos(anchor.lat * Math.PI / 180),
+  y: (lat - anchor.lat) * 110540
+ };
+}
+
+/** Sample shotpoints along a preplot line (lat/lon start–end). */
+function _foldSampleShotsOnLine(start, end, spIntervalM) {
+ const len = haversine(start, end);
+ if (!(len > 1)) return [{ lat: start[0], lon: start[1], sp: 1 }];
+ const brg = bearing(start, end);
+ const spInt = Math.max(1, spIntervalM || 25);
+ const n = Math.max(1, Math.floor(len / spInt) + 1);
+ const shots = [];
+ for (let i = 0; i < n; i++) {
+  const d = Math.min(len, i * spInt);
+  const p = destinationPoint(start, brg, d);
+  shots.push({ lat: p[0], lon: p[1], sp: i + 1, brg });
+ }
+ return shots;
+}
+
+/**
+ * Build synthetic CMP / fold-at-depth hits from the Design survey
+ * (preplot lines + streamer geometry, or OBN nodes).
+ */
+async function foldBuildSyntheticAtDepth() {
+ if (typeof haversine !== 'function' || typeof destinationPoint !== 'function') {
+  showToast('Open Design workspace first (map geometry helpers needed)', 5000);
+  return;
+ }
+ const lines = (state.lines && state.lines.length)
+  ? state.lines
+  : ((_ppgEditLines && _ppgEditLines.length) ? _ppgEditLines : []);
+ if (!lines.length) {
+  showToast('No Design preplot lines — generate or load a survey first', 5000);
+  return;
+ }
+
+ const Z = Math.max(10, parseFloat(document.getElementById('fold-synth-depth')?.value) || 1000);
+ const zs = Math.max(0, parseFloat(document.getElementById('fold-synth-src-z')?.value) || 8);
+ const modeSel = (document.getElementById('fold-synth-mode') || {}).value || 'auto';
+ const spInt = parseFloat(document.getElementById('ppg-sp-interval')?.value)
+  || state.settings.spInterval || 25;
+ const maxOff = Math.max(100, parseFloat(document.getElementById('fold-synth-max-off')?.value)
+  || parseFloat(document.getElementById('fold-cable')?.value) || 8000);
+ const maxInc = parseFloat(document.getElementById('fold-synth-max-inc')?.value);
+ const hasInc = isFinite(maxInc) && maxInc > 0 && maxInc < 90;
+
+ const dim = (document.getElementById('ppg-dimension') || {}).value || '';
+ const obnNodes = (state.obnNodes && state.obnNodes.length) ? state.obnNodes : [];
+ let mode = modeSel;
+ if (mode === 'auto') {
+  mode = (dim === 'OBN' || obnNodes.length) ? 'obn' : 'streamer';
+ }
+ if (mode === 'obn' && !obnNodes.length) {
+  showToast('OBN mode needs OBN nodes — generate an OBN preplot first', 5000);
+  return;
+ }
+
+ // Receiver geometry for streamer
+ const nStr = Math.max(1, parseInt(document.getElementById('ppg-streamers')?.value, 10)
+  || state.settings.numStreamers || 6);
+ const strSep = Math.max(1, parseFloat(document.getElementById('ppg-streamer-sep')?.value)
+  || state.settings.streamerSeparation || 100);
+ const strLen = Math.max(100, parseFloat(document.getElementById('ppg-streamer-length')?.value) || 6000);
+ const chSp = Math.max(1, state.settings.channelSpacing || 12.5);
+ const nChan = Math.max(1, Math.min(800, Math.floor(strLen / chSp)));
+ const nearOff = Math.max(0, parseFloat(document.getElementById('fold-synth-near')?.value) || 150);
+ const zrRcv = mode === 'obn' ? Z : 0; // OBN nodes on seabed ≈ target depth for water-column fold
+
+ // Confirm if fold already exists
+ if (_fold && (_fold.fileData || []).length) {
+  if (!confirm('Replace current fold with a new synthetic survey at depth ' + Z + ' m?')) return;
+  foldReset();
+ }
+
+ const cableEl = document.getElementById('fold-cable');
+ if (cableEl && mode === 'streamer') cableEl.value = String(Math.round(strLen + nearOff));
+ if (cableEl && mode === 'obn') cableEl.value = String(Math.round(maxOff));
+
+ showToast('Building synthetic fold @ ' + Z + ' m (' + mode + ')…', 2500);
+
+ const anchor = { lat: lines[0].start[0], lon: lines[0].start[1] };
+ let nShots = 0, nRecs = 0, nSkipOff = 0, nSkipInc = 0;
+ const shotPts = [];
+ let firstXY = null, lastXY = null;
+
+ const azGuess = (() => {
+  const a = lines[0].start, b = lines[0].end;
+  const brg = bearing(a, b);
+  return ((brg % 360) + 360) % 360;
+ })();
+
+ const mids = []; // [mx, my, off]
+ const CHUNK_LINES = 1;
+
+ for (let li = 0; li < lines.length; li++) {
+  const L = lines[li];
+  const name = L.name || ('L' + (li + 1));
+  const shots = _foldSampleShotsOnLine(L.start, L.end, spInt);
+  for (const sh of shots) {
+   nShots++;
+   const sxy = _foldLatLonToXY(sh.lat, sh.lon, anchor);
+   if (!firstXY) firstXY = sxy;
+   lastXY = sxy;
+   shotPts.push([sxy.x, sxy.y, sh.sp, name]);
+
+   if (mode === 'obn') {
+    for (const nd of obnNodes) {
+     const rxy = _foldLatLonToXY(nd.lat, nd.lon, anchor);
+     const ip = _foldImagePointXY(sxy.x, sxy.y, zs, rxy.x, rxy.y, zrRcv, Z);
+     if (ip.offset > maxOff) { nSkipOff++; continue; }
+     if (hasInc) {
+      const h = Math.max(1e-3, Z - zs);
+      const inc = Math.atan2(ip.offset / 2, h) * 180 / Math.PI;
+      if (inc > maxInc) { nSkipInc++; continue; }
+     }
+     mids.push([ip.x, ip.y, ip.offset]);
+     nRecs++;
+    }
+   } else {
+    // Streamer spread behind the shot (opposite sail heading)
+    const sailBrg = sh.brg != null ? sh.brg : bearing(L.start, L.end);
+    const aft = (sailBrg + 180) % 360;
+    const port = (sailBrg + 270) % 360;
+    const x0 = -((nStr - 1) * strSep) / 2;
+    for (let si = 0; si < nStr; si++) {
+     const cross = x0 + si * strSep;
+     // Streamer reference at shot, then channels aft
+     const strRef = destinationPoint([sh.lat, sh.lon], port, cross);
+     for (let c = 0; c < nChan; c++) {
+      const along = nearOff + c * chSp;
+      const rp = destinationPoint(strRef, aft, along);
+      const rxy = _foldLatLonToXY(rp[0], rp[1], anchor);
+      const ip = _foldImagePointXY(sxy.x, sxy.y, zs, rxy.x, rxy.y, 0, Z);
+      if (ip.offset > maxOff) { nSkipOff++; continue; }
+      if (hasInc) {
+       const h = Math.max(1e-3, Z - zs);
+       const inc = Math.atan2(ip.offset / 2, h) * 180 / Math.PI;
+       if (inc > maxInc) { nSkipInc++; continue; }
+      }
+      mids.push([ip.x, ip.y, ip.offset]);
+      nRecs++;
+     }
+    }
+   }
+  }
+  // Yield between lines so UI stays alive
+  if (li % CHUNK_LINES === 0) await new Promise(r => setTimeout(r, 0));
+ }
+
+ if (!mids.length) {
+  showToast('No synthetic midpoints — check max offset / incidence / geometry', 6000);
+  return;
+ }
+
+ // Create fold grid from UI + first midpoint
+ let az = _foldNum('fold-az');
+ if (az == null) az = azGuess;
+ const grid = {
+  e0: _foldNum('fold-org-e') ?? mids[0][0],
+  n0: _foldNum('fold-org-n') ?? mids[0][1],
+  az,
+  bw: _foldNum('fold-bin-w') ?? 25,
+  bh: _foldNum('fold-bin-h') ?? 12.5,
+  cable: _foldNum('fold-cable') ?? (mode === 'obn' ? maxOff : (strLen + nearOff)),
+  cor: !!(document.getElementById('fold-cor') || {}).checked,
+  corW: _foldNum('fold-cor-w') ?? 25,
+  flex: _foldFlexFromUI(),
+  anchor,
+  frame: 'geo',
+  synthetic: true,
+  targetDepthM: Z,
+  synthMode: mode
+ };
+ _fold = {
+  grid,
+  fileData: [],
+  base: null,
+  bands: [new Map(), new Map(), new Map(), new Map(), new Map()],
+  files: [], shots: 0, recs: 0, rejected: 0,
+  reg: { n: 0, si: 0, ssp: 0, sii: 0, sisp: 0 },
+  lineMarks: {}
+ };
+ const setV = (id, v) => { const el = document.getElementById(id); if (el) el.value = Math.round(v * 100) / 100; };
+ setV('fold-org-e', grid.e0); setV('fold-org-n', grid.n0); setV('fold-az', grid.az);
+ _foldLockUI(true);
+
+ const entry = {
+  name: 'synthetic_' + mode + '_Z' + Math.round(Z) + 'm',
+  shots: nShots,
+  recs: nRecs,
+  hits: new Map(),
+  reg: { n: 0, si: 0, ssp: 0, sii: 0, sisp: 0 },
+  lineMarks: {},
+  synthetic: true,
+  targetDepthM: Z
+ };
+ const aRad = grid.az * Math.PI / 180;
+ const sA = Math.sin(aRad), cA = Math.cos(aRad);
+ const corW = Math.max(1, grid.corW || 25);
+ const BIN_CHUNK = 50000;
+ for (let i = 0; i < mids.length; i++) {
+  const [mx, my, off] = mids[i];
+  const dx = mx - grid.e0, dy = my - grid.n0;
+  const ii = Math.floor((dx * sA + dy * cA) / grid.bh);
+  const jh = Math.floor((dx * cA - dy * sA) / (grid.bw / 2));
+  const fkey = ii + ',' + jh + ',' + Math.floor(off / corW);
+  entry.hits.set(fkey, (entry.hits.get(fkey) || 0) + 1);
+  if (i > 0 && i % BIN_CHUNK === 0) await new Promise(r => setTimeout(r, 0));
+ }
+ for (const [x, y, sp, ln] of shotPts) {
+  const dx = x - grid.e0, dy = y - grid.n0;
+  const i = Math.floor((dx * sA + dy * cA) / grid.bh);
+  const j = Math.floor((dx * cA - dy * sA) / grid.bw);
+  entry.reg.n++; entry.reg.si += i; entry.reg.ssp += sp;
+  entry.reg.sii += i * i; entry.reg.sisp += i * sp;
+  const lm = entry.lineMarks[ln] || (entry.lineMarks[ln] = { sj: 0, n: 0 });
+  lm.sj += j; lm.n++;
+ }
+
+ _fold.fileData.push(entry);
+ _foldRebuild();
+ _foldRender();
+ _foldUpdateLimitBanner();
+
+ const band = _fold.bands[4];
+ let maxF = 0, nBins = band.size;
+ band.forEach(v => { if (v > maxF) maxF = v; });
+ showToast(
+  'Synthetic fold @ ' + Z + ' m · ' + mode
+   + ' · ' + nShots.toLocaleString() + ' shots · '
+   + nRecs.toLocaleString() + ' traces · max fold ' + maxF
+   + (nSkipOff || nSkipInc ? (' · skipped off/inc ' + nSkipOff + '/' + nSkipInc) : ''),
+  7000
+ );
+}
+
 // COR toggled or class width changed: rebuild the fold from the stored
 // per-file midpoints with the new setting.
 function foldCorChanged() {
@@ -25215,7 +25471,7 @@ function _foldRender() {
  const flist = document.getElementById('fold-file-list');
  const fbtn = document.getElementById('fold-files-btn');
  if (!_fold || _fold.recs === 0) {
- if (summary) summary.textContent = 'No fold data - add a P1 file with receiver (R) records.';
+ if (summary) summary.textContent = 'No fold data — add a P1 file, or build a synthetic fold at depth from Design.';
  if (flist) { flist.innerHTML = ''; flist.style.display = 'none'; }
  if (fbtn) fbtn.style.display = 'none';
  _foldFilesOpen = false;
@@ -25236,7 +25492,10 @@ function _foldRender() {
  : '';
  summary.innerHTML = `<strong style="color:#5eead4;">${_fold.files.length} file(s)</strong> | ` +
  `${_fold.shots.toLocaleString()} shots | ${_fold.recs.toLocaleString()} midpoints | ` +
- `grid ${g.bw}x${g.bh} m @ ${Math.round(g.az * 10) / 10} deg | origin ${Math.round(g.e0)}, ${Math.round(g.n0)}${corTxt}${flexTxt}`;
+ `grid ${g.bw}x${g.bh} m @ ${Math.round(g.az * 10) / 10} deg | origin ${Math.round(g.e0)}, ${Math.round(g.n0)}${corTxt}${flexTxt}` +
+ (g.synthetic
+  ? ` | <span style="color:#fbbf24;">synthetic ${g.synthMode || ''} fold @ ${Math.round(g.targetDepthM || 0)} m depth</span>`
+  : '');
  }
 
  // Loaded file list lives in a dropdown menu so it never eats plot space.

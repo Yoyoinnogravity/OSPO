@@ -996,7 +996,39 @@
  <div id="panel-fold-coverage" class="settings-panel" style="display:none; width:840px; max-width:94vw; max-height:88vh; overflow-y:auto;">
  <button class="panel-close-btn" onclick="hidePanel('fold-coverage')">&times;</button>
  <div class="panel-title">Fold of Coverage - CMP Bin Maps</div>
- <div style="font-size:11px;color:#a0aebb;margin-bottom:8px;line-height:1.4;">Builds CMP fold maps from P1 files containing shot (S) and receiver group (R) records. Each shot-channel midpoint is binned on the grid below, split into offset quarters of the cable (nears / near-mids / far-mids / fars / alls). Fold accumulates across every file you add - load the next sequence to build up coverage. Files are processed locally.
+ <div style="font-size:11px;color:#a0aebb;margin-bottom:8px;line-height:1.4;">
+ Builds CMP fold maps from P1 shot (S) + receiver (R) records, <b style="color:#e2e8f0;">or a synthetic survey from Design</b> showing <b style="color:#5eead4;">fold at a target depth</b> (flat-horizon image points). Offset quarters: nears / near-mids / far-mids / fars / alls. Files processed locally.
+ </div>
+ <div style="background:#0a1210;border:1px solid #134e4a;border-radius:6px;padding:10px 12px;margin-bottom:10px;">
+  <div style="font-size:10px;color:#5eead4;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;margin-bottom:8px;">Synthetic survey → fold at depth</div>
+  <div style="font-size:10px;color:#94a3b8;line-height:1.4;margin-bottom:8px;">
+   Uses Design preplot lines + streamer geometry, or OBN nodes. Specular image points on a flat horizon at depth Z (constant-V). Not full NORSAR illumination — a planning fold map.
+  </div>
+  <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:10px;color:#8a9bb0;margin-bottom:8px;">
+   <label style="display:flex;align-items:center;gap:4px;">Mode
+    <select id="fold-synth-mode" style="background:#111;border:1px solid #333;color:#5eead4;padding:4px 6px;border-radius:4px;font-size:10px;outline:none;">
+     <option value="auto" selected>Auto</option>
+     <option value="streamer">Streamer</option>
+     <option value="obn">OBN</option>
+    </select>
+   </label>
+   <label style="display:flex;align-items:center;gap:4px;">Target depth Z
+    <input id="fold-synth-depth" type="number" min="10" step="10" value="1000" style="background:#111;border:1px solid #333;color:#fff;padding:4px 6px;border-radius:4px;font-size:10px;width:64px;outline:none;"/> m
+   </label>
+   <label style="display:flex;align-items:center;gap:4px;">Source depth
+    <input id="fold-synth-src-z" type="number" min="0" step="1" value="8" style="background:#111;border:1px solid #333;color:#fff;padding:4px 6px;border-radius:4px;font-size:10px;width:48px;outline:none;"/> m
+   </label>
+   <label style="display:flex;align-items:center;gap:4px;">Near offset
+    <input id="fold-synth-near" type="number" min="0" step="10" value="150" style="background:#111;border:1px solid #333;color:#fff;padding:4px 6px;border-radius:4px;font-size:10px;width:52px;outline:none;"/> m
+   </label>
+   <label style="display:flex;align-items:center;gap:4px;">Max offset
+    <input id="fold-synth-max-off" type="number" min="100" step="100" value="8000" style="background:#111;border:1px solid #333;color:#fff;padding:4px 6px;border-radius:4px;font-size:10px;width:60px;outline:none;"/> m
+   </label>
+   <label style="display:flex;align-items:center;gap:4px;" title="Leave blank to disable">Max incidence
+    <input id="fold-synth-max-inc" type="number" min="1" max="89" step="1" placeholder="off" style="background:#111;border:1px solid #333;color:#fff;padding:4px 6px;border-radius:4px;font-size:10px;width:48px;outline:none;"/> °
+   </label>
+  </div>
+  <button type="button" onclick="foldBuildSyntheticAtDepth()" style="padding:7px 14px;border-radius:4px;border:none;background:#14b8a6;color:#042f2e;font-weight:800;cursor:pointer;font-size:11px;">Build synthetic fold at depth</button>
  </div>
  <div id="fold-limit-banner" style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:10px;padding:8px 10px;border-radius:5px;border:1px solid rgba(255,214,10,0.45);background:rgba(255,214,10,0.08);">
   <div style="font-size:11px;color:#e8e0b0;line-height:1.45;">
@@ -2085,9 +2117,9 @@
  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
  <script src="https://unpkg.com/shpjs@latest/dist/shp.min.js"></script>
  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
- <script src="app.js?v=16.37"></script>
- <script src="ray_tracing_module.js?v=16.37"></script>
- <script src="wmm_declination.js?v=16.37"></script>
- <script src="magnetic_isogones.js?v=16.37"></script>
+ <script src="app.js?v=16.38"></script>
+ <script src="ray_tracing_module.js?v=16.38"></script>
+ <script src="wmm_declination.js?v=16.38"></script>
+ <script src="magnetic_isogones.js?v=16.38"></script>
 </body>
 </html>
