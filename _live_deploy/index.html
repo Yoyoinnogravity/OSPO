@@ -997,12 +997,16 @@
  <button class="panel-close-btn" onclick="hidePanel('fold-coverage')">&times;</button>
  <div class="panel-title">Fold of Coverage - CMP Bin Maps</div>
  <div style="font-size:11px;color:#a0aebb;margin-bottom:8px;line-height:1.4;">
- Builds CMP fold maps from P1 shot (S) + receiver (R) records, <b style="color:#e2e8f0;">or a synthetic survey from Design</b> showing <b style="color:#5eead4;">fold at a target depth</b> (flat-horizon image points). Offset quarters: nears / near-mids / far-mids / fars / alls. Files processed locally.
+ Builds CMP fold maps from P1 shot (S) + receiver (R) records, <b style="color:#e2e8f0;">or a synthetic survey from Design</b> showing <b style="color:#5eead4;">fold at a target depth</b> (Snell image points through your velocity field). Offset quarters: nears / near-mids / far-mids / fars / alls. Files processed locally.
  </div>
  <div style="background:#0a1210;border:1px solid #134e4a;border-radius:6px;padding:10px 12px;margin-bottom:10px;">
   <div style="font-size:10px;color:#5eead4;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;margin-bottom:8px;">Synthetic survey → fold at depth</div>
   <div style="font-size:10px;color:#94a3b8;line-height:1.4;margin-bottom:8px;">
-   Uses Design preplot lines + streamer geometry, or OBN nodes. Specular image points on a flat horizon at depth Z (constant-V). Not full NORSAR illumination — a planning fold map.
+   Asks for a <b style="color:#fbbf24;">velocity field</b>, then builds specular image points on a flat horizon at depth Z (Snell’s law through V(z)). Uses Design preplot + streamer geometry, or OBN nodes. Planning fold — not NORSAR illumination.
+  </div>
+  <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px;">
+   <button type="button" onclick="velFieldAsk({title:'Velocity field for fold at depth',coverZ:parseFloat(document.getElementById('fold-synth-depth')?.value)||1000,reason:'Snell specular image points for fold maps use this 1D V(z) field.'}).then(function(ok){if(ok&amp;&amp;typeof velFieldSyncStatusUi==='function')velFieldSyncStatusUi();})" style="padding:6px 12px;border-radius:4px;border:1px solid #f59e0b;background:#1a1205;color:#fbbf24;font-weight:800;cursor:pointer;font-size:10px;">Set velocity field…</button>
+   <span id="fold-vel-status" style="font-size:9px;color:#64748b;line-height:1.35;">No velocity field confirmed yet</span>
   </div>
   <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:10px;color:#8a9bb0;margin-bottom:8px;">
    <label style="display:flex;align-items:center;gap:4px;">Mode
@@ -1018,13 +1022,16 @@
    <label style="display:flex;align-items:center;gap:4px;">Source depth
     <input id="fold-synth-src-z" type="number" min="0" step="1" value="8" style="background:#111;border:1px solid #333;color:#fff;padding:4px 6px;border-radius:4px;font-size:10px;width:48px;outline:none;"/> m
    </label>
+   <label style="display:flex;align-items:center;gap:4px;" title="OBN node / seabed depth (receiver)">Node / seabed
+    <input id="fold-synth-node-z" type="number" min="0" step="1" value="1000" style="background:#111;border:1px solid #333;color:#fff;padding:4px 6px;border-radius:4px;font-size:10px;width:56px;outline:none;"/> m
+   </label>
    <label style="display:flex;align-items:center;gap:4px;">Near offset
     <input id="fold-synth-near" type="number" min="0" step="10" value="150" style="background:#111;border:1px solid #333;color:#fff;padding:4px 6px;border-radius:4px;font-size:10px;width:52px;outline:none;"/> m
    </label>
    <label style="display:flex;align-items:center;gap:4px;">Max offset
     <input id="fold-synth-max-off" type="number" min="100" step="100" value="8000" style="background:#111;border:1px solid #333;color:#fff;padding:4px 6px;border-radius:4px;font-size:10px;width:60px;outline:none;"/> m
    </label>
-   <label style="display:flex;align-items:center;gap:4px;" title="Leave blank to disable">Max incidence
+   <label style="display:flex;align-items:center;gap:4px;" title="Leave blank to disable — uses incidence at target from Snell p">Max incidence
     <input id="fold-synth-max-inc" type="number" min="1" max="89" step="1" placeholder="off" style="background:#111;border:1px solid #333;color:#fff;padding:4px 6px;border-radius:4px;font-size:10px;width:48px;outline:none;"/> °
    </label>
   </div>
@@ -1141,7 +1148,10 @@
    </div>
   </div>
   <div style="background:#0a0a12;border:1px solid #1a1a24;border-radius:6px;padding:10px;">
-   <div style="font-size:10px;color:#fbbf24;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;margin-bottom:8px;">Velocity mode</div>
+   <div style="font-size:10px;color:#fbbf24;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;margin-bottom:8px;">Velocity field</div>
+   <div style="margin-bottom:8px;">
+    <button type="button" onclick="velFieldAsk({title:'Velocity field for ray tracing',coverZ:parseFloat(document.getElementById('ray-rcv-z')?.value)||1000,reason:'Snell paths from source to nodes use this 1D V(z) field.'})" style="padding:5px 10px;border-radius:3px;border:1px solid #f59e0b;background:#1a1205;color:#fbbf24;font-weight:800;cursor:pointer;font-size:10px;">Ask for velocity field…</button>
+   </div>
    <div class="panel-row" style="margin-bottom:8px;align-items:center;">
     <label style="width:110px;font-size:11px;color:#c0c8d4;">Mode</label>
     <select id="ray-vel-mode" onchange="rayVelocityModeChanged()" style="flex:1;min-width:0;padding:5px 8px;border-radius:3px;border:1px solid #f59e0b;background:#111;color:#fbbf24;font-size:11px;font-weight:700;outline:none;">
@@ -2117,9 +2127,9 @@
  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
  <script src="https://unpkg.com/shpjs@latest/dist/shp.min.js"></script>
  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
- <script src="app.js?v=16.38"></script>
- <script src="ray_tracing_module.js?v=16.38"></script>
- <script src="wmm_declination.js?v=16.38"></script>
- <script src="magnetic_isogones.js?v=16.38"></script>
+ <script src="app.js?v=16.39"></script>
+ <script src="ray_tracing_module.js?v=16.39"></script>
+ <script src="wmm_declination.js?v=16.39"></script>
+ <script src="magnetic_isogones.js?v=16.39"></script>
 </body>
 </html>

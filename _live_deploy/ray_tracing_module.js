@@ -13,6 +13,7 @@ var _rayState = {
  pickMode: null, // 'source' | 'node' | null
  velMode: 'layered', // constant | gradient | layered | mackenzie
  layers: [{ zBot: 200, v: 1480 }, { zBot: 600, v: 1500 }, { zBot: 1200, v: 1520 }],
+ velConfirmed: false, // user accepted a velocity field via ask dialog
  busy: false,
  lastRunAt: null
 };
@@ -132,18 +133,21 @@ function rayApplyVelocityMode(announce) {
 }
 
 function rayUpdateVelStatus() {
- const el = document.getElementById('ray-vel-mode-status');
- if (!el) return;
- const layers = rayReadLayers();
- if (!layers.length) {
-  el.textContent = 'No velocity layers defined.';
-  return;
+ if (typeof velFieldSyncStatusUi === 'function') velFieldSyncStatusUi();
+ else {
+  const el = document.getElementById('ray-vel-mode-status');
+  if (!el) return;
+  const layers = rayReadLayers();
+  if (!layers.length) {
+   el.textContent = 'No velocity layers defined.';
+   return;
+  }
+  const vs = layers.map(L => L.v);
+  const zMax = layers[layers.length - 1].zBot;
+  el.innerHTML = `<span style="color:#fbbf24;font-weight:700;text-transform:uppercase;letter-spacing:0.3px;">${_rayState.velMode}</span>`
+   + ` · ${layers.length} layer(s) to ${Math.round(zMax)} m`
+   + ` · V ${Math.min(...vs).toFixed(0)}–${Math.max(...vs).toFixed(0)} m/s`;
  }
- const vs = layers.map(L => L.v);
- const zMax = layers[layers.length - 1].zBot;
- el.innerHTML = `<span style="color:#fbbf24;font-weight:700;text-transform:uppercase;letter-spacing:0.3px;">${_rayState.velMode}</span>`
-  + ` · ${layers.length} layer(s) to ${Math.round(zMax)} m`
-  + ` · V ${Math.min(...vs).toFixed(0)}–${Math.max(...vs).toFixed(0)} m/s`;
 }
 
 function rayPresetWater() {
@@ -242,6 +246,302 @@ function rayEnsureModelCovers(layers, zr) {
   L.push({ zTop, zBot: zr + 10, v });
  }
  return L;
+}
+
+function rayVAtDepth(layers, z) {
+ const L = layers || [];
+ for (let i = 0; i < L.length; i++) {
+  if (z <= L[i].zBot + 1e-6) return L[i].v;
+ }
+ return L.length ? L[L.length - 1].v : 1500;
+}
+
+/**
+ * Flat-horizon specular image point through a 1D V(z) field (Snell p shared on both legs).
+ * Falls back to CMP when the target coincides with a station depth.
+ */
+function raySpecularImagePoint(sx, sy, zs, rx, ry, zr, Z, layers) {
+ const off = Math.hypot(rx - sx, ry - sy);
+ if (!(isFinite(off))) return { x: sx, y: sy, offset: 0, method: 'bad', p: 0, incDeg: 0 };
+ // Classic CMP when target ≈ receiver depth, or stations at same depth with tiny offset
+ if (Math.abs(Z - zr) < 1 || (Math.abs(zs - zr) < 0.5 && Math.abs(Z - zs) < 1)) {
+  return { x: (sx + rx) / 2, y: (sy + ry) / 2, offset: off, method: 'cmp', p: 0, incDeg: 0 };
+ }
+ if (!(Z > zs + 0.5) || !(Z > zr + 0.5)) {
+  const h1 = Math.max(1e-3, Math.abs(Z - zs));
+  const h2 = Math.max(1e-3, Math.abs(Z - zr));
+  const w = h1 / (h1 + h2);
+  return {
+   x: sx + (rx - sx) * w,
+   y: sy + (ry - sy) * w,
+   offset: off,
+   method: 'depth_weight',
+   p: 0,
+   incDeg: Math.atan2(off / 2, Math.max(1e-3, Z - Math.min(zs, zr))) * 180 / Math.PI
+  };
+ }
+ if (off < 1) {
+  return { x: sx, y: sy, offset: 0, method: 'vertical', p: 0, incDeg: 0 };
+ }
+
+ const L = rayEnsureModelCovers(layers || rayReadLayers(), Z + 20);
+ const vmin = Math.min(...L.map(l => l.v), 1500);
+ let lo = 0, hi = (1 / vmin) * 0.999;
+ let best = null;
+ for (let iter = 0; iter < 72; iter++) {
+  const mid = 0.5 * (lo + hi);
+  const ds = rayPropagate(mid, L, zs, Z);
+  const dr = rayPropagate(mid, L, zr, Z);
+  if (!ds.ok || !dr.ok) { hi = mid; continue; }
+  const sum = ds.offsetM + dr.offsetM;
+  best = { p: mid, xs: ds.offsetM, xr: dr.offsetM, sum };
+  if (sum > off) hi = mid;
+  else lo = mid;
+  if (Math.abs(sum - off) < 0.4) break;
+ }
+ if (!best || !(best.sum > 1e-6)) {
+  const h1 = Math.max(1e-3, Z - zs);
+  const h2 = Math.max(1e-3, Z - zr);
+  const w = h1 / (h1 + h2);
+  return {
+   x: sx + (rx - sx) * w,
+   y: sy + (ry - sy) * w,
+   offset: off,
+   method: 'fallback',
+   p: 0,
+   incDeg: Math.atan2(off / 2, h1) * 180 / Math.PI
+  };
+ }
+ const scale = off / best.sum;
+ const xs = best.xs * scale;
+ const ux = (rx - sx) / off, uy = (ry - sy) / off;
+ const vZ = rayVAtDepth(L, Z);
+ const arg = Math.min(0.999999, Math.max(0, best.p * vZ));
+ const incDeg = Math.asin(arg) * 180 / Math.PI;
+ return {
+  x: sx + ux * xs,
+  y: sy + uy * xs,
+  offset: off,
+  method: 'snell',
+  p: best.p,
+  xs,
+  xr: best.xr * scale,
+  incDeg
+ };
+}
+
+function velFieldGetLayers(coverZ) {
+ if (typeof rayGetVelMode === 'function' && rayGetVelMode() !== 'layered') {
+  try { rayApplyVelocityMode(false); } catch (_) {}
+ }
+ return rayEnsureModelCovers(rayReadLayers(), Math.max(50, coverZ || 1000));
+}
+
+function velFieldStatusText() {
+ const layers = rayReadLayers();
+ if (!layers.length) return 'No velocity field set';
+ const vs = layers.map(L => L.v);
+ const zMax = layers[layers.length - 1].zBot;
+ const conf = _rayState.velConfirmed ? 'ready' : 'not confirmed';
+ return (_rayState.velMode || 'layered')
+  + ' · ' + layers.length + ' layer(s) to ' + Math.round(zMax) + ' m'
+  + ' · V ' + Math.min(...vs).toFixed(0) + '–' + Math.max(...vs).toFixed(0) + ' m/s'
+  + ' · ' + conf;
+}
+
+function velFieldSyncStatusUi() {
+ const t = velFieldStatusText();
+ const a = document.getElementById('ray-vel-mode-status');
+ if (a) {
+  const layers = rayReadLayers();
+  if (!layers.length) a.textContent = 'No velocity layers defined.';
+  else {
+   const vs = layers.map(L => L.v);
+   const zMax = layers[layers.length - 1].zBot;
+   a.innerHTML = `<span style="color:#fbbf24;font-weight:700;text-transform:uppercase;letter-spacing:0.3px;">${_rayState.velMode || 'layered'}</span>`
+    + ` · ${layers.length} layer(s) to ${Math.round(zMax)} m`
+    + ` · V ${Math.min(...vs).toFixed(0)}–${Math.max(...vs).toFixed(0)} m/s`
+    + (_rayState.velConfirmed
+      ? ' · <span style="color:#30d158;">confirmed</span>'
+      : ' · <span style="color:#fbbf24;">ask to confirm</span>');
+  }
+ }
+ const b = document.getElementById('fold-vel-status');
+ if (b) b.textContent = t;
+}
+
+function velFieldParseCsv(text) {
+ const rows = [];
+ String(text || '').split(/\r?\n/).forEach(line => {
+  const s = line.trim();
+  if (!s || s[0] === '#' || s[0] === ';') return;
+  const parts = s.split(/[,;\s\t]+/).map(Number).filter(n => isFinite(n));
+  if (parts.length >= 2) rows.push({ zBot: parts[0], v: parts[1] });
+ });
+ rows.sort((a, b) => a.zBot - b.zBot);
+ return rows.filter(r => r.zBot > 0 && r.v > 50);
+}
+
+/**
+ * Ask the user for a 1D velocity field (modal). Resolves true if applied.
+ * Shared by ray tracing and fold-at-depth.
+ */
+function velFieldAsk(opts) {
+ const o = opts || {};
+ const coverSuggest = Math.max(50, parseFloat(o.coverZ) || parseFloat(document.getElementById('fold-synth-depth')?.value)
+  || parseFloat(document.getElementById('ray-rcv-z')?.value) || 1000);
+ const title = o.title || 'Velocity field';
+ const reason = o.reason || 'Used for Snell ray tracing and fold image points at depth.';
+
+ return new Promise((resolve) => {
+  const existing = document.getElementById('vel-field-ask-overlay');
+  if (existing) existing.remove();
+
+  const mode0 = _rayState.velMode || rayGetVelMode() || 'layered';
+  const overlay = document.createElement('div');
+  overlay.id = 'vel-field-ask-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:10050;background:rgba(0,0,0,0.72);display:flex;align-items:center;justify-content:center;padding:16px;';
+  overlay.innerHTML = `
+   <div style="width:min(520px,96vw);max-height:90vh;overflow:auto;background:#0c0c14;border:1px solid #334155;border-radius:10px;padding:16px 18px;box-shadow:0 20px 50px rgba(0,0,0,0.55);">
+    <div style="font-size:14px;font-weight:800;color:#fbbf24;margin-bottom:6px;">${title}</div>
+    <div style="font-size:11px;color:#94a3b8;line-height:1.45;margin-bottom:12px;">${reason}<br/>Enter a 1D V(z) water-column (or extended) field, then confirm.</div>
+    <label style="display:flex;align-items:center;gap:8px;font-size:11px;color:#cbd5e1;margin-bottom:10px;">Mode
+     <select id="vf-ask-mode" style="flex:1;padding:6px 8px;border-radius:4px;border:1px solid #f59e0b;background:#111;color:#fbbf24;font-weight:700;font-size:11px;outline:none;">
+      <option value="constant">Constant</option>
+      <option value="gradient">Linear gradient</option>
+      <option value="layered">Layered 1D / CSV</option>
+      <option value="mackenzie">Mackenzie SSP</option>
+     </select>
+    </label>
+    <label style="display:flex;align-items:center;gap:8px;font-size:11px;color:#cbd5e1;margin-bottom:10px;">Cover to depth
+     <input id="vf-ask-cover" type="number" min="10" step="10" value="${Math.round(coverSuggest)}"
+      style="width:90px;padding:5px 6px;border-radius:4px;border:1px solid #333;background:#111;color:#fff;font-size:11px;outline:none;"/> m
+    </label>
+    <div id="vf-ask-constant" style="display:none;margin-bottom:10px;">
+     <label style="font-size:11px;color:#94a3b8;">V <input id="vf-ask-const-v" type="number" min="100" step="1" value="1500"
+      style="width:90px;margin-left:6px;padding:5px 6px;border-radius:4px;border:1px solid #333;background:#111;color:#fff;font-size:11px;outline:none;"/> m/s</label>
+    </div>
+    <div id="vf-ask-gradient" style="display:none;margin-bottom:10px;">
+     <div style="display:flex;flex-wrap:wrap;gap:10px;font-size:11px;color:#94a3b8;">
+      <label>V top <input id="vf-ask-grad-top" type="number" value="1480" style="width:72px;margin-left:4px;padding:4px;border-radius:3px;border:1px solid #333;background:#111;color:#fff;font-size:11px;"/></label>
+      <label>V bottom <input id="vf-ask-grad-bot" type="number" value="1520" style="width:72px;margin-left:4px;padding:4px;border-radius:3px;border:1px solid #333;background:#111;color:#fff;font-size:11px;"/></label>
+      <label>Layers <input id="vf-ask-grad-n" type="number" min="2" max="80" value="8" style="width:52px;margin-left:4px;padding:4px;border-radius:3px;border:1px solid #333;background:#111;color:#fff;font-size:11px;"/></label>
+     </div>
+    </div>
+    <div id="vf-ask-mackenzie" style="display:none;margin-bottom:10px;">
+     <div style="display:flex;flex-wrap:wrap;gap:10px;font-size:11px;color:#94a3b8;">
+      <label>T °C <input id="vf-ask-mac-t" type="number" value="10" step="0.1" style="width:60px;margin-left:4px;padding:4px;border-radius:3px;border:1px solid #333;background:#111;color:#fff;font-size:11px;"/></label>
+      <label>S psu <input id="vf-ask-mac-s" type="number" value="35" step="0.1" style="width:60px;margin-left:4px;padding:4px;border-radius:3px;border:1px solid #333;background:#111;color:#fff;font-size:11px;"/></label>
+      <label>Layers <input id="vf-ask-mac-n" type="number" min="2" max="80" value="12" style="width:52px;margin-left:4px;padding:4px;border-radius:3px;border:1px solid #333;background:#111;color:#fff;font-size:11px;"/></label>
+     </div>
+    </div>
+    <div id="vf-ask-layered" style="margin-bottom:10px;">
+     <div style="font-size:10px;color:#64748b;margin-bottom:6px;">Paste CSV: <code style="color:#94a3b8;">depth_m, v_mps</code> (layer bottoms). Leave blank to keep the current layered table.</div>
+     <textarea id="vf-ask-csv" rows="5" placeholder="# zBot_m, v_mps&#10;200,1480&#10;600,1500&#10;1200,1520"
+      style="width:100%;box-sizing:border-box;padding:8px;border-radius:4px;border:1px solid #333;background:#0a0a12;color:#e2e8f0;font-size:11px;font-family:ui-monospace,monospace;resize:vertical;outline:none;"></textarea>
+     <div style="font-size:9px;color:#556;margin-top:4px;">Current: ${(_rayState.layers || []).map(L => L.zBot + 'm@' + L.v).join(' · ') || 'none'}</div>
+    </div>
+    <div id="vf-ask-preview" style="font-size:10px;color:#64748b;margin-bottom:12px;min-height:1.2em;"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;">
+     <button type="button" id="vf-ask-cancel" style="padding:7px 14px;border-radius:4px;border:1px solid #333;background:#1a1a2e;color:#94a3b8;font-weight:700;cursor:pointer;font-size:11px;">Cancel</button>
+     <button type="button" id="vf-ask-ok" style="padding:7px 16px;border-radius:4px;border:none;background:#f59e0b;color:#111;font-weight:800;cursor:pointer;font-size:11px;">Use velocity field</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+
+  const set = (id, v) => { const el = document.getElementById(id); if (el && v != null && isFinite(v)) el.value = v; };
+  // Prefill from ray panel if present
+  set('vf-ask-const-v', parseFloat(document.getElementById('ray-vel-const-v')?.value) || 1500);
+  set('vf-ask-grad-top', parseFloat(document.getElementById('ray-vel-grad-top')?.value) || 1480);
+  set('vf-ask-grad-bot', parseFloat(document.getElementById('ray-vel-grad-bot')?.value) || 1520);
+  set('vf-ask-grad-n', parseInt(document.getElementById('ray-vel-grad-n')?.value, 10) || 8);
+  set('vf-ask-mac-t', parseFloat(document.getElementById('ray-vel-mac-t')?.value) || 10);
+  set('vf-ask-mac-s', parseFloat(document.getElementById('ray-vel-mac-s')?.value) || 35);
+  set('vf-ask-mac-n', parseInt(document.getElementById('ray-vel-mac-n')?.value, 10) || 12);
+
+  const modeEl = document.getElementById('vf-ask-mode');
+  if (modeEl) modeEl.value = mode0;
+
+  function syncBlocks() {
+   const m = modeEl.value;
+   ['constant', 'gradient', 'layered', 'mackenzie'].forEach(k => {
+    const el = document.getElementById('vf-ask-' + k);
+    if (el) el.style.display = (k === m) ? 'block' : 'none';
+   });
+  }
+  syncBlocks();
+  modeEl.onchange = syncBlocks;
+
+  function finish(ok) {
+   overlay.remove();
+   resolve(!!ok);
+  }
+  document.getElementById('vf-ask-cancel').onclick = () => finish(false);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) finish(false); });
+
+  document.getElementById('vf-ask-ok').onclick = () => {
+   const mode = modeEl.value;
+   const cover = Math.max(50, parseFloat(document.getElementById('vf-ask-cover')?.value) || coverSuggest);
+   let layers = [];
+
+   if (mode === 'constant') {
+    const v = Math.max(100, parseFloat(document.getElementById('vf-ask-const-v')?.value) || 1500);
+    layers = [{ zBot: cover + 50, v }];
+    const el = document.getElementById('ray-vel-const-v'); if (el) el.value = String(v);
+   } else if (mode === 'gradient') {
+    const vTop = Math.max(100, parseFloat(document.getElementById('vf-ask-grad-top')?.value) || 1480);
+    const vBot = Math.max(100, parseFloat(document.getElementById('vf-ask-grad-bot')?.value) || 1520);
+    const n = Math.max(2, Math.min(80, parseInt(document.getElementById('vf-ask-grad-n')?.value, 10) || 8));
+    for (let i = 1; i <= n; i++) {
+     const zBot = (cover * i) / n;
+     const midZ = (cover * (i - 0.5)) / n;
+     const v = vTop + (vBot - vTop) * (midZ / cover);
+     layers.push({ zBot, v: Math.round(v * 10) / 10 });
+    }
+    set('ray-vel-grad-top', vTop); set('ray-vel-grad-bot', vBot); set('ray-vel-grad-n', n);
+   } else if (mode === 'mackenzie') {
+    const T = parseFloat(document.getElementById('vf-ask-mac-t')?.value);
+    const S = parseFloat(document.getElementById('vf-ask-mac-s')?.value);
+    const n = Math.max(2, Math.min(80, parseInt(document.getElementById('vf-ask-mac-n')?.value, 10) || 12));
+    const t = isFinite(T) ? T : 10;
+    const s = isFinite(S) ? S : 35;
+    for (let i = 1; i <= n; i++) {
+     const zBot = (cover * i) / n;
+     const midZ = (cover * (i - 0.5)) / n;
+     layers.push({ zBot, v: Math.round(rayMackenzieSpeed(t, s, midZ) * 10) / 10 });
+    }
+    set('ray-vel-mac-t', t); set('ray-vel-mac-s', s); set('ray-vel-mac-n', n);
+   } else {
+    const csv = document.getElementById('vf-ask-csv')?.value || '';
+    const parsed = velFieldParseCsv(csv);
+    if (parsed.length) layers = parsed;
+    else layers = (_rayState.layers || []).map(L => ({ zBot: L.zBot, v: L.v }));
+    if (!layers.length) layers = [{ zBot: cover + 50, v: 1500 }];
+    // Extend last layer if CSV stops above cover
+    if (layers[layers.length - 1].zBot < cover) {
+     layers.push({ zBot: cover + 10, v: layers[layers.length - 1].v });
+    }
+   }
+
+   _rayState.layers = layers;
+   _rayState.velMode = mode;
+   _rayState.velConfirmed = true;
+   const modeUi = document.getElementById('ray-vel-mode');
+   if (modeUi) modeUi.value = mode;
+   try {
+    raySyncVelocityModeUi();
+    rayRenderVModel();
+    rayUpdateVelStatus();
+    rayDrawProfile();
+   } catch (_) {}
+   velFieldSyncStatusUi();
+   if (typeof showToast === 'function') {
+    showToast('Velocity field set: ' + mode + ' · ' + layers.length + ' layer(s) to ~'
+     + Math.round(layers[layers.length - 1].zBot) + ' m', 3500);
+   }
+   finish(true);
+  };
+ });
 }
 
 function rayTraceStopPick() {
@@ -518,7 +818,7 @@ function raySetBusy(busy, msg) {
  }
 }
 
-function rayTraceRun() {
+async function rayTraceRun() {
  rayTraceStopPick();
  if (_rayState.busy) { showToast('Trace already running'); return; }
  if (!_rayState.source) { showToast('Place a source first'); return; }
@@ -528,13 +828,24 @@ function rayTraceRun() {
   return;
  }
 
- if (rayGetVelMode() !== 'layered') rayApplyVelocityMode(false);
+ const zs0 = Math.max(0, parseFloat(document.getElementById('ray-src-z')?.value) || 8);
+ const zr0 = Math.max(zs0 + 1, parseFloat(document.getElementById('ray-rcv-z')?.value) || 1000);
+ if (typeof velFieldAsk === 'function') {
+  const ok = await velFieldAsk({
+   title: 'Velocity field for ray tracing',
+   coverZ: zr0,
+   reason: 'Snell paths from source to nodes use this 1D V(z) field.'
+  });
+  if (!ok) { showToast('Ray trace cancelled — no velocity field', 3500); return; }
+ } else if (rayGetVelMode() !== 'layered') {
+  rayApplyVelocityMode(false);
+ }
 
  const zs = Math.max(0, parseFloat(document.getElementById('ray-src-z')?.value) || 8);
  const zr = Math.max(zs + 1, parseFloat(document.getElementById('ray-rcv-z')?.value) || 1000);
  const maxOff = Math.max(100, parseFloat(document.getElementById('ray-max-off')?.value) || 8000);
  const maxDraw = Math.max(1, Math.min(2000, parseInt(document.getElementById('ray-max-draw')?.value, 10) || 200));
- let layers = rayEnsureModelCovers(rayReadLayers(), zr);
+ let layers = velFieldGetLayers(zr);
 
  const nodes = _rayState.nodes.slice();
  const source = _rayState.source.slice();

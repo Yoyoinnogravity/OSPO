@@ -24448,19 +24448,31 @@ function foldReset() {
 }
 
 /**
- * Flat-horizon specular image point (constant V).
- * Divides the S→R horizontal offset by vertical travel legs to depth Z.
- * When zs ≈ zr, this is the CMP midpoint. Used for fold-at-depth maps.
+ * Flat-horizon specular image point (constant V fallback).
+ * Prefer raySpecularImagePoint when a velocity field is available.
  */
 function _foldImagePointXY(sx, sy, zs, rx, ry, zr, Z) {
+ const off = Math.hypot(rx - sx, ry - sy);
+ if (Math.abs(zs - zr) < 0.5 || Math.abs(Z - zr) < 1) {
+  return { x: (sx + rx) / 2, y: (sy + ry) / 2, offset: off, method: 'cmp', incDeg: 0 };
+ }
  const h1 = Math.max(1e-3, Z - zs);
  const h2 = Math.max(1e-3, Z - zr);
  const w = h1 / (h1 + h2);
  return {
   x: sx + (rx - sx) * w,
   y: sy + (ry - sy) * w,
-  offset: Math.hypot(rx - sx, ry - sy)
+  offset: off,
+  method: 'depth_weight',
+  incDeg: Math.atan2(off / 2, h1) * 180 / Math.PI
  };
+}
+
+function _foldImagePointWithVel(sx, sy, zs, rx, ry, zr, Z, layers) {
+ if (typeof raySpecularImagePoint === 'function' && layers && layers.length) {
+  return raySpecularImagePoint(sx, sy, zs, rx, ry, zr, Z, layers);
+ }
+ return _foldImagePointXY(sx, sy, zs, rx, ry, zr, Z);
 }
 
 function _foldLatLonToXY(lat, lon, anchor) {
@@ -24489,6 +24501,7 @@ function _foldSampleShotsOnLine(start, end, spIntervalM) {
 /**
  * Build synthetic CMP / fold-at-depth hits from the Design survey
  * (preplot lines + streamer geometry, or OBN nodes).
+ * Asks for a velocity field, then uses Snell specular image points at depth Z.
  */
 async function foldBuildSyntheticAtDepth() {
  if (typeof haversine !== 'function' || typeof destinationPoint !== 'function') {
@@ -24505,6 +24518,7 @@ async function foldBuildSyntheticAtDepth() {
 
  const Z = Math.max(10, parseFloat(document.getElementById('fold-synth-depth')?.value) || 1000);
  const zs = Math.max(0, parseFloat(document.getElementById('fold-synth-src-z')?.value) || 8);
+ const nodeZ = Math.max(0, parseFloat(document.getElementById('fold-synth-node-z')?.value) || Z);
  const modeSel = (document.getElementById('fold-synth-mode') || {}).value || 'auto';
  const spInt = parseFloat(document.getElementById('ppg-sp-interval')?.value)
   || state.settings.spInterval || 25;
@@ -24512,6 +24526,25 @@ async function foldBuildSyntheticAtDepth() {
   || parseFloat(document.getElementById('fold-cable')?.value) || 8000);
  const maxInc = parseFloat(document.getElementById('fold-synth-max-inc')?.value);
  const hasInc = isFinite(maxInc) && maxInc > 0 && maxInc < 90;
+
+ // Ask for velocity field (shared with ray tracing)
+ if (typeof velFieldAsk !== 'function') {
+  showToast('Velocity field UI not loaded — refresh the page', 5000);
+  return;
+ }
+ const velOk = await velFieldAsk({
+  title: 'Velocity field for fold at depth',
+  coverZ: Math.max(Z, nodeZ, zs) + 50,
+  reason: 'Snell specular image points at depth Z use this 1D V(z) field (same model as ray tracing).'
+ });
+ if (!velOk) {
+  showToast('Fold build cancelled — no velocity field', 3500);
+  return;
+ }
+ const layers = (typeof velFieldGetLayers === 'function')
+  ? velFieldGetLayers(Math.max(Z, nodeZ) + 50)
+  : [];
+ if (typeof velFieldSyncStatusUi === 'function') velFieldSyncStatusUi();
 
  const dim = (document.getElementById('ppg-dimension') || {}).value || '';
  const obnNodes = (state.obnNodes && state.obnNodes.length) ? state.obnNodes : [];
@@ -24533,7 +24566,7 @@ async function foldBuildSyntheticAtDepth() {
  const chSp = Math.max(1, state.settings.channelSpacing || 12.5);
  const nChan = Math.max(1, Math.min(800, Math.floor(strLen / chSp)));
  const nearOff = Math.max(0, parseFloat(document.getElementById('fold-synth-near')?.value) || 150);
- const zrRcv = mode === 'obn' ? Z : 0; // OBN nodes on seabed ≈ target depth for water-column fold
+ const zrRcv = mode === 'obn' ? nodeZ : 0;
 
  // Confirm if fold already exists
  if (_fold && (_fold.fileData || []).length) {
@@ -24545,7 +24578,8 @@ async function foldBuildSyntheticAtDepth() {
  if (cableEl && mode === 'streamer') cableEl.value = String(Math.round(strLen + nearOff));
  if (cableEl && mode === 'obn') cableEl.value = String(Math.round(maxOff));
 
- showToast('Building synthetic fold @ ' + Z + ' m (' + mode + ')…', 2500);
+ const velLabel = (typeof _rayState !== 'undefined' && _rayState.velMode) ? _rayState.velMode : 'V(z)';
+ showToast('Building synthetic fold @ ' + Z + ' m (' + mode + ', ' + velLabel + ')…', 2500);
 
  const anchor = { lat: lines[0].start[0], lon: lines[0].start[1] };
  let nShots = 0, nRecs = 0, nSkipOff = 0, nSkipInc = 0;
@@ -24575,11 +24609,12 @@ async function foldBuildSyntheticAtDepth() {
    if (mode === 'obn') {
     for (const nd of obnNodes) {
      const rxy = _foldLatLonToXY(nd.lat, nd.lon, anchor);
-     const ip = _foldImagePointXY(sxy.x, sxy.y, zs, rxy.x, rxy.y, zrRcv, Z);
+     const ip = _foldImagePointWithVel(sxy.x, sxy.y, zs, rxy.x, rxy.y, zrRcv, Z, layers);
      if (ip.offset > maxOff) { nSkipOff++; continue; }
      if (hasInc) {
-      const h = Math.max(1e-3, Z - zs);
-      const inc = Math.atan2(ip.offset / 2, h) * 180 / Math.PI;
+      const inc = (ip.incDeg != null && isFinite(ip.incDeg))
+       ? ip.incDeg
+       : Math.atan2(ip.offset / 2, Math.max(1e-3, Z - zs)) * 180 / Math.PI;
       if (inc > maxInc) { nSkipInc++; continue; }
      }
      mids.push([ip.x, ip.y, ip.offset]);
@@ -24593,17 +24628,17 @@ async function foldBuildSyntheticAtDepth() {
     const x0 = -((nStr - 1) * strSep) / 2;
     for (let si = 0; si < nStr; si++) {
      const cross = x0 + si * strSep;
-     // Streamer reference at shot, then channels aft
      const strRef = destinationPoint([sh.lat, sh.lon], port, cross);
      for (let c = 0; c < nChan; c++) {
       const along = nearOff + c * chSp;
       const rp = destinationPoint(strRef, aft, along);
       const rxy = _foldLatLonToXY(rp[0], rp[1], anchor);
-      const ip = _foldImagePointXY(sxy.x, sxy.y, zs, rxy.x, rxy.y, 0, Z);
+      const ip = _foldImagePointWithVel(sxy.x, sxy.y, zs, rxy.x, rxy.y, 0, Z, layers);
       if (ip.offset > maxOff) { nSkipOff++; continue; }
       if (hasInc) {
-       const h = Math.max(1e-3, Z - zs);
-       const inc = Math.atan2(ip.offset / 2, h) * 180 / Math.PI;
+       const inc = (ip.incDeg != null && isFinite(ip.incDeg))
+        ? ip.incDeg
+        : Math.atan2(ip.offset / 2, Math.max(1e-3, Z - zs)) * 180 / Math.PI;
        if (inc > maxInc) { nSkipInc++; continue; }
       }
       mids.push([ip.x, ip.y, ip.offset]);
@@ -24612,7 +24647,6 @@ async function foldBuildSyntheticAtDepth() {
     }
    }
   }
-  // Yield between lines so UI stays alive
   if (li % CHUNK_LINES === 0) await new Promise(r => setTimeout(r, 0));
  }
 
@@ -24638,7 +24672,9 @@ async function foldBuildSyntheticAtDepth() {
   frame: 'geo',
   synthetic: true,
   targetDepthM: Z,
-  synthMode: mode
+  synthMode: mode,
+  velMode: (typeof _rayState !== 'undefined' && _rayState.velMode) || null,
+  velLayers: layers.length
  };
  _fold = {
   grid,
@@ -24695,7 +24731,7 @@ async function foldBuildSyntheticAtDepth() {
  let maxF = 0, nBins = band.size;
  band.forEach(v => { if (v > maxF) maxF = v; });
  showToast(
-  'Synthetic fold @ ' + Z + ' m · ' + mode
+  'Synthetic fold @ ' + Z + ' m · ' + mode + ' · ' + velLabel
    + ' · ' + nShots.toLocaleString() + ' shots · '
    + nRecs.toLocaleString() + ' traces · max fold ' + maxF
    + (nSkipOff || nSkipInc ? (' · skipped off/inc ' + nSkipOff + '/' + nSkipInc) : ''),
