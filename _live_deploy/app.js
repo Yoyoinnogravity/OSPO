@@ -15693,6 +15693,7 @@ const TDB_ACTIVITIES = [
  { id: 'HSE_TRAINING', categoryId: 'HSE', label: 'HSE training', color: '#9f1239' },
  { id: 'HSE_OTHER', categoryId: 'HSE', label: 'HSE — other time', color: '#881337' },
  { id: 'OTHER', categoryId: 'OTHER', label: 'Other / misc', color: '#94a3b8' },
+ { id: 'MEETING', categoryId: 'OTHER', label: 'Meetings', color: '#7dd3fc' },
  { id: 'MEAL', categoryId: 'OTHER', label: 'Meal / crew change', color: '#64748b' }
 ];
 
