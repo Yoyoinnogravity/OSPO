@@ -99,213 +99,8 @@
  <a href="https://candooka.world/">candooka.world</a>.</p>
  </main>
  </noscript>
- <!-- Workspace chooser (Planning vs Timing Database) — after sign-in -->
- <div id="workspace-chooser" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(6,6,12,0.96); z-index:9997; align-items:center; justify-content:center;">
- <div style="background:#0e0e16; border:1px solid #1a1a24; border-radius:10px; padding:28px 32px; width:100%; max-width:640px; box-shadow:0 16px 64px rgba(0,0,0,0.7); text-align:center; margin:16px;">
- <div style="font-size:15px; font-weight:700; color:#e0e8f0; margin-bottom:6px; letter-spacing:0.4px;">Choose workspace</div>
- <div style="font-size:11px; color:#8a9bb0; margin-bottom:22px; line-height:1.45;">Switch between Design (planning) and Database (timing). You can also pick this on the sign-in page.</div>
- <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:8px;">
- <button type="button" onclick="enterWorkspace('planning')" style="text-align:left; padding:18px 16px; border-radius:8px; border:1px solid #1e3a52; background:#0a1220; color:#e0e8f0; cursor:pointer; font-family:inherit;">
-  <div style="font-size:13px; font-weight:800; color:#00d2ff; letter-spacing:0.5px; margin-bottom:8px;">DESIGN</div>
-  <div style="font-size:11px; color:#a0aebb; line-height:1.45;">Preplot, route optimisation, fold coverage, NOAA, AIS, cost &amp; look-ahead time estimates.</div>
- </button>
- <button type="button" onclick="enterWorkspace('database')" style="text-align:left; padding:18px 16px; border-radius:8px; border:1px solid #3f2e1a; background:#14100a; color:#e0e8f0; cursor:pointer; font-family:inherit;">
-  <div style="font-size:13px; font-weight:800; color:#fbbf24; letter-spacing:0.5px; margin-bottom:8px;">DATABASE</div>
-  <div style="font-size:11px; color:#a0aebb; line-height:1.45;">Full-day ops timing, daily report, HSE metrics &amp; man-hours.</div>
- </button>
- </div>
- </div>
- </div>
+ <!-- Base Layer Chooser (after sign-in) -->
 
- <!-- Timing Database workspace (shown when mode = database) -->
- <div id="workspace-database" style="display:none; position:fixed; inset:0; z-index:9000; background:#08080e; color:#e2e8f0; font-family:inherit; overflow:auto;">
- <header style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 20px; border-bottom:1px solid #1a1a24; background:#0e0e16; position:sticky; top:0; z-index:2;">
-  <div style="display:flex; align-items:center; gap:12px; min-width:0;">
-   <div style="font-size:14px; font-weight:800; letter-spacing:0.6px; color:#fbbf24;">OSPO TIMING DATABASE</div>
-   <div id="tdb-project-label" style="font-size:11px; color:#8a9bb0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">No project selected</div>
-  </div>
-  <div style="display:flex; gap:8px; flex-shrink:0;">
-   <button type="button" onclick="showWorkspaceChooser()" style="padding:7px 12px; border-radius:4px; border:1px solid #334155; background:#111827; color:#cbd5e1; font-size:11px; font-weight:700; cursor:pointer; font-family:inherit;">Switch workspace</button>
-   <button type="button" onclick="enterWorkspace('planning')" style="padding:7px 12px; border-radius:4px; border:1px solid #0e7490; background:#164e63; color:#a5f3fc; font-size:11px; font-weight:700; cursor:pointer; font-family:inherit;">Open Design</button>
-  </div>
- </header>
- <div style="max-width:1100px; margin:0 auto; padding:20px 16px 40px;">
-  <div style="font-size:12px; color:#94a3b8; line-height:1.5; margin-bottom:18px;">
-   Every operational day must account for <b style="color:#e2e8f0;">all 1,440 minutes</b> (00:00–24:00). Gaps and overlaps are flagged until the day is complete.
-  </div>
-
-  <div style="display:grid; grid-template-columns:1fr 1.4fr; gap:14px; margin-bottom:16px;">
-   <section style="background:#0e0e16; border:1px solid #1a1a24; border-radius:8px; padding:14px 16px;">
-    <div style="font-size:10px; color:#fbbf24; font-weight:700; letter-spacing:0.45px; text-transform:uppercase; margin-bottom:10px;">Projects</div>
-    <div style="display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap;">
-     <input id="tdb-new-project" type="text" placeholder="New project name" style="flex:1; min-width:140px; padding:8px 10px; border-radius:4px; border:1px solid #333; background:#111; color:#fff; font-size:12px; outline:none; font-family:inherit;"/>
-     <button type="button" onclick="tdbCreateProject()" style="padding:8px 12px; border-radius:4px; border:none; background:#f59e0b; color:#111; font-weight:800; font-size:11px; cursor:pointer; font-family:inherit;">Create</button>
-    </div>
-    <div id="tdb-project-list" style="max-height:260px; overflow:auto; font-size:12px;"></div>
-   </section>
-
-   <section style="background:#0e0e16; border:1px solid #1a1a24; border-radius:8px; padding:14px 16px;">
-    <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:10px; flex-wrap:wrap;">
-     <div style="font-size:10px; color:#fbbf24; font-weight:700; letter-spacing:0.45px; text-transform:uppercase;">Day accounting</div>
-     <label style="font-size:10px; color:#8a9bb0; display:flex; align-items:center; gap:6px;">Date
-      <input id="tdb-day" type="date" onchange="tdbOnDayChanged()" style="padding:5px 8px; border-radius:4px; border:1px solid #333; background:#111; color:#fff; font-size:11px; font-family:inherit;"/>
-     </label>
-    </div>
-    <div id="tdb-day-status" style="font-size:12px; margin-bottom:10px; padding:8px 10px; border-radius:5px; border:1px solid #1a1a24; background:#0a0a12; line-height:1.45;">Select a project and day.</div>
-    <div style="font-size:9px; color:#64748b; margin-bottom:4px; letter-spacing:0.3px;">00:00 — 24-hour timeline — 24:00</div>
-    <div id="tdb-day-timeline" style="height:28px; border-radius:4px; border:1px solid #1a1a24; background:#050508; overflow:hidden; display:flex; margin-bottom:12px;"></div>
-
-    <div style="font-size:10px; color:#fbbf24; font-weight:700; letter-spacing:0.45px; text-transform:uppercase; margin-bottom:8px;">Add time block</div>
-    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">
-     <label style="font-size:10px; color:#8a9bb0;">Category
-      <select id="tdb-category" onchange="tdbOnCategoryChanged()" style="display:block; width:100%; margin-top:4px; padding:7px 8px; border-radius:4px; border:1px solid #f59e0b; background:#111; color:#fbbf24; font-size:11px; font-weight:700; font-family:inherit;"></select>
-     </label>
-     <label style="font-size:10px; color:#8a9bb0;">Activity
-      <select id="tdb-activity" style="display:block; width:100%; margin-top:4px; padding:7px 8px; border-radius:4px; border:1px solid #333; background:#111; color:#fff; font-size:11px; font-family:inherit;"></select>
-     </label>
-    </div>
-    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">
-     <label style="font-size:10px; color:#8a9bb0;">Start
-      <input id="tdb-act-start" type="time" value="00:00" style="display:block; width:100%; margin-top:4px; padding:7px 8px; border-radius:4px; border:1px solid #333; background:#111; color:#fff; font-size:11px; font-family:inherit;"/>
-     </label>
-     <label style="font-size:10px; color:#8a9bb0;">End
-      <input id="tdb-act-end" type="time" value="01:00" style="display:block; width:100%; margin-top:4px; padding:7px 8px; border-radius:4px; border:1px solid #333; background:#111; color:#fff; font-size:11px; font-family:inherit;"/>
-     </label>
-    </div>
-    <label style="font-size:10px; color:#8a9bb0; display:block; margin-bottom:8px;">Note
-     <input id="tdb-act-note" type="text" placeholder="Sequence / line / comment" style="display:block; width:100%; margin-top:4px; padding:7px 8px; border-radius:4px; border:1px solid #333; background:#111; color:#fff; font-size:11px; font-family:inherit;"/>
-    </label>
-    <div style="display:flex; gap:8px; flex-wrap:wrap;">
-     <button type="button" onclick="tdbAddActivity()" style="flex:1; min-width:120px; padding:8px; border-radius:4px; border:1px solid #f59e0b; background:#1a1205; color:#fbbf24; font-weight:700; font-size:11px; cursor:pointer; font-family:inherit;">Add block</button>
-     <button type="button" onclick="tdbFillGaps()" style="flex:1; min-width:120px; padding:8px; border-radius:4px; border:1px solid #334155; background:#111827; color:#cbd5e1; font-weight:700; font-size:11px; cursor:pointer; font-family:inherit;" title="Fill every unaccounted gap with the selected category / activity">Fill all gaps with activity</button>
-     <button type="button" onclick="tdbClearDay()" style="padding:8px 10px; border-radius:4px; border:1px solid #7f1d1d; background:#1a0a0a; color:#f87171; font-weight:700; font-size:11px; cursor:pointer; font-family:inherit;">Clear day</button>
-    </div>
-    <div style="font-size:9px; color:#556; margin-top:8px; line-height:1.4;">CheckPoint-style <b style="color:#94a3b8;">Category → Activity</b> (Mobilisation / Operational / Chargeable Standby / Non Chargeable Standby / Technical Downtime). End 00:00 = 24:00. Day complete at 1,440 min with no overlaps.</div>
-   </section>
-  </div>
-
-  <section style="background:#0e0e16; border:1px solid #1a1a24; border-radius:8px; padding:14px 16px; margin-bottom:16px;">
-   <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:10px; flex-wrap:wrap;">
-    <div style="font-size:10px; color:#fbbf24; font-weight:700; letter-spacing:0.45px; text-transform:uppercase;">Day roll-up (category → activity)</div>
-    <button type="button" onclick="tdbExportJson()" style="padding:5px 10px; border-radius:4px; border:1px solid #334155; background:#111827; color:#cbd5e1; font-size:10px; font-weight:700; cursor:pointer; font-family:inherit;">Export project JSON</button>
-   </div>
-   <div id="tdb-rollup" style="font-size:12px; color:#94a3b8; line-height:1.5;">Select or create a project to see minutes by time code.</div>
-   <div id="tdb-activity-list" style="margin-top:12px; max-height:320px; overflow:auto;"></div>
-  </section>
-
-  <section style="background:#0e0e16; border:1px solid #1e3a52; border-radius:8px; padding:14px 16px; margin-bottom:16px;">
-   <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:8px; flex-wrap:wrap;">
-    <div style="font-size:10px; color:#38bdf8; font-weight:700; letter-spacing:0.45px; text-transform:uppercase;">Daily report</div>
-    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-     <div id="tdb-report-day-label" style="font-size:10px; color:#94a3b8;"></div>
-     <button type="button" onclick="tdbExportDailyReport()" style="padding:5px 10px; border-radius:4px; border:1px solid #0e7490; background:#0c1924; color:#7dd3fc; font-size:10px; font-weight:700; cursor:pointer; font-family:inherit;">Export daily report</button>
-    </div>
-   </div>
-   <div style="font-size:11px; color:#94a3b8; line-height:1.45; margin-bottom:12px;">
-    CheckPoint-style operational dynamics for this day — narrative sections auto-save with the project.
-   </div>
-   <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-bottom:10px;">
-    <label style="font-size:9px; color:#8a9bb0;">Vessel / location
-     <input id="tdb-report-vessel" type="text" placeholder="Vessel / site" onchange="tdbSaveReportFromForm()" style="display:block;width:100%;margin-top:4px;padding:7px 8px;border-radius:4px;border:1px solid #333;background:#111;color:#fff;font-size:11px;font-family:inherit;"/>
-    </label>
-    <label style="font-size:9px; color:#8a9bb0;">Prepared by
-     <input id="tdb-report-author" type="text" placeholder="Name / role" onchange="tdbSaveReportFromForm()" style="display:block;width:100%;margin-top:4px;padding:7px 8px;border-radius:4px;border:1px solid #333;background:#111;color:#fff;font-size:11px;font-family:inherit;"/>
-    </label>
-    <label style="font-size:9px; color:#8a9bb0;">Shift / watch
-     <input id="tdb-report-shift" type="text" placeholder="e.g. Day / Night" onchange="tdbSaveReportFromForm()" style="display:block;width:100%;margin-top:4px;padding:7px 8px;border-radius:4px;border:1px solid #333;background:#111;color:#fff;font-size:11px;font-family:inherit;"/>
-    </label>
-   </div>
-   <label style="font-size:9px; color:#8a9bb0; display:block; margin-bottom:8px;">Daily synopsis
-    <textarea id="tdb-report-summary" rows="3" placeholder="Overall summary of the day…" onchange="tdbSaveReportFromForm()" style="display:block;width:100%;margin-top:4px;padding:8px 9px;border-radius:4px;border:1px solid #333;background:#111;color:#fff;font-size:11px;font-family:inherit;resize:vertical;line-height:1.45;"></textarea>
-   </label>
-   <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">
-    <label style="font-size:9px; color:#8a9bb0;">Operations / production
-     <textarea id="tdb-report-operations" rows="3" placeholder="Prime / infill / line changes, sequences…" onchange="tdbSaveReportFromForm()" style="display:block;width:100%;margin-top:4px;padding:8px 9px;border-radius:4px;border:1px solid #333;background:#111;color:#fff;font-size:11px;font-family:inherit;resize:vertical;line-height:1.45;"></textarea>
-    </label>
-    <label style="font-size:9px; color:#8a9bb0;">Weather / sea state
-     <textarea id="tdb-report-weather" rows="3" placeholder="Wind, swell, visibility, WOW…" onchange="tdbSaveReportFromForm()" style="display:block;width:100%;margin-top:4px;padding:8px 9px;border-radius:4px;border:1px solid #333;background:#111;color:#fff;font-size:11px;font-family:inherit;resize:vertical;line-height:1.45;"></textarea>
-    </label>
-    <label style="font-size:9px; color:#8a9bb0;">Technical / downtime
-     <textarea id="tdb-report-technical" rows="3" placeholder="Equipment, source, streamer, OBN…" onchange="tdbSaveReportFromForm()" style="display:block;width:100%;margin-top:4px;padding:8px 9px;border-radius:4px;border:1px solid #333;background:#111;color:#fff;font-size:11px;font-family:inherit;resize:vertical;line-height:1.45;"></textarea>
-    </label>
-    <label style="font-size:9px; color:#8a9bb0;">Standby
-     <textarea id="tdb-report-standby" rows="3" placeholder="Chargeable / non-chargeable standby notes…" onchange="tdbSaveReportFromForm()" style="display:block;width:100%;margin-top:4px;padding:8px 9px;border-radius:4px;border:1px solid #333;background:#111;color:#fff;font-size:11px;font-family:inherit;resize:vertical;line-height:1.45;"></textarea>
-    </label>
-    <label style="font-size:9px; color:#8a9bb0;">HSE / QHSE
-     <textarea id="tdb-report-hse" rows="3" placeholder="Toolbox, incidents, observations, stop work…" onchange="tdbSaveReportFromForm()" style="display:block;width:100%;margin-top:4px;padding:8px 9px;border-radius:4px;border:1px solid #333;background:#111;color:#fff;font-size:11px;font-family:inherit;resize:vertical;line-height:1.45;"></textarea>
-    </label>
-    <label style="font-size:9px; color:#8a9bb0;">MMO / environmental
-     <textarea id="tdb-report-mmo" rows="3" placeholder="Sightings, PAM, mitigation, fisheries…" onchange="tdbSaveReportFromForm()" style="display:block;width:100%;margin-top:4px;padding:8px 9px;border-radius:4px;border:1px solid #333;background:#111;color:#fff;font-size:11px;font-family:inherit;resize:vertical;line-height:1.45;"></textarea>
-    </label>
-    <label style="font-size:9px; color:#8a9bb0;">Client / commercial
-     <textarea id="tdb-report-client" rows="3" placeholder="Client instructions, meetings, commercial notes…" onchange="tdbSaveReportFromForm()" style="display:block;width:100%;margin-top:4px;padding:8px 9px;border-radius:4px;border:1px solid #333;background:#111;color:#fff;font-size:11px;font-family:inherit;resize:vertical;line-height:1.45;"></textarea>
-    </label>
-    <label style="font-size:9px; color:#8a9bb0;">Plan for tomorrow
-     <textarea id="tdb-report-tomorrow" rows="3" placeholder="Look-ahead / priorities…" onchange="tdbSaveReportFromForm()" style="display:block;width:100%;margin-top:4px;padding:8px 9px;border-radius:4px;border:1px solid #333;background:#111;color:#fff;font-size:11px;font-family:inherit;resize:vertical;line-height:1.45;"></textarea>
-    </label>
-   </div>
-   <label style="font-size:9px; color:#8a9bb0; display:block; margin-bottom:10px;">General comments
-    <textarea id="tdb-report-general" rows="3" placeholder="Anything else for the daily report…" onchange="tdbSaveReportFromForm()" style="display:block;width:100%;margin-top:4px;padding:8px 9px;border-radius:4px;border:1px solid #333;background:#111;color:#fff;font-size:11px;font-family:inherit;resize:vertical;line-height:1.45;"></textarea>
-   </label>
-   <div id="tdb-report-status" style="font-size:11px; color:#64748b; line-height:1.45;"></div>
-  </section>
-
-  <section style="background:#0e0e16; border:1px solid #3f1d2e; border-radius:8px; padding:14px 16px; margin-bottom:16px;">
-   <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:8px; flex-wrap:wrap;">
-    <div style="font-size:10px; color:#fb7185; font-weight:700; letter-spacing:0.45px; text-transform:uppercase;">HSE metrics (this day)</div>
-    <div id="tdb-hse-day-label" style="font-size:10px; color:#94a3b8;"></div>
-   </div>
-   <div style="font-size:11px; color:#94a3b8; line-height:1.45; margin-bottom:12px;">
-    Daily HSE counters for the selected project day. <b style="color:#e2e8f0;">Man-hours</b> default to <b style="color:#e2e8f0;">POB × 24</b> (leave blank for auto). Category man-hours below = time-block hours × POB.
-   </div>
-   <div style="display:grid; grid-template-columns:repeat(5, minmax(0, 1fr)); gap:8px; margin-bottom:10px;">
-    <label style="font-size:9px; color:#8a9bb0;">POB
-     <input id="tdb-hse-pob" type="number" min="0" step="1" value="0" onchange="tdbSaveHseFromForm()" style="display:block;width:100%;margin-top:4px;padding:6px 7px;border-radius:4px;border:1px solid #333;background:#111;color:#fff;font-size:11px;font-family:inherit;"/>
-    </label>
-    <label style="font-size:9px; color:#8a9bb0;">Man-hours
-     <input id="tdb-hse-manhours" type="number" min="0" step="0.5" placeholder="auto POB×24" onchange="tdbSaveHseFromForm()" style="display:block;width:100%;margin-top:4px;padding:6px 7px;border-radius:4px;border:1px solid #333;background:#111;color:#fff;font-size:11px;font-family:inherit;"/>
-    </label>
-    <label style="font-size:9px; color:#8a9bb0;">LTI
-     <input id="tdb-hse-lti" type="number" min="0" step="1" value="0" onchange="tdbSaveHseFromForm()" style="display:block;width:100%;margin-top:4px;padding:6px 7px;border-radius:4px;border:1px solid #333;background:#111;color:#fff;font-size:11px;font-family:inherit;"/>
-    </label>
-    <label style="font-size:9px; color:#8a9bb0;">Recordable
-     <input id="tdb-hse-recordable" type="number" min="0" step="1" value="0" onchange="tdbSaveHseFromForm()" style="display:block;width:100%;margin-top:4px;padding:6px 7px;border-radius:4px;border:1px solid #333;background:#111;color:#fff;font-size:11px;font-family:inherit;"/>
-    </label>
-    <label style="font-size:9px; color:#8a9bb0;">First aid
-     <input id="tdb-hse-firstaid" type="number" min="0" step="1" value="0" onchange="tdbSaveHseFromForm()" style="display:block;width:100%;margin-top:4px;padding:6px 7px;border-radius:4px;border:1px solid #333;background:#111;color:#fff;font-size:11px;font-family:inherit;"/>
-    </label>
-    <label style="font-size:9px; color:#8a9bb0;">Near miss
-     <input id="tdb-hse-nearmiss" type="number" min="0" step="1" value="0" onchange="tdbSaveHseFromForm()" style="display:block;width:100%;margin-top:4px;padding:6px 7px;border-radius:4px;border:1px solid #333;background:#111;color:#fff;font-size:11px;font-family:inherit;"/>
-    </label>
-    <label style="font-size:9px; color:#8a9bb0;">Observations
-     <input id="tdb-hse-obs" type="number" min="0" step="1" value="0" onchange="tdbSaveHseFromForm()" style="display:block;width:100%;margin-top:4px;padding:6px 7px;border-radius:4px;border:1px solid #333;background:#111;color:#fff;font-size:11px;font-family:inherit;"/>
-    </label>
-    <label style="font-size:9px; color:#8a9bb0;">Stop work
-     <input id="tdb-hse-stopwork" type="number" min="0" step="1" value="0" onchange="tdbSaveHseFromForm()" style="display:block;width:100%;margin-top:4px;padding:6px 7px;border-radius:4px;border:1px solid #333;background:#111;color:#fff;font-size:11px;font-family:inherit;"/>
-    </label>
-    <label style="font-size:9px; color:#8a9bb0;">Env. incidents
-     <input id="tdb-hse-env" type="number" min="0" step="1" value="0" onchange="tdbSaveHseFromForm()" style="display:block;width:100%;margin-top:4px;padding:6px 7px;border-radius:4px;border:1px solid #333;background:#111;color:#fff;font-size:11px;font-family:inherit;"/>
-    </label>
-    <label style="font-size:9px; color:#8a9bb0;">MMO sightings
-     <input id="tdb-hse-mmo" type="number" min="0" step="1" value="0" onchange="tdbSaveHseFromForm()" style="display:block;width:100%;margin-top:4px;padding:6px 7px;border-radius:4px;border:1px solid #333;background:#111;color:#fff;font-size:11px;font-family:inherit;"/>
-    </label>
-   </div>
-   <label style="font-size:10px; color:#8a9bb0; display:block; margin-bottom:10px;">HSE note
-    <input id="tdb-hse-note" type="text" placeholder="Incidents, actions, remarks" onchange="tdbSaveHseFromForm()" style="display:block;width:100%;margin-top:4px;padding:7px 8px;border-radius:4px;border:1px solid #333;background:#111;color:#fff;font-size:11px;font-family:inherit;"/>
-   </label>
-   <div id="tdb-hse-summary" style="font-size:12px; color:#94a3b8; line-height:1.5; padding:8px 10px; border-radius:5px; border:1px solid #3f1d2e; background:#140a10;"></div>
-   <div id="tdb-hse-manhours-by-cat" style="margin-top:10px; font-size:11px; color:#94a3b8; line-height:1.45;"></div>
-   <div id="tdb-hse-project-summary" style="font-size:11px; color:#64748b; margin-top:10px; line-height:1.45;"></div>
-  </section>
-
-  <section style="background:#0e0e16; border:1px solid #1a1a24; border-radius:8px; padding:14px 16px;">
-   <div style="font-size:10px; color:#64748b; font-weight:700; letter-spacing:0.45px; text-transform:uppercase; margin-bottom:8px;">Next build</div>
-   <div style="font-size:11px; color:#64748b; line-height:1.5;">Server-side project DB, sequence ingest, multi-day / weekly report packs, and plan-vs-actual vs Planning route TIME.</div>
-  </section>
- </div>
- </div>
-
- <!-- Base Layer Chooser (shown after Planning workspace is chosen) -->
  <div id="baselayer-chooser" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(6,6,12,0.92); z-index:9998; align-items:center; justify-content:center;">
  <div style="background:#0e0e16; border:1px solid #1a1a24; border-radius:8px; padding:28px 32px; width:100%; max-width:400px; box-shadow:0 16px 64px rgba(0,0,0,0.7); text-align:center;">
  <div style="font-size:14px; font-weight:700; color:#e0e8f0; margin-bottom:6px;">Choose Default Base Map</div>
@@ -335,20 +130,6 @@
  </div>
  <h1 style="font-size:16px; font-weight:700; color:#e0e8f0; letter-spacing:1.4px; margin:0 0 4px 0;">CANDOOKA OSPO</h1>
  <h2 style="font-size:11px; font-weight:400; color:#8a9bb0; letter-spacing:0.3px; margin:0 0 14px 0;">Offshore Survey Planner &amp; Route Optimizer</h2>
- <div style="text-align:left; margin-bottom:16px;">
-  <div style="font-size:9px; color:#5a6a7a; font-weight:700; letter-spacing:0.5px; text-transform:uppercase; margin-bottom:8px;">Open after sign-in</div>
-  <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;" role="radiogroup" aria-label="Workspace">
-   <button type="button" id="signin-ws-design" onclick="selectSignInWorkspace('planning')" style="text-align:left; padding:12px 12px; border-radius:6px; border:2px solid #00d2ff; background:#0a1220; color:#e0e8f0; cursor:pointer; font-family:inherit;">
-    <div style="font-size:11px; font-weight:800; color:#00d2ff; letter-spacing:0.4px; margin-bottom:4px;">DESIGN</div>
-    <div style="font-size:10px; color:#8a9bb0; line-height:1.35;">Survey planning, preplot, routes, fold &amp; look-ahead.</div>
-   </button>
-   <button type="button" id="signin-ws-database" onclick="selectSignInWorkspace('database')" style="text-align:left; padding:12px 12px; border-radius:6px; border:2px solid #1a1a24; background:#14100a; color:#e0e8f0; cursor:pointer; font-family:inherit;">
-    <div style="font-size:11px; font-weight:800; color:#fbbf24; letter-spacing:0.4px; margin-bottom:4px;">DATABASE</div>
-    <div style="font-size:10px; color:#8a9bb0; line-height:1.35;">Timing DB, daily report, HSE &amp; man-hours.</div>
-   </button>
-  </div>
-  <input type="hidden" id="signin-workspace" value="planning"/>
- </div>
  <div style="text-align:left; margin-bottom:20px; padding:10px 14px; background:#0a0a12; border:1px solid #1a1a24; border-radius:4px;">
  <h2 style="font-size:9px; color:#5a6a7a; font-weight:600; letter-spacing:0.5px; text-transform:uppercase; margin:0 0 8px 0;">Offshore Survey Planning Features</h2>
  <ul style="margin:0; padding:0 0 0 14px; font-size:10px; color:#a0aebb; line-height:1.9; list-style:disc;">
@@ -463,7 +244,7 @@
  <div id="app">
  <!-- ===== TIER 1: App Bar (Top Tier) ===== -->
  <header id="tier1" style="display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 0 20px;">
- <span class="logo" onclick="showWorkspaceChooser()" style="margin-right: 12px; flex-shrink: 0; cursor: pointer;" title="Switch workspace (Planning / Timing Database)">OSPO <span style="font-size:9px;color:#5a6a7a;font-weight:400;">v3.5</span></span>
+ <span class="logo" style="margin-right: 12px; flex-shrink: 0;" title="Candooka OSPO — maps & GIS">OSPO <span style="font-size:9px;color:#5a6a7a;font-weight:400;">v3.5</span></span>
  <div class="t1-menu-wrapper" style="display: flex; flex: 1; gap: 6px; align-items: center; margin-right: 8px;">
  <!-- Load P1 -->
  <label class="corp-btn btn-load" for="file-input" style="flex: 1; text-align: center; margin: 0; cursor: pointer;">LOAD P1</label>
@@ -2146,9 +1927,9 @@
  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
  <script src="https://unpkg.com/shpjs@latest/dist/shp.min.js"></script>
  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
- <script src="app.js?v=16.42"></script>
- <script src="ray_tracing_module.js?v=16.42"></script>
- <script src="wmm_declination.js?v=16.42"></script>
- <script src="magnetic_isogones.js?v=16.42"></script>
+ <script src="app.js?v=16.43"></script>
+ <script src="ray_tracing_module.js?v=16.43"></script>
+ <script src="wmm_declination.js?v=16.43"></script>
+ <script src="magnetic_isogones.js?v=16.43"></script>
 </body>
 </html>
