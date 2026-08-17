@@ -15895,15 +15895,185 @@ function _tdbFmtMin(m) {
  return String(h).padStart(2, '0') + ':' + String(mm).padStart(2, '0');
 }
 
+/** CheckPoint-style Operational Dynamics daily report fields. */
+const TDB_REPORT_DEFAULT = {
+ vessel: '',
+ author: '',
+ shift: '',
+ summary: '',
+ operations: '',
+ weather: '',
+ technical: '',
+ standby: '',
+ hse: '',
+ mmo: '',
+ client: '',
+ tomorrow: '',
+ general: '',
+ updatedAt: null
+};
+
+const TDB_REPORT_FIELDS = [
+ { key: 'vessel', el: 'tdb-report-vessel', label: 'Vessel / location' },
+ { key: 'author', el: 'tdb-report-author', label: 'Prepared by' },
+ { key: 'shift', el: 'tdb-report-shift', label: 'Shift / watch' },
+ { key: 'summary', el: 'tdb-report-summary', label: 'Daily synopsis' },
+ { key: 'operations', el: 'tdb-report-operations', label: 'Operations / production' },
+ { key: 'weather', el: 'tdb-report-weather', label: 'Weather / sea state' },
+ { key: 'technical', el: 'tdb-report-technical', label: 'Technical / downtime' },
+ { key: 'standby', el: 'tdb-report-standby', label: 'Standby' },
+ { key: 'hse', el: 'tdb-report-hse', label: 'HSE / QHSE' },
+ { key: 'mmo', el: 'tdb-report-mmo', label: 'MMO / environmental' },
+ { key: 'client', el: 'tdb-report-client', label: 'Client / commercial' },
+ { key: 'tomorrow', el: 'tdb-report-tomorrow', label: 'Plan for tomorrow' },
+ { key: 'general', el: 'tdb-report-general', label: 'General comments' }
+];
+
 function _tdbGetDaySegs(proj, day) {
  if (!proj || !day) return [];
  if (!proj.days) proj.days = {};
- if (!proj.days[day]) proj.days[day] = { segments: [], hse: Object.assign({}, TDB_HSE_DEFAULT) };
+ if (!proj.days[day]) {
+  proj.days[day] = {
+   segments: [],
+   hse: Object.assign({}, TDB_HSE_DEFAULT),
+   report: Object.assign({}, TDB_REPORT_DEFAULT)
+  };
+ }
  if (!Array.isArray(proj.days[day].segments)) proj.days[day].segments = [];
  if (!proj.days[day].hse || typeof proj.days[day].hse !== 'object') {
   proj.days[day].hse = Object.assign({}, TDB_HSE_DEFAULT);
  }
+ if (!proj.days[day].report || typeof proj.days[day].report !== 'object') {
+  proj.days[day].report = Object.assign({}, TDB_REPORT_DEFAULT);
+ }
  return proj.days[day].segments || [];
+}
+
+function _tdbGetDayReport(proj, day) {
+ _tdbGetDaySegs(proj, day);
+ const raw = (proj.days[day] && proj.days[day].report) || {};
+ const out = Object.assign({}, TDB_REPORT_DEFAULT, raw);
+ TDB_REPORT_FIELDS.forEach((f) => {
+  out[f.key] = String(out[f.key] != null ? out[f.key] : '');
+ });
+ return out;
+}
+
+function tdbSaveReportFromForm() {
+ if (!_tdbActiveProjectId) { showToast('Select a project first'); return; }
+ const day = _tdbActiveDay || _tdbTodayIso();
+ const store = _tdbLoadStore();
+ const proj = store.projects.find(p => p.id === _tdbActiveProjectId);
+ if (!proj) { showToast('Project not found'); return; }
+ _tdbGetDaySegs(proj, day);
+ const report = Object.assign({}, TDB_REPORT_DEFAULT);
+ TDB_REPORT_FIELDS.forEach((f) => {
+  const el = document.getElementById(f.el);
+  report[f.key] = el ? String(el.value || '').trim() : '';
+ });
+ report.updatedAt = new Date().toISOString();
+ proj.days[day].report = report;
+ _tdbSaveStore(store);
+ tdbRenderReport(proj);
+}
+
+function tdbLoadReportIntoForm(report) {
+ TDB_REPORT_FIELDS.forEach((f) => {
+  const el = document.getElementById(f.el);
+  if (el) el.value = report[f.key] || '';
+ });
+}
+
+function _tdbReportFilledCount(report) {
+ return TDB_REPORT_FIELDS.filter((f) => String(report[f.key] || '').trim().length > 0).length;
+}
+
+function tdbRenderReport(proj) {
+ const dayLabel = document.getElementById('tdb-report-day-label');
+ const status = document.getElementById('tdb-report-status');
+ if (!proj) {
+  if (dayLabel) dayLabel.textContent = '';
+  if (status) status.textContent = 'Select a project to write the daily report.';
+  tdbLoadReportIntoForm(Object.assign({}, TDB_REPORT_DEFAULT));
+  return;
+ }
+ const day = _tdbActiveDay || _tdbTodayIso();
+ const report = _tdbGetDayReport(proj, day);
+ tdbLoadReportIntoForm(report);
+ if (dayLabel) dayLabel.textContent = day;
+ const filled = _tdbReportFilledCount(report);
+ if (status) {
+  if (!filled) {
+   status.textContent = 'No comments yet for ' + day + ' — fill any section; changes save automatically.';
+  } else {
+   const when = report.updatedAt
+    ? (' · last saved ' + new Date(report.updatedAt).toLocaleString())
+    : '';
+   status.innerHTML = '<strong style="color:#7dd3fc;">' + filled + '</strong> of '
+    + TDB_REPORT_FIELDS.length + ' sections filled for <strong style="color:#e2e8f0;">'
+    + _escHtml(day) + '</strong>' + _escHtml(when);
+  }
+ }
+}
+
+function tdbBuildDailyReportText(proj, day) {
+ const report = _tdbGetDayReport(proj, day);
+ const analysis = _tdbAnalyseDay(_tdbGetDaySegs(proj, day));
+ const hse = _tdbGetDayHse(proj, day);
+ const mh = _tdbEffectiveManHours(hse);
+ const lines = [];
+ lines.push('CANDOOKA OSPO — DAILY REPORT');
+ lines.push('Project: ' + (proj.name || ''));
+ lines.push('Date: ' + day);
+ if (report.vessel) lines.push('Vessel / location: ' + report.vessel);
+ if (report.author) lines.push('Prepared by: ' + report.author);
+ if (report.shift) lines.push('Shift / watch: ' + report.shift);
+ lines.push('');
+ lines.push('— TIME ACCOUNTING —');
+ lines.push('Covered: ' + analysis.covered + ' / 1440 min'
+  + (analysis.complete ? ' (complete)' : (' · gaps ' + analysis.gapMinutes + ' min')));
+ TDB_CATEGORIES.forEach((cat) => {
+  const mins = analysis.byCategory[cat.id] || 0;
+  if (!(mins > 0)) return;
+  lines.push('  ' + cat.label + ': ' + mins + ' min (' + (mins / 60).toFixed(2) + ' h)');
+ });
+ lines.push('');
+ lines.push('— HSE —');
+ lines.push('POB: ' + (hse.pob || 0) + ' · Man-hours: ' + mh
+  + ' · LTI: ' + hse.lti + ' · Recordable: ' + hse.recordable
+  + ' · First aid: ' + hse.firstAid + ' · Near miss: ' + hse.nearMiss);
+ lines.push('Observations: ' + hse.observations + ' · Stop work: ' + hse.stopWork
+  + ' · Env: ' + hse.envIncidents + ' · MMO: ' + hse.mmoSightings);
+ if (hse.note) lines.push('HSE note: ' + hse.note);
+ lines.push('');
+ lines.push('— NARRATIVE —');
+ TDB_REPORT_FIELDS.forEach((f) => {
+  if (f.key === 'vessel' || f.key === 'author' || f.key === 'shift') return;
+  const val = String(report[f.key] || '').trim();
+  lines.push(f.label.toUpperCase());
+  lines.push(val || '(none)');
+  lines.push('');
+ });
+ lines.push('Generated: ' + new Date().toISOString());
+ return lines.join('\n');
+}
+
+function tdbExportDailyReport() {
+ if (!_tdbActiveProjectId) { showToast('Select a project first'); return; }
+ const store = _tdbLoadStore();
+ const proj = store.projects.find(p => p.id === _tdbActiveProjectId);
+ if (!proj) { showToast('Project not found'); return; }
+ const day = _tdbActiveDay || _tdbTodayIso();
+ // Persist any unsaved form edits first
+ tdbSaveReportFromForm();
+ const text = tdbBuildDailyReportText(proj, day);
+ const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+ const a = document.createElement('a');
+ a.href = URL.createObjectURL(blob);
+ a.download = 'daily_report_' + (proj.name || 'project').replace(/[^\w\-]+/g, '_') + '_' + day + '.txt';
+ a.click();
+ URL.revokeObjectURL(a.href);
+ showToast('Daily report exported', 2500);
 }
 
 const TDB_HSE_NUM_KEYS = [
@@ -16445,7 +16615,10 @@ function tdbClearDay() {
  const keepHse = (proj.days[day] && proj.days[day].hse)
   ? Object.assign({}, proj.days[day].hse)
   : Object.assign({}, TDB_HSE_DEFAULT);
- proj.days[day] = { segments: [], hse: keepHse };
+ const keepReport = (proj.days[day] && proj.days[day].report)
+  ? Object.assign({}, proj.days[day].report)
+  : Object.assign({}, TDB_REPORT_DEFAULT);
+ proj.days[day] = { segments: [], hse: keepHse, report: keepReport };
  _tdbSaveStore(store);
  tdbRender();
  showToast('Day cleared: ' + day, 2500);
@@ -16474,9 +16647,11 @@ function tdbRenderDay(proj) {
   if (roll) roll.textContent = 'Select or create a project to see minutes by time code.';
   if (list) list.innerHTML = '';
   tdbRenderHse(null);
+  tdbRenderReport(null);
   return;
  }
  tdbRenderHse(proj);
+ tdbRenderReport(proj);
  const day = _tdbActiveDay || _tdbTodayIso();
  const segs = _tdbGetDaySegs(proj, day);
  const a = _tdbAnalyseDay(segs);
@@ -16621,6 +16796,7 @@ function tdbExportJson() {
   manHoursDay: _tdbEffectiveManHours(dayHse),
   manHoursFromTiming: _tdbManHoursFromTiming(proj, day, dayHse.pob || 0),
   hseProjectTotals: hseTotals,
+  dailyReport: _tdbGetDayReport(proj, day),
   project: proj
  }, null, 2)], { type: 'application/json' });
  const a = document.createElement('a');

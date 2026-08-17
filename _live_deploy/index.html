@@ -193,6 +193,63 @@
    <div id="tdb-activity-list" style="margin-top:12px; max-height:320px; overflow:auto;"></div>
   </section>
 
+  <section style="background:#0e0e16; border:1px solid #1e3a52; border-radius:8px; padding:14px 16px; margin-bottom:16px;">
+   <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:8px; flex-wrap:wrap;">
+    <div style="font-size:10px; color:#38bdf8; font-weight:700; letter-spacing:0.45px; text-transform:uppercase;">Daily report</div>
+    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+     <div id="tdb-report-day-label" style="font-size:10px; color:#94a3b8;"></div>
+     <button type="button" onclick="tdbExportDailyReport()" style="padding:5px 10px; border-radius:4px; border:1px solid #0e7490; background:#0c1924; color:#7dd3fc; font-size:10px; font-weight:700; cursor:pointer; font-family:inherit;">Export daily report</button>
+    </div>
+   </div>
+   <div style="font-size:11px; color:#94a3b8; line-height:1.45; margin-bottom:12px;">
+    CheckPoint-style operational dynamics for this day — narrative sections auto-save with the project.
+   </div>
+   <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-bottom:10px;">
+    <label style="font-size:9px; color:#8a9bb0;">Vessel / location
+     <input id="tdb-report-vessel" type="text" placeholder="Vessel / site" onchange="tdbSaveReportFromForm()" style="display:block;width:100%;margin-top:4px;padding:7px 8px;border-radius:4px;border:1px solid #333;background:#111;color:#fff;font-size:11px;font-family:inherit;"/>
+    </label>
+    <label style="font-size:9px; color:#8a9bb0;">Prepared by
+     <input id="tdb-report-author" type="text" placeholder="Name / role" onchange="tdbSaveReportFromForm()" style="display:block;width:100%;margin-top:4px;padding:7px 8px;border-radius:4px;border:1px solid #333;background:#111;color:#fff;font-size:11px;font-family:inherit;"/>
+    </label>
+    <label style="font-size:9px; color:#8a9bb0;">Shift / watch
+     <input id="tdb-report-shift" type="text" placeholder="e.g. Day / Night" onchange="tdbSaveReportFromForm()" style="display:block;width:100%;margin-top:4px;padding:7px 8px;border-radius:4px;border:1px solid #333;background:#111;color:#fff;font-size:11px;font-family:inherit;"/>
+    </label>
+   </div>
+   <label style="font-size:9px; color:#8a9bb0; display:block; margin-bottom:8px;">Daily synopsis
+    <textarea id="tdb-report-summary" rows="3" placeholder="Overall summary of the day…" onchange="tdbSaveReportFromForm()" style="display:block;width:100%;margin-top:4px;padding:8px 9px;border-radius:4px;border:1px solid #333;background:#111;color:#fff;font-size:11px;font-family:inherit;resize:vertical;line-height:1.45;"></textarea>
+   </label>
+   <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">
+    <label style="font-size:9px; color:#8a9bb0;">Operations / production
+     <textarea id="tdb-report-operations" rows="3" placeholder="Prime / infill / line changes, sequences…" onchange="tdbSaveReportFromForm()" style="display:block;width:100%;margin-top:4px;padding:8px 9px;border-radius:4px;border:1px solid #333;background:#111;color:#fff;font-size:11px;font-family:inherit;resize:vertical;line-height:1.45;"></textarea>
+    </label>
+    <label style="font-size:9px; color:#8a9bb0;">Weather / sea state
+     <textarea id="tdb-report-weather" rows="3" placeholder="Wind, swell, visibility, WOW…" onchange="tdbSaveReportFromForm()" style="display:block;width:100%;margin-top:4px;padding:8px 9px;border-radius:4px;border:1px solid #333;background:#111;color:#fff;font-size:11px;font-family:inherit;resize:vertical;line-height:1.45;"></textarea>
+    </label>
+    <label style="font-size:9px; color:#8a9bb0;">Technical / downtime
+     <textarea id="tdb-report-technical" rows="3" placeholder="Equipment, source, streamer, OBN…" onchange="tdbSaveReportFromForm()" style="display:block;width:100%;margin-top:4px;padding:8px 9px;border-radius:4px;border:1px solid #333;background:#111;color:#fff;font-size:11px;font-family:inherit;resize:vertical;line-height:1.45;"></textarea>
+    </label>
+    <label style="font-size:9px; color:#8a9bb0;">Standby
+     <textarea id="tdb-report-standby" rows="3" placeholder="Chargeable / non-chargeable standby notes…" onchange="tdbSaveReportFromForm()" style="display:block;width:100%;margin-top:4px;padding:8px 9px;border-radius:4px;border:1px solid #333;background:#111;color:#fff;font-size:11px;font-family:inherit;resize:vertical;line-height:1.45;"></textarea>
+    </label>
+    <label style="font-size:9px; color:#8a9bb0;">HSE / QHSE
+     <textarea id="tdb-report-hse" rows="3" placeholder="Toolbox, incidents, observations, stop work…" onchange="tdbSaveReportFromForm()" style="display:block;width:100%;margin-top:4px;padding:8px 9px;border-radius:4px;border:1px solid #333;background:#111;color:#fff;font-size:11px;font-family:inherit;resize:vertical;line-height:1.45;"></textarea>
+    </label>
+    <label style="font-size:9px; color:#8a9bb0;">MMO / environmental
+     <textarea id="tdb-report-mmo" rows="3" placeholder="Sightings, PAM, mitigation, fisheries…" onchange="tdbSaveReportFromForm()" style="display:block;width:100%;margin-top:4px;padding:8px 9px;border-radius:4px;border:1px solid #333;background:#111;color:#fff;font-size:11px;font-family:inherit;resize:vertical;line-height:1.45;"></textarea>
+    </label>
+    <label style="font-size:9px; color:#8a9bb0;">Client / commercial
+     <textarea id="tdb-report-client" rows="3" placeholder="Client instructions, meetings, commercial notes…" onchange="tdbSaveReportFromForm()" style="display:block;width:100%;margin-top:4px;padding:8px 9px;border-radius:4px;border:1px solid #333;background:#111;color:#fff;font-size:11px;font-family:inherit;resize:vertical;line-height:1.45;"></textarea>
+    </label>
+    <label style="font-size:9px; color:#8a9bb0;">Plan for tomorrow
+     <textarea id="tdb-report-tomorrow" rows="3" placeholder="Look-ahead / priorities…" onchange="tdbSaveReportFromForm()" style="display:block;width:100%;margin-top:4px;padding:8px 9px;border-radius:4px;border:1px solid #333;background:#111;color:#fff;font-size:11px;font-family:inherit;resize:vertical;line-height:1.45;"></textarea>
+    </label>
+   </div>
+   <label style="font-size:9px; color:#8a9bb0; display:block; margin-bottom:10px;">General comments
+    <textarea id="tdb-report-general" rows="3" placeholder="Anything else for the daily report…" onchange="tdbSaveReportFromForm()" style="display:block;width:100%;margin-top:4px;padding:8px 9px;border-radius:4px;border:1px solid #333;background:#111;color:#fff;font-size:11px;font-family:inherit;resize:vertical;line-height:1.45;"></textarea>
+   </label>
+   <div id="tdb-report-status" style="font-size:11px; color:#64748b; line-height:1.45;"></div>
+  </section>
+
   <section style="background:#0e0e16; border:1px solid #3f1d2e; border-radius:8px; padding:14px 16px; margin-bottom:16px;">
    <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:8px; flex-wrap:wrap;">
     <div style="font-size:10px; color:#fb7185; font-weight:700; letter-spacing:0.45px; text-transform:uppercase;">HSE metrics (this day)</div>
@@ -243,7 +300,7 @@
 
   <section style="background:#0e0e16; border:1px solid #1a1a24; border-radius:8px; padding:14px 16px;">
    <div style="font-size:10px; color:#64748b; font-weight:700; letter-spacing:0.45px; text-transform:uppercase; margin-bottom:8px;">Next build</div>
-   <div style="font-size:11px; color:#64748b; line-height:1.5;">Server-side project DB, sequence ingest, multi-day reports, and plan-vs-actual vs Planning route TIME.</div>
+   <div style="font-size:11px; color:#64748b; line-height:1.5;">Server-side project DB, sequence ingest, multi-day / weekly report packs, and plan-vs-actual vs Planning route TIME.</div>
   </section>
  </div>
  </div>
@@ -2012,9 +2069,9 @@
  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
  <script src="https://unpkg.com/shpjs@latest/dist/shp.min.js"></script>
  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
- <script src="app.js?v=16.34"></script>
- <script src="ray_tracing_module.js?v=16.34"></script>
- <script src="wmm_declination.js?v=16.34"></script>
- <script src="magnetic_isogones.js?v=16.34"></script>
+ <script src="app.js?v=16.35"></script>
+ <script src="ray_tracing_module.js?v=16.35"></script>
+ <script src="wmm_declination.js?v=16.35"></script>
+ <script src="magnetic_isogones.js?v=16.35"></script>
 </body>
 </html>
