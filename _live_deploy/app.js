@@ -14519,7 +14519,7 @@ function offerSaveThenLogout() {
   </div>
   <div style="font-size:11px;color:#a5f3fc;background:rgba(8,47,73,0.45);border:1px solid #155e75;border-radius:6px;padding:10px 12px;margin-bottom:14px;line-height:1.45;">
    <strong style="color:#67e8f9;">How to save</strong><br/>
-   Same as the top-bar <strong style="color:#e2e8f0;">SAVE PLAN</strong> button: store lines, route and obstructions in your shared directory under a name. Later use <strong style="color:#e2e8f0;">RESTORE PLAN</strong> to open it again.
+   Same as top-bar <strong style="color:#e2e8f0;">SAVE PLAN</strong>: your lines, route, layers and status go into <strong style="color:#e2e8f0;">your private vault</strong> only. No other user can see them. Recover later with <strong style="color:#e2e8f0;">RESTORE PLAN</strong>.
   </div>
   <label style="display:block;font-size:10px;color:#a0aebb;font-weight:700;margin-bottom:6px;letter-spacing:0.3px;">PLAN NAME</label>
   <input id="logout-save-name" type="text" value="${String(defaultName).replace(/"/g, '&quot;')}"
@@ -15268,57 +15268,204 @@ function renderDBStats() {
  (stats.lastUpdated === 'never' ? 'never' : fmtDT24(stats.lastUpdated));
 }
 
-// ===== SAVE & RESTORE PROJECT PLANS (candooka.world Shared Directory) =====
+// ===== SAVE & RESTORE — private per signed-in individual =====
+
+function _planOwnerId() {
+ const u = state.currentUser || 'Guest';
+ return String(u).trim().toLowerCase() || 'guest';
+}
+
+function _planOwnerLabel() {
+ if (typeof currentUser === 'object' && currentUser && currentUser.name) return String(currentUser.name);
+ return state.currentUser || 'Guest';
+}
+
+function _readPrivatePlans() {
+ const saveKey = userKey('saved_plans');
+ let records = [];
+ try { records = JSON.parse(localStorage.getItem(saveKey) || '[]'); } catch (_) { records = []; }
+ if (!Array.isArray(records)) records = [];
+ const owner = _planOwnerId();
+ // Strict isolation: only this account's records (legacy rows without ownerId match savedBy)
+ return records.filter(r => {
+  if (!r) return false;
+  const oid = String(r.ownerId || r.savedBy || '').trim().toLowerCase();
+  return oid === owner;
+ });
+}
+
+function _writePrivatePlans(records) {
+ const saveKey = userKey('saved_plans');
+ const owner = _planOwnerId();
+ // Never persist another owner's rows into this vault
+ const clean = (records || []).filter(r => {
+  if (!r) return false;
+  const oid = String(r.ownerId || r.savedBy || '').trim().toLowerCase();
+  return oid === owner;
+ });
+ localStorage.setItem(saveKey, JSON.stringify(clean));
+}
+
+/** Full personal snapshot for save / backup / recovery. */
+function buildPersonalPlanSnapshot() {
+ return {
+  lines: state.lines || [],
+  _allLines: state._allLines || null,
+  settings: Object.assign({}, state.settings || {}),
+  obstructions: state.obstructions || [],
+  userFeatures: state.userFeatures || [],
+  obnNodes: state.obnNodes || [],
+  lineStatus: state.lineStatus || {},
+  skippedRanges: state.skippedRanges || [],
+  route: state.route || null,
+  rawText: state.rawText || null
+ };
+}
+
+function openSavePlanPanel() {
+ togglePanel('save-plan');
+ const nameEl = document.getElementById('save-file-name');
+ if (nameEl && !nameEl.value.trim()) {
+  const user = _planOwnerLabel().replace(/[^\w.-]+/g, '_').slice(0, 24) || 'plan';
+  nameEl.value = user + '_' + fmtD24(new Date()).replace(/[^\d]+/g, '');
+  setTimeout(() => { try { nameEl.focus(); nameEl.select(); } catch (_) {} }, 40);
+ }
+}
 
 function saveCurrentPlanAs(fileName) {
  if (!fileName) {
- showToast('Please enter a file name.');
- return false;
+  showToast('Please enter a plan name.');
+  return false;
  }
- if (state.lines.length === 0) {
- showToast('No active survey lines to save.');
- return false;
+ if (!state.lines || state.lines.length === 0) {
+  showToast('No active survey lines to save.');
+  return false;
  }
 
- const saveKey = userKey('saved_plans');
- const records = JSON.parse(localStorage.getItem(saveKey) || '[]');
+ const owner = _planOwnerId();
+ const records = _readPrivatePlans();
  const fullName = fileName.toLowerCase().endsWith('.json') ? fileName : fileName + '.json';
- const existingIdx = records.findIndex(r =>r.fileName.toLowerCase() === fullName.toLowerCase());
+ const existingIdx = records.findIndex(r => r.fileName.toLowerCase() === fullName.toLowerCase());
+ const snap = buildPersonalPlanSnapshot();
  const newRecord = {
- id: Date.now(),
- fileName: fullName,
- savedBy: state.currentUser || 'Guest',
- savedAt: new Date().toISOString(),
- linesCount: state.lines.length,
- obsCount: state.obstructions.length,
- state: {
- lines: state.lines,
- settings: state.settings,
- obstructions: state.obstructions,
- route: state.route
- }
+  id: Date.now(),
+  fileName: fullName,
+  ownerId: owner,
+  savedBy: _planOwnerLabel(),
+  savedAt: new Date().toISOString(),
+  linesCount: (snap.lines || []).length,
+  obsCount: (snap.obstructions || []).length,
+  featureCount: (snap.userFeatures || []).length,
+  hasRoute: !!(snap.route && snap.route.length),
+  private: true,
+  state: snap
  };
 
  if (existingIdx >= 0) {
- if (!confirm(`A plan named "${fullName}" already exists. Overwrite?`)) return false;
- records[existingIdx] = newRecord;
+  if (!confirm('A plan named "' + fullName + '" already exists in your private vault. Overwrite?')) return false;
+  records[existingIdx] = newRecord;
  } else {
- records.push(newRecord);
+  records.push(newRecord);
  }
 
- localStorage.setItem(saveKey, JSON.stringify(records));
- showToast(`Saved plan "${fullName}"`);
+ try {
+  _writePrivatePlans(records);
+ } catch (err) {
+  showToast('Could not save — browser storage may be full. Download a backup instead.');
+  console.warn('saveCurrentPlanAs failed:', err);
+  return false;
+ }
+ showToast('Saved private plan "' + fullName + '" — only you can recover it');
  return true;
 }
 
 function savePlanToDirectory() {
- const fileName = document.getElementById('save-file-name').value.trim();
+ const fileName = (document.getElementById('save-file-name')?.value || '').trim();
  if (saveCurrentPlanAs(fileName)) {
- document.getElementById('save-file-name').value = '';
- hidePanel('save-plan');
- const rp = document.getElementById('panel-restore-plan');
- if (rp && rp.style.display === 'block') renderRestoreDirectoryList();
+  const el = document.getElementById('save-file-name');
+  if (el) el.value = '';
+  hidePanel('save-plan');
+  const rp = document.getElementById('panel-restore-plan');
+  if (rp && rp.style.display === 'block') renderRestoreDirectoryList();
  }
+}
+
+function exportPersonalPlanBackup() {
+ if (!state.lines || state.lines.length === 0) {
+  showToast('Nothing to export — load or generate a survey first');
+  return;
+ }
+ const nameEl = document.getElementById('save-file-name');
+ const base = ((nameEl && nameEl.value) || (_planOwnerLabel() + '_backup')).replace(/[^\w.-]+/g, '_');
+ const payload = {
+  type: 'candooka-personal-plan',
+  version: 1,
+  private: true,
+  ownerId: _planOwnerId(),
+  savedBy: _planOwnerLabel(),
+  savedAt: new Date().toISOString(),
+  state: buildPersonalPlanSnapshot()
+ };
+ const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
+ const a = document.createElement('a');
+ a.href = URL.createObjectURL(blob);
+ a.download = (base.toLowerCase().endsWith('.json') ? base : base + '.json');
+ document.body.appendChild(a);
+ a.click();
+ document.body.removeChild(a);
+ URL.revokeObjectURL(a.href);
+ showToast('Downloaded private backup — keep it safe; only you should use it');
+}
+
+function importPersonalPlanBackup(event) {
+ const file = (event.target.files || [])[0];
+ event.target.value = '';
+ if (!file) return;
+ const reader = new FileReader();
+ reader.onload = () => {
+  try {
+   const data = JSON.parse(reader.result);
+   if (!data || !data.state || !Array.isArray(data.state.lines)) {
+    showToast('Not a Candooka personal plan backup');
+    return;
+   }
+   const fileOwner = String(data.ownerId || data.savedBy || '').trim().toLowerCase();
+   const me = _planOwnerId();
+   if (fileOwner && fileOwner !== me && fileOwner !== 'guest') {
+    if (!confirm(
+     'This backup was saved by "' + (data.savedBy || data.ownerId) + '".\n\n' +
+     'Import into YOUR private vault only? It will not be shared with any other user.'
+    )) return;
+   }
+   const name = (file.name || 'imported_plan.json').replace(/[^\w.-]+/g, '_');
+   const records = _readPrivatePlans();
+   const fullName = name.toLowerCase().endsWith('.json') ? name : name + '.json';
+   const snap = data.state;
+   const rec = {
+    id: Date.now(),
+    fileName: fullName,
+    ownerId: me,
+    savedBy: _planOwnerLabel(),
+    savedAt: new Date().toISOString(),
+    linesCount: (snap.lines || []).length,
+    obsCount: (snap.obstructions || []).length,
+    featureCount: (snap.userFeatures || []).length,
+    hasRoute: !!(snap.route && snap.route.length),
+    private: true,
+    importedFrom: data.savedBy || null,
+    state: snap
+   };
+   const idx = records.findIndex(r => r.fileName.toLowerCase() === fullName.toLowerCase());
+   if (idx >= 0) records[idx] = rec; else records.push(rec);
+   _writePrivatePlans(records);
+   renderRestoreDirectoryList();
+   showToast('Imported into your private vault: "' + fullName + '"');
+  } catch (err) {
+   showToast('Could not read backup file');
+   console.warn(err);
+  }
+ };
+ reader.readAsText(file);
 }
 
 function openRestorePlanPanel() {
@@ -15330,128 +15477,139 @@ function renderRestoreDirectoryList() {
  const container = document.getElementById('shared-directory-list');
  if (!container) return;
 
- const saveKey = userKey('saved_plans');
- const records = JSON.parse(localStorage.getItem(saveKey) || '[]');
+ const records = _readPrivatePlans().slice().sort((a, b) => String(b.savedAt || '').localeCompare(String(a.savedAt || '')));
 
  if (records.length === 0) {
- container.innerHTML = `<div style="padding:24px; text-align:center; color:#a0aebb; font-size:11px;">No saved plans for this user yet.<br/>Save a planning status to publish it here.
- </div>`;
- return;
+  container.innerHTML = `<div style="padding:24px; text-align:center; color:#a0aebb; font-size:11px;line-height:1.5;">
+   No private plans for <strong style="color:#e2e8f0;">${_planOwnerLabel()}</strong> yet.<br/>
+   Use <strong style="color:#67e8f9;">SAVE PLAN</strong> or import a personal backup.
+  </div>`;
+  return;
  }
 
  container.innerHTML = records.map(r => {
- const formattedDate = fmtDT24(r.savedAt);
- 
- // Authorization: User can delete if they are the admin, or if they saved it themselves!
- const canDelete = (state.currentUser === 'admin') || (r.savedBy.toLowerCase() === state.currentUser.toLowerCase());
-
- return `
+  const formattedDate = fmtDT24(r.savedAt);
+  const routeBit = r.hasRoute || (r.state && r.state.route) ? 'Route saved' : 'No route yet';
+  const feat = r.featureCount != null ? r.featureCount : ((r.state && r.state.userFeatures) ? r.state.userFeatures.length : 0);
+  return `
  <div style="display:flex; align-items:center; justify-content:space-between; padding:10px 14px; border-bottom:1px solid #1c1c1e; font-size:11px; gap:8px;">
- <div style="flex:1; text-align:left;">
- <div style="color:#ffffff; font-weight:700; font-size:11px; letter-spacing:0.3px;">${r.fileName}</div>
- <div style="color:#a0aebb; font-size:10px; margin-top:3px; display:flex; gap:6px; flex-wrap:nowrap;">
- <span>By: <strong style="color:#eaeaea">${r.savedBy}</strong></span>
- <span>&bull;</span>
- <span>${formattedDate}</span>
+ <div style="flex:1; text-align:left; min-width:0;">
+ <div style="color:#ffffff; font-weight:700; font-size:11px; letter-spacing:0.3px;">${String(r.fileName || '').replace(/</g, '&lt;')}</div>
+ <div style="color:#64748b; font-size:9px; margin-top:3px;">Private · ${_planOwnerLabel()} · ${formattedDate}</div>
+ <div style="color:#a0aebb; font-size:9px; margin-top:2px; letter-spacing:0.2px;">${r.linesCount || 0} lines · ${r.obsCount || 0} exclusions · ${feat} layers · ${routeBit}</div>
  </div>
- <div style="color:#a0aebb; font-size:9px; margin-top:2px; letter-spacing:0.2px;">Status: ${r.linesCount} lines | ${r.obsCount} exclusions ${r.state.route ? '| Route calculated' : '| Raw survey'}
+ <div style="display:flex; gap:6px; align-items:center; flex-shrink:0;">
+ <button type="button" onclick="restorePlanFromData(${r.id})" style="padding:4px 10px; background:#1c1c1e; border:1px solid #00d2ff; color:#00d2ff; border-radius:3px; font-weight:700; cursor:pointer; font-size:10px;">RECOVER</button>
+ <button type="button" onclick="deletePlanFromData(${r.id})" style="background:none; border:none; color:#ff453a; cursor:pointer; font-size:13px; padding:4px 6px;" title="Delete from your vault">&#10005;</button>
  </div>
- </div>
- <div style="display:flex; gap:6px; align-items:center;">
- <button onclick="restorePlanFromData(${r.id})" style="padding:4px 10px; background:#1c1c1e; border:1px solid #00d2ff; color:#00d2ff; border-radius:3px; font-weight:700; cursor:pointer; font-size:10px;">RECOVER</button>
- ${canDelete ? `
- <button onclick="deletePlanFromData(${r.id})" style="background:none; border:none; color:#ff453a; cursor:pointer; font-size:13px; padding:4px 6px;" title="Delete file">&#10005;</button>
- ` : `<span style="width:23px;"></span>`}
- </div>
- </div>
- `;
+ </div>`;
  }).join('');
 }
 
-function restorePlanFromData(id) {
- const saveKey = userKey('saved_plans');
- const records = JSON.parse(localStorage.getItem(saveKey) || '[]');
- const record = records.find(r =>r.id === id);
- if (!record) {
- showToast('Failed to recover file.');
- return;
- }
-
- // Restore state properties
- const savedState = record.state;
+function applyPersonalPlanSnapshot(savedState, opts) {
+ opts = opts || {};
+ if (!savedState) return false;
  state.lines = savedState.lines || [];
+ state._allLines = savedState._allLines || null;
  state.obstructions = savedState.obstructions || [];
- 
+ state.userFeatures = savedState.userFeatures || [];
+ state.obnNodes = savedState.obnNodes || [];
+ state.lineStatus = savedState.lineStatus || {};
+ state.skippedRanges = savedState.skippedRanges || [];
+ state.route = savedState.route || null;
+ if (savedState.rawText != null) state.rawText = savedState.rawText;
+
  if (savedState.settings) {
- state.settings.turnRadius = savedState.settings.turnRadius ?? 3500;
- state.settings.speed = savedState.settings.speed ?? 4.5;
- state.settings.turnSpeed = savedState.settings.turnSpeed ?? 6;
- state.settings.runIn = savedState.settings.runIn ?? 7500;
- state.settings.runOut = savedState.settings.runOut ?? 3050;
- state.settings.startPoint = savedState.settings.startPoint || null;
- 
- // Update inputs values
- const trInput = document.getElementById('input-turn-radius'); if (trInput) trInput.value = state.settings.turnRadius;
- const spInput = document.getElementById('input-speed'); if (spInput) spInput.value = state.settings.speed;
- const riInput = document.getElementById('input-runin'); if (riInput) riInput.value = state.settings.runIn;
- const roInput = document.getElementById('input-runout'); if (roInput) roInput.value = state.settings.runOut;
- 
- // Update labels in bottom bar
- document.getElementById('val-turn-radius').textContent = (state.settings.turnRadius/1000).toFixed(1) + 'km';
- document.getElementById('val-speed').textContent = state.settings.speed + 'kn';
- document.getElementById('val-run-inout').textContent = state.settings.runIn + '/' + state.settings.runOut + 'm';
+  Object.keys(savedState.settings).forEach(k => {
+   state.settings[k] = savedState.settings[k];
+  });
+  const trInput = document.getElementById('input-turn-radius'); if (trInput) trInput.value = state.settings.turnRadius;
+  const spInput = document.getElementById('input-speed'); if (spInput) spInput.value = state.settings.speed;
+  const tsInput = document.getElementById('input-turn-speed'); if (tsInput) tsInput.value = state.settings.turnSpeed;
+  const riInput = document.getElementById('input-runin'); if (riInput) riInput.value = state.settings.runIn;
+  const roInput = document.getElementById('input-runout'); if (roInput) roInput.value = state.settings.runOut;
+  const trLab = document.getElementById('val-turn-radius');
+  if (trLab) trLab.textContent = ((state.settings.turnRadius || 0) / 1000).toFixed(1) + 'km';
+  const spLab = document.getElementById('val-speed');
+  if (spLab) spLab.textContent = (state.settings.speed || 0) + 'kn';
+  const rioLab = document.getElementById('val-run-inout');
+  if (rioLab) rioLab.textContent = (state.settings.runIn || 0) + '/' + (state.settings.runOut || 0) + 'm';
+  if (typeof markSurveyCriteriaSet === 'function' && state.settings.criteriaConfirmed) {
+   markSurveyCriteriaSet(true);
+  }
  }
 
- // Reinitialize layout
+ if (typeof updateUserLayersList === 'function') {
+  try { updateUserLayersList(); } catch (_) {}
+ }
+ return true;
+}
+
+function restorePlanFromData(id) {
+ const records = _readPrivatePlans();
+ const record = records.find(r => r.id === id);
+ if (!record) {
+  showToast('Plan not found in your private vault.');
+  return;
+ }
+ if (String(record.ownerId || record.savedBy || '').trim().toLowerCase() !== _planOwnerId()) {
+  showToast('Access denied — that plan belongs to another account.');
+  return;
+ }
+
+ applyPersonalPlanSnapshot(record.state);
  hidePanel('restore-plan');
- 
- if (state.lines.length > 0) {
- const allPts = state.lines.flatMap(l => [l.start, l.end]);
- const avgLat = allPts.reduce((s, p) =>s + p[0], 0) / allPts.length;
- const avgLon = allPts.reduce((s, p) =>s + p[1], 0) / allPts.length;
 
- if (globeActive) {
- transitionToMap(avgLat, avgLon, 10);
- setTimeout(() => {
- renderSurveyLines();
- renderObstructions();
- updateSurveyList();
- updateObstructionList();
- fitMapToLines();
- planRoute();
- }, 700);
+ const finishDraw = () => {
+  if (typeof renderSurveyLines === 'function') renderSurveyLines();
+  if (typeof renderObstructions === 'function') renderObstructions();
+  if (typeof updateSurveyList === 'function') updateSurveyList();
+  if (typeof updateObstructionList === 'function') updateObstructionList();
+  if (typeof updateUserLayersList === 'function') updateUserLayersList();
+  if (typeof hideSurveyOverlay === 'function') hideSurveyOverlay();
+  if (typeof fitMapToLines === 'function') fitMapToLines();
+  // Prefer restored route; only replan if none was saved
+  if (state.route && state.route.length && typeof renderRoute === 'function') {
+   try { renderRoute(); } catch (_) {}
+  } else if (state.lines.length > 1 && typeof planRoute === 'function') {
+   planRoute();
+  }
+  showToast('Recovered private plan: "' + record.fileName + '"');
+ };
+
+ if (state.lines.length > 0) {
+  const allPts = state.lines.flatMap(l => [l.start, l.end]).filter(Boolean);
+  if (allPts.length) {
+   const avgLat = allPts.reduce((s, p) => s + p[0], 0) / allPts.length;
+   const avgLon = allPts.reduce((s, p) => s + p[1], 0) / allPts.length;
+   if (globeActive) {
+    transitionToMap(avgLat, avgLon, 10);
+    setTimeout(finishDraw, 700);
+    return;
+   }
+   if (!map && typeof initLeafletMap === 'function') initLeafletMap();
+  }
+  finishDraw();
  } else {
- if (!map) initLeafletMap();
- renderSurveyLines();
- renderObstructions();
- updateSurveyList();
- updateObstructionList();
- hideSurveyOverlay();
- fitMapToLines();
- planRoute();
- }
- showToast(`Successfully recovered plan: "${record.fileName}"`);
+  showToast('Recovered "' + record.fileName + '" but it had no lines');
  }
 }
 
 function deletePlanFromData(id) {
- const saveKey = userKey('saved_plans');
- let records = JSON.parse(localStorage.getItem(saveKey) || '[]');
- const record = records.find(r =>r.id === id);
+ let records = _readPrivatePlans();
+ const record = records.find(r => r.id === id);
  if (!record) return;
 
- // Enforce delete controls: must be admin or the original author
- const canDelete = (state.currentUser === 'admin') || (record.savedBy.toLowerCase() === state.currentUser.toLowerCase());
- if (!canDelete) {
- showToast('Permission denied. You can only delete your own saved files.');
- return;
+ if (String(record.ownerId || record.savedBy || '').trim().toLowerCase() !== _planOwnerId()) {
+  showToast('Permission denied. You can only delete your own private plans.');
+  return;
  }
 
- if (confirm(`Are you sure you want to delete "${record.fileName}"?`)) {
- records = records.filter(r =>r.id !== id);
- localStorage.setItem(saveKey, JSON.stringify(records));
- renderRestoreDirectoryList();
- showToast(`Deleted "${record.fileName}" from candooka.world directory.`);
+ if (confirm('Delete "' + record.fileName + '" from your private vault?\n\nNo other user can see this file.')) {
+  records = records.filter(r => r.id !== id);
+  _writePrivatePlans(records);
+  renderRestoreDirectoryList();
+  showToast('Deleted "' + record.fileName + '" from your private vault');
  }
 }
 

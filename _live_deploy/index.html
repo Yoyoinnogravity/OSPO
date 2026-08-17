@@ -272,7 +272,7 @@
  <!-- NOAA real-time weather maps -->
  <button class="corp-btn" id="nav-noaa" onclick="openNoaaPanel()" title="NOAA wind, waves, swell &amp; SST maps" style="flex: 1; text-align: center; margin: 0; border-color:#22d3ee; color:#a5f3fc;">NOAA</button>
  <!-- Save Plan -->
- <button class="corp-btn" onclick="togglePanel('save-plan')" style="flex: 1; text-align: center; margin: 0;">SAVE PLAN</button>
+ <button class="corp-btn" onclick="openSavePlanPanel()" style="flex: 1; text-align: center; margin: 0;">SAVE PLAN</button>
  <!-- Restore Plan -->
  <button class="corp-btn" onclick="openRestorePlanPanel()" style="flex: 1; text-align: center; margin: 0;">RESTORE PLAN</button>
  <!-- Cost -->
@@ -1697,34 +1697,43 @@
  </div>
  </div>
  <!-- Save Plan Popup Panel -->
- <div id="panel-save-plan" class="settings-panel" style="display:none; min-width:320px;">
+ <div id="panel-save-plan" class="settings-panel" style="display:none; min-width:340px; max-width:440px;">
  <button class="panel-close-btn" onclick="hidePanel('save-plan')">&times;</button>
- <div class="panel-title">Save Plan to candooka.world</div>
- <div style="font-size:11px;color:#a0aebb;margin-bottom:10px;line-height:1.45;">Save the current survey status, obstructions, and planned route to your shared directory.
+ <div class="panel-title">Save my plan</div>
+ <div style="font-size:11px;color:#a0aebb;margin-bottom:10px;line-height:1.45;">Save your survey lines, route, obstructions, line status and layers for later recovery.
  </div>
- <div style="font-size:10px;color:#67e8f9;background:rgba(8,47,73,0.4);border:1px solid #155e75;border-radius:5px;padding:8px 10px;margin-bottom:12px;line-height:1.4;">
- <strong>How to save:</strong> type a name below → <strong style="color:#e2e8f0;">Save File</strong>. Open it later with <strong style="color:#e2e8f0;">RESTORE PLAN</strong>. Logging out also offers this save step.
+ <div style="font-size:10px;color:#a5f3fc;background:rgba(8,47,73,0.4);border:1px solid #155e75;border-radius:5px;padding:8px 10px;margin-bottom:12px;line-height:1.45;">
+ <strong style="color:#67e8f9;">Private to you</strong> — only your signed-in account can see or recover these files. No other user can view them.
+ </div>
+ <div style="font-size:10px;color:#94a3b8;background:#0a0a12;border:1px solid #1a1a24;border-radius:5px;padding:8px 10px;margin-bottom:12px;line-height:1.4;">
+ <strong style="color:#e2e8f0;">How to save:</strong> name the plan → <strong style="color:#e2e8f0;">Save</strong>. Recover anytime with <strong style="color:#e2e8f0;">RESTORE PLAN</strong>. Optional: download a personal JSON backup.
  </div>
  <div class="panel-row">
  <label style="width:80px">File Name</label>
- <input type="text" id="save-file-name" placeholder="survey_block_alpha" />
+ <input type="text" id="save-file-name" placeholder="my_survey_plan" />
  </div>
- <div style="margin-top:16px; display:flex; justify-content:flex-end; gap:8px;">
- <button type="button" class="panel-ok" onclick="savePlanToDirectory()" style="background:#00d2ff; margin:0; color:#000;">Save File</button>
+ <div style="margin-top:14px; display:flex; flex-wrap:wrap; justify-content:flex-end; gap:8px;">
+ <button type="button" class="panel-ok" onclick="exportPersonalPlanBackup()" style="background:#0c1929; margin:0; border:1px solid #155e75; color:#a5f3fc;" title="Download a private JSON backup for this account">Download backup</button>
+ <button type="button" class="panel-ok" onclick="savePlanToDirectory()" style="background:#00d2ff; margin:0; color:#000;">Save</button>
  <button class="panel-cancel" onclick="hidePanel('save-plan')">Cancel</button>
  </div>
  </div>
  <!-- Restore Plan Popup Panel -->
- <div id="panel-restore-plan" class="settings-panel" style="display:none; min-width:420px; max-width:500px;">
+ <div id="panel-restore-plan" class="settings-panel" style="display:none; min-width:440px; max-width:520px;">
  <button class="panel-close-btn" onclick="hidePanel('restore-plan')">&times;</button>
- <div class="panel-title">Shared Directory (candooka.world)</div>
- <div style="font-size:11px;color:#a0aebb;margin-bottom:12px;line-height:1.4">Load planning statuses created by any enterprise user to recover or continue work.
+ <div class="panel-title">Recover my plans</div>
+ <div style="font-size:11px;color:#a0aebb;margin-bottom:10px;line-height:1.45;">Your private saved plans for this account only.
  </div>
- <div id="shared-directory-list" style="max-height:220px; overflow-y:auto; border:1px solid #222; border-radius:4px; margin-bottom:16px; background:#000;">
+ <div style="font-size:10px;color:#a5f3fc;background:rgba(8,47,73,0.4);border:1px solid #155e75;border-radius:5px;padding:8px 10px;margin-bottom:12px;line-height:1.45;">
+ <strong style="color:#67e8f9;">Private vault</strong> — no other user can list, open or delete these files.
+ </div>
+ <div id="shared-directory-list" style="max-height:260px; overflow-y:auto; border:1px solid #222; border-radius:4px; margin-bottom:12px; background:#000;">
  <!-- Dynamic files rendered here -->
  </div>
- <div style="display:flex; justify-content:flex-end;">
- <button class="panel-cancel" onclick="hidePanel('restore-plan')" style="width:100%">Close Directory</button>
+ <div style="display:flex; gap:8px; flex-wrap:wrap;">
+ <label class="panel-ok" for="import-personal-plan-file" style="flex:1;text-align:center;cursor:pointer;margin:0;background:#0c1929;border:1px solid #155e75;color:#a5f3fc;">Import my backup…</label>
+ <input type="file" id="import-personal-plan-file" accept=".json,application/json" style="display:none" onchange="importPersonalPlanBackup(event)"/>
+ <button class="panel-cancel" onclick="hidePanel('restore-plan')" style="flex:1;margin:0;">Close</button>
  </div>
  </div>
  <div id="panel-turn-radius" class="settings-panel" style="display:none">
@@ -1954,9 +1963,9 @@
  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
  <script src="https://unpkg.com/shpjs@latest/dist/shp.min.js"></script>
  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
- <script src="app.js?v=16.48"></script>
- <script src="ray_tracing_module.js?v=16.48"></script>
- <script src="wmm_declination.js?v=16.48"></script>
- <script src="magnetic_isogones.js?v=16.48"></script>
+ <script src="app.js?v=16.49"></script>
+ <script src="ray_tracing_module.js?v=16.49"></script>
+ <script src="wmm_declination.js?v=16.49"></script>
+ <script src="magnetic_isogones.js?v=16.49"></script>
 </body>
 </html>
