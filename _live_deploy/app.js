@@ -766,18 +766,28 @@ function switchTab(tab) {
  fileInput.click();
  }
  } else {
- // Re-trigger survey planning parameters verification dialog!
+ // Re-trigger: UTM first, then full Survey Criteria
  const detected = detectUtmZone(state.rawRows || []);
- askSurveyCriteria(detected, (zone, hemi) => {
- markSurveyCriteriaSet(true);
- if (state.rawText) {
- const lines = parseCSVWithUtm(state.rawText, zone, hemi);
- if (lines.length > 0) {
- setLines(lines);
- return;
- }
- }
- showLineManager();
+ confirmUtmZoneFirst({
+  zone: detected.zone || state.settings.utmZone || 31,
+  hemi: detected.hemi || state.settings.utmHemi || 'N',
+  message: 'Confirm UTM zone first, then review the rest of the survey criteria.',
+  okLabel: 'Continue to survey criteria',
+  detectedNote: detected.confident
+   ? ('Previously detected / saved suggestion: zone ' + (detected.zone || state.settings.utmZone) + (detected.hemi || state.settings.utmHemi || '') + ' — verify.')
+   : null
+ }, (zone, hemi) => {
+  askSurveyCriteria({ zone, hemi }, (z, h) => {
+   markSurveyCriteriaSet(true);
+   if (state.rawText) {
+    const lines = parseCSVWithUtm(state.rawText, z, h);
+    if (lines.length > 0) {
+     setLines(lines);
+     return;
+    }
+   }
+   showLineManager();
+  });
  });
  }
  }
@@ -4093,7 +4103,7 @@ function loadFile(event) {
  event.target.value = '';
  if (!files.length) return;
 
- // Read one or many P1/CSV flavours, then ask UTM once and merge lines.
+ // Read one or many P1/CSV flavours → ask UTM first → Survey Criteria → merge lines.
  Promise.all(files.map(file =>new Promise((resolve, reject) => {
  const reader = new FileReader();
  reader.onload = e =>resolve({ name: file.name, text: e.target.result });
@@ -4104,19 +4114,35 @@ function loadFile(event) {
  const rows = combinedText.split('\n').map(r =>r.trimEnd());
  state.rawText = combinedText;
  state.rawRows = rows;
+ // Do not place lines on the map until UTM is confirmed
+ state.lines = state.lines || [];
  const detected = detectUtmZone(rows);
-
- if (detected.confident && detected.zone >= 1 && detected.zone <= 60) {
- const preLines = parseCSVWithUtm(combinedText, detected.zone, detected.hemi || 'N');
- if (preLines.length > 0) state.lines = preLines;
- } else {
- const preLines = extractLineNames(rows);
- if (preLines.length > 0) state.lines = preLines;
- }
-
  const label = files.length === 1 ? files[0].name : (files.length + ' files');
- askSurveyCriteria(detected, (zone, hemi) => {
- finishPreplotLoad(items, zone, hemi, label);
+
+ confirmUtmZoneFirst({
+  zone: detected.zone || state.settings.utmZone || 31,
+  hemi: detected.hemi || state.settings.utmHemi || 'N',
+  message: 'Confirm UTM zone first while loading this P1 / preplot. Wrong zone places the survey in the wrong part of the world.',
+  okLabel: 'Continue to survey criteria',
+  fileLabel: label,
+  detectedNote: detected.confident
+   ? ('Auto-detected zone ' + detected.zone + (detected.hemi || '') + ' from file headers/coords — please verify.')
+   : 'Could not confidently detect a zone from the file — set UTM before continuing.'
+ }, (zone, hemi) => {
+  // Light name-only preview so Survey Criteria start-point list has lines if possible
+  try {
+   const preLines = parseCSVWithUtm(combinedText, zone, hemi);
+   if (preLines.length > 0) state.lines = preLines;
+   else {
+    const named = extractLineNames(rows);
+    if (named.length > 0) state.lines = named;
+   }
+  } catch (_) {}
+
+  askSurveyCriteria({ zone, hemi }, (z, h) => {
+   markSurveyCriteriaSet(true);
+   finishPreplotLoad(items, z, h, label);
+  });
  });
  }).catch(err => {
  showToast(err.message || 'Failed to read preplot file(s)');
@@ -4238,7 +4264,8 @@ function loadCSVManual(event) {
  confirmUtmZoneFirst({
  zone: detected.zone || state.settings.utmZone || 31,
  hemi: detected.hemi || state.settings.utmHemi || 'N',
- message: 'Confirm UTM zone before choosing Line / X / Y columns.'
+ message: 'Confirm UTM zone before choosing Line / X / Y columns.',
+ okLabel: 'Continue to columns'
  }, (zone, hemi) => {
  promptPreplotColumnMap(text, zone, hemi, {
  message: 'Confirm which columns are Line, X and Y. Zone UTM ' + zone + hemi + ' will be used for grid conversion.',
@@ -4259,10 +4286,10 @@ function loadCSVManual(event) {
 }
 
 /**
- * Compact UTM zone/hemisphere confirm - always shown before Line/X/Y mapping.
- * callback(zone, hemi) on Continue; Cancel closes without mapping.
+ * Compact UTM zone/hemisphere confirm — always first when loading P1 / mapping columns.
+ * callback(zone, hemi) on Continue; Cancel closes without loading.
  */
-function confirmUtmZoneFirst({ zone, hemi, message }, callback) {
+function confirmUtmZoneFirst({ zone, hemi, message, okLabel, fileLabel, detectedNote }, callback) {
  let z = parseInt(zone, 10);
  if (!(z >= 1 && z <= 60)) z = state.settings.utmZone || 31;
  let h = (hemi === 'S' || hemi === 's') ? 'S' : 'N';
@@ -4272,16 +4299,29 @@ function confirmUtmZoneFirst({ zone, hemi, message }, callback) {
  dlg = document.createElement('div');
  dlg.id = 'utm-zone-confirm-dialog';
  dlg.style.cssText = `position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
- background:#000;border:1px solid #ffd60a;border-radius:8px;padding:22px 26px;
- z-index:10000;min-width:380px;max-width:460px;box-shadow:0 8px 32px rgba(0,0,0,0.85);
+ background:#000;border:2px solid #ffd60a;border-radius:8px;padding:22px 26px;
+ z-index:10020;min-width:400px;max-width:480px;box-shadow:0 0 0 1px rgba(255,214,10,0.3),0 12px 40px rgba(0,0,0,0.9);
  color:#fff;font-family:inherit;`;
  document.body.appendChild(dlg);
 
+ const btnText = okLabel || 'Continue';
+ const fileBit = fileLabel
+  ? `<div style="font-size:10px;color:#94a3b8;margin-bottom:10px;">File: <span style="color:#e2e8f0;font-weight:700;">${fileLabel}</span></div>`
+  : '';
+ const noteBit = detectedNote
+  ? `<div style="font-size:10px;color:#fde047;background:rgba(255,214,10,0.08);border:1px solid rgba(255,214,10,0.35);border-radius:4px;padding:8px 10px;margin-bottom:12px;line-height:1.4;">${detectedNote}</div>`
+  : '';
+
  dlg.innerHTML = `
- <div style="font-weight:700;font-size:14px;color:#ffd60a;margin-bottom:8px;">Confirm UTM Zone</div>
- <div style="font-size:11px;color:#a0aebb;margin-bottom:14px;line-height:1.45;">
- ${message || 'Confirm the UTM zone before assigning X / Y columns. Wrong zone places the survey in the wrong part of the world.'}
+ <div style="font-weight:800;font-size:15px;color:#ffd60a;margin-bottom:8px;letter-spacing:0.3px;display:flex;align-items:center;gap:8px;">
+  <span style="display:inline-flex;width:22px;height:22px;align-items:center;justify-content:center;border-radius:4px;border:1px solid #ffd60a;background:rgba(255,214,10,0.15);font-size:12px;">1</span>
+  Confirm UTM Zone first
  </div>
+ ${fileBit}
+ <div style="font-size:11px;color:#a0aebb;margin-bottom:12px;line-height:1.45;">
+ ${message || 'Confirm the UTM zone before continuing. Wrong zone places the survey in the wrong part of the world.'}
+ </div>
+ ${noteBit}
  <div class="panel-row" style="margin-bottom:16px;align-items:center;">
  <label style="width:90px;color:#ffd60a;font-weight:700;">UTM Zone</label>
  <input id="utm-confirm-zone" type="number" min="1" max="60" value="${z}"
@@ -4293,12 +4333,15 @@ function confirmUtmZoneFirst({ zone, hemi, message }, callback) {
  </select>
  </div>
  <div style="display:flex;gap:10px;">
- <button id="utm-confirm-ok" style="flex:2;padding:10px;border-radius:4px;border:none;background:#ffd60a;color:#000;font-weight:700;cursor:pointer;font-size:12px;">Continue to columns</button>
+ <button id="utm-confirm-ok" style="flex:2;padding:10px;border-radius:4px;border:none;background:#ffd60a;color:#000;font-weight:800;cursor:pointer;font-size:12px;">${btnText}</button>
  <button id="utm-confirm-cancel" style="flex:1;padding:10px;border-radius:4px;border:1px solid #333;background:#1a1a2e;color:#e0e8f0;cursor:pointer;font-size:12px;">Cancel</button>
  </div>`;
 
  const close = () => { if (dlg && dlg.parentNode) dlg.remove(); };
- dlg.querySelector('#utm-confirm-cancel').onclick = close;
+ dlg.querySelector('#utm-confirm-cancel').onclick = () => {
+  close();
+  showToast('Load cancelled — set UTM zone to place the survey correctly', 4000);
+ };
  dlg.querySelector('#utm-confirm-ok').onclick = () => {
  let nz = parseInt(document.getElementById('utm-confirm-zone').value, 10);
  const nh = document.getElementById('utm-confirm-hemi').value === 'S' ? 'S' : 'N';
@@ -4313,7 +4356,7 @@ function confirmUtmZoneFirst({ zone, hemi, message }, callback) {
  };
  makeDialogInteractive(dlg);
  const zoneInput = dlg.querySelector('#utm-confirm-zone');
- if (zoneInput) zoneInput.focus();
+ if (zoneInput) { zoneInput.focus(); zoneInput.select(); }
 }
 
 function _showColumnMapperDialog(rawText, rows, headerCols, sampleRows, delimiter, opts) {
@@ -4742,7 +4785,7 @@ function askSurveyCriteria({ zone, hemi }, callback) {
  <div style="font-size:11px;color:#a0aebb;margin-bottom:14px;line-height:1.4">Verify and adjust the operational planning criteria for this survey before route planning, fold, or ray tracing.
  </div>
  <div style="background:#1a1a00;border:1px solid #ffd60a;border-radius:6px;padding:10px 12px;margin-bottom:12px;">
- <div style="font-size:10px;color:#ffd60a;font-weight:700;margin-bottom:6px;letter-spacing:0.4px;">s CONFIRM UTM ZONE - all grid calculations depend on this</div>
+ <div style="font-size:10px;color:#ffd60a;font-weight:700;margin-bottom:6px;letter-spacing:0.4px;">UTM ZONE (confirmed first on P1 load — re-check if needed)</div>
  <div class="panel-row" style="margin-bottom:0;">
  <label style="width:100px; color:#ffd60a; font-weight:700;">UTM Zone</label>
  <input id="crit-utm-zone" type="number" min="1" max="60" value="${zone || 31}"
@@ -5215,6 +5258,7 @@ function askSurveyCriteria({ zone, hemi }, callback) {
 
  dlg.style.display = 'block';
  makeDialogInteractive(dlg);
+ updateSurveyCriteriaBtnHighlight();
 
  // Populate per-swath direction dropdowns
  updateSwathDirectionUI();
@@ -5470,6 +5514,7 @@ function askSurveyCriteria({ zone, hemi }, callback) {
  state.settings.ud3Rate = parseFloat(document.getElementById('crit-ud3-rate').value) || 0;
  state.settings.ud3Fixed = parseFloat(document.getElementById('crit-ud3-fixed').value) || 0;
  dlg.style.display = 'none';
+ markSurveyCriteriaSet(true);
 
  // Parse and display lines without opening Line Manager
  if (state.rawText) {
@@ -13851,6 +13896,7 @@ function toggleLabels() {
 document.getElementById('tab-plan').addEventListener('click', () => {
  if (state.lines.length > 0) showLineManager();
 });
+try { updateSurveyCriteriaBtnHighlight(); } catch (_) {}
 
 // Init input defaults on startup from state settings
 const savedStartTime = localStorage.getItem(userKey('default_starttime')) || new Date().toISOString().slice(0,16);
@@ -14431,10 +14477,12 @@ function resetWorkspaceForLogout() {
  state._staleRouteObsHits = 0;
  if (state.settings) {
   state.settings.startConfigured = false;
+  state.settings.criteriaConfirmed = false;
   state.settings.startPoint = null;
   state.settings.startLineId = null;
   state.settings.startLineIdx = null;
  }
+ try { updateSurveyCriteriaBtnHighlight(); } catch (_) {}
  _startLineChooserShown = false;
 
  // Clear map layers
