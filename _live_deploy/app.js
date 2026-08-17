@@ -769,6 +769,7 @@ function switchTab(tab) {
  // Re-trigger survey planning parameters verification dialog!
  const detected = detectUtmZone(state.rawRows || []);
  askSurveyCriteria(detected, (zone, hemi) => {
+ markSurveyCriteriaSet(true);
  if (state.rawText) {
  const lines = parseCSVWithUtm(state.rawText, zone, hemi);
  if (lines.length > 0) {
@@ -780,6 +781,21 @@ function switchTab(tab) {
  });
  }
  }
+}
+
+/** Keep SURVEY CRITERIA toolbar button visually prominent until confirmed. */
+function updateSurveyCriteriaBtnHighlight() {
+ const btn = document.getElementById('tab-plan');
+ if (!btn) return;
+ const set = !!(state.settings && state.settings.criteriaConfirmed);
+ btn.classList.toggle('needs-attention', !set);
+ btn.classList.toggle('criteria-set', set);
+}
+
+function markSurveyCriteriaSet(confirmed) {
+ if (!state.settings) state.settings = {};
+ state.settings.criteriaConfirmed = !!confirmed;
+ updateSurveyCriteriaBtnHighlight();
 }
 
 // ===== GENERATE PREPLOT =====
@@ -4712,15 +4728,18 @@ function askSurveyCriteria({ zone, hemi }, callback) {
  dlg = document.createElement('div');
  dlg.id = 'survey-criteria-dialog';
  dlg.style.cssText = `position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
- background:#000000;border:1px solid #222222;border-radius:8px;padding:24px 28px 0 28px;
- z-index:9999;min-width:480px;max-width:580px;max-height:90vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.8);color:#ffffff;font-family:inherit;
+ background:#000000;border:2px solid #ffd60a;border-radius:8px;padding:24px 28px 0 28px;
+ z-index:9999;min-width:480px;max-width:580px;max-height:90vh;overflow-y:auto;box-shadow:0 0 0 1px rgba(255,214,10,0.25),0 12px 40px rgba(0,0,0,0.85);color:#ffffff;font-family:inherit;
  display:flex;flex-direction:column;`;
  document.body.appendChild(dlg);
  }
 
  dlg.innerHTML = `
- <div style="font-weight:700;font-size:14px;margin-bottom:12px;color:#ffffff">&#9888; Critical Survey Criteria</div>
- <div style="font-size:11px;color:#a0aebb;margin-bottom:14px;line-height:1.4">Please verify and adjust the operational planning criteria for this survey area before initiating the route solver.
+ <div style="font-weight:800;font-size:15px;margin-bottom:8px;color:#ffd60a;letter-spacing:0.3px;display:flex;align-items:center;gap:8px;">
+  <span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:4px;background:rgba(255,214,10,0.18);border:1px solid #ffd60a;font-size:13px;">!</span>
+  Critical Survey Criteria
+ </div>
+ <div style="font-size:11px;color:#a0aebb;margin-bottom:14px;line-height:1.4">Verify and adjust the operational planning criteria for this survey before route planning, fold, or ray tracing.
  </div>
  <div style="background:#1a1a00;border:1px solid #ffd60a;border-radius:6px;padding:10px 12px;margin-bottom:12px;">
  <div style="font-size:10px;color:#ffd60a;font-weight:700;margin-bottom:6px;letter-spacing:0.4px;">s CONFIRM UTM ZONE - all grid calculations depend on this</div>
@@ -5376,6 +5395,7 @@ function askSurveyCriteria({ zone, hemi }, callback) {
  document.getElementById('val-run-inout').textContent = ri + '/' + ro + 'm';
 
  dlg.style.display = 'none';
+ markSurveyCriteriaSet(true);
  callback(z, h);
  };
 
