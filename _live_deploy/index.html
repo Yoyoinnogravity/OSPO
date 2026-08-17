@@ -193,6 +193,53 @@
    <div id="tdb-activity-list" style="margin-top:12px; max-height:320px; overflow:auto;"></div>
   </section>
 
+  <section style="background:#0e0e16; border:1px solid #3f1d2e; border-radius:8px; padding:14px 16px; margin-bottom:16px;">
+   <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:8px; flex-wrap:wrap;">
+    <div style="font-size:10px; color:#fb7185; font-weight:700; letter-spacing:0.45px; text-transform:uppercase;">HSE metrics (this day)</div>
+    <div id="tdb-hse-day-label" style="font-size:10px; color:#94a3b8;"></div>
+   </div>
+   <div style="font-size:11px; color:#94a3b8; line-height:1.45; margin-bottom:12px;">
+    Daily HSE counters for the selected project day. Exposure hours default to <b style="color:#e2e8f0;">POB × 24</b> unless you override. Leave exposure blank to auto-calculate.
+   </div>
+   <div style="display:grid; grid-template-columns:repeat(5, minmax(0, 1fr)); gap:8px; margin-bottom:10px;">
+    <label style="font-size:9px; color:#8a9bb0;">POB
+     <input id="tdb-hse-pob" type="number" min="0" step="1" value="0" onchange="tdbSaveHseFromForm()" style="display:block;width:100%;margin-top:4px;padding:6px 7px;border-radius:4px;border:1px solid #333;background:#111;color:#fff;font-size:11px;font-family:inherit;"/>
+    </label>
+    <label style="font-size:9px; color:#8a9bb0;">Exposure h
+     <input id="tdb-hse-exposure" type="number" min="0" step="0.5" placeholder="auto" onchange="tdbSaveHseFromForm()" style="display:block;width:100%;margin-top:4px;padding:6px 7px;border-radius:4px;border:1px solid #333;background:#111;color:#fff;font-size:11px;font-family:inherit;"/>
+    </label>
+    <label style="font-size:9px; color:#8a9bb0;">LTI
+     <input id="tdb-hse-lti" type="number" min="0" step="1" value="0" onchange="tdbSaveHseFromForm()" style="display:block;width:100%;margin-top:4px;padding:6px 7px;border-radius:4px;border:1px solid #333;background:#111;color:#fff;font-size:11px;font-family:inherit;"/>
+    </label>
+    <label style="font-size:9px; color:#8a9bb0;">Recordable
+     <input id="tdb-hse-recordable" type="number" min="0" step="1" value="0" onchange="tdbSaveHseFromForm()" style="display:block;width:100%;margin-top:4px;padding:6px 7px;border-radius:4px;border:1px solid #333;background:#111;color:#fff;font-size:11px;font-family:inherit;"/>
+    </label>
+    <label style="font-size:9px; color:#8a9bb0;">First aid
+     <input id="tdb-hse-firstaid" type="number" min="0" step="1" value="0" onchange="tdbSaveHseFromForm()" style="display:block;width:100%;margin-top:4px;padding:6px 7px;border-radius:4px;border:1px solid #333;background:#111;color:#fff;font-size:11px;font-family:inherit;"/>
+    </label>
+    <label style="font-size:9px; color:#8a9bb0;">Near miss
+     <input id="tdb-hse-nearmiss" type="number" min="0" step="1" value="0" onchange="tdbSaveHseFromForm()" style="display:block;width:100%;margin-top:4px;padding:6px 7px;border-radius:4px;border:1px solid #333;background:#111;color:#fff;font-size:11px;font-family:inherit;"/>
+    </label>
+    <label style="font-size:9px; color:#8a9bb0;">Observations
+     <input id="tdb-hse-obs" type="number" min="0" step="1" value="0" onchange="tdbSaveHseFromForm()" style="display:block;width:100%;margin-top:4px;padding:6px 7px;border-radius:4px;border:1px solid #333;background:#111;color:#fff;font-size:11px;font-family:inherit;"/>
+    </label>
+    <label style="font-size:9px; color:#8a9bb0;">Stop work
+     <input id="tdb-hse-stopwork" type="number" min="0" step="1" value="0" onchange="tdbSaveHseFromForm()" style="display:block;width:100%;margin-top:4px;padding:6px 7px;border-radius:4px;border:1px solid #333;background:#111;color:#fff;font-size:11px;font-family:inherit;"/>
+    </label>
+    <label style="font-size:9px; color:#8a9bb0;">Env. incidents
+     <input id="tdb-hse-env" type="number" min="0" step="1" value="0" onchange="tdbSaveHseFromForm()" style="display:block;width:100%;margin-top:4px;padding:6px 7px;border-radius:4px;border:1px solid #333;background:#111;color:#fff;font-size:11px;font-family:inherit;"/>
+    </label>
+    <label style="font-size:9px; color:#8a9bb0;">MMO sightings
+     <input id="tdb-hse-mmo" type="number" min="0" step="1" value="0" onchange="tdbSaveHseFromForm()" style="display:block;width:100%;margin-top:4px;padding:6px 7px;border-radius:4px;border:1px solid #333;background:#111;color:#fff;font-size:11px;font-family:inherit;"/>
+    </label>
+   </div>
+   <label style="font-size:10px; color:#8a9bb0; display:block; margin-bottom:10px;">HSE note
+    <input id="tdb-hse-note" type="text" placeholder="Incidents, actions, remarks" onchange="tdbSaveHseFromForm()" style="display:block;width:100%;margin-top:4px;padding:7px 8px;border-radius:4px;border:1px solid #333;background:#111;color:#fff;font-size:11px;font-family:inherit;"/>
+   </label>
+   <div id="tdb-hse-summary" style="font-size:12px; color:#94a3b8; line-height:1.5; padding:8px 10px; border-radius:5px; border:1px solid #3f1d2e; background:#140a10;"></div>
+   <div id="tdb-hse-project-summary" style="font-size:11px; color:#64748b; margin-top:10px; line-height:1.45;"></div>
+  </section>
+
   <section style="background:#0e0e16; border:1px solid #1a1a24; border-radius:8px; padding:14px 16px;">
    <div style="font-size:10px; color:#64748b; font-weight:700; letter-spacing:0.45px; text-transform:uppercase; margin-bottom:8px;">Next build</div>
    <div style="font-size:11px; color:#64748b; line-height:1.5;">Server-side project DB, sequence ingest, multi-day reports, and plan-vs-actual vs Planning route TIME.</div>
@@ -1964,9 +2011,9 @@
  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
  <script src="https://unpkg.com/shpjs@latest/dist/shp.min.js"></script>
  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
- <script src="app.js?v=16.30"></script>
- <script src="ray_tracing_module.js?v=16.30"></script>
- <script src="wmm_declination.js?v=16.30"></script>
- <script src="magnetic_isogones.js?v=16.30"></script>
+ <script src="app.js?v=16.31"></script>
+ <script src="ray_tracing_module.js?v=16.31"></script>
+ <script src="wmm_declination.js?v=16.31"></script>
+ <script src="magnetic_isogones.js?v=16.31"></script>
 </body>
 </html>

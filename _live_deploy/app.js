@@ -15668,6 +15668,7 @@ const TDB_CATEGORIES = [
  { id: 'STANDBY', label: 'Standby', color: '#a78bfa' },
  { id: 'DOWNTIME', label: 'Downtime', color: '#f97316' },
  { id: 'MOBILISATION', label: 'Mobilisation', color: '#eab308' },
+ { id: 'HSE', label: 'HSE', color: '#f43f5e' },
  { id: 'OTHER', label: 'Other', color: '#94a3b8' }
 ];
 
@@ -15685,9 +15686,29 @@ const TDB_ACTIVITIES = [
  { id: 'MOB', categoryId: 'MOBILISATION', label: 'Mobilisation', color: '#eab308' },
  { id: 'DEMOB', categoryId: 'MOBILISATION', label: 'Demobilisation', color: '#facc15' },
  { id: 'PORT', categoryId: 'MOBILISATION', label: 'Port / logistics', color: '#ca8a04' },
+ { id: 'HSE_TOOLBOX', categoryId: 'HSE', label: 'Toolbox talk / briefing', color: '#fb7185' },
+ { id: 'HSE_DRILL', categoryId: 'HSE', label: 'Emergency drill / exercise', color: '#f43f5e' },
+ { id: 'HSE_STANDDOWN', categoryId: 'HSE', label: 'Safety stand-down', color: '#e11d48' },
+ { id: 'HSE_INVESTIGATION', categoryId: 'HSE', label: 'Incident investigation', color: '#be123c' },
+ { id: 'HSE_TRAINING', categoryId: 'HSE', label: 'HSE training', color: '#9f1239' },
+ { id: 'HSE_OTHER', categoryId: 'HSE', label: 'HSE — other time', color: '#881337' },
  { id: 'OTHER', categoryId: 'OTHER', label: 'Other / misc', color: '#94a3b8' },
  { id: 'MEAL', categoryId: 'OTHER', label: 'Meal / crew change', color: '#64748b' }
 ];
+
+const TDB_HSE_DEFAULT = {
+ pob: 0,
+ exposureHours: null, // null = auto from POB × 24
+ lti: 0,
+ recordable: 0,
+ firstAid: 0,
+ nearMiss: 0,
+ observations: 0,
+ stopWork: 0,
+ envIncidents: 0,
+ mmoSightings: 0,
+ note: ''
+};
 
 /** Map legacy flat codes → category/activity. */
 const TDB_LEGACY_MAP = {
@@ -15839,8 +15860,187 @@ function _tdbFmtMin(m) {
 function _tdbGetDaySegs(proj, day) {
  if (!proj || !day) return [];
  if (!proj.days) proj.days = {};
- if (!proj.days[day]) proj.days[day] = { segments: [] };
+ if (!proj.days[day]) proj.days[day] = { segments: [], hse: Object.assign({}, TDB_HSE_DEFAULT) };
+ if (!Array.isArray(proj.days[day].segments)) proj.days[day].segments = [];
+ if (!proj.days[day].hse || typeof proj.days[day].hse !== 'object') {
+  proj.days[day].hse = Object.assign({}, TDB_HSE_DEFAULT);
+ }
  return proj.days[day].segments || [];
+}
+
+const TDB_HSE_NUM_KEYS = [
+ 'pob', 'exposureHours', 'lti', 'recordable', 'firstAid', 'nearMiss',
+ 'observations', 'stopWork', 'envIncidents', 'mmoSightings'
+];
+
+function _tdbGetDayHse(proj, day) {
+ _tdbGetDaySegs(proj, day);
+ const raw = (proj.days[day] && proj.days[day].hse) || {};
+ const out = Object.assign({}, TDB_HSE_DEFAULT, raw);
+ TDB_HSE_NUM_KEYS.forEach((k) => {
+  if (k === 'exposureHours' && (raw.exposureHours == null || raw.exposureHours === '')) {
+   out.exposureHours = null;
+   return;
+  }
+  const n = Number(out[k]);
+  out[k] = Number.isFinite(n) && n >= 0 ? n : 0;
+ });
+ out.note = String(out.note || '');
+ return out;
+}
+
+function _tdbEffectiveExposure(hse) {
+ if (hse.exposureHours != null && Number(hse.exposureHours) > 0) return Number(hse.exposureHours);
+ if (hse.pob > 0) return Math.round(hse.pob * 24 * 10) / 10;
+ return 0;
+}
+
+function tdbSaveHseFromForm() {
+ if (!_tdbActiveProjectId) { showToast('Select a project first'); return; }
+ const day = _tdbActiveDay || _tdbTodayIso();
+ const store = _tdbLoadStore();
+ const proj = store.projects.find(p => p.id === _tdbActiveProjectId);
+ if (!proj) { showToast('Project not found'); return; }
+ _tdbGetDaySegs(proj, day);
+ const num = (id) => {
+  const el = document.getElementById(id);
+  if (!el || el.value === '' || el.value == null) return null;
+  const n = Number(el.value);
+  return Number.isFinite(n) && n >= 0 ? n : 0;
+ };
+ const hse = {
+  pob: Math.round(num('tdb-hse-pob') || 0),
+  exposureHours: (() => {
+   const v = num('tdb-hse-exposure');
+   return v == null ? null : Math.round(v * 10) / 10;
+  })(),
+  lti: Math.round(num('tdb-hse-lti') || 0),
+  recordable: Math.round(num('tdb-hse-recordable') || 0),
+  firstAid: Math.round(num('tdb-hse-firstaid') || 0),
+  nearMiss: Math.round(num('tdb-hse-nearmiss') || 0),
+  observations: Math.round(num('tdb-hse-obs') || 0),
+  stopWork: Math.round(num('tdb-hse-stopwork') || 0),
+  envIncidents: Math.round(num('tdb-hse-env') || 0),
+  mmoSightings: Math.round(num('tdb-hse-mmo') || 0),
+  note: ((document.getElementById('tdb-hse-note') || {}).value || '').trim()
+ };
+ proj.days[day].hse = hse;
+ _tdbSaveStore(store);
+ tdbRenderHse(proj);
+}
+
+function tdbLoadHseIntoForm(hse) {
+ const set = (id, v, blankZero) => {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (v == null || (blankZero && !v)) el.value = '';
+  else el.value = String(v);
+ };
+ set('tdb-hse-pob', hse.pob || 0);
+ set('tdb-hse-exposure', hse.exposureHours, true);
+ set('tdb-hse-lti', hse.lti || 0);
+ set('tdb-hse-recordable', hse.recordable || 0);
+ set('tdb-hse-firstaid', hse.firstAid || 0);
+ set('tdb-hse-nearmiss', hse.nearMiss || 0);
+ set('tdb-hse-obs', hse.observations || 0);
+ set('tdb-hse-stopwork', hse.stopWork || 0);
+ set('tdb-hse-env', hse.envIncidents || 0);
+ set('tdb-hse-mmo', hse.mmoSightings || 0);
+ const noteEl = document.getElementById('tdb-hse-note');
+ if (noteEl) noteEl.value = hse.note || '';
+}
+
+function tdbProjectHseTotals(proj) {
+ const totals = {
+  pob: 0, exposureHours: 0, lti: 0, recordable: 0, firstAid: 0, nearMiss: 0,
+  observations: 0, stopWork: 0, envIncidents: 0, mmoSightings: 0, _days: 0
+ };
+ const days = Object.keys(proj.days || {}).sort();
+ let maxPob = 0;
+ days.forEach((d) => {
+  const h = _tdbGetDayHse(proj, d);
+  const hasAny = h.pob || h.lti || h.recordable || h.firstAid || h.nearMiss
+   || h.observations || h.stopWork || h.envIncidents || h.mmoSightings
+   || h.exposureHours != null || (h.note && h.note.length);
+  // Count days that have segments or any HSE entry
+  const segs = _tdbGetDaySegs(proj, d);
+  if (!segs.length && !hasAny) return;
+  totals._days += 1;
+  maxPob = Math.max(maxPob, h.pob || 0);
+  totals.exposureHours += _tdbEffectiveExposure(h);
+  totals.lti += h.lti || 0;
+  totals.recordable += h.recordable || 0;
+  totals.firstAid += h.firstAid || 0;
+  totals.nearMiss += h.nearMiss || 0;
+  totals.observations += h.observations || 0;
+  totals.stopWork += h.stopWork || 0;
+  totals.envIncidents += h.envIncidents || 0;
+  totals.mmoSightings += h.mmoSightings || 0;
+ });
+ totals.pob = maxPob;
+ totals.exposureHours = Math.round(totals.exposureHours * 10) / 10;
+ totals._trir = totals.exposureHours > 0
+  ? ((totals.recordable + totals.lti) * 200000) / totals.exposureHours
+  : null;
+ totals._ltir = totals.exposureHours > 0
+  ? (totals.lti * 200000) / totals.exposureHours
+  : null;
+ return totals;
+}
+
+function tdbRenderHse(proj) {
+ const dayLabel = document.getElementById('tdb-hse-day-label');
+ const summary = document.getElementById('tdb-hse-summary');
+ const projEl = document.getElementById('tdb-hse-project-summary');
+ if (!proj) {
+  if (dayLabel) dayLabel.textContent = '';
+  if (summary) summary.textContent = 'Select a project to log HSE metrics.';
+  if (projEl) projEl.textContent = '';
+  tdbLoadHseIntoForm(Object.assign({}, TDB_HSE_DEFAULT));
+  return;
+ }
+ const day = _tdbActiveDay || _tdbTodayIso();
+ const hse = _tdbGetDayHse(proj, day);
+ tdbLoadHseIntoForm(hse);
+ if (dayLabel) dayLabel.textContent = day;
+ const segs = _tdbGetDaySegs(proj, day);
+ const hseMins = segs
+  .map(_tdbNormalizeSeg)
+  .filter((s) => s.categoryId === 'HSE')
+  .reduce((acc, s) => acc + Math.max(0, (s.endMin || 0) - (s.startMin || 0)), 0);
+ const exp = _tdbEffectiveExposure(hse);
+ const expLabel = hse.exposureHours == null && hse.pob > 0
+  ? (exp + ' h (auto POB×24)')
+  : (exp + ' h');
+ if (summary) {
+  summary.innerHTML =
+   '<strong style="color:#e2e8f0">' + _escHtml(day) + '</strong> — POB ' + (hse.pob || 0) +
+   ' · Exposure ' + expLabel +
+   (hseMins ? ' · HSE time logged ' + hseMins + ' min' : '') +
+   (hse.lti || hse.recordable || hse.firstAid || hse.nearMiss
+    ? ' · Events: LTI ' + hse.lti + ' / Rec ' + hse.recordable + ' / FA ' + hse.firstAid + ' / NM ' + hse.nearMiss
+    : ' · No injury / near-miss events') +
+   (hse.observations || hse.stopWork
+    ? ' · Obs ' + hse.observations + ' · Stop work ' + hse.stopWork
+    : '') +
+   (hse.envIncidents || hse.mmoSightings
+    ? ' · Env ' + hse.envIncidents + ' · MMO ' + hse.mmoSightings
+    : '') +
+   (hse.note ? ' · <span style="color:#94a3b8">' + _escHtml(hse.note) + '</span>' : '');
+ }
+ const tot = tdbProjectHseTotals(proj);
+ if (projEl) {
+  const trir = tot._trir != null ? tot._trir.toFixed(2) : '—';
+  const ltir = tot._ltir != null ? tot._ltir.toFixed(2) : '—';
+  projEl.innerHTML =
+   '<strong style="color:#e2e8f0">Project roll-up</strong> (' + tot._days + ' day' + (tot._days === 1 ? '' : 's') + ') — ' +
+   'Exposure ' + tot.exposureHours + ' h · Peak POB ' + tot.pob +
+   ' · LTI ' + tot.lti + ' · Recordable ' + tot.recordable + ' · First aid ' + tot.firstAid +
+   ' · Near miss ' + tot.nearMiss + ' · Observations ' + tot.observations +
+   ' · Stop work ' + tot.stopWork + ' · Env ' + tot.envIncidents + ' · MMO ' + tot.mmoSightings +
+   ' · TRIR ' + trir + ' · LTIR ' + ltir +
+   ' <span style="opacity:.65">(rates per 200,000 exposure hours)</span>';
+ }
 }
 
 /** Analyse coverage of a day's segments. Returns gaps, overlaps, covered minutes. */
@@ -15938,7 +16138,7 @@ function enterWorkspace(mode) {
   }
   tdbInitCategoryActivityUi();
   tdbRender();
-  showToast('Timing Database — Category → Activity, every minute of the day', 3000);
+  showToast('Timing Database — Category → Activity + daily HSE metrics', 3000);
   return;
  }
 
@@ -16125,7 +16325,10 @@ function tdbClearDay() {
  const proj = store.projects.find(p => p.id === _tdbActiveProjectId);
  if (!proj) return;
  if (!proj.days) proj.days = {};
- proj.days[day] = { segments: [] };
+ const keepHse = (proj.days[day] && proj.days[day].hse)
+  ? Object.assign({}, proj.days[day].hse)
+  : Object.assign({}, TDB_HSE_DEFAULT);
+ proj.days[day] = { segments: [], hse: keepHse };
  _tdbSaveStore(store);
  tdbRender();
  showToast('Day cleared: ' + day, 2500);
@@ -16153,8 +16356,10 @@ function tdbRenderDay(proj) {
   if (timeline) timeline.innerHTML = '';
   if (roll) roll.textContent = 'Select or create a project to see minutes by time code.';
   if (list) list.innerHTML = '';
+  tdbRenderHse(null);
   return;
  }
+ tdbRenderHse(proj);
  const day = _tdbActiveDay || _tdbTodayIso();
  const segs = _tdbGetDaySegs(proj, day);
  const a = _tdbAnalyseDay(segs);
@@ -16278,6 +16483,8 @@ function tdbExportJson() {
  if (!proj) { showToast('Project not found'); return; }
  const day = _tdbActiveDay || _tdbTodayIso();
  const analysis = _tdbAnalyseDay(_tdbGetDaySegs(proj, day));
+ const dayHse = _tdbGetDayHse(proj, day);
+ const hseTotals = tdbProjectHseTotals(proj);
  const blob = new Blob([JSON.stringify({
   type: 'candooka-timing-db',
   version: 3,
@@ -16288,6 +16495,9 @@ function tdbExportJson() {
   dayCoveredMinutes: analysis.covered,
   byCategory: analysis.byCategory,
   byActivity: analysis.byActivity,
+  hseDay: dayHse,
+  hseDayExposureEffective: _tdbEffectiveExposure(dayHse),
+  hseProjectTotals: hseTotals,
   project: proj
  }, null, 2)], { type: 'application/json' });
  const a = document.createElement('a');
