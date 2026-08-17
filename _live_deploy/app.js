@@ -23047,15 +23047,149 @@ function _foldUpdateLimitBanner() {
   if (usageEl) {
    usageEl.innerHTML = ` Upgraded account - no session cap. Loaded this session: <strong style="color:#fff;">${_foldFmtBytes(_foldBytesLoaded)}</strong>.`;
   }
+ } else {
+  banner.style.borderColor = 'rgba(255,214,10,0.45)';
+  banner.style.background = 'rgba(255,214,10,0.08)';
+  const left = Math.max(0, FOLD_FREE_LIMIT_BYTES - _foldBytesLoaded);
+  if (usageEl) {
+   usageEl.innerHTML = ` Used <strong style="color:#fff;">${_foldFmtBytes(_foldBytesLoaded)}</strong> of ${_foldFreeLimitLabel()}` +
+    (left > 0 ? ` (<strong style="color:#fff;">${_foldFmtBytes(left)}</strong> remaining).` : ' - limit reached.');
+  }
+ }
+ _foldUpdateCrashBanner();
+}
+
+/** Count fold Map entries used as a proxy for browser heap pressure. */
+function _foldHitEntryCount() {
+ let n = 0;
+ if (!_fold) return 0;
+ (_fold.fileData || []).forEach(fd => { if (fd && fd.hits) n += fd.hits.size; });
+ if (_fold.bands) _fold.bands.forEach(m => { if (m) n += m.size; });
+ return n;
+}
+
+/**
+ * Probe browser / fold memory risk.
+ * level: 'ok' | 'caution' | 'warn' | 'critical'
+ * Chrome/Edge expose performance.memory; other browsers use heuristics.
+ */
+function _foldMemProbe(extraBytes) {
+ const extra = Math.max(0, extraBytes || 0);
+ const bytes = _foldBytesLoaded + extra;
+ const hits = _foldHitEntryCount();
+ // Rough structural estimate: ~120 B per Map entry + file text already streamed
+ const estStruct = hits * 120;
+ let used = 0, limit = 0, ratio = 0, source = 'heuristic';
+ try {
+  if (typeof performance !== 'undefined' && performance.memory && performance.memory.jsHeapSizeLimit > 0) {
+   used = performance.memory.usedJSHeapSize || 0;
+   limit = performance.memory.jsHeapSizeLimit || 0;
+   // Project near-term growth from another P1 chunk / rebuild
+   const projected = used + Math.min(extra, 400 * 1024 * 1024) + Math.min(estStruct * 0.15, 200 * 1024 * 1024);
+   ratio = projected / limit;
+   source = 'heap';
+  }
+ } catch (_) {}
+
+ if (source !== 'heap') {
+  // Typical Chromium tabs OOM well before multi-GB P1 sessions on many machines.
+  // Treat cumulative P1 + bin maps as a soft physical budget (~2.0 GB effective).
+  const softCap = 2 * 1024 * 1024 * 1024;
+  used = bytes + estStruct;
+  limit = softCap;
+  ratio = used / softCap;
+ }
+
+ let level = 'ok';
+ if (ratio >= 0.85 || bytes >= 1.8 * 1024 * 1024 * 1024 || hits >= 12e6) level = 'critical';
+ else if (ratio >= 0.70 || bytes >= 1.2 * 1024 * 1024 * 1024 || hits >= 6e6) level = 'warn';
+ else if (ratio >= 0.55 || bytes >= 0.7 * 1024 * 1024 * 1024 || hits >= 2.5e6) level = 'caution';
+
+ return {
+  level, ratio, used, limit, bytes, hits, estStruct, source,
+  pct: Math.min(99, Math.round(ratio * 100))
+ };
+}
+
+function _foldMemRiskLabel(level) {
+ if (level === 'critical') return 'About to crash';
+ if (level === 'warn') return 'High crash risk';
+ if (level === 'caution') return 'Memory pressure rising';
+ return 'OK';
+}
+
+function _foldUpdateCrashBanner(extraBytes) {
+ const banner = document.getElementById('fold-crash-banner');
+ const title = document.getElementById('fold-crash-title');
+ const msg = document.getElementById('fold-crash-msg');
+ if (!banner) return;
+ const p = _foldMemProbe(extraBytes);
+ if (p.level === 'ok') {
+  banner.style.display = 'none';
   return;
  }
- banner.style.borderColor = 'rgba(255,214,10,0.45)';
- banner.style.background = 'rgba(255,214,10,0.08)';
- const left = Math.max(0, FOLD_FREE_LIMIT_BYTES - _foldBytesLoaded);
- if (usageEl) {
-  usageEl.innerHTML = ` Used <strong style="color:#fff;">${_foldFmtBytes(_foldBytesLoaded)}</strong> of ${_foldFreeLimitLabel()}` +
-   (left > 0 ? ` (<strong style="color:#fff;">${_foldFmtBytes(left)}</strong> remaining).` : ' - limit reached.');
+ banner.style.display = 'flex';
+ const colors = {
+  caution: { border: 'rgba(255,214,10,0.55)', bg: 'rgba(255,214,10,0.10)', title: '#ffd60a', body: '#e8e0b0' },
+  warn: { border: 'rgba(255,159,10,0.65)', bg: 'rgba(255,159,10,0.12)', title: '#ff9f0a', body: '#ffd7a8' },
+  critical: { border: 'rgba(255,69,58,0.7)', bg: 'rgba(255,69,58,0.14)', title: '#ff453a', body: '#fecaca' }
+ };
+ const c = colors[p.level] || colors.warn;
+ banner.style.borderColor = c.border;
+ banner.style.background = c.bg;
+ if (title) {
+  title.style.color = c.title;
+  title.textContent = _foldMemRiskLabel(p.level) + ':';
  }
+ const heapBit = (p.source === 'heap' && p.limit > 0)
+  ? ` Browser heap ~${_foldFmtBytes(p.used)} / ${_foldFmtBytes(p.limit)} (${p.pct}%).`
+  : ` Estimated fold pressure ~${p.pct}% of a typical browser budget.`;
+ if (msg) {
+  msg.style.color = c.body;
+  msg.innerHTML = heapBit
+   + ` Loaded <strong style="color:#fff;">${_foldFmtBytes(p.bytes)}</strong>`
+   + ` · ~<strong style="color:#fff;">${p.hits.toLocaleString()}</strong> bin keys.`
+   + (p.level === 'critical'
+     ? ' Stop adding P1 files, save fold JSON, or reset — the tab is likely to freeze or crash soon.'
+     : ' Prefer smaller batches, save progress, or remove files before continuing.');
+ }
+ return p;
+}
+
+/**
+ * Returns false if the user cancelled continuing at critical risk.
+ * Shows toasts at caution/warn; confirm() at critical.
+ */
+function _foldWarnIfCrashRisk(extraBytes, context) {
+ const p = _foldUpdateCrashBanner(extraBytes) || _foldMemProbe(extraBytes);
+ if (p.level === 'ok') return true;
+ const ctx = context ? (' ' + context) : '';
+ if (p.level === 'caution') {
+  showToast(`Fold memory pressure rising${ctx}. Consider saving fold JSON before adding more P1.`, 6500);
+  return true;
+ }
+ if (p.level === 'warn') {
+  showToast(
+   `High crash risk for Fold of Coverage${ctx}. ` +
+   `Browser may freeze if you keep adding large P1 files. Save now, or reset the fold.`,
+   9000
+  );
+  return true;
+ }
+ // critical
+ const ok = confirm(
+  'Fold of Coverage is near the browser memory limit and will likely crash soon if you continue.\n\n' +
+  (p.source === 'heap'
+   ? `Heap ~${_foldFmtBytes(p.used)} / ${_foldFmtBytes(p.limit)} (${p.pct}%).\n`
+   : `Estimated pressure ~${p.pct}% · loaded ${_foldFmtBytes(p.bytes)}.\n`) +
+  `Bin keys ~${p.hits.toLocaleString()}.\n\n` +
+  'Save fold JSON / remove files / reset before adding more.\n\n' +
+  'Continue anyway?'
+ );
+ if (!ok) {
+  showToast('Stopped — save or reset fold before adding more P1 files.', 6000);
+ }
+ return ok;
 }
 
 function foldToggleFileList() {
@@ -23094,6 +23228,8 @@ function foldReset() {
  _foldLockUI(false);
  _foldUpdateLimitBanner();
  _foldRender();
+ const crash = document.getElementById('fold-crash-banner');
+ if (crash) crash.style.display = 'none';
 }
 
 // COR toggled or class width changed: rebuild the fold from the stored
@@ -23675,10 +23811,34 @@ async function foldAddFiles(event) {
   }
  }
 
+ // Physical / browser crash risk (independent of licence cap)
+ const batchBytes = files.reduce((s, f) => s + (f.size || 0), 0);
+ if (!_foldWarnIfCrashRisk(batchBytes, 'before this batch')) {
+  _foldUpdateLimitBanner();
+  return;
+ }
+ // Very large first file buffers midpoints until the grid locks — warn hard
+ if (!_fold && files[0] && files[0].size > 250 * 1024 * 1024) {
+  const go = confirm(
+   `The first P1 file "${files[0].name}" is ${_foldFmtBytes(files[0].size)}. ` +
+   'The first file buffers midpoints in memory before binning and is the most crash-prone step.\n\n' +
+   'Prefer a smaller first file to lock the grid, then add large files.\n\nContinue with this first file?'
+  );
+  if (!go) {
+   showToast('Cancelled — start with a smaller P1 to lock the fold grid.', 6000);
+   return;
+  }
+ }
+
  // Sequential + streamed: one file (in 8 MB slices) in memory at a time,
  // so a large batch import cannot exhaust memory. Peak usage is O(bins).
  for (let k = 0; k < files.length; k++) {
  const f = files[k];
+ // Re-check between files — heap grows as hits Maps fill
+ if (k > 0 && !_foldWarnIfCrashRisk(f.size || 0, `before "${f.name}"`)) {
+  showToast(`Stopped before "${f.name}" (${k}/${files.length} already processed). Save fold JSON now.`, 8000);
+  break;
+ }
  const big = f.size > 20 * 1024 * 1024;
  if (files.length > 1 || big) {
  showToast(`Processing "${f.name}" (${k + 1}/${files.length}, ${(f.size / 1048576).toFixed(1)} MB)...`, 60000);
@@ -23693,16 +23853,30 @@ async function foldAddFiles(event) {
  } else {
   _foldBytesLoaded += (f.size || 0);
   if (r.warn) showToast(r.warn, 6000);
+  _foldUpdateCrashBanner();
  }
  } catch (err) {
  console.error('Fold parse error:', err);
  showToast(`Failed to process "${f.name}": ${err.message}`, 5000);
+ // OOM-ish failures often surface as unexpected errors
+ const p = _foldMemProbe();
+ if (p.level === 'warn' || p.level === 'critical') {
+  showToast('Fold processing failed under memory pressure — save what you have and reset before retrying.', 8000);
+  break;
+ }
  }
  }
  _foldRebuild();
  _foldUpdateLimitBanner();
  _foldRender();
- if (files.length > 1) showToast(`Batch import done - ${files.length} file(s) processed.`, 3500);
+ const risk = _foldMemProbe();
+ if (risk.level === 'critical') {
+  showToast('Fold rebuild done — browser memory is critical. Save fold JSON and avoid adding more P1.', 9000);
+ } else if (risk.level === 'warn') {
+  showToast('Fold rebuild done — high crash risk if you add more large P1 files.', 7000);
+ } else if (files.length > 1) {
+  showToast(`Batch import done - ${files.length} file(s) processed.`, 3500);
+ }
 }
 
 function foldSave() {
