@@ -15662,16 +15662,115 @@ var _appWorkspace = null; // 'planning' | 'database'
 var _tdbActiveProjectId = null;
 var _tdbActiveDay = null; // YYYY-MM-DD
 
-const TDB_CODE_COLORS = {
- ONLINE: '#30d158',
- LINECHANGE: '#00d2ff',
- STANDBY: '#a78bfa',
- WEATHER: '#60a5fa',
- TECH: '#f97316',
- MOB: '#eab308',
- OTHER: '#94a3b8',
- GAP: '#ef4444'
+/** Timing taxonomy: Category → Activities (CheckPoint-style). */
+const TDB_CATEGORIES = [
+ { id: 'PRODUCTION', label: 'Production', color: '#30d158' },
+ { id: 'STANDBY', label: 'Standby', color: '#a78bfa' },
+ { id: 'DOWNTIME', label: 'Downtime', color: '#f97316' },
+ { id: 'MOBILISATION', label: 'Mobilisation', color: '#eab308' },
+ { id: 'OTHER', label: 'Other', color: '#94a3b8' }
+];
+
+const TDB_ACTIVITIES = [
+ { id: 'ONLINE', categoryId: 'PRODUCTION', label: 'Online acquisition', color: '#30d158' },
+ { id: 'LINECHANGE', categoryId: 'PRODUCTION', label: 'Line change / transit', color: '#00d2ff' },
+ { id: 'INFILL', categoryId: 'PRODUCTION', label: 'Infill / reshoot', color: '#34d399' },
+ { id: 'TEST_PROD', categoryId: 'PRODUCTION', label: 'Test / calibration (production)', color: '#5eead4' },
+ { id: 'STANDBY_CLIENT', categoryId: 'STANDBY', label: 'Waiting on client', color: '#a78bfa' },
+ { id: 'STANDBY_PERMIT', categoryId: 'STANDBY', label: 'Waiting on permit / access', color: '#c4b5fd' },
+ { id: 'STANDBY_OTHER', categoryId: 'STANDBY', label: 'Standby — other', color: '#8b5cf6' },
+ { id: 'WEATHER', categoryId: 'DOWNTIME', label: 'Weather (WOW)', color: '#60a5fa' },
+ { id: 'TECH', categoryId: 'DOWNTIME', label: 'Technical / equipment', color: '#f97316' },
+ { id: 'STREAMER', categoryId: 'DOWNTIME', label: 'Streamer / cable work', color: '#fb923c' },
+ { id: 'MOB', categoryId: 'MOBILISATION', label: 'Mobilisation', color: '#eab308' },
+ { id: 'DEMOB', categoryId: 'MOBILISATION', label: 'Demobilisation', color: '#facc15' },
+ { id: 'PORT', categoryId: 'MOBILISATION', label: 'Port / logistics', color: '#ca8a04' },
+ { id: 'OTHER', categoryId: 'OTHER', label: 'Other / misc', color: '#94a3b8' },
+ { id: 'MEAL', categoryId: 'OTHER', label: 'Meal / crew change', color: '#64748b' }
+];
+
+/** Map legacy flat codes → category/activity. */
+const TDB_LEGACY_MAP = {
+ ONLINE: { categoryId: 'PRODUCTION', activityId: 'ONLINE' },
+ LINECHANGE: { categoryId: 'PRODUCTION', activityId: 'LINECHANGE' },
+ STANDBY: { categoryId: 'STANDBY', activityId: 'STANDBY_OTHER' },
+ WEATHER: { categoryId: 'DOWNTIME', activityId: 'WEATHER' },
+ TECH: { categoryId: 'DOWNTIME', activityId: 'TECH' },
+ MOB: { categoryId: 'MOBILISATION', activityId: 'MOB' },
+ OTHER: { categoryId: 'OTHER', activityId: 'OTHER' },
+ GAP: { categoryId: 'OTHER', activityId: 'OTHER' }
 };
+
+function _tdbCat(id) {
+ return TDB_CATEGORIES.find(c => c.id === id) || TDB_CATEGORIES[TDB_CATEGORIES.length - 1];
+}
+
+function _tdbAct(id) {
+ return TDB_ACTIVITIES.find(a => a.id === id) || TDB_ACTIVITIES.find(a => a.id === 'OTHER');
+}
+
+function _tdbActsForCategory(categoryId) {
+ return TDB_ACTIVITIES.filter(a => a.categoryId === categoryId);
+}
+
+function _tdbNormalizeSeg(s) {
+ let categoryId = s.categoryId;
+ let activityId = s.activityId || s.code;
+ if ((!categoryId || !activityId) && s.code && TDB_LEGACY_MAP[s.code]) {
+  categoryId = TDB_LEGACY_MAP[s.code].categoryId;
+  activityId = TDB_LEGACY_MAP[s.code].activityId;
+ }
+ if (!activityId) activityId = 'OTHER';
+ const act = _tdbAct(activityId);
+ if (!categoryId) categoryId = act.categoryId;
+ return {
+  ...s,
+  categoryId,
+  activityId,
+  code: activityId // keep code alias for older UI paths
+ };
+}
+
+function tdbInitCategoryActivityUi() {
+ const catEl = document.getElementById('tdb-category');
+ const actEl = document.getElementById('tdb-activity');
+ if (!catEl || !actEl) return;
+ if (!catEl.options.length) {
+  catEl.innerHTML = TDB_CATEGORIES.map(c =>
+   `<option value="${c.id}">${c.label}</option>`
+  ).join('');
+ }
+ if (!catEl.value) catEl.value = 'PRODUCTION';
+ tdbOnCategoryChanged();
+}
+
+function tdbOnCategoryChanged() {
+ const catEl = document.getElementById('tdb-category');
+ const actEl = document.getElementById('tdb-activity');
+ if (!catEl || !actEl) return;
+ const catId = catEl.value || 'PRODUCTION';
+ const acts = _tdbActsForCategory(catId);
+ const prev = actEl.value;
+ actEl.innerHTML = acts.map(a =>
+  `<option value="${a.id}">${a.label}</option>`
+ ).join('');
+ if (prev && acts.some(a => a.id === prev)) actEl.value = prev;
+ else if (acts.length) actEl.value = acts[0].id;
+}
+
+function _tdbSelectedCatAct() {
+ const catEl = document.getElementById('tdb-category');
+ const actEl = document.getElementById('tdb-activity');
+ let categoryId = (catEl && catEl.value) || 'PRODUCTION';
+ let activityId = (actEl && actEl.value) || 'ONLINE';
+ const act = _tdbAct(activityId);
+ if (act.categoryId !== categoryId) {
+  // Keep activity authoritative if mismatched
+  categoryId = act.categoryId;
+  if (catEl) catEl.value = categoryId;
+ }
+ return { categoryId, activityId, act, cat: _tdbCat(categoryId) };
+}
 
 function _tdbTodayIso() {
  const d = new Date();
@@ -15790,13 +15889,25 @@ function _tdbAnalyseDay(segments) {
  if (cursor < TDB_DAY_MINUTES) gaps.push({ startMin: cursor, endMin: TDB_DAY_MINUTES });
 
  const byCode = {};
- segs.forEach(s => {
-  const c = s.code || 'OTHER';
-  byCode[c] = (byCode[c] || 0) + (s.endMin - s.startMin);
+ const byCategory = {};
+ const byActivity = {};
+ segs.forEach(raw => {
+  const s = _tdbNormalizeSeg(raw);
+  const mins = s.endMin - s.startMin;
+  const c = s.activityId || s.code || 'OTHER';
+  const cat = s.categoryId || _tdbAct(c).categoryId;
+  byCode[c] = (byCode[c] || 0) + mins;
+  byActivity[c] = (byActivity[c] || 0) + mins;
+  byCategory[cat] = (byCategory[cat] || 0) + mins;
  });
 
  const complete = gaps.length === 0 && overlaps.length === 0 && covered === TDB_DAY_MINUTES;
- return { segs, gaps, overlaps, covered, gapMinutes: TDB_DAY_MINUTES - covered, byCode, complete };
+ return {
+  segs: segs.map(_tdbNormalizeSeg),
+  gaps, overlaps, covered,
+  gapMinutes: TDB_DAY_MINUTES - covered,
+  byCode, byCategory, byActivity, complete
+ };
 }
 
 function showWorkspaceChooser() {
@@ -15825,8 +15936,9 @@ function enterWorkspace(mode) {
    const dayEl = document.getElementById('tdb-day');
    if (dayEl) dayEl.value = _tdbActiveDay;
   }
+  tdbInitCategoryActivityUi();
   tdbRender();
-  showToast('Timing Database — account every minute of the day', 3000);
+  showToast('Timing Database — Category → Activity, every minute of the day', 3000);
   return;
  }
 
@@ -15844,6 +15956,7 @@ function tdbOnDayChanged() {
 }
 
 function tdbRender() {
+ tdbInitCategoryActivityUi();
  const store = _tdbLoadStore();
  if (!_tdbActiveProjectId && store.projects.length) {
   _tdbActiveProjectId = store.projects[0].id;
@@ -15911,11 +16024,8 @@ function tdbCreateProject() {
 function tdbAddActivity() {
  if (!_tdbActiveProjectId) { showToast('Create or select a project first'); return; }
  const day = _tdbActiveDay || _tdbTodayIso();
- const code = (document.getElementById('tdb-act-code') || {}).value || 'OTHER';
- if (code === 'GAP') {
-  showToast('GAP is for unaccounted time — pick a real time code, or use Fill all gaps');
-  return;
- }
+ const sel = _tdbSelectedCatAct();
+ const { categoryId, activityId } = sel;
  const startStr = (document.getElementById('tdb-act-start') || {}).value || '00:00';
  const endStr = (document.getElementById('tdb-act-end') || {}).value || '01:00';
  const note = ((document.getElementById('tdb-act-note') || {}).value || '').trim();
@@ -15936,22 +16046,24 @@ function tdbAddActivity() {
  const segs = _tdbGetDaySegs(proj, day);
  const overlap = segs.find(s => startMin < s.endMin && endMin > s.startMin);
  if (overlap) {
+  const o = _tdbNormalizeSeg(overlap);
   showToast(
-   'Overlaps existing ' + overlap.code + ' (' + _tdbFmtMin(overlap.startMin) + '–' + _tdbFmtMin(overlap.endMin) + ')',
+   'Overlaps existing ' + _tdbCat(o.categoryId).label + ' / ' + _tdbAct(o.activityId).label
+    + ' (' + _tdbFmtMin(o.startMin) + '–' + _tdbFmtMin(o.endMin) + ')',
    6000
   );
   return;
  }
  segs.push({
   id: 'a_' + Date.now().toString(36),
-  code, startMin, endMin, note
+  categoryId, activityId, code: activityId,
+  startMin, endMin, note
  });
  segs.sort((a, b) => a.startMin - b.startMin);
  proj.days[day].segments = segs;
  _tdbSaveStore(store);
  const noteEl = document.getElementById('tdb-act-note');
  if (noteEl) noteEl.value = '';
- // Suggest next start = this end
  const startEl = document.getElementById('tdb-act-start');
  const endEl = document.getElementById('tdb-act-end');
  if (startEl) startEl.value = _tdbFmtMin(endMin === TDB_DAY_MINUTES ? 0 : endMin);
@@ -15961,13 +16073,17 @@ function tdbAddActivity() {
  }
  tdbRender();
  const mins = endMin - startMin;
- showToast('Logged ' + code + ' ' + _tdbFmtMin(startMin) + '–' + _tdbFmtMin(endMin) + ' (' + mins + ' min)', 3000);
+ showToast(
+  sel.cat.label + ' → ' + sel.act.label + ' · '
+   + _tdbFmtMin(startMin) + '–' + _tdbFmtMin(endMin) + ' (' + mins + ' min)',
+  3500
+ );
 }
 
 function tdbFillGaps() {
  if (!_tdbActiveProjectId) { showToast('Select a project first'); return; }
- const code = (document.getElementById('tdb-act-code') || {}).value || 'STANDBY';
- if (code === 'GAP') { showToast('Pick a real time code to fill gaps with'); return; }
+ const sel = _tdbSelectedCatAct();
+ const { categoryId, activityId } = sel;
  const day = _tdbActiveDay || _tdbTodayIso();
  const store = _tdbLoadStore();
  const proj = store.projects.find(p => p.id === _tdbActiveProjectId);
@@ -15985,7 +16101,8 @@ function tdbFillGaps() {
  analysis.gaps.forEach(g => {
   segs.push({
    id: 'a_' + Date.now().toString(36) + '_' + g.startMin,
-   code, startMin: g.startMin, endMin: g.endMin,
+   categoryId, activityId, code: activityId,
+   startMin: g.startMin, endMin: g.endMin,
    note: 'Auto-filled gap'
   });
  });
@@ -15993,7 +16110,11 @@ function tdbFillGaps() {
  proj.days[day].segments = segs;
  _tdbSaveStore(store);
  tdbRender();
- showToast('Filled ' + analysis.gaps.length + ' gap(s) with ' + code + ' (' + analysis.gapMinutes + ' min)', 4000);
+ showToast(
+  'Filled ' + analysis.gaps.length + ' gap(s) with '
+   + sel.cat.label + ' → ' + sel.act.label + ' (' + analysis.gapMinutes + ' min)',
+  4000
+ );
 }
 
 function tdbClearDay() {
@@ -16055,7 +16176,7 @@ function tdbRenderDay(proj) {
  }
 
  if (timeline) {
-  // Paint covered segments + gap stripes
+  // Paint covered segments + gap stripes (colour by activity)
   const bits = [];
   let cursor = 0;
   const sorted = a.segs.slice().sort((x, y) => x.startMin - y.startMin);
@@ -16065,8 +16186,10 @@ function tdbRenderDay(proj) {
     bits.push(`<div title="GAP ${_tdbFmtMin(cursor)}–${_tdbFmtMin(s.startMin)}" style="width:${gPct}%;height:100%;background:repeating-linear-gradient(135deg,#3f1d1d,#3f1d1d 4px,#1a0a0a 4px,#1a0a0a 8px);flex-shrink:0;"></div>`);
    }
    const pct = ((s.endMin - s.startMin) / TDB_DAY_MINUTES) * 100;
-   const col = TDB_CODE_COLORS[s.code] || TDB_CODE_COLORS.OTHER;
-   bits.push(`<div title="${_escHtml(s.code)} ${_tdbFmtMin(s.startMin)}–${_tdbFmtMin(s.endMin)}" style="width:${pct}%;height:100%;background:${col};flex-shrink:0;opacity:0.9;"></div>`);
+   const act = _tdbAct(s.activityId);
+   const cat = _tdbCat(s.categoryId);
+   const col = act.color || cat.color || '#94a3b8';
+   bits.push(`<div title="${_escHtml(cat.label)} → ${_escHtml(act.label)} ${_tdbFmtMin(s.startMin)}–${_tdbFmtMin(s.endMin)}" style="width:${pct}%;height:100%;background:${col};flex-shrink:0;opacity:0.9;"></div>`);
    cursor = Math.max(cursor, s.endMin);
   });
   if (cursor < TDB_DAY_MINUTES) {
@@ -16077,22 +16200,41 @@ function tdbRenderDay(proj) {
  }
 
  if (roll) {
-  const order = ['ONLINE', 'LINECHANGE', 'STANDBY', 'WEATHER', 'TECH', 'MOB', 'OTHER'];
-  const keys = order.filter(k => a.byCode[k] > 0).concat(Object.keys(a.byCode).filter(k => !order.includes(k)));
-  if (!keys.length && a.gapMinutes === TDB_DAY_MINUTES) {
-   roll.textContent = 'No blocks yet — add time blocks until 1,440 minutes are covered.';
+  if (!Object.keys(a.byCategory || {}).length && a.gapMinutes === TDB_DAY_MINUTES) {
+   roll.textContent = 'No blocks yet — pick Category → Activity and add blocks until 1,440 minutes are covered.';
   } else {
-   roll.innerHTML = keys.map(k => {
-    const mins = a.byCode[k];
-    return `<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #14141c;">
-      <span style="color:${TDB_CODE_COLORS[k] || '#94a3b8'};font-weight:700;">${k}</span>
-      <span style="color:#e2e8f0;font-weight:700;">${mins} min <span style="color:#64748b;font-weight:500;">(${(mins / 60).toFixed(2)} h)</span></span>
+   let html = '';
+   TDB_CATEGORIES.forEach(cat => {
+    const catMins = a.byCategory[cat.id] || 0;
+    if (!(catMins > 0)) return;
+    html += `<div style="display:flex;justify-content:space-between;padding:6px 0 2px;margin-top:4px;border-top:1px solid #1a1a24;">
+      <span style="color:${cat.color};font-weight:800;letter-spacing:0.3px;text-transform:uppercase;font-size:10px;">${_escHtml(cat.label)}</span>
+      <span style="color:#e2e8f0;font-weight:800;">${catMins} min <span style="color:#64748b;font-weight:500;">(${(catMins / 60).toFixed(2)} h)</span></span>
      </div>`;
-   }).join('')
-    + (a.gapMinutes > 0
+    _tdbActsForCategory(cat.id).forEach(act => {
+     const mins = a.byActivity[act.id] || 0;
+     if (!(mins > 0)) return;
+     html += `<div style="display:flex;justify-content:space-between;padding:2px 0 2px 12px;border-bottom:1px solid #14141c;">
+       <span style="color:${act.color};font-weight:600;">${_escHtml(act.label)}</span>
+       <span style="color:#cbd5e1;font-weight:600;">${mins} min <span style="color:#64748b;font-weight:500;">(${(mins / 60).toFixed(2)} h)</span></span>
+      </div>`;
+    });
+   });
+   // Orphan activity ids not in taxonomy
+   Object.keys(a.byActivity || {}).forEach(aid => {
+    if (TDB_ACTIVITIES.some(x => x.id === aid)) return;
+    const mins = a.byActivity[aid];
+    if (!(mins > 0)) return;
+    html += `<div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid #14141c;">
+      <span style="color:#94a3b8;font-weight:600;">${_escHtml(aid)}</span>
+      <span style="color:#cbd5e1;font-weight:600;">${mins} min</span>
+     </div>`;
+   });
+   html += (a.gapMinutes > 0
      ? `<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #14141c;"><span style="color:#ef4444;font-weight:700;">UNACCOUNTED</span><span style="color:#ef4444;font-weight:700;">${a.gapMinutes} min</span></div>`
      : '')
     + `<div style="display:flex;justify-content:space-between;padding:8px 0 0;margin-top:4px;"><span style="color:#fbbf24;font-weight:700;">DAY TOTAL</span><span style="color:#fbbf24;font-weight:800;">${a.covered} / 1,440 min</span></div>`;
+   roll.innerHTML = html;
   }
  }
 
@@ -16103,9 +16245,13 @@ function tdbRenderDay(proj) {
    list.innerHTML = '<div style="font-size:10px;color:#64748b;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.4px;">Blocks (chronological)</div>'
     + a.segs.map(s => {
      const mins = s.endMin - s.startMin;
+     const act = _tdbAct(s.activityId);
+     const cat = _tdbCat(s.categoryId);
      return `<div style="display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid #14141c;font-size:11px;align-items:center;">
        <div style="min-width:0;">
-        <span style="color:${TDB_CODE_COLORS[s.code] || '#94a3b8'};font-weight:700;">${_escHtml(s.code)}</span>
+        <span style="color:${cat.color};font-weight:700;">${_escHtml(cat.label)}</span>
+        <span style="color:#64748b;"> → </span>
+        <span style="color:${act.color};font-weight:700;">${_escHtml(act.label)}</span>
         <span style="color:#94a3b8;"> · ${_tdbFmtMin(s.startMin)}–${_tdbFmtMin(s.endMin)}</span>
         ${s.note ? ` <span style="color:#64748b;">· ${_escHtml(s.note)}</span>` : ''}
        </div>
@@ -16134,11 +16280,14 @@ function tdbExportJson() {
  const analysis = _tdbAnalyseDay(_tdbGetDaySegs(proj, day));
  const blob = new Blob([JSON.stringify({
   type: 'candooka-timing-db',
-  version: 2,
+  version: 3,
   dayMinutes: TDB_DAY_MINUTES,
+  taxonomy: { categories: TDB_CATEGORIES, activities: TDB_ACTIVITIES },
   exportDay: day,
   dayComplete: analysis.complete,
   dayCoveredMinutes: analysis.covered,
+  byCategory: analysis.byCategory,
+  byActivity: analysis.byActivity,
   project: proj
  }, null, 2)], { type: 'application/json' });
  const a = document.createElement('a');
