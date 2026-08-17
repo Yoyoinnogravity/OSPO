@@ -2,18 +2,19 @@
 // NOAA real-time map grid proxy for Leaflet image overlays.
 // Waves/swell: PacIOOS ww3_global (WAVEWATCH III)
 // Wind: PacIOOS ncep_global / CoastWatch NCEP_Global_Best (GFS 10 m)
+// Currents: CoastWatch nesdisSSH1day (altimetry geostrophic ugos/vgos → speed kt)
 // Returns a compact lat/lon value grid (JSON) so the client can paint a canvas overlay.
-// Public-domain U.S. Government model fields via ERDDAP.
+// Public-domain U.S. Government model / altimetry fields via ERDDAP.
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 header('Cache-Control: public, max-age=900'); // 15 min — model fields update ~hourly
 
 $mode = isset($_GET['mode']) ? strtolower(trim($_GET['mode'])) : 'waves';
-$allowed = ['waves', 'swell', 'swell_period', 'wind'];
+$allowed = ['waves', 'swell', 'swell_period', 'wind', 'currents'];
 if (!in_array($mode, $allowed, true)) {
     http_response_code(400);
-    echo json_encode(['error' => 'mode must be waves, swell, swell_period, or wind']);
+    echo json_encode(['error' => 'mode must be waves, swell, swell_period, wind, or currents']);
     exit;
 }
 
@@ -50,6 +51,10 @@ function snapHalf($v) {
     return round($v * 2) / 2;
 }
 
+function snapQuarter($v) {
+    return round($v * 4) / 4;
+}
+
 function fetchErddapJson($url) {
     $ch = curl_init($url);
     curl_setopt_array($ch, [
@@ -71,29 +76,18 @@ function fetchErddapJson($url) {
     return is_array($j) ? $j : null;
 }
 
-/** Snap and stride a 0.5° axis so we stay near maxCells. */
-function axisSpec($a, $b, $maxCells) {
-    $a = snapHalf($a);
-    $b = snapHalf($b);
+/** Snap and stride an axis so we stay near maxCells. */
+function axisSpec($a, $b, $maxCells, $step = 0.5) {
+    $snap = ($step <= 0.25) ? 'snapQuarter' : 'snapHalf';
+    $a = $snap($a);
+    $b = $snap($b);
     if ($b < $a) { $t = $a; $a = $b; $b = $t; }
-    $n = (int)round(($b - $a) / 0.5) + 1;
-    if ($n < 2) { $b = $a + 0.5; $n = 2; }
+    $n = (int)round(($b - $a) / $step) + 1;
+    if ($n < 2) { $b = $a + $step; $n = 2; }
     $stride = (int)max(1, (int)ceil($n / $maxCells));
     // ERDDAP stride syntax: (start):stride:(stop) — stride is index step
     return [$a, $b, $stride];
 }
-
-$w360 = lon360($west);
-$e360 = lon360($east);
-// Refuse antimeridian for this endpoint (client should split or zoom)
-if ($e360 < $w360) {
-    http_response_code(400);
-    echo json_encode(['error' => 'Antimeridian spans are not supported — pan so the view does not cross 180°']);
-    exit;
-}
-
-list($lat0, $lat1, $latStride) = axisSpec($south, $north, $maxCells);
-list($lon0, $lon1, $lonStride) = axisSpec($w360, $e360, $maxCells);
 
 $meta = [
     'waves' => [
@@ -112,29 +106,60 @@ $meta = [
         'var' => 'speed', 'unit' => 'kt', 'label' => '10 m wind speed',
         'depth' => false, 'paletteMax' => 40.0,
     ],
+    'currents' => [
+        'var' => 'speed', 'unit' => 'kt', 'label' => 'Surface current speed',
+        'depth' => false, 'paletteMax' => 4.0,
+    ],
 ];
 $m = $meta[$mode];
 
-if ($mode === 'wind') {
+// Currents (altimetry geostrophic) use ±180 lon and 0.25° cells.
+// Wind/waves use 0–360 lon on PacIOOS / CoastWatch WW3+GFS grids.
+if ($mode === 'currents') {
+    list($lat0, $lat1, $latStride) = axisSpec($south, $north, $maxCells, 0.25);
+    list($lon0, $lon1, $lonStride) = axisSpec($west, $east, $maxCells, 0.25);
     $q = sprintf(
-        '?ugrd10m%%5B(last)%%5D%%5B(%.1f):%d:(%.1f)%%5D%%5B(%.1f):%d:(%.1f)%%5D'
-        . ',vgrd10m%%5B(last)%%5D%%5B(%.1f):%d:(%.1f)%%5D%%5B(%.1f):%d:(%.1f)%%5D',
+        '?ugos%%5B(last)%%5D%%5B(%.2f):%d:(%.2f)%%5D%%5B(%.2f):%d:(%.2f)%%5D'
+        . ',vgos%%5B(last)%%5D%%5B(%.2f):%d:(%.2f)%%5D%%5B(%.2f):%d:(%.2f)%%5D',
         $lat0, $latStride, $lat1, $lon0, $lonStride, $lon1,
         $lat0, $latStride, $lat1, $lon0, $lonStride, $lon1
     );
     $urls = [
-        'https://pae-paha.pacioos.hawaii.edu/erddap/griddap/ncep_global.json' . $q,
-        'https://coastwatch.pfeg.noaa.gov/erddap/griddap/NCEP_Global_Best.json' . $q,
+        'https://coastwatch.pfeg.noaa.gov/erddap/griddap/nesdisSSH1day.json' . $q,
     ];
 } else {
-    $q = sprintf(
-        '?%s%%5B(last)%%5D%%5B(0.0)%%5D%%5B(%.1f):%d:(%.1f)%%5D%%5B(%.1f):%d:(%.1f)%%5D',
-        $m['var'], $lat0, $latStride, $lat1, $lon0, $lonStride, $lon1
-    );
-    $urls = [
-        'https://pae-paha.pacioos.hawaii.edu/erddap/griddap/ww3_global.json' . $q,
-        'https://coastwatch.pfeg.noaa.gov/erddap/griddap/NWW3_Global_Best.json' . $q,
-    ];
+    $w360 = lon360($west);
+    $e360 = lon360($east);
+    // Refuse antimeridian for this endpoint (client should split or zoom)
+    if ($e360 < $w360) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Antimeridian spans are not supported — pan so the view does not cross 180°']);
+        exit;
+    }
+    list($lat0, $lat1, $latStride) = axisSpec($south, $north, $maxCells, 0.5);
+    list($lon0, $lon1, $lonStride) = axisSpec($w360, $e360, $maxCells, 0.5);
+
+    if ($mode === 'wind') {
+        $q = sprintf(
+            '?ugrd10m%%5B(last)%%5D%%5B(%.1f):%d:(%.1f)%%5D%%5B(%.1f):%d:(%.1f)%%5D'
+            . ',vgrd10m%%5B(last)%%5D%%5B(%.1f):%d:(%.1f)%%5D%%5B(%.1f):%d:(%.1f)%%5D',
+            $lat0, $latStride, $lat1, $lon0, $lonStride, $lon1,
+            $lat0, $latStride, $lat1, $lon0, $lonStride, $lon1
+        );
+        $urls = [
+            'https://pae-paha.pacioos.hawaii.edu/erddap/griddap/ncep_global.json' . $q,
+            'https://coastwatch.pfeg.noaa.gov/erddap/griddap/NCEP_Global_Best.json' . $q,
+        ];
+    } else {
+        $q = sprintf(
+            '?%s%%5B(last)%%5D%%5B(0.0)%%5D%%5B(%.1f):%d:(%.1f)%%5D%%5B(%.1f):%d:(%.1f)%%5D',
+            $m['var'], $lat0, $latStride, $lat1, $lon0, $lonStride, $lon1
+        );
+        $urls = [
+            'https://pae-paha.pacioos.hawaii.edu/erddap/griddap/ww3_global.json' . $q,
+            'https://coastwatch.pfeg.noaa.gov/erddap/griddap/NWW3_Global_Best.json' . $q,
+        ];
+    }
 }
 
 $json = null;
@@ -169,12 +194,15 @@ foreach ($rows as $r) {
     $lo = floatval($r[$idx['longitude']]);
     // Present lons in -180..180 for Leaflet
     $loSigned = $lo > 180 ? $lo - 360 : $lo;
-    $latSet[sprintf('%.1f', $la)] = $la;
-    $lonSet[sprintf('%.1f', $loSigned)] = $loSigned;
 
     if ($mode === 'wind') {
         $u = $r[$idx['ugrd10m']] ?? null;
         $v = $r[$idx['vgrd10m']] ?? null;
+        if (!is_numeric($u) || !is_numeric($v)) continue;
+        $val = sqrt(floatval($u) * floatval($u) + floatval($v) * floatval($v)) * 1.943844; // kt
+    } else if ($mode === 'currents') {
+        $u = $r[$idx['ugos']] ?? null;
+        $v = $r[$idx['vgos']] ?? null;
         if (!is_numeric($u) || !is_numeric($v)) continue;
         $val = sqrt(floatval($u) * floatval($u) + floatval($v) * floatval($v)) * 1.943844; // kt
     } else {
@@ -182,7 +210,11 @@ foreach ($rows as $r) {
         if (!is_numeric($raw) || strcasecmp((string)$raw, 'NaN') === 0) continue;
         $val = floatval($raw);
     }
-    $byKey[sprintf('%.1f|%.1f', $la, $loSigned)] = $val;
+    $keyFmt = ($mode === 'currents') ? '%.3f|%.3f' : '%.1f|%.1f';
+    $axisFmt = ($mode === 'currents') ? '%.3f' : '%.1f';
+    $latSet[sprintf($axisFmt, $la)] = $la;
+    $lonSet[sprintf($axisFmt, $loSigned)] = $loSigned;
+    $byKey[sprintf($keyFmt, $la, $loSigned)] = $val;
 }
 
 $lats = array_values($latSet);
@@ -192,13 +224,15 @@ sort($lons, SORT_NUMERIC);
 // Paint north→south so image matches geographic orientation when drawn top-down
 $lats = array_reverse($lats);
 
+$keyFmt = ($mode === 'currents') ? '%.3f|%.3f' : '%.1f|%.1f';
+
 $values = [];
 $min = null;
 $max = null;
 foreach ($lats as $la) {
     $rowOut = [];
     foreach ($lons as $lo) {
-        $k = sprintf('%.1f|%.1f', $la, $lo);
+        $k = sprintf($keyFmt, $la, $lo);
         if (!array_key_exists($k, $byKey)) {
             $rowOut[] = null;
             continue;
@@ -238,7 +272,9 @@ echo json_encode([
     'max' => round($max, 2),
     'source' => $mode === 'wind'
         ? 'NOAA/NCEP GFS 10 m (PacIOOS / CoastWatch ERDDAP)'
-        : 'NOAA WAVEWATCH III (PacIOOS / CoastWatch ERDDAP)',
-    'attribution' => 'NOAA public-domain model field',
+        : ($mode === 'currents'
+            ? 'NOAA CoastWatch altimetry geostrophic currents (nesdisSSH1day)'
+            : 'NOAA WAVEWATCH III (PacIOOS / CoastWatch ERDDAP)'),
+    'attribution' => 'NOAA public-domain model / altimetry field',
     'datasetHint' => $used,
 ]);

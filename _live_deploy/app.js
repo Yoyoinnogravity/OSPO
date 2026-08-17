@@ -14437,7 +14437,7 @@ function logoutUser() {
   overlay.style.display = 'flex';
   overlay.style.zIndex = '9999';
  }
- // Hide Database workspace when returning to sign-in
+ // Maps / GIS only — ensure timing-DB shell is gone on sign-in
  const dbWs = document.getElementById('workspace-database');
  if (dbWs) dbWs.style.display = 'none';
  const app = document.getElementById('app');
@@ -16590,7 +16590,55 @@ function toggleMapLayer(layerName) {
  return;
  }
  
- if (layerName === 'sst') {
+ if (layerName === 'waves' || layerName === 'wind' || layerName === 'currents') {
+  const cb = document.getElementById('layer-overlay-' + layerName);
+  const wantOn = !!(cb && cb.checked);
+  if (wantOn) {
+   // NOAA painted overlays are mutually exclusive
+   ['waves', 'wind', 'currents'].forEach((name) => {
+    if (name === layerName) return;
+    const other = document.getElementById('layer-overlay-' + name);
+    if (other) other.checked = false;
+   });
+   const radio = document.querySelector('input[name="noaa-map-overlay"][value="' + layerName + '"]');
+   if (radio) radio.checked = true;
+   setNoaaMapOverlay(layerName);
+  } else if (noaaMapMode === layerName) {
+   setNoaaMapOverlay('off');
+  }
+ } else if (layerName === 'offshore') {
+  if (mapLayers.offshore) {
+   map.removeLayer(mapLayers.offshore);
+   mapLayers.offshore = null;
+  } else {
+   mapLayers.offshore = L.tileLayer.wms('https://ows.emodnet-humanactivities.eu/wms', {
+    layers: 'platforms,pipelines,powercables,telecablesactual',
+    format: 'image/png',
+    transparent: true,
+    opacity: 0.9,
+    attribution: 'Offshore infra (c) EMODnet Human Activities',
+    maxZoom: 22,
+    version: '1.3.0'
+   }).addTo(map);
+   showToast('Platforms, pipelines & cables on (EMODnet — European waters)');
+  }
+ } else if (layerName === 'mpa') {
+  if (mapLayers.mpa) {
+   map.removeLayer(mapLayers.mpa);
+   mapLayers.mpa = null;
+  } else {
+   mapLayers.mpa = L.tileLayer.wms('https://ows.emodnet-humanactivities.eu/wms', {
+    layers: 'marineprotectedareas',
+    format: 'image/png',
+    transparent: true,
+    opacity: 0.75,
+    attribution: 'MPAs (c) EMODnet Human Activities',
+    maxZoom: 22,
+    version: '1.3.0'
+   }).addTo(map);
+   showToast('Marine protected areas on (EMODnet — European waters)');
+  }
+ } else if (layerName === 'sst') {
  // SST heatmap overlay on whatever basemap is active (on request only).
  if (mapLayers.sst) {
  map.removeLayer(mapLayers.sst);
@@ -25037,8 +25085,8 @@ function _applyNoaaMarine(el, data) {
   + '</div>';
 }
 
-// ===== NOAA real-time map overlays (WW3 / GFS grids via /api/noaa-map-grid.php) =====
-let noaaMapMode = null; // waves | swell | swell_period | wind | null
+// ===== NOAA real-time map overlays (WW3 / GFS / altimetry currents via /api/noaa-map-grid.php) =====
+let noaaMapMode = null; // waves | swell | swell_period | wind | currents | null
 let noaaMapLayer = null;
 let noaaMapOpacity = 0.65;
 let noaaMapBusy = false;
@@ -25046,22 +25094,31 @@ let noaaMapMoveTimer = null;
 let noaaMapListenersBound = false;
 let noaaMapRequestId = 0;
 
+function syncNoaaLayerCheckboxes() {
+  const modes = ['waves', 'wind', 'currents'];
+  modes.forEach((name) => {
+    const cb = document.getElementById('layer-overlay-' + name);
+    if (cb) cb.checked = (noaaMapMode === name);
+  });
+}
+
 function openNoaaPanel() {
- togglePanel('noaa');
- // Sync SST checkbox with Layers overlay state
- const sstCb = document.getElementById('noaa-overlay-sst');
- const layerCb = document.getElementById('layer-overlay-sst');
- if (sstCb && layerCb) sstCb.checked = !!layerCb.checked;
- const op = document.getElementById('noaa-map-opacity');
- if (op) {
-  op.value = String(Math.round(noaaMapOpacity * 100));
-  const lab = document.getElementById('noaa-map-opacity-val');
-  if (lab) lab.textContent = op.value + '%';
- }
- if (noaaMapMode) {
-  const r = document.querySelector('input[name="noaa-map-overlay"][value="' + noaaMapMode + '"]');
-  if (r) r.checked = true;
- }
+  togglePanel('noaa');
+  // Sync SST checkbox with Layers overlay state
+  const sstCb = document.getElementById('noaa-overlay-sst');
+  const layerCb = document.getElementById('layer-overlay-sst');
+  if (sstCb && layerCb) sstCb.checked = !!layerCb.checked;
+  const op = document.getElementById('noaa-map-opacity');
+  if (op) {
+   op.value = String(Math.round(noaaMapOpacity * 100));
+   const lab = document.getElementById('noaa-map-opacity-val');
+   if (lab) lab.textContent = op.value + '%';
+  }
+  if (noaaMapMode) {
+   const r = document.querySelector('input[name="noaa-map-overlay"][value="' + noaaMapMode + '"]');
+   if (r) r.checked = true;
+  }
+  syncNoaaLayerCheckboxes();
 }
 
 function setNoaaMapStatus(msg, isErr) {
@@ -25091,30 +25148,33 @@ function toggleNoaaSstOverlay(on) {
 }
 
 function setNoaaMapOverlay(mode) {
- if (!mode || mode === 'off') {
-  clearNoaaMapOverlay();
-  setNoaaMapStatus('Overlay off');
-  return;
- }
- if (typeof map === 'undefined' || !map || typeof map.getBounds !== 'function') {
-  showToast('NOAA overlays need the 2D map — switch to 2D first');
-  const off = document.querySelector('input[name="noaa-map-overlay"][value="off"]');
-  if (off) off.checked = true;
-  return;
- }
- noaaMapMode = mode;
- bindNoaaMapListeners();
- refreshNoaaMapOverlay(true);
+  if (!mode || mode === 'off') {
+   clearNoaaMapOverlay();
+   setNoaaMapStatus('Overlay off');
+   return;
+  }
+  if (typeof map === 'undefined' || !map || typeof map.getBounds !== 'function') {
+   showToast('NOAA overlays need the 2D map — switch to 2D first');
+   const off = document.querySelector('input[name="noaa-map-overlay"][value="off"]');
+   if (off) off.checked = true;
+   syncNoaaLayerCheckboxes();
+   return;
+  }
+  noaaMapMode = mode;
+  syncNoaaLayerCheckboxes();
+  bindNoaaMapListeners();
+  refreshNoaaMapOverlay(true);
 }
 
 function clearNoaaMapOverlay() {
- noaaMapMode = null;
- if (noaaMapLayer && map) {
-  try { map.removeLayer(noaaMapLayer); } catch (_) {}
- }
- noaaMapLayer = null;
- const off = document.querySelector('input[name="noaa-map-overlay"][value="off"]');
- if (off) off.checked = true;
+  noaaMapMode = null;
+  if (noaaMapLayer && map) {
+   try { map.removeLayer(noaaMapLayer); } catch (_) {}
+  }
+  noaaMapLayer = null;
+  const off = document.querySelector('input[name="noaa-map-overlay"][value="off"]');
+  if (off) off.checked = true;
+  syncNoaaLayerCheckboxes();
 }
 
 function bindNoaaMapListeners() {

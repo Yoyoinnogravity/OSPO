@@ -1054,7 +1054,7 @@
  <div id="panel-noaa" class="settings-panel" style="display:none; min-width:340px; max-width:440px; max-height:90vh; overflow-y:auto;">
  <button class="panel-close-btn" onclick="hidePanel('noaa')">&times;</button>
  <div class="panel-title">NOAA weather</div>
- <div style="font-size:11px;color:#94a3b8;margin-bottom:12px;line-height:1.45;">Public-domain NOAA model fields (GFS wind, WAVEWATCH III waves/swell, MUR SST). Point values at map centre; overlays refresh as you pan.</div>
+ <div style="font-size:11px;color:#94a3b8;margin-bottom:12px;line-height:1.45;">Public-domain NOAA fields (GFS wind, WAVEWATCH III waves/swell, altimetry currents, MUR SST). Point values at map centre; overlays refresh as you pan.</div>
 
  <div style="border:1px solid #1e293b;border-radius:8px;padding:10px 12px;margin-bottom:12px;background:#0a0a12;">
  <div style="font-size:10px;color:#a5f3fc;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;margin-bottom:8px;">Point at map centre</div>
@@ -1068,7 +1068,7 @@
 
  <div style="border:1px solid #155e75;border-radius:8px;padding:10px 12px;margin-bottom:12px;background:rgba(8,47,73,0.35);">
  <div style="font-size:10px;color:#67e8f9;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;margin-bottom:8px;">Real-time map overlays</div>
- <div style="font-size:10px;color:#64748b;margin-bottom:10px;line-height:1.4;">One field at a time. Painted from the latest NOAA grid for the current view (≈0.5°).</div>
+ <div style="font-size:10px;color:#64748b;margin-bottom:10px;line-height:1.4;">One field at a time. Painted from the latest NOAA grid for the current view (≈0.25–0.5°).</div>
  <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#e2e8f0;cursor:pointer;margin-bottom:7px;">
   <input type="radio" name="noaa-map-overlay" value="off" checked onchange="setNoaaMapOverlay('off')" style="accent-color:#22d3ee;"/>Off
  </label>
@@ -1081,8 +1081,11 @@
  <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#e2e8f0;cursor:pointer;margin-bottom:7px;">
   <input type="radio" name="noaa-map-overlay" value="swell_period" onchange="setNoaaMapOverlay('swell_period')" style="accent-color:#22d3ee;"/>Swell period (surf)
  </label>
- <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#e2e8f0;cursor:pointer;margin-bottom:10px;">
+ <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#e2e8f0;cursor:pointer;margin-bottom:7px;">
   <input type="radio" name="noaa-map-overlay" value="wind" onchange="setNoaaMapOverlay('wind')" style="accent-color:#22d3ee;"/>Wind speed (GFS 10 m)
+ </label>
+ <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#e2e8f0;cursor:pointer;margin-bottom:10px;">
+  <input type="radio" name="noaa-map-overlay" value="currents" onchange="setNoaaMapOverlay('currents')" style="accent-color:#22d3ee;"/>Surface currents (altimetry)
  </label>
  <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#e2e8f0;cursor:pointer;margin-bottom:8px;">
   Opacity
@@ -1220,6 +1223,24 @@
  <div style="border-top:1px solid #1a1a24; padding-top:14px; margin-bottom:14px;">
  <div style="font-size:10px; color:#a0aebb; margin-bottom:8px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px;">Overlay Layers</div>
  <div style="display:flex; flex-direction:column; gap:5px;">
+ <div style="font-size:9px;color:#64748b;margin:2px 0 4px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;">Marine conditions</div>
+ <label title="NOAA WAVEWATCH III significant wave height. Same overlay as the NOAA panel — one field at a time." style="display:flex; align-items:center; gap:8px; font-size:11px; color:#ccc; cursor:pointer;">
+ <input type="checkbox" id="layer-overlay-waves" onchange="toggleMapLayer('waves')" style="accent-color:#00d2ff;"/>Waves (NOAA WW3 Hs)
+ </label>
+ <label title="NOAA GFS 10 m wind speed. Same overlay as the NOAA panel — one field at a time." style="display:flex; align-items:center; gap:8px; font-size:11px; color:#ccc; cursor:pointer;">
+ <input type="checkbox" id="layer-overlay-wind" onchange="toggleMapLayer('wind')" style="accent-color:#00d2ff;"/>Wind (NOAA GFS 10 m)
+ </label>
+ <label title="NOAA CoastWatch daily geostrophic surface current speed from altimetry. Same overlay family as waves/wind — one field at a time." style="display:flex; align-items:center; gap:8px; font-size:11px; color:#ccc; cursor:pointer;">
+ <input type="checkbox" id="layer-overlay-currents" onchange="toggleMapLayer('currents')" style="accent-color:#00d2ff;"/>Surface currents (NOAA altimetry)
+ </label>
+ <div style="font-size:9px;color:#64748b;margin:10px 0 4px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;">Infrastructure &amp; restricted</div>
+ <label title="EMODnet Human Activities: offshore platforms, pipelines, power cables and telecom cables. European waters." style="display:flex; align-items:center; gap:8px; font-size:11px; color:#ccc; cursor:pointer;">
+ <input type="checkbox" id="layer-overlay-offshore" onchange="toggleMapLayer('offshore')" style="accent-color:#00d2ff;"/>Platforms, pipelines &amp; cables (EMODnet)
+ </label>
+ <label title="EMODnet Human Activities marine protected areas. European waters." style="display:flex; align-items:center; gap:8px; font-size:11px; color:#ccc; cursor:pointer;">
+ <input type="checkbox" id="layer-overlay-mpa" onchange="toggleMapLayer('mpa')" style="accent-color:#00d2ff;"/>Marine protected areas (EMODnet)
+ </label>
+ <div style="font-size:9px;color:#64748b;margin:10px 0 4px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;">Bathymetry &amp; traffic</div>
  <label style="display:flex; align-items:center; gap:8px; font-size:11px; color:#ccc; cursor:pointer;">
  <input type="checkbox" id="layer-overlay-bathy" onchange="toggleMapLayer('bathymetry')" style="accent-color:#00d2ff;"/>Bathymetry Contours (EMODnet)
  </label>
@@ -1927,9 +1948,9 @@
  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
  <script src="https://unpkg.com/shpjs@latest/dist/shp.min.js"></script>
  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
- <script src="app.js?v=16.43"></script>
- <script src="ray_tracing_module.js?v=16.43"></script>
- <script src="wmm_declination.js?v=16.43"></script>
- <script src="magnetic_isogones.js?v=16.43"></script>
+ <script src="app.js?v=16.44"></script>
+ <script src="ray_tracing_module.js?v=16.44"></script>
+ <script src="wmm_declination.js?v=16.44"></script>
+ <script src="magnetic_isogones.js?v=16.44"></script>
 </body>
 </html>
