@@ -23012,15 +23012,21 @@ var _foldOverlayLayer = null; // L.imageOverlay instance
 var _foldZoom = 1; // in-panel fold map zoom factor (1 = fit)
 var _foldFilesOpen = false; // files dropdown menu expanded
 var _foldBytesLoaded = 0; // cumulative P1 bytes loaded this fold session
-var FOLD_FREE_LIMIT_BYTES = 2 * 1024 * 1024 * 1024; // 2 GB unless upgraded
+// Free / trial session cap for cumulative P1 bytes (was 2 GB — too small for multi-seq surveys).
+var FOLD_FREE_LIMIT_BYTES = 16 * 1024 * 1024 * 1024; // 16 GB unless upgraded
 
 function _foldHasUpgrade() {
  const u = (typeof currentUser === 'object' && currentUser) ? currentUser : null;
  const role = String((u && u.role) || '').toLowerCase();
- // Paid / commercial roles unlock larger coverage-plot sessions
+ const name = String((u && u.name) || '').toLowerCase();
+ // Paid / commercial roles unlock uncapped coverage-plot sessions
  if (role.includes('enterprise') || role.includes('commercial') || role.includes('pro')) return true;
- if (role.includes('senior surveyor') || role === 'admin') return true;
+ if (role.includes('senior surveyor') || role === 'admin' || name === 'admin') return true;
  return false;
+}
+
+function _foldFreeLimitLabel() {
+ return _foldFmtBytes(FOLD_FREE_LIMIT_BYTES);
 }
 
 function _foldFmtBytes(n) {
@@ -23032,12 +23038,14 @@ function _foldFmtBytes(n) {
 function _foldUpdateLimitBanner() {
  const usageEl = document.getElementById('fold-limit-usage');
  const banner = document.getElementById('fold-limit-banner');
+ const capEl = document.getElementById('fold-limit-cap-label');
+ if (capEl) capEl.textContent = _foldFreeLimitLabel();
  if (!banner) return;
  if (_foldHasUpgrade()) {
   banner.style.borderColor = 'rgba(48,209,88,0.45)';
   banner.style.background = 'rgba(48,209,88,0.08)';
   if (usageEl) {
-   usageEl.innerHTML = ` Upgraded account - no 2 GB cap. Loaded this session: <strong style="color:#fff;">${_foldFmtBytes(_foldBytesLoaded)}</strong>.`;
+   usageEl.innerHTML = ` Upgraded account - no session cap. Loaded this session: <strong style="color:#fff;">${_foldFmtBytes(_foldBytesLoaded)}</strong>.`;
   }
   return;
  }
@@ -23045,7 +23053,7 @@ function _foldUpdateLimitBanner() {
  banner.style.background = 'rgba(255,214,10,0.08)';
  const left = Math.max(0, FOLD_FREE_LIMIT_BYTES - _foldBytesLoaded);
  if (usageEl) {
-  usageEl.innerHTML = ` Used <strong style="color:#fff;">${_foldFmtBytes(_foldBytesLoaded)}</strong> of 2 GB` +
+  usageEl.innerHTML = ` Used <strong style="color:#fff;">${_foldFmtBytes(_foldBytesLoaded)}</strong> of ${_foldFreeLimitLabel()}` +
    (left > 0 ? ` (<strong style="color:#fff;">${_foldFmtBytes(left)}</strong> remaining).` : ' - limit reached.');
  }
 }
@@ -23633,14 +23641,15 @@ async function foldAddFiles(event) {
  event.target.value = '';
  if (files.length === 0) return;
 
- // Free tier: remind and enforce 2 GB cumulative P1 load unless upgraded
+ // Free tier: remind and enforce cumulative P1 load unless upgraded
  if (!_foldHasUpgrade()) {
   const batchBytes = files.reduce((s, f) => s + (f.size || 0), 0);
   const nextTotal = _foldBytesLoaded + batchBytes;
+  const capLabel = _foldFreeLimitLabel();
   if (nextTotal > FOLD_FREE_LIMIT_BYTES) {
    const over = nextTotal - FOLD_FREE_LIMIT_BYTES;
    showToast(
-    `Coverage plots are limited to 2 GB unless you upgrade. ` +
+    `Coverage plots are limited to ${capLabel} unless you upgrade. ` +
     `This batch would add ${_foldFmtBytes(batchBytes)} (session ${_foldFmtBytes(_foldBytesLoaded)} → ${_foldFmtBytes(nextTotal)}, ` +
     `${_foldFmtBytes(over)} over). Open Licensing to upgrade.`,
     9000
@@ -23655,14 +23664,14 @@ async function foldAddFiles(event) {
      allowed.push(f);
      remain -= (f.size || 0);
     } else {
-     showToast(`Skipped "${f.name}" (${_foldFmtBytes(f.size)}) - would exceed the 2 GB limit.`, 5000);
+     showToast(`Skipped "${f.name}" (${_foldFmtBytes(f.size)}) - would exceed the ${capLabel} limit.`, 5000);
     }
    }
    if (!allowed.length) return;
    files.length = 0;
    allowed.forEach(f => files.push(f));
   } else if (_foldBytesLoaded === 0) {
-   showToast('Reminder: coverage plots handle up to 2 GB unless you upgrade.', 4500);
+   showToast(`Reminder: coverage plots handle up to ${capLabel} unless you upgrade.`, 4500);
   }
  }
 
