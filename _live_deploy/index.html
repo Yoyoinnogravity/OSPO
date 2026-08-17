@@ -856,8 +856,8 @@
  <button class="panel-close-btn" onclick="hidePanel('ray-tracing'); rayTraceStopPick();">&times;</button>
  <div class="panel-title">Ray Tracing - OBN / Water Column</div>
  <div style="font-size:11px;color:#a0aebb;margin-bottom:10px;line-height:1.45;">
- Acoustic paths from a source to seabed nodes through a layered velocity model (Snell's law).
- First slice for OBN planning: place a source, place or generate a node patch, then trace rays for travel time and emergence angle.
+ Acoustic paths from a source to seabed nodes through a <b style="color:#e2e8f0;">Velocity Mode</b> (constant, gradient, layered, or Mackenzie SSP) using Snell’s law.
+ First slice for OBN planning: choose velocity mode, place a source, place or generate a node patch, then Trace Rays.
  </div>
  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
   <div style="background:#0a0a12;border:1px solid #1a1a24;border-radius:6px;padding:10px;">
@@ -883,14 +883,72 @@
    </div>
   </div>
   <div style="background:#0a0a12;border:1px solid #1a1a24;border-radius:6px;padding:10px;">
-   <div style="font-size:10px;color:#fbbf24;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;margin-bottom:8px;">Velocity model (1D layers)</div>
-   <div style="font-size:9px;color:#666;margin-bottom:6px;">Bottom depth (m) and P-velocity (m/s) per layer, top to bottom.</div>
-   <div id="ray-vmodel-rows" style="max-height:120px;overflow-y:auto;margin-bottom:6px;"></div>
-   <div style="display:flex;gap:6px;flex-wrap:wrap;">
-    <button type="button" onclick="rayAddLayer()" style="padding:4px 8px;border-radius:3px;border:1px solid #333;background:#1a1a2e;color:#e0e8f0;font-size:10px;cursor:pointer;">+ Layer</button>
-    <button type="button" onclick="rayPresetWater()" style="padding:4px 8px;border-radius:3px;border:1px solid #333;background:#1a1a2e;color:#5eead4;font-size:10px;cursor:pointer;">Water only 1500</button>
-    <button type="button" onclick="rayPresetGradient()" style="padding:4px 8px;border-radius:3px;border:1px solid #333;background:#1a1a2e;color:#5eead4;font-size:10px;cursor:pointer;">Water gradient</button>
+   <div style="font-size:10px;color:#fbbf24;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;margin-bottom:8px;">Velocity mode</div>
+   <div class="panel-row" style="margin-bottom:8px;align-items:center;">
+    <label style="width:110px;font-size:11px;color:#c0c8d4;">Mode</label>
+    <select id="ray-vel-mode" onchange="rayVelocityModeChanged()" style="flex:1;min-width:0;padding:5px 8px;border-radius:3px;border:1px solid #f59e0b;background:#111;color:#fbbf24;font-size:11px;font-weight:700;outline:none;">
+     <option value="constant">Constant</option>
+     <option value="gradient">Linear gradient</option>
+     <option value="layered" selected>Layered 1D</option>
+     <option value="mackenzie">Mackenzie SSP</option>
+    </select>
    </div>
+   <div id="ray-vel-hint" style="font-size:9px;color:#666;margin-bottom:8px;line-height:1.4;">Edit layer bottoms (m) and P-velocity (m/s). Used for Snell’s-law water-column paths.</div>
+
+   <div id="ray-vel-constant" style="display:none;margin-bottom:8px;">
+    <div class="panel-row" style="margin-bottom:6px;">
+     <label style="width:110px;font-size:11px;color:#c0c8d4;">Water velocity</label>
+     <input id="ray-vel-const-v" type="number" min="100" step="1" value="1500" onchange="rayApplyVelocityMode()" style="width:80px;padding:4px 6px;border-radius:3px;border:1px solid #333;background:#111;color:#fff;font-size:11px;outline:none;"/>
+     <span style="font-size:10px;color:#666;margin-left:4px;">m/s</span>
+    </div>
+   </div>
+
+   <div id="ray-vel-gradient" style="display:none;margin-bottom:8px;">
+    <div class="panel-row" style="margin-bottom:6px;">
+     <label style="width:110px;font-size:11px;color:#c0c8d4;">Surface V</label>
+     <input id="ray-vel-grad-top" type="number" min="100" step="1" value="1480" onchange="rayApplyVelocityMode()" style="width:80px;padding:4px 6px;border-radius:3px;border:1px solid #333;background:#111;color:#fff;font-size:11px;outline:none;"/>
+     <span style="font-size:10px;color:#666;margin-left:4px;">m/s</span>
+    </div>
+    <div class="panel-row" style="margin-bottom:6px;">
+     <label style="width:110px;font-size:11px;color:#c0c8d4;">Seabed V</label>
+     <input id="ray-vel-grad-bot" type="number" min="100" step="1" value="1520" onchange="rayApplyVelocityMode()" style="width:80px;padding:4px 6px;border-radius:3px;border:1px solid #333;background:#111;color:#fff;font-size:11px;outline:none;"/>
+     <span style="font-size:10px;color:#666;margin-left:4px;">m/s</span>
+    </div>
+    <div class="panel-row" style="margin-bottom:6px;">
+     <label style="width:110px;font-size:11px;color:#c0c8d4;">Layers</label>
+     <input id="ray-vel-grad-n" type="number" min="2" max="40" step="1" value="8" onchange="rayApplyVelocityMode()" style="width:80px;padding:4px 6px;border-radius:3px;border:1px solid #333;background:#111;color:#fff;font-size:11px;outline:none;"/>
+    </div>
+   </div>
+
+   <div id="ray-vel-mackenzie" style="display:none;margin-bottom:8px;">
+    <div class="panel-row" style="margin-bottom:6px;">
+     <label style="width:110px;font-size:11px;color:#c0c8d4;">Temp</label>
+     <input id="ray-vel-mac-t" type="number" min="-2" max="40" step="0.1" value="10" onchange="rayApplyVelocityMode()" style="width:80px;padding:4px 6px;border-radius:3px;border:1px solid #333;background:#111;color:#fff;font-size:11px;outline:none;"/>
+     <span style="font-size:10px;color:#666;margin-left:4px;">°C</span>
+    </div>
+    <div class="panel-row" style="margin-bottom:6px;">
+     <label style="width:110px;font-size:11px;color:#c0c8d4;">Salinity</label>
+     <input id="ray-vel-mac-s" type="number" min="0" max="45" step="0.1" value="35" onchange="rayApplyVelocityMode()" style="width:80px;padding:4px 6px;border-radius:3px;border:1px solid #333;background:#111;color:#fff;font-size:11px;outline:none;"/>
+     <span style="font-size:10px;color:#666;margin-left:4px;">psu</span>
+    </div>
+    <div class="panel-row" style="margin-bottom:6px;">
+     <label style="width:110px;font-size:11px;color:#c0c8d4;">Layers</label>
+     <input id="ray-vel-mac-n" type="number" min="2" max="40" step="1" value="12" onchange="rayApplyVelocityMode()" style="width:80px;padding:4px 6px;border-radius:3px;border:1px solid #333;background:#111;color:#fff;font-size:11px;outline:none;"/>
+    </div>
+    <div style="font-size:9px;color:#556;line-height:1.35;">Mackenzie (1981) approximate sound-speed vs depth for the water column down to node depth.</div>
+   </div>
+
+   <div id="ray-vel-layered">
+    <div style="font-size:9px;color:#666;margin-bottom:6px;">Bottom depth (m) and P-velocity (m/s) per layer, top to bottom.</div>
+    <div id="ray-vmodel-rows" style="max-height:120px;overflow-y:auto;margin-bottom:6px;"></div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;">
+     <button type="button" onclick="rayAddLayer()" style="padding:4px 8px;border-radius:3px;border:1px solid #333;background:#1a1a2e;color:#e0e8f0;font-size:10px;cursor:pointer;">+ Layer</button>
+     <button type="button" onclick="rayPresetWater()" style="padding:4px 8px;border-radius:3px;border:1px solid #333;background:#1a1a2e;color:#5eead4;font-size:10px;cursor:pointer;">Water only 1500</button>
+     <button type="button" onclick="rayPresetGradient()" style="padding:4px 8px;border-radius:3px;border:1px solid #333;background:#1a1a2e;color:#5eead4;font-size:10px;cursor:pointer;">Water gradient</button>
+    </div>
+   </div>
+
+   <div id="ray-vel-mode-status" style="margin-top:8px;font-size:9px;color:#64748b;line-height:1.35;"></div>
   </div>
  </div>
  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center;">
@@ -1795,9 +1853,9 @@
  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
  <script src="https://unpkg.com/shpjs@latest/dist/shp.min.js"></script>
  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
- <script src="app.js?v=16.25"></script>
- <script src="ray_tracing_module.js?v=16.25"></script>
- <script src="wmm_declination.js?v=16.25"></script>
- <script src="magnetic_isogones.js?v=16.25"></script>
+ <script src="app.js?v=16.26"></script>
+ <script src="ray_tracing_module.js?v=16.26"></script>
+ <script src="wmm_declination.js?v=16.26"></script>
+ <script src="magnetic_isogones.js?v=16.26"></script>
 </body>
 </html>

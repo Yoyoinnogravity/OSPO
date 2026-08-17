@@ -1,4 +1,5 @@
 // ===== ACOUSTIC RAY TRACING (OBN / water-column) =====
+// Velocity Mode: constant | gradient | layered | mackenzie
 // Layered 1D velocity model + Snell's law shooting method.
 // Map overlay + vertical offset-depth profile for OBN planning.
 
@@ -7,58 +8,189 @@ var _rayState = {
  nodes: [], // [{lat, lon, id}]
  results: [], // traced rays
  pickMode: null, // 'source' | 'node' | null
+ velMode: 'layered', // constant | gradient | layered | mackenzie
  layers: [{ zBot: 200, v: 1480 }, { zBot: 600, v: 1500 }, { zBot: 1200, v: 1520 }]
 };
 var _rayPickHandler = null;
 
 function showRayTracing() {
  if (typeof togglePanel === 'function') togglePanel('ray-tracing');
+ const modeEl = document.getElementById('ray-vel-mode');
+ if (modeEl && _rayState.velMode) modeEl.value = _rayState.velMode;
+ raySyncVelocityModeUi();
  rayRenderVModel();
+ rayUpdateVelStatus();
  rayUpdateSummary();
  rayDrawProfile();
  if (!layerRayTrace && map) layerRayTrace = L.layerGroup().addTo(map);
 }
 
-function rayPresetWater() {
- const z = parseFloat(document.getElementById('ray-rcv-z')?.value) || 1000;
- _rayState.layers = [{ zBot: Math.max(z + 50, 100), v: 1500 }];
+function rayGetVelMode() {
+ const el = document.getElementById('ray-vel-mode');
+ const m = el ? el.value : (_rayState.velMode || 'layered');
+ return ['constant', 'gradient', 'layered', 'mackenzie'].includes(m) ? m : 'layered';
+}
+
+function raySyncVelocityModeUi() {
+ const mode = rayGetVelMode();
+ _rayState.velMode = mode;
+ const blocks = {
+  constant: document.getElementById('ray-vel-constant'),
+  gradient: document.getElementById('ray-vel-gradient'),
+  layered: document.getElementById('ray-vel-layered'),
+  mackenzie: document.getElementById('ray-vel-mackenzie')
+ };
+ Object.keys(blocks).forEach(k => {
+  if (blocks[k]) blocks[k].style.display = (k === mode) ? 'block' : 'none';
+ });
+ const hint = document.getElementById('ray-vel-hint');
+ if (hint) {
+  const hints = {
+   constant: 'Single water velocity from surface to seabed. Fastest check for travel times.',
+   gradient: 'Linear V(z) from surface to seabed, discretised into thin layers for Snell’s law.',
+   layered: 'Edit layer bottoms (m) and P-velocity (m/s). Full manual 1D water column.',
+   mackenzie: 'Mackenzie (1981) approximate sound-speed profile from T, S and depth.'
+  };
+  hint.textContent = hints[mode] || '';
+ }
+}
+
+function rayVelocityModeChanged() {
+ raySyncVelocityModeUi();
+ rayApplyVelocityMode(true);
+}
+
+/** Mackenzie (1981) sound speed (m/s): T °C, S psu, D depth km. */
+function rayMackenzieSpeed(T, S, depthM) {
+ const D = Math.max(0, depthM) / 1000;
+ return 1448.96
+  + 4.591 * T
+  - 5.304e-2 * T * T
+  + 2.374e-4 * T * T * T
+  + 1.340 * (S - 35)
+  + 1.630 * D
+  + 1.675e-1 * D * D
+  - 1.025e-2 * T * (S - 35)
+  - 7.139e-3 * T * D * D;
+}
+
+function rayApplyVelocityMode(announce) {
+ const mode = rayGetVelMode();
+ _rayState.velMode = mode;
+ const zr = Math.max(50, parseFloat(document.getElementById('ray-rcv-z')?.value) || 1000);
+
+ if (mode === 'constant') {
+  const v = Math.max(100, parseFloat(document.getElementById('ray-vel-const-v')?.value) || 1500);
+  _rayState.layers = [{ zBot: zr + 50, v }];
+ } else if (mode === 'gradient') {
+  const vTop = Math.max(100, parseFloat(document.getElementById('ray-vel-grad-top')?.value) || 1480);
+  const vBot = Math.max(100, parseFloat(document.getElementById('ray-vel-grad-bot')?.value) || 1520);
+  const n = Math.max(2, Math.min(40, parseInt(document.getElementById('ray-vel-grad-n')?.value, 10) || 8));
+  const layers = [];
+  for (let i = 1; i <= n; i++) {
+   const zBot = (zr * i) / n;
+   const midZ = (zr * (i - 0.5)) / n;
+   const v = vTop + (vBot - vTop) * (midZ / zr);
+   layers.push({ zBot, v: Math.round(v * 10) / 10 });
+  }
+  _rayState.layers = layers;
+ } else if (mode === 'mackenzie') {
+  const T = parseFloat(document.getElementById('ray-vel-mac-t')?.value);
+  const S = parseFloat(document.getElementById('ray-vel-mac-s')?.value);
+  const n = Math.max(2, Math.min(40, parseInt(document.getElementById('ray-vel-mac-n')?.value, 10) || 12));
+  const t = isFinite(T) ? T : 10;
+  const s = isFinite(S) ? S : 35;
+  const layers = [];
+  for (let i = 1; i <= n; i++) {
+   const zBot = (zr * i) / n;
+   const midZ = (zr * (i - 0.5)) / n;
+   const v = rayMackenzieSpeed(t, s, midZ);
+   layers.push({ zBot, v: Math.round(v * 10) / 10 });
+  }
+  _rayState.layers = layers;
+ }
+ // layered: keep existing editable layers
+
  rayRenderVModel();
+ rayUpdateVelStatus();
+ rayDrawProfile();
+ if (announce) {
+  const labels = {
+   constant: 'Constant velocity',
+   gradient: 'Linear gradient',
+   layered: 'Layered 1D',
+   mackenzie: 'Mackenzie SSP'
+  };
+  showToast('Velocity mode: ' + (labels[mode] || mode), 2500);
+ }
+}
+
+function rayUpdateVelStatus() {
+ const el = document.getElementById('ray-vel-mode-status');
+ if (!el) return;
+ const layers = rayReadLayers();
+ if (!layers.length) {
+  el.textContent = 'No velocity layers defined.';
+  return;
+ }
+ const vs = layers.map(L => L.v);
+ const zMax = layers[layers.length - 1].zBot;
+ el.innerHTML = `<span style="color:#fbbf24;font-weight:700;text-transform:uppercase;letter-spacing:0.3px;">${_rayState.velMode}</span>`
+  + ` · ${layers.length} layer(s) to ${Math.round(zMax)} m`
+  + ` · V ${Math.min(...vs).toFixed(0)}–${Math.max(...vs).toFixed(0)} m/s`;
+}
+
+function rayPresetWater() {
+ const modeEl = document.getElementById('ray-vel-mode');
+ if (modeEl) modeEl.value = 'constant';
+ const vEl = document.getElementById('ray-vel-const-v');
+ if (vEl) vEl.value = '1500';
+ raySyncVelocityModeUi();
+ rayApplyVelocityMode(true);
 }
 
 function rayPresetGradient() {
- const z = parseFloat(document.getElementById('ray-rcv-z')?.value) || 1000;
- const n = 6;
- const layers = [];
- for (let i = 1; i <= n; i++) {
-  layers.push({ zBot: (z * i) / n, v: 1480 + i * 12 });
- }
- _rayState.layers = layers;
- rayRenderVModel();
+ const modeEl = document.getElementById('ray-vel-mode');
+ if (modeEl) modeEl.value = 'gradient';
+ raySyncVelocityModeUi();
+ rayApplyVelocityMode(true);
 }
 
 function rayAddLayer() {
+ const modeEl = document.getElementById('ray-vel-mode');
+ if (modeEl && modeEl.value !== 'layered') {
+  modeEl.value = 'layered';
+  raySyncVelocityModeUi();
+ }
  const last = _rayState.layers[_rayState.layers.length - 1];
  const zBot = (last ? last.zBot : 0) + 200;
  const v = last ? last.v + 20 : 1500;
  _rayState.layers.push({ zBot, v });
+ _rayState.velMode = 'layered';
  rayRenderVModel();
+ rayUpdateVelStatus();
 }
 
 function rayRenderVModel() {
  const host = document.getElementById('ray-vmodel-rows');
  if (!host) return;
+ const editable = rayGetVelMode() === 'layered';
  host.innerHTML = _rayState.layers.map((L, i) =>
   `<div style="display:flex;gap:6px;align-items:center;margin-bottom:4px;">
     <span style="width:18px;color:#666;font-size:9px;">${i + 1}</span>
     <input data-ray-i="${i}" data-ray-f="zBot" type="number" min="1" step="10" value="${L.zBot}"
-      style="width:70px;padding:3px 5px;border-radius:3px;border:1px solid #333;background:#111;color:#fff;font-size:10px;outline:none;"
+      ${editable ? '' : 'disabled'}
+      style="width:70px;padding:3px 5px;border-radius:3px;border:1px solid #333;background:#111;color:#fff;font-size:10px;outline:none;opacity:${editable ? 1 : 0.55};"
       onchange="rayVModelChanged(this)"/>
     <span style="font-size:9px;color:#666;">m</span>
     <input data-ray-i="${i}" data-ray-f="v" type="number" min="100" step="1" value="${L.v}"
-      style="width:70px;padding:3px 5px;border-radius:3px;border:1px solid #333;background:#111;color:#fff;font-size:10px;outline:none;"
+      ${editable ? '' : 'disabled'}
+      style="width:70px;padding:3px 5px;border-radius:3px;border:1px solid #333;background:#111;color:#fff;font-size:10px;outline:none;opacity:${editable ? 1 : 0.55};"
       onchange="rayVModelChanged(this)"/>
     <span style="font-size:9px;color:#666;">m/s</span>
-    <button type="button" onclick="rayRemoveLayer(${i})" style="background:none;border:none;color:#ff453a;cursor:pointer;font-size:12px;" title="Remove">x</button>
+    ${editable
+      ? `<button type="button" onclick="rayRemoveLayer(${i})" style="background:none;border:none;color:#ff453a;cursor:pointer;font-size:12px;" title="Remove">x</button>`
+      : ''}
   </div>`
  ).join('');
 }
@@ -69,12 +201,16 @@ function rayVModelChanged(el) {
  const v = parseFloat(el.value);
  if (!isFinite(i) || !_rayState.layers[i] || !isFinite(v) || v <= 0) return;
  _rayState.layers[i][f] = v;
+ rayUpdateVelStatus();
+ rayDrawProfile();
 }
 
 function rayRemoveLayer(i) {
  if (_rayState.layers.length <= 1) { showToast('Keep at least one velocity layer'); return; }
  _rayState.layers.splice(i, 1);
  rayRenderVModel();
+ rayUpdateVelStatus();
+ rayDrawProfile();
 }
 
 function rayReadLayers() {
@@ -287,6 +423,9 @@ function rayTraceRun() {
  if (!_rayState.source) { showToast('Place a source first'); return; }
  if (!_rayState.nodes.length) { showToast('Place or generate at least one node'); return; }
 
+ // Rebuild generated modes from current geometry / params before shooting
+ if (rayGetVelMode() !== 'layered') rayApplyVelocityMode(false);
+
  const zs = Math.max(0, parseFloat(document.getElementById('ray-src-z')?.value) || 8);
  const zr = Math.max(zs + 1, parseFloat(document.getElementById('ray-rcv-z')?.value) || 1000);
  const maxOff = Math.max(100, parseFloat(document.getElementById('ray-max-off')?.value) || 8000);
@@ -396,7 +535,8 @@ function rayUpdateSummary() {
   el.textContent = 'No rays yet - place a source and at least one node, then Trace Rays.';
   return;
  }
- let html = `<strong style="color:#fbbf24;">${nSrc}</strong> source · <strong style="color:#38bdf8;">${nNodes}</strong> node(s) · <strong style="color:#30d158;">${nRays}</strong> ray(s)`;
+ let html = `<strong style="color:#fbbf24;">${nSrc}</strong> source · <strong style="color:#38bdf8;">${nNodes}</strong> node(s) · <strong style="color:#30d158;">${nRays}</strong> ray(s)`
+  + ` · vel <strong style="color:#fbbf24;">${_rayState.velMode || rayGetVelMode()}</strong>`;
  if (nRays) {
   const times = _rayState.results.map(r => r.timeSec);
   const offs = _rayState.results.map(r => r.offsetM);
