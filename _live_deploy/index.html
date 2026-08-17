@@ -1080,10 +1080,10 @@
  <!-- Ray Tracing (OBN / water-column acoustic paths) -->
  <div id="panel-ray-tracing" class="settings-panel" style="display:none; width:720px; max-width:94vw; max-height:88vh; overflow-y:auto;">
  <button class="panel-close-btn" onclick="hidePanel('ray-tracing'); rayTraceStopPick();">&times;</button>
- <div class="panel-title">Ray Tracing - OBN / Water Column</div>
+ <div class="panel-title">Ray Tracing — OBN / Water Column</div>
  <div style="font-size:11px;color:#a0aebb;margin-bottom:10px;line-height:1.45;">
  Acoustic paths from a source to seabed nodes through a <b style="color:#e2e8f0;">Velocity Mode</b> (constant, gradient, layered, or Mackenzie SSP) using Snell’s law.
- First slice for OBN planning: choose velocity mode, place a source, place or generate a node patch, then Trace Rays.
+ <b style="color:#fbbf24;">Water-column only</b> — not subsurface illumination (NORSAR / ACTeQ Z-Design). Use for OBN travel times and path visualisation.
  </div>
  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
   <div style="background:#0a0a12;border:1px solid #1a1a24;border-radius:6px;padding:10px;">
@@ -1105,7 +1105,7 @@
    </div>
    <div class="panel-row" style="margin-bottom:6px;">
     <label style="width:110px;font-size:11px;color:#c0c8d4;">Max rays drawn</label>
-    <input id="ray-max-draw" type="number" min="1" max="500" step="1" value="80" style="width:80px;padding:4px 6px;border-radius:3px;border:1px solid #333;background:#111;color:#fff;font-size:11px;outline:none;"/>
+    <input id="ray-max-draw" type="number" min="1" max="2000" step="1" value="200" style="width:80px;padding:4px 6px;border-radius:3px;border:1px solid #333;background:#111;color:#fff;font-size:11px;outline:none;"/>
    </div>
   </div>
   <div style="background:#0a0a12;border:1px solid #1a1a24;border-radius:6px;padding:10px;">
@@ -1142,7 +1142,7 @@
     </div>
     <div class="panel-row" style="margin-bottom:6px;">
      <label style="width:110px;font-size:11px;color:#c0c8d4;">Layers</label>
-     <input id="ray-vel-grad-n" type="number" min="2" max="40" step="1" value="8" onchange="rayApplyVelocityMode()" style="width:80px;padding:4px 6px;border-radius:3px;border:1px solid #333;background:#111;color:#fff;font-size:11px;outline:none;"/>
+     <input id="ray-vel-grad-n" type="number" min="2" max="80" step="1" value="8" onchange="rayApplyVelocityMode()" style="width:80px;padding:4px 6px;border-radius:3px;border:1px solid #333;background:#111;color:#fff;font-size:11px;outline:none;"/>
     </div>
    </div>
 
@@ -1159,7 +1159,7 @@
     </div>
     <div class="panel-row" style="margin-bottom:6px;">
      <label style="width:110px;font-size:11px;color:#c0c8d4;">Layers</label>
-     <input id="ray-vel-mac-n" type="number" min="2" max="40" step="1" value="12" onchange="rayApplyVelocityMode()" style="width:80px;padding:4px 6px;border-radius:3px;border:1px solid #333;background:#111;color:#fff;font-size:11px;outline:none;"/>
+     <input id="ray-vel-mac-n" type="number" min="2" max="80" step="1" value="12" onchange="rayApplyVelocityMode()" style="width:80px;padding:4px 6px;border-radius:3px;border:1px solid #333;background:#111;color:#fff;font-size:11px;outline:none;"/>
     </div>
     <div style="font-size:9px;color:#556;line-height:1.35;">Mackenzie (1981) approximate sound-speed vs depth for the water column down to node depth.</div>
    </div>
@@ -1180,27 +1180,33 @@
  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center;">
   <button type="button" id="ray-btn-src" onclick="rayTracePickSource()" style="padding:7px 12px;border-radius:4px;border:none;background:#f59e0b;color:#111;font-weight:700;cursor:pointer;font-size:11px;">1. Place Source</button>
   <button type="button" id="ray-btn-node" onclick="rayTracePickNode()" style="padding:7px 12px;border-radius:4px;border:1px solid #f59e0b;background:#1a1205;color:#fbbf24;font-weight:700;cursor:pointer;font-size:11px;">2. Place Node</button>
-  <button type="button" onclick="rayGeneratePatch()" style="padding:7px 12px;border-radius:4px;border:1px solid #333;background:#1a1a2e;color:#e0e8f0;font-weight:700;cursor:pointer;font-size:11px;">Generate Node Patch</button>
-  <button type="button" onclick="rayTraceRun()" style="padding:7px 14px;border-radius:4px;border:none;background:#30d158;color:#000;font-weight:700;cursor:pointer;font-size:11px;">Trace Rays</button>
+  <button type="button" onclick="rayImportObnNodes()" style="padding:7px 12px;border-radius:4px;border:1px solid #0e7490;background:#0c1924;color:#7dd3fc;font-weight:700;cursor:pointer;font-size:11px;" title="Pull nodes from OBN preplot in Design">Import OBN</button>
+  <button type="button" onclick="rayGeneratePatch()" style="padding:7px 12px;border-radius:4px;border:1px solid #333;background:#1a1a2e;color:#e0e8f0;font-weight:700;cursor:pointer;font-size:11px;">Generate Patch</button>
+  <button type="button" id="ray-btn-trace" onclick="rayTraceRun()" style="padding:7px 14px;border-radius:4px;border:none;background:#30d158;color:#000;font-weight:700;cursor:pointer;font-size:11px;">Trace Rays</button>
+  <button type="button" onclick="rayFitMap()" style="padding:7px 12px;border-radius:4px;border:1px solid #333;background:#1a1a2e;color:#cbd5e1;font-weight:700;cursor:pointer;font-size:11px;">Fit map</button>
+  <button type="button" onclick="rayExportCsv()" style="padding:7px 12px;border-radius:4px;border:1px solid #334155;background:#111827;color:#cbd5e1;font-weight:700;cursor:pointer;font-size:11px;">Export CSV</button>
   <button type="button" onclick="rayTraceClear()" style="padding:7px 12px;border-radius:4px;border:1px solid #333;background:#1a1a2e;color:#ff453a;font-weight:700;cursor:pointer;font-size:11px;">Clear</button>
  </div>
+ <div id="ray-progress" style="display:none;font-size:10px;color:#fbbf24;margin-bottom:8px;"></div>
  <div style="display:flex;gap:10px;margin-bottom:8px;font-size:10px;color:#8a9bb0;flex-wrap:wrap;">
   <label style="display:flex;align-items:center;gap:4px;">Patch nx
-   <input id="ray-patch-nx" type="number" min="1" max="40" value="5" style="width:44px;padding:3px 4px;border-radius:3px;border:1px solid #333;background:#111;color:#fff;font-size:10px;outline:none;"/>
+   <input id="ray-patch-nx" type="number" min="1" max="60" value="5" style="width:44px;padding:3px 4px;border-radius:3px;border:1px solid #333;background:#111;color:#fff;font-size:10px;outline:none;"/>
   </label>
   <label style="display:flex;align-items:center;gap:4px;">ny
-   <input id="ray-patch-ny" type="number" min="1" max="40" value="5" style="width:44px;padding:3px 4px;border-radius:3px;border:1px solid #333;background:#111;color:#fff;font-size:10px;outline:none;"/>
+   <input id="ray-patch-ny" type="number" min="1" max="60" value="5" style="width:44px;padding:3px 4px;border-radius:3px;border:1px solid #333;background:#111;color:#fff;font-size:10px;outline:none;"/>
   </label>
   <label style="display:flex;align-items:center;gap:4px;">Spacing
    <input id="ray-patch-dx" type="number" min="10" step="10" value="400" style="width:56px;padding:3px 4px;border-radius:3px;border:1px solid #333;background:#111;color:#fff;font-size:10px;outline:none;"/> m
   </label>
  </div>
  <div id="ray-summary" style="font-size:10px;color:#8a9bb0;padding:8px 10px;background:#0a0a12;border:1px solid #1a1a24;border-radius:4px;margin-bottom:10px;">
-  No rays yet - place a source and at least one node, then Trace Rays.
+  No rays yet — place a source and nodes (or Import OBN / Generate patch), then Trace Rays.
  </div>
  <div style="font-size:10px;color:#fbbf24;font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.4px;">Vertical profile (offset vs depth)</div>
  <canvas id="ray-profile-canvas" width="680" height="260" style="width:100%;max-width:680px;height:260px;background:#07070c;border:1px solid #1a1a24;border-radius:4px;display:block;margin-bottom:8px;"></canvas>
- <div style="font-size:9px;color:#556;line-height:1.4;">Rays are coloured by travel time on the map. Profile shows depth downward; source at top. Critical / turning rays that cannot reach the node depth are skipped.</div>
+ <div style="font-size:10px;color:#fbbf24;font-weight:700;margin:10px 0 6px;text-transform:uppercase;letter-spacing:0.4px;">Travel-time table</div>
+ <div id="ray-results-table" style="max-height:180px;overflow:auto;margin-bottom:8px;background:#0a0a12;border:1px solid #1a1a24;border-radius:4px;padding:4px 6px;"></div>
+ <div style="font-size:9px;color:#556;line-height:1.4;">Rays coloured by travel time on the map (hover for TT). Profile shows depth downward. Critical / turning rays that cannot reach node depth are skipped and counted. Chunked tracing keeps the UI responsive on large OBN patches.</div>
  </div>
  <!-- NOAA Panel (tier-1) — point readout + real-time map overlays -->
  <div id="panel-noaa" class="settings-panel" style="display:none; min-width:340px; max-width:440px; max-height:90vh; overflow-y:auto;">
@@ -2079,9 +2085,9 @@
  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
  <script src="https://unpkg.com/shpjs@latest/dist/shp.min.js"></script>
  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
- <script src="app.js?v=16.36"></script>
- <script src="ray_tracing_module.js?v=16.36"></script>
- <script src="wmm_declination.js?v=16.36"></script>
- <script src="magnetic_isogones.js?v=16.36"></script>
+ <script src="app.js?v=16.37"></script>
+ <script src="ray_tracing_module.js?v=16.37"></script>
+ <script src="wmm_declination.js?v=16.37"></script>
+ <script src="magnetic_isogones.js?v=16.37"></script>
 </body>
 </html>

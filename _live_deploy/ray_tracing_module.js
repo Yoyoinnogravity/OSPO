@@ -1,17 +1,23 @@
 // ===== ACOUSTIC RAY TRACING (OBN / water-column) =====
 // Velocity Mode: constant | gradient | layered | mackenzie
-// Layered 1D velocity model + Snell's law shooting method.
+// Layered 1D water-column model + Snell's-law shooting.
+// Water-column only (not NORSAR / ACTeQ subsurface illumination).
 // Map overlay + vertical offset-depth profile for OBN planning.
 
 var _rayState = {
  source: null, // [lat, lon]
- nodes: [], // [{lat, lon, id}]
- results: [], // traced rays
+ nodes: [], // [{lat, lon, id, name?}]
+ results: [], // drawn rays (may be capped)
+ allResults: [], // full compute set
+ skipped: { maxOffset: 0, critical: 0, failed: 0 },
  pickMode: null, // 'source' | 'node' | null
  velMode: 'layered', // constant | gradient | layered | mackenzie
- layers: [{ zBot: 200, v: 1480 }, { zBot: 600, v: 1500 }, { zBot: 1200, v: 1520 }]
+ layers: [{ zBot: 200, v: 1480 }, { zBot: 600, v: 1500 }, { zBot: 1200, v: 1520 }],
+ busy: false,
+ lastRunAt: null
 };
 var _rayPickHandler = null;
+var _rayTraceToken = 0;
 
 function showRayTracing() {
  if (typeof togglePanel === 'function') togglePanel('ray-tracing');
@@ -21,6 +27,7 @@ function showRayTracing() {
  rayRenderVModel();
  rayUpdateVelStatus();
  rayUpdateSummary();
+ rayRenderResultsTable();
  rayDrawProfile();
  if (!layerRayTrace && map) layerRayTrace = L.layerGroup().addTo(map);
 }
@@ -46,7 +53,7 @@ function raySyncVelocityModeUi() {
  const hint = document.getElementById('ray-vel-hint');
  if (hint) {
   const hints = {
-   constant: 'Single water velocity from surface to seabed. Fastest check for travel times.',
+   constant: 'Single water velocity from surface to seabed. Exact straight-ray travel times.',
    gradient: 'Linear V(z) from surface to seabed, discretised into thin layers for Snell’s law.',
    layered: 'Edit layer bottoms (m) and P-velocity (m/s). Full manual 1D water column.',
    mackenzie: 'Mackenzie (1981) approximate sound-speed profile from T, S and depth.'
@@ -85,7 +92,7 @@ function rayApplyVelocityMode(announce) {
  } else if (mode === 'gradient') {
   const vTop = Math.max(100, parseFloat(document.getElementById('ray-vel-grad-top')?.value) || 1480);
   const vBot = Math.max(100, parseFloat(document.getElementById('ray-vel-grad-bot')?.value) || 1520);
-  const n = Math.max(2, Math.min(40, parseInt(document.getElementById('ray-vel-grad-n')?.value, 10) || 8));
+  const n = Math.max(2, Math.min(80, parseInt(document.getElementById('ray-vel-grad-n')?.value, 10) || 8));
   const layers = [];
   for (let i = 1; i <= n; i++) {
    const zBot = (zr * i) / n;
@@ -97,7 +104,7 @@ function rayApplyVelocityMode(announce) {
  } else if (mode === 'mackenzie') {
   const T = parseFloat(document.getElementById('ray-vel-mac-t')?.value);
   const S = parseFloat(document.getElementById('ray-vel-mac-s')?.value);
-  const n = Math.max(2, Math.min(40, parseInt(document.getElementById('ray-vel-mac-n')?.value, 10) || 12));
+  const n = Math.max(2, Math.min(80, parseInt(document.getElementById('ray-vel-mac-n')?.value, 10) || 12));
   const t = isFinite(T) ? T : 10;
   const s = isFinite(S) ? S : 35;
   const layers = [];
@@ -109,7 +116,6 @@ function rayApplyVelocityMode(announce) {
   }
   _rayState.layers = layers;
  }
- // layered: keep existing editable layers
 
  rayRenderVModel();
  rayUpdateVelStatus();
@@ -214,12 +220,10 @@ function rayRemoveLayer(i) {
 }
 
 function rayReadLayers() {
- // Ensure sorted by depth and positive
  const rows = (_rayState.layers || []).map(L => ({
   zBot: Math.max(1, parseFloat(L.zBot) || 1),
   v: Math.max(100, parseFloat(L.v) || 1500)
  })).sort((a, b) => a.zBot - b.zBot);
- // Dedupe / enforce increasing bottoms
  const out = [];
  let prev = 0;
  rows.forEach(L => {
@@ -228,6 +232,16 @@ function rayReadLayers() {
   prev = zBot;
  });
  return out;
+}
+
+function rayEnsureModelCovers(layers, zr) {
+ const L = layers.slice();
+ if (!L.length || L[L.length - 1].zBot < zr) {
+  const v = L.length ? L[L.length - 1].v : 1500;
+  const zTop = L.length ? L[L.length - 1].zBot : 0;
+  L.push({ zTop, zBot: zr + 10, v });
+ }
+ return L;
 }
 
 function rayTraceStopPick() {
@@ -245,7 +259,7 @@ function rayTraceStopPick() {
 
 function rayTracePickSource() {
  rayTraceStopPick();
- if (!map) { showToast('Open the map first'); return; }
+ if (!map) { showToast('Open the Design map first'); return; }
  _rayState.pickMode = 'source';
  const bs = document.getElementById('ray-btn-src');
  if (bs) bs.style.outline = '2px solid #fff';
@@ -263,7 +277,7 @@ function rayTracePickSource() {
 
 function rayTracePickNode() {
  rayTraceStopPick();
- if (!map) { showToast('Open the map first'); return; }
+ if (!map) { showToast('Open the Design map first'); return; }
  _rayState.pickMode = 'node';
  const bn = document.getElementById('ray-btn-node');
  if (bn) bn.style.outline = '2px solid #fff';
@@ -282,12 +296,42 @@ function rayTracePickNode() {
  map.on('click', _rayPickHandler);
 }
 
+/** Import seabed nodes from OBN preplot / state.obnNodes. */
+function rayImportObnNodes() {
+ const fromState = (typeof state !== 'undefined' && Array.isArray(state.obnNodes))
+  ? state.obnNodes
+  : [];
+ if (!fromState.length) {
+  showToast('No OBN preplot nodes found — generate an OBN layout in Design first', 5000);
+  return;
+ }
+ _rayState.nodes = fromState.map((n, i) => ({
+  id: n.id != null ? n.id : (i + 1),
+  name: n.name || ('N' + (i + 1)),
+  lat: Number(n.lat),
+  lon: Number(n.lon)
+ })).filter(n => isFinite(n.lat) && isFinite(n.lon));
+
+ if (!_rayState.source && map) {
+  // Use patch centroid as a default source if none placed
+  let slat = 0, slon = 0;
+  _rayState.nodes.forEach(n => { slat += n.lat; slon += n.lon; });
+  _rayState.source = [slat / _rayState.nodes.length, slon / _rayState.nodes.length];
+ }
+
+ rayRedrawMapGraphics();
+ rayUpdateSummary();
+ rayFitMap();
+ showToast('Imported ' + _rayState.nodes.length + ' OBN node(s)'
+  + (_rayState.source ? ' · source at patch centre (move if needed)' : ''), 4500);
+}
+
 function rayGeneratePatch() {
  if (!_rayState.source) {
-  showToast('Place a source first (or click the map centre will be used)');
+  showToast('Place a source first (or map centre will be used)');
  }
- const nx = Math.max(1, Math.min(40, parseInt(document.getElementById('ray-patch-nx')?.value, 10) || 5));
- const ny = Math.max(1, Math.min(40, parseInt(document.getElementById('ray-patch-ny')?.value, 10) || 5));
+ const nx = Math.max(1, Math.min(60, parseInt(document.getElementById('ray-patch-nx')?.value, 10) || 5));
+ const ny = Math.max(1, Math.min(60, parseInt(document.getElementById('ray-patch-ny')?.value, 10) || 5));
  const dx = Math.max(10, parseFloat(document.getElementById('ray-patch-dx')?.value) || 400);
  let origin = _rayState.source;
  if (!origin && map) {
@@ -297,7 +341,6 @@ function rayGeneratePatch() {
  }
  if (!origin) { showToast('Need a map centre or source'); return; }
 
- // Patch centred on source (east/north offsets in metres)
  const nodes = [];
  const x0 = -((nx - 1) * dx) / 2;
  const y0 = -((ny - 1) * dx) / 2;
@@ -305,15 +348,17 @@ function rayGeneratePatch() {
   for (let ix = 0; ix < nx; ix++) {
    const east = x0 + ix * dx;
    const north = y0 + iy * dx;
-   // Move east then north from origin
    const p1 = destinationPoint(origin, 90, east);
    const p2 = destinationPoint(p1, 0, north);
    nodes.push({ id: nodes.length + 1, lat: p2[0], lon: p2[1] });
   }
  }
  _rayState.nodes = nodes;
+ _rayState.results = [];
+ _rayState.allResults = [];
  rayRedrawMapGraphics();
  rayUpdateSummary();
+ rayRenderResultsTable();
  showToast(`Generated ${nodes.length}-node patch @ ${dx} m`, 3500);
 }
 
@@ -336,10 +381,9 @@ function rayPropagate(p, layers, zs, zr) {
 
   const arg = p * L.v;
   if (arg >= 1) {
-   // Turning / critical in this layer - cannot continue downward
    return { ok: false, reason: 'critical', offsetM: x, timeSec: t, path };
   }
-  const theta = Math.asin(arg); // from vertical
+  const theta = Math.asin(Math.min(0.999999, arg));
   const dz = zLeave - zEnter;
   const cosT = Math.cos(theta);
   if (cosT < 1e-9) return { ok: false, reason: 'horizontal', offsetM: x, timeSec: t, path };
@@ -353,11 +397,10 @@ function rayPropagate(p, layers, zs, zr) {
  }
 
  if (z < zr - 0.5) {
-  // Model too shallow - extend last velocity
   const v = layers.length ? layers[layers.length - 1].v : 1500;
   const arg = p * v;
   if (arg >= 1) return { ok: false, reason: 'critical', offsetM: x, timeSec: t, path };
-  const theta = Math.asin(arg);
+  const theta = Math.asin(Math.min(0.999999, arg));
   const dz = zr - z;
   const cosT = Math.cos(theta);
   x += dz * Math.tan(theta);
@@ -368,11 +411,32 @@ function rayPropagate(p, layers, zs, zr) {
  return { ok: true, offsetM: x, timeSec: t, path, p };
 }
 
-/** Shoot a ray from (zs) to hit horizontal offset X at depth zr. */
+/** Exact straight-ray solution for a single constant velocity. */
+function rayShootConstant(v, zs, zr, targetOffsetM) {
+ const X = Math.abs(targetOffsetM);
+ const D = zr - zs;
+ if (!(D > 0) || !(v > 0)) return { ok: false, reason: 'bad_geometry' };
+ const slant = Math.sqrt(X * X + D * D);
+ const t = slant / v;
+ const takeoffDeg = (Math.atan2(X, D) * 180) / Math.PI;
+ const path = [
+  { z: zs, x: 0, v, theta: takeoffDeg },
+  { z: zr, x: X, v, theta: takeoffDeg }
+ ];
+ return { ok: true, offsetM: X, timeSec: t, path, takeoffDeg, p: Math.sin(takeoffDeg * Math.PI / 180) / v, method: 'exact' };
+}
+
+/** Shoot a ray from zs to hit horizontal offset X at depth zr. */
 function rayShoot(layers, zs, zr, targetOffsetM) {
  const X = Math.abs(targetOffsetM);
+ if (!(zr > zs)) return { ok: false, reason: 'receiver_above_source' };
+
+ // Fast exact path for homogeneous water
+ if (layers.length === 1 || (layers.length && layers.every(L => Math.abs(L.v - layers[0].v) < 1e-6))) {
+  return rayShootConstant(layers[0].v, zs, zr, X);
+ }
+
  if (X < 1) {
-  // Vertical
   let t = 0, z = zs;
   const path = [{ z: zs, x: 0 }];
   for (const L of layers) {
@@ -390,107 +454,180 @@ function rayShoot(layers, zs, zr, targetOffsetM) {
    t += (zr - z) / v;
    path.push({ z: zr, x: 0, v, theta: 0 });
   }
-  return { ok: true, offsetM: 0, timeSec: t, path, takeoffDeg: 0, p: 0 };
+  return { ok: true, offsetM: 0, timeSec: t, path, takeoffDeg: 0, p: 0, method: 'vertical' };
  }
 
- // p ranges from 0 (vertical) to almost 1/vmin
  const vmin = Math.min(...layers.map(L => L.v), 1500);
  let lo = 0, hi = (1 / vmin) * 0.999;
  let best = null;
- for (let iter = 0; iter < 48; iter++) {
+ for (let iter = 0; iter < 64; iter++) {
   const mid = 0.5 * (lo + hi);
   const r = rayPropagate(mid, layers, zs, zr);
   if (!r.ok) { hi = mid; continue; }
   best = r;
   if (r.offsetM > X) hi = mid;
   else lo = mid;
-  if (Math.abs(r.offsetM - X) < 0.5) break;
+  if (Math.abs(r.offsetM - X) < 0.25) break;
  }
  if (!best || !best.ok) return { ok: false, reason: 'no_solution' };
- // Scale path x to exact target (small correction) if close
+
  const scale = best.offsetM > 1e-6 ? X / best.offsetM : 1;
- if (Math.abs(scale - 1) < 0.05) {
+ if (Math.abs(scale - 1) < 0.08) {
   best.path = best.path.map(pt => ({ ...pt, x: (pt.x || 0) * scale }));
   best.offsetM = X;
+  // First-order TT correction for small geometric scale
+  if (Math.abs(scale - 1) > 1e-6) best.timeSec = best.timeSec * (0.5 + 0.5 * scale);
  }
  const takeoff = best.path.find(pt => pt.theta != null);
  best.takeoffDeg = takeoff ? takeoff.theta : (Math.asin(Math.min(0.999, best.p * vmin)) * 180 / Math.PI);
+ best.method = 'snell';
  return best;
+}
+
+function rayBuildResult(node, source, shot, brng) {
+ const latlngs = shot.path.map(pt => {
+  const d = Math.abs(pt.x || 0);
+  if (d < 0.5) return source.slice();
+  return destinationPoint(source, brng, d);
+ });
+ return {
+  nodeId: node.id,
+  nodeName: node.name || ('N' + node.id),
+  offsetM: haversine(source, [node.lat, node.lon]),
+  timeSec: shot.timeSec,
+  takeoffDeg: shot.takeoffDeg,
+  method: shot.method || 'snell',
+  path: shot.path,
+  latlngs,
+  node: [node.lat, node.lon]
+ };
+}
+
+function raySetBusy(busy, msg) {
+ _rayState.busy = !!busy;
+ const btn = document.getElementById('ray-btn-trace');
+ if (btn) {
+  btn.disabled = !!busy;
+  btn.textContent = busy ? (msg || 'Tracing…') : 'Trace Rays';
+  btn.style.opacity = busy ? '0.7' : '1';
+ }
+ const prog = document.getElementById('ray-progress');
+ if (prog) {
+  prog.style.display = busy ? 'block' : 'none';
+  if (msg) prog.textContent = msg;
+ }
 }
 
 function rayTraceRun() {
  rayTraceStopPick();
+ if (_rayState.busy) { showToast('Trace already running'); return; }
  if (!_rayState.source) { showToast('Place a source first'); return; }
- if (!_rayState.nodes.length) { showToast('Place or generate at least one node'); return; }
+ if (!_rayState.nodes.length) { showToast('Place, generate, or import at least one node'); return; }
+ if (typeof haversine !== 'function' || typeof bearing !== 'function' || typeof destinationPoint !== 'function') {
+  showToast('Map geometry helpers not ready — open Design workspace first', 5000);
+  return;
+ }
 
- // Rebuild generated modes from current geometry / params before shooting
  if (rayGetVelMode() !== 'layered') rayApplyVelocityMode(false);
 
  const zs = Math.max(0, parseFloat(document.getElementById('ray-src-z')?.value) || 8);
  const zr = Math.max(zs + 1, parseFloat(document.getElementById('ray-rcv-z')?.value) || 1000);
  const maxOff = Math.max(100, parseFloat(document.getElementById('ray-max-off')?.value) || 8000);
- const maxDraw = Math.max(1, Math.min(500, parseInt(document.getElementById('ray-max-draw')?.value, 10) || 80));
- const layers = rayReadLayers();
- // Ensure model covers receiver depth
- if (!layers.length || layers[layers.length - 1].zBot < zr) {
-  const v = layers.length ? layers[layers.length - 1].v : 1500;
-  const zTop = layers.length ? layers[layers.length - 1].zBot : 0;
-  layers.push({ zTop, zBot: zr + 10, v });
- }
+ const maxDraw = Math.max(1, Math.min(2000, parseInt(document.getElementById('ray-max-draw')?.value, 10) || 200));
+ let layers = rayEnsureModelCovers(rayReadLayers(), zr);
 
+ const nodes = _rayState.nodes.slice();
+ const source = _rayState.source.slice();
+ const token = ++_rayTraceToken;
  const results = [];
- for (const node of _rayState.nodes) {
-  const off = haversine(_rayState.source, [node.lat, node.lon]);
-  if (off > maxOff) continue;
-  const shot = rayShoot(layers, zs, zr, off);
-  if (!shot.ok) continue;
-  const brng = bearing(_rayState.source, [node.lat, node.lon]);
-  // Build geographic polyline along bearing using path offsets
-  const latlngs = shot.path.map(pt => {
-   const d = Math.abs(pt.x || 0);
-   if (d < 0.5) return _rayState.source.slice();
-   return destinationPoint(_rayState.source, brng, d);
-  });
-  results.push({
-   nodeId: node.id,
-   offsetM: off,
-   timeSec: shot.timeSec,
-   takeoffDeg: shot.takeoffDeg,
-   path: shot.path,
-   latlngs,
-   node: [node.lat, node.lon]
-  });
+ const skipped = { maxOffset: 0, critical: 0, failed: 0 };
+ const CHUNK = 40;
+ let i = 0;
+
+ raySetBusy(true, 'Tracing 0 / ' + nodes.length + '…');
+
+ function finish() {
+  if (token !== _rayTraceToken) return;
+  results.sort((a, b) => a.offsetM - b.offsetM);
+  _rayState.allResults = results;
+  _rayState.results = results.slice(0, maxDraw);
+  _rayState.skipped = skipped;
+  _rayState.lastRunAt = new Date().toISOString();
+  raySetBusy(false);
+  rayRedrawMapGraphics();
+  rayDrawProfile();
+  rayUpdateSummary();
+  rayRenderResultsTable();
+
+  const parts = [];
+  parts.push('Traced ' + results.length + ' ray(s)');
+  if (results.length > maxDraw) parts.push('drawing ' + maxDraw);
+  if (skipped.maxOffset) parts.push(skipped.maxOffset + ' beyond max offset');
+  if (skipped.critical) parts.push(skipped.critical + ' critical / turning');
+  if (skipped.failed) parts.push(skipped.failed + ' failed');
+  showToast(parts.join(' · '), results.length ? 4000 : 6000);
+  if (!results.length) {
+   showToast('No rays reached nodes — check depths, max offset, or velocity model', 6000);
+  }
  }
 
- results.sort((a, b) => a.offsetM - b.offsetM);
- _rayState.results = results.slice(0, maxDraw);
- if (results.length > maxDraw) {
-  showToast(`Traced ${results.length} rays - drawing first ${maxDraw} (raise Max rays to see more)`, 5000);
- } else if (!results.length) {
-  showToast('No rays reached nodes - check depths, max offset, or velocity model', 6000);
- } else {
-  showToast(`Traced ${_rayState.results.length} ray(s)`, 3000);
+ function step() {
+  if (token !== _rayTraceToken) return;
+  const end = Math.min(i + CHUNK, nodes.length);
+  for (; i < end; i++) {
+   const node = nodes[i];
+   const off = haversine(source, [node.lat, node.lon]);
+   if (off > maxOff) { skipped.maxOffset++; continue; }
+   const shot = rayShoot(layers, zs, zr, off);
+   if (!shot.ok) {
+    if (shot.reason === 'critical' || shot.reason === 'horizontal') skipped.critical++;
+    else skipped.failed++;
+    continue;
+   }
+   const brng = bearing(source, [node.lat, node.lon]);
+   results.push(rayBuildResult(node, source, shot, brng));
+  }
+  raySetBusy(true, 'Tracing ' + i + ' / ' + nodes.length + '…');
+  if (i < nodes.length) {
+   setTimeout(step, 0);
+  } else {
+   finish();
+  }
  }
- rayRedrawMapGraphics();
- rayDrawProfile();
- rayUpdateSummary();
+
+ setTimeout(step, 0);
 }
 
 function rayTraceClear() {
+ _rayTraceToken++;
  rayTraceStopPick();
+ raySetBusy(false);
  _rayState.source = null;
  _rayState.nodes = [];
  _rayState.results = [];
+ _rayState.allResults = [];
+ _rayState.skipped = { maxOffset: 0, critical: 0, failed: 0 };
  if (layerRayTrace) layerRayTrace.clearLayers();
  rayUpdateSummary();
+ rayRenderResultsTable();
  rayDrawProfile();
  showToast('Ray tracing cleared');
+}
+
+function rayFitMap() {
+ if (!map || !layerRayTrace) return;
+ const pts = [];
+ if (_rayState.source) pts.push(_rayState.source);
+ _rayState.nodes.forEach(n => pts.push([n.lat, n.lon]));
+ if (pts.length < 1) return;
+ try {
+  map.fitBounds(L.latLngBounds(pts), { padding: [40, 40], maxZoom: 14 });
+ } catch (_) {}
 }
 
 function rayTimeColor(t, tMin, tMax) {
  if (!(tMax > tMin)) return '#fbbf24';
  const u = Math.max(0, Math.min(1, (t - tMin) / (tMax - tMin)));
- // yellow -> orange -> red
  const r = Math.round(251 + (239 - 251) * u);
  const g = Math.round(191 * (1 - u));
  const b = Math.round(36 * (1 - u));
@@ -511,7 +648,7 @@ function rayRedrawMapGraphics() {
  _rayState.nodes.forEach(n => {
   L.circleMarker([n.lat, n.lon], {
    radius: 5, color: '#0ea5e9', weight: 1, fillColor: '#38bdf8', fillOpacity: 0.95
-  }).bindTooltip('Node ' + n.id, { permanent: false }).addTo(layerRayTrace);
+  }).bindTooltip((n.name || ('Node ' + n.id)), { permanent: false }).addTo(layerRayTrace);
  });
 
  const times = _rayState.results.map(r => r.timeSec);
@@ -520,8 +657,14 @@ function rayRedrawMapGraphics() {
  _rayState.results.forEach(r => {
   const col = rayTimeColor(r.timeSec, tMin, tMax);
   L.polyline(r.latlngs, {
-   color: col, weight: 2, opacity: 0.85, interactive: false
-  }).addTo(layerRayTrace);
+   color: col, weight: 2, opacity: 0.85
+  }).bindTooltip(
+   (r.nodeName || ('N' + r.nodeId))
+    + ' · ' + r.offsetM.toFixed(0) + ' m · '
+    + r.timeSec.toFixed(3) + ' s · θ '
+    + (r.takeoffDeg != null ? r.takeoffDeg.toFixed(1) : '—') + '°',
+   { sticky: true }
+  ).addTo(layerRayTrace);
  });
 }
 
@@ -530,21 +673,94 @@ function rayUpdateSummary() {
  if (!el) return;
  const nSrc = _rayState.source ? 1 : 0;
  const nNodes = _rayState.nodes.length;
- const nRays = _rayState.results.length;
+ const nRays = (_rayState.allResults.length || _rayState.results.length);
+ const nDraw = _rayState.results.length;
  if (!nSrc && !nNodes) {
-  el.textContent = 'No rays yet - place a source and at least one node, then Trace Rays.';
+  el.textContent = 'No rays yet — place a source and nodes (or Import OBN / Generate patch), then Trace Rays.';
   return;
  }
  let html = `<strong style="color:#fbbf24;">${nSrc}</strong> source · <strong style="color:#38bdf8;">${nNodes}</strong> node(s) · <strong style="color:#30d158;">${nRays}</strong> ray(s)`
+  + (nDraw < nRays ? ` <span style="color:#64748b;">(drawing ${nDraw})</span>` : '')
   + ` · vel <strong style="color:#fbbf24;">${_rayState.velMode || rayGetVelMode()}</strong>`;
+ const sk = _rayState.skipped || {};
+ if (sk.maxOffset || sk.critical || sk.failed) {
+  html += `<br><span style="color:#f87171;">Skipped: ${sk.maxOffset || 0} max-offset · ${sk.critical || 0} critical · ${sk.failed || 0} failed</span>`;
+ }
  if (nRays) {
-  const times = _rayState.results.map(r => r.timeSec);
-  const offs = _rayState.results.map(r => r.offsetM);
-  html += `<br>Offset ${Math.min(...offs).toFixed(0)}-${Math.max(...offs).toFixed(0)} m · ` +
-   `Travel time ${(Math.min(...times)).toFixed(3)}-${(Math.max(...times)).toFixed(3)} s · ` +
-   `Takeoff ${Math.min(..._rayState.results.map(r => r.takeoffDeg)).toFixed(1)}-${Math.max(..._rayState.results.map(r => r.takeoffDeg)).toFixed(1)} deg from vertical`;
+  const pool = _rayState.allResults.length ? _rayState.allResults : _rayState.results;
+  const times = pool.map(r => r.timeSec);
+  const offs = pool.map(r => r.offsetM);
+  html += `<br>Offset ${Math.min(...offs).toFixed(0)}–${Math.max(...offs).toFixed(0)} m · `
+   + `TT ${(Math.min(...times)).toFixed(3)}–${(Math.max(...times)).toFixed(3)} s · `
+   + `Takeoff ${Math.min(...pool.map(r => r.takeoffDeg)).toFixed(1)}–${Math.max(...pool.map(r => r.takeoffDeg)).toFixed(1)}° from vertical`;
  }
  el.innerHTML = html;
+}
+
+function rayRenderResultsTable() {
+ const host = document.getElementById('ray-results-table');
+ if (!host) return;
+ const rows = _rayState.allResults.length ? _rayState.allResults : _rayState.results;
+ if (!rows.length) {
+  host.innerHTML = '<div style="color:#64748b;font-size:10px;padding:6px 0;">No travel-time table yet.</div>';
+  return;
+ }
+ const show = rows.slice(0, 200);
+ let html = '<table style="width:100%;border-collapse:collapse;font-size:10px;">'
+  + '<thead><tr style="color:#94a3b8;text-align:left;">'
+  + '<th style="padding:4px 6px;border-bottom:1px solid #1a1a24;">Node</th>'
+  + '<th style="padding:4px 6px;border-bottom:1px solid #1a1a24;">Offset m</th>'
+  + '<th style="padding:4px 6px;border-bottom:1px solid #1a1a24;">TT s</th>'
+  + '<th style="padding:4px 6px;border-bottom:1px solid #1a1a24;">Takeoff°</th>'
+  + '<th style="padding:4px 6px;border-bottom:1px solid #1a1a24;">Method</th>'
+  + '</tr></thead><tbody>';
+ show.forEach(r => {
+  html += '<tr>'
+   + `<td style="padding:3px 6px;border-bottom:1px solid #12121a;color:#e2e8f0;">${String(r.nodeName || r.nodeId).replace(/</g, '&lt;')}</td>`
+   + `<td style="padding:3px 6px;border-bottom:1px solid #12121a;color:#cbd5e1;">${r.offsetM.toFixed(1)}</td>`
+   + `<td style="padding:3px 6px;border-bottom:1px solid #12121a;color:#fbbf24;font-weight:700;">${r.timeSec.toFixed(4)}</td>`
+   + `<td style="padding:3px 6px;border-bottom:1px solid #12121a;color:#94a3b8;">${r.takeoffDeg != null ? r.takeoffDeg.toFixed(2) : '—'}</td>`
+   + `<td style="padding:3px 6px;border-bottom:1px solid #12121a;color:#64748b;">${r.method || 'snell'}</td>`
+   + '</tr>';
+ });
+ html += '</tbody></table>';
+ if (rows.length > show.length) {
+  html += `<div style="font-size:9px;color:#64748b;margin-top:6px;">Showing ${show.length} of ${rows.length} — export CSV for full table.</div>`;
+ }
+ host.innerHTML = html;
+}
+
+function rayExportCsv() {
+ const rows = _rayState.allResults.length ? _rayState.allResults : _rayState.results;
+ if (!rows.length) { showToast('No results to export — run Trace Rays first'); return; }
+ const zs = parseFloat(document.getElementById('ray-src-z')?.value) || 8;
+ const zr = parseFloat(document.getElementById('ray-rcv-z')?.value) || 1000;
+ const lines = [
+  '# Candooka OSPO water-column ray tracing',
+  '# velMode=' + (_rayState.velMode || ''),
+  '# sourceDepth_m=' + zs + ' nodeDepth_m=' + zr,
+  '# source_lat=' + (_rayState.source ? _rayState.source[0] : '') + ' source_lon=' + (_rayState.source ? _rayState.source[1] : ''),
+  'node_id,node_name,node_lat,node_lon,offset_m,travel_time_s,takeoff_deg,method'
+ ];
+ rows.forEach(r => {
+  lines.push([
+   r.nodeId,
+   JSON.stringify(String(r.nodeName || '')),
+   r.node[0],
+   r.node[1],
+   r.offsetM.toFixed(3),
+   r.timeSec.toFixed(6),
+   r.takeoffDeg != null ? r.takeoffDeg.toFixed(4) : '',
+   r.method || ''
+  ].join(','));
+ });
+ const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+ const a = document.createElement('a');
+ a.href = URL.createObjectURL(blob);
+ a.download = 'ray_tracing_tt_' + new Date().toISOString().slice(0, 10) + '.csv';
+ a.click();
+ URL.revokeObjectURL(a.href);
+ showToast('Exported ' + rows.length + ' travel times', 2500);
 }
 
 function rayDrawProfile() {
@@ -569,7 +785,6 @@ function rayDrawProfile() {
  const xToPx = (x) => padL + (x / maxX) * plotW;
  const zToPx = (z) => padT + ((z - 0) / zr) * plotH;
 
- // Grid
  ctx.strokeStyle = '#1a1a24';
  ctx.lineWidth = 1;
  for (let i = 0; i <= 4; i++) {
@@ -588,13 +803,11 @@ function rayDrawProfile() {
   ctx.fillText(Math.round(x) + ' m', px - 10, H - 12);
  }
 
- // Seabed line
  ctx.strokeStyle = '#334155';
  ctx.setLineDash([4, 3]);
  ctx.beginPath(); ctx.moveTo(padL, zToPx(zr)); ctx.lineTo(W - padR, zToPx(zr)); ctx.stroke();
  ctx.setLineDash([]);
 
- // Velocity layer boundaries
  const layers = rayReadLayers();
  ctx.strokeStyle = '#1e293b';
  layers.forEach(L => {
@@ -624,7 +837,6 @@ function rayDrawProfile() {
   ctx.stroke();
  });
 
- // Source marker
  ctx.fillStyle = '#f59e0b';
  ctx.beginPath();
  ctx.arc(xToPx(0), zToPx(zs), 4, 0, Math.PI * 2);
