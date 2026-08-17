@@ -14147,7 +14147,7 @@ async function handleSignIn() {
  updateUserDisplay();
  notifyLogin(existingUser.email || existingUser.name, pass);
  showToast('Signed in (server confirmed). Welcome ' + (existingUser.name || user));
- setTimeout(showBaseLayerChooser, 300);
+ setTimeout(showWorkspaceChooser, 300);
  resetButton();
  return;
  }
@@ -14166,7 +14166,7 @@ async function handleSignIn() {
  updateUserDisplay();
  notifyLogin(existingUser.email || existingUser.name, pass);
  showToast('Signed in (server confirmed). Welcome ' + (existingUser.name || user));
- setTimeout(showBaseLayerChooser, 300);
+ setTimeout(showWorkspaceChooser, 300);
  resetButton();
  } catch (err) {
  console.error('Sign-in error:', err);
@@ -14251,6 +14251,7 @@ function submitTrialRequest() {
  updateUserDisplay();
 
  showToast(`Trial activated! We'll send updates to ${email}`, 5000);
+ setTimeout(showWorkspaceChooser, 300);
 }
 
 function showFirstLoginContactPrompt(user) {
@@ -14308,7 +14309,6 @@ function submitFirstLoginContact() {
  updateAdminButton();
  state.currentUser = user.email || state.currentUser;
  updateUserDisplay();
- showAdminPanel();
  showToast(`Welcome ${user.name} - contact details saved`);
  } else {
  adminLoggedIn = false;
@@ -14317,6 +14317,7 @@ function submitFirstLoginContact() {
  updateUserDisplay();
  showToast(`Welcome ${user.name} - contact details saved`);
  }
+ setTimeout(showWorkspaceChooser, 200);
 }
 
 function adminLogout() {
@@ -15654,6 +15655,195 @@ function geoBatchCopy() {
 // ===== MAP LAYERS =====
 let mapLayers = {};
 let currentBaseLayer = null;
+
+const TDB_STORAGE_KEY = 'candooka_timing_db_v1';
+var _appWorkspace = null; // 'planning' | 'database'
+var _tdbActiveProjectId = null;
+
+function _tdbLoadStore() {
+ try {
+  const raw = localStorage.getItem(TDB_STORAGE_KEY);
+  if (!raw) return { projects: [] };
+  const d = JSON.parse(raw);
+  if (!d || !Array.isArray(d.projects)) return { projects: [] };
+  return d;
+ } catch (_) {
+  return { projects: [] };
+ }
+}
+
+function _tdbSaveStore(store) {
+ try {
+  localStorage.setItem(TDB_STORAGE_KEY, JSON.stringify(store));
+ } catch (e) {
+  showToast('Could not save timing database locally (storage full?)', 5000);
+ }
+}
+
+function showWorkspaceChooser() {
+ const el = document.getElementById('workspace-chooser');
+ if (el) el.style.display = 'flex';
+ // Hide other full-screen choosers while picking
+ const base = document.getElementById('baselayer-chooser');
+ if (base) base.style.display = 'none';
+}
+
+function enterWorkspace(mode) {
+ const m = (mode === 'database') ? 'database' : 'planning';
+ _appWorkspace = m;
+ try { localStorage.setItem('candooka_workspace', m); } catch (_) {}
+
+ const chooser = document.getElementById('workspace-chooser');
+ if (chooser) chooser.style.display = 'none';
+
+ const dbWs = document.getElementById('workspace-database');
+ const app = document.getElementById('app');
+
+ if (m === 'database') {
+  if (app) app.style.visibility = 'hidden';
+  if (dbWs) dbWs.style.display = 'block';
+  tdbRender();
+  showToast('Timing Database workspace', 2500);
+  return;
+ }
+
+ // Planning
+ if (dbWs) dbWs.style.display = 'none';
+ if (app) app.style.visibility = 'visible';
+ showToast('Planning workspace', 2500);
+ // Only prompt for basemap if none saved yet
+ const saved = localStorage.getItem('candooka_baseLayer');
+ if (!saved) setTimeout(showBaseLayerChooser, 200);
+}
+
+function tdbRender() {
+ const store = _tdbLoadStore();
+ if (!_tdbActiveProjectId && store.projects.length) {
+  _tdbActiveProjectId = store.projects[0].id;
+ }
+ const list = document.getElementById('tdb-project-list');
+ const label = document.getElementById('tdb-project-label');
+ if (list) {
+  if (!store.projects.length) {
+   list.innerHTML = '<div style="color:#64748b;font-size:11px;padding:8px 0;">No projects yet — create one to start time accounting.</div>';
+  } else {
+   list.innerHTML = store.projects.map(p => {
+    const active = p.id === _tdbActiveProjectId;
+    const hrs = (p.activities || []).reduce((s, a) => s + (Number(a.hours) || 0), 0);
+    return `<button type="button" onclick="tdbSelectProject('${p.id}')" style="display:block;width:100%;text-align:left;padding:8px 10px;margin-bottom:6px;border-radius:5px;border:1px solid ${active ? '#f59e0b' : '#1a1a24'};background:${active ? '#1a1205' : '#0a0a12'};color:#e2e8f0;cursor:pointer;font-family:inherit;">
+      <div style="font-size:12px;font-weight:700;color:${active ? '#fbbf24' : '#e2e8f0'};">${_escHtml(p.name)}</div>
+      <div style="font-size:10px;color:#64748b;margin-top:2px;">${(p.activities || []).length} activities · ${hrs.toFixed(1)} h</div>
+     </button>`;
+   }).join('');
+  }
+ }
+ const proj = store.projects.find(p => p.id === _tdbActiveProjectId);
+ if (label) label.textContent = proj ? ('Project: ' + proj.name) : 'No project selected';
+ tdbRenderRollup(proj);
+}
+
+function _escHtml(s) {
+ return String(s == null ? '' : s)
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;');
+}
+
+function tdbSelectProject(id) {
+ _tdbActiveProjectId = id;
+ tdbRender();
+}
+
+function tdbCreateProject() {
+ const inp = document.getElementById('tdb-new-project');
+ const name = (inp && inp.value || '').trim();
+ if (!name) { showToast('Enter a project name'); return; }
+ const store = _tdbLoadStore();
+ const id = 'p_' + Date.now().toString(36);
+ store.projects.unshift({
+  id, name, createdAt: new Date().toISOString(), activities: []
+ });
+ _tdbSaveStore(store);
+ _tdbActiveProjectId = id;
+ if (inp) inp.value = '';
+ tdbRender();
+ showToast('Project created: ' + name, 2500);
+}
+
+function tdbAddActivity() {
+ if (!_tdbActiveProjectId) { showToast('Create or select a project first'); return; }
+ const code = (document.getElementById('tdb-act-code') || {}).value || 'OTHER';
+ const hours = parseFloat((document.getElementById('tdb-act-hours') || {}).value);
+ const note = ((document.getElementById('tdb-act-note') || {}).value || '').trim();
+ if (!(hours > 0)) { showToast('Enter hours greater than 0'); return; }
+ const store = _tdbLoadStore();
+ const proj = store.projects.find(p => p.id === _tdbActiveProjectId);
+ if (!proj) { showToast('Project not found'); return; }
+ proj.activities = proj.activities || [];
+ proj.activities.unshift({
+  id: 'a_' + Date.now().toString(36),
+  code, hours, note,
+  at: new Date().toISOString()
+ });
+ _tdbSaveStore(store);
+ const noteEl = document.getElementById('tdb-act-note');
+ if (noteEl) noteEl.value = '';
+ tdbRender();
+ showToast('Activity logged: ' + code + ' ' + hours + ' h', 2500);
+}
+
+function tdbRenderRollup(proj) {
+ const roll = document.getElementById('tdb-rollup');
+ const list = document.getElementById('tdb-activity-list');
+ if (!roll) return;
+ if (!proj) {
+  roll.textContent = 'Select or create a project to see hours by time code.';
+  if (list) list.innerHTML = '';
+  return;
+ }
+ const sums = {};
+ (proj.activities || []).forEach(a => {
+  const c = a.code || 'OTHER';
+  sums[c] = (sums[c] || 0) + (Number(a.hours) || 0);
+ });
+ const total = Object.values(sums).reduce((s, v) => s + v, 0);
+ const order = ['ONLINE', 'LINECHANGE', 'STANDBY', 'WEATHER', 'TECH', 'MOB', 'OTHER'];
+ const keys = order.filter(k => sums[k] > 0).concat(Object.keys(sums).filter(k => !order.includes(k)));
+ roll.innerHTML = keys.length
+  ? keys.map(k => `<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #14141c;"><span style="color:#94a3b8;">${k}</span><span style="color:#e2e8f0;font-weight:700;">${sums[k].toFixed(2)} h</span></div>`).join('')
+    + `<div style="display:flex;justify-content:space-between;padding:8px 0 0;margin-top:4px;"><span style="color:#fbbf24;font-weight:700;">TOTAL</span><span style="color:#fbbf24;font-weight:800;">${total.toFixed(2)} h</span></div>`
+  : 'No activities yet — log hours above.';
+
+ if (list) {
+  const acts = proj.activities || [];
+  if (!acts.length) {
+   list.innerHTML = '';
+  } else {
+   list.innerHTML = '<div style="font-size:10px;color:#64748b;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.4px;">Recent activity</div>'
+    + acts.slice(0, 40).map(a =>
+     `<div style="display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid #14141c;font-size:11px;">
+       <div style="min-width:0;"><span style="color:#fbbf24;font-weight:700;">${_escHtml(a.code)}</span>`
+       + (a.note ? ` <span style="color:#64748b;">· ${_escHtml(a.note)}</span>` : '')
+       + `<div style="font-size:9px;color:#475569;margin-top:2px;">${_escHtml((a.at || '').replace('T', ' ').slice(0, 19))}</div></div>
+       <div style="color:#e2e8f0;font-weight:700;flex-shrink:0;">${Number(a.hours).toFixed(2)} h</div>
+      </div>`
+    ).join('');
+  }
+ }
+}
+
+function tdbExportJson() {
+ if (!_tdbActiveProjectId) { showToast('Select a project first'); return; }
+ const store = _tdbLoadStore();
+ const proj = store.projects.find(p => p.id === _tdbActiveProjectId);
+ if (!proj) { showToast('Project not found'); return; }
+ const blob = new Blob([JSON.stringify({ type: 'candooka-timing-db', version: 1, project: proj }, null, 2)], { type: 'application/json' });
+ const a = document.createElement('a');
+ a.href = URL.createObjectURL(blob);
+ a.download = 'timing_' + (proj.name || 'project').replace(/[^\w\-]+/g, '_') + '.json';
+ a.click();
+ URL.revokeObjectURL(a.href);
+ showToast('Timing project exported', 2500);
+}
 
 function showBaseLayerChooser() {
  // Default to satellite (Esri) if no saved preference

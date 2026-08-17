@@ -99,7 +99,93 @@
  <a href="https://candooka.world/">candooka.world</a>.</p>
  </main>
  </noscript>
- <!-- Base Layer Chooser (shown after sign-in) -->
+ <!-- Workspace chooser (Planning vs Timing Database) — after sign-in -->
+ <div id="workspace-chooser" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(6,6,12,0.96); z-index:9997; align-items:center; justify-content:center;">
+ <div style="background:#0e0e16; border:1px solid #1a1a24; border-radius:10px; padding:28px 32px; width:100%; max-width:640px; box-shadow:0 16px 64px rgba(0,0,0,0.7); text-align:center; margin:16px;">
+ <div style="font-size:15px; font-weight:700; color:#e0e8f0; margin-bottom:6px; letter-spacing:0.4px;">Choose workspace</div>
+ <div style="font-size:11px; color:#8a9bb0; margin-bottom:22px; line-height:1.45;">Select how you want to work in Candooka OSPO. You can switch later from the logo menu.</div>
+ <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:8px;">
+ <button type="button" onclick="enterWorkspace('planning')" style="text-align:left; padding:18px 16px; border-radius:8px; border:1px solid #1e3a52; background:#0a1220; color:#e0e8f0; cursor:pointer; font-family:inherit;">
+  <div style="font-size:13px; font-weight:800; color:#00d2ff; letter-spacing:0.5px; margin-bottom:8px;">PLANNING</div>
+  <div style="font-size:11px; color:#a0aebb; line-height:1.45;">Preplot, route optimisation, fold coverage, NOAA, AIS, cost &amp; look-ahead time estimates.</div>
+ </button>
+ <button type="button" onclick="enterWorkspace('database')" style="text-align:left; padding:18px 16px; border-radius:8px; border:1px solid #3f2e1a; background:#14100a; color:#e0e8f0; cursor:pointer; font-family:inherit;">
+  <div style="font-size:13px; font-weight:800; color:#fbbf24; letter-spacing:0.5px; margin-bottom:8px;">TIMING DATABASE</div>
+  <div style="font-size:11px; color:#a0aebb; line-height:1.45;">Operations timing &amp; production database — projects, sequences, activity / time accounting (CheckPoint-style).</div>
+ </button>
+ </div>
+ </div>
+ </div>
+
+ <!-- Timing Database workspace (shown when mode = database) -->
+ <div id="workspace-database" style="display:none; position:fixed; inset:0; z-index:9000; background:#08080e; color:#e2e8f0; font-family:inherit; overflow:auto;">
+ <header style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 20px; border-bottom:1px solid #1a1a24; background:#0e0e16; position:sticky; top:0; z-index:2;">
+  <div style="display:flex; align-items:center; gap:12px; min-width:0;">
+   <div style="font-size:14px; font-weight:800; letter-spacing:0.6px; color:#fbbf24;">OSPO TIMING DATABASE</div>
+   <div id="tdb-project-label" style="font-size:11px; color:#8a9bb0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">No project selected</div>
+  </div>
+  <div style="display:flex; gap:8px; flex-shrink:0;">
+   <button type="button" onclick="showWorkspaceChooser()" style="padding:7px 12px; border-radius:4px; border:1px solid #334155; background:#111827; color:#cbd5e1; font-size:11px; font-weight:700; cursor:pointer; font-family:inherit;">Switch workspace</button>
+   <button type="button" onclick="enterWorkspace('planning')" style="padding:7px 12px; border-radius:4px; border:1px solid #0e7490; background:#164e63; color:#a5f3fc; font-size:11px; font-weight:700; cursor:pointer; font-family:inherit;">Open Planning</button>
+  </div>
+ </header>
+ <div style="max-width:1100px; margin:0 auto; padding:20px 16px 40px;">
+  <div style="font-size:12px; color:#94a3b8; line-height:1.5; margin-bottom:18px;">
+   Timing Database stores <b style="color:#e2e8f0;">actual</b> survey operations: projects, sequences, activity / time codes, and production roll-ups — alongside Planning (which remains for pre-survey design).
+  </div>
+
+  <div style="display:grid; grid-template-columns:1.1fr 1fr; gap:14px; margin-bottom:16px;">
+   <section style="background:#0e0e16; border:1px solid #1a1a24; border-radius:8px; padding:14px 16px;">
+    <div style="font-size:10px; color:#fbbf24; font-weight:700; letter-spacing:0.45px; text-transform:uppercase; margin-bottom:10px;">Projects</div>
+    <div style="display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap;">
+     <input id="tdb-new-project" type="text" placeholder="New project name" style="flex:1; min-width:160px; padding:8px 10px; border-radius:4px; border:1px solid #333; background:#111; color:#fff; font-size:12px; outline:none; font-family:inherit;"/>
+     <button type="button" onclick="tdbCreateProject()" style="padding:8px 12px; border-radius:4px; border:none; background:#f59e0b; color:#111; font-weight:800; font-size:11px; cursor:pointer; font-family:inherit;">Create</button>
+    </div>
+    <div id="tdb-project-list" style="max-height:220px; overflow:auto; font-size:12px;"></div>
+   </section>
+
+   <section style="background:#0e0e16; border:1px solid #1a1a24; border-radius:8px; padding:14px 16px;">
+    <div style="font-size:10px; color:#fbbf24; font-weight:700; letter-spacing:0.45px; text-transform:uppercase; margin-bottom:10px;">Activity / time accounting</div>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">
+     <label style="font-size:10px; color:#8a9bb0;">Code
+      <select id="tdb-act-code" style="display:block; width:100%; margin-top:4px; padding:7px 8px; border-radius:4px; border:1px solid #333; background:#111; color:#fff; font-size:11px; font-family:inherit;">
+       <option value="ONLINE">ONLINE — acquisition</option>
+       <option value="LINECHANGE">LINECHANGE — transit / turn</option>
+       <option value="STANDBY">STANDBY — waiting</option>
+       <option value="WEATHER">WEATHER — WOW</option>
+       <option value="TECH">TECH — technical downtime</option>
+       <option value="MOB">MOB / DEMOB</option>
+       <option value="OTHER">OTHER</option>
+      </select>
+     </label>
+     <label style="font-size:10px; color:#8a9bb0;">Hours
+      <input id="tdb-act-hours" type="number" min="0" step="0.25" value="1" style="display:block; width:100%; margin-top:4px; padding:7px 8px; border-radius:4px; border:1px solid #333; background:#111; color:#fff; font-size:11px; font-family:inherit;"/>
+     </label>
+    </div>
+    <label style="font-size:10px; color:#8a9bb0; display:block; margin-bottom:8px;">Note
+     <input id="tdb-act-note" type="text" placeholder="Optional note / sequence ref" style="display:block; width:100%; margin-top:4px; padding:7px 8px; border-radius:4px; border:1px solid #333; background:#111; color:#fff; font-size:11px; font-family:inherit;"/>
+    </label>
+    <button type="button" onclick="tdbAddActivity()" style="width:100%; padding:8px; border-radius:4px; border:1px solid #f59e0b; background:#1a1205; color:#fbbf24; font-weight:700; font-size:11px; cursor:pointer; font-family:inherit;">Add activity</button>
+   </section>
+  </div>
+
+  <section style="background:#0e0e16; border:1px solid #1a1a24; border-radius:8px; padding:14px 16px; margin-bottom:16px;">
+   <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:10px; flex-wrap:wrap;">
+    <div style="font-size:10px; color:#fbbf24; font-weight:700; letter-spacing:0.45px; text-transform:uppercase;">Time roll-up</div>
+    <button type="button" onclick="tdbExportJson()" style="padding:5px 10px; border-radius:4px; border:1px solid #334155; background:#111827; color:#cbd5e1; font-size:10px; font-weight:700; cursor:pointer; font-family:inherit;">Export project JSON</button>
+   </div>
+   <div id="tdb-rollup" style="font-size:12px; color:#94a3b8; line-height:1.5;">Select or create a project to see hours by time code.</div>
+   <div id="tdb-activity-list" style="margin-top:12px; max-height:280px; overflow:auto;"></div>
+  </section>
+
+  <section style="background:#0e0e16; border:1px solid #1a1a24; border-radius:8px; padding:14px 16px;">
+   <div style="font-size:10px; color:#64748b; font-weight:700; letter-spacing:0.45px; text-transform:uppercase; margin-bottom:8px;">Next build</div>
+   <div style="font-size:11px; color:#64748b; line-height:1.5;">Sequence ingest (P1/11 packs), shot tables, plan-vs-actual vs Planning route TIME, multi-user server sync. This workspace is the front door for that timing database.</div>
+  </section>
+ </div>
+ </div>
+
+ <!-- Base Layer Chooser (shown after Planning workspace is chosen) -->
  <div id="baselayer-chooser" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(6,6,12,0.92); z-index:9998; align-items:center; justify-content:center;">
  <div style="background:#0e0e16; border:1px solid #1a1a24; border-radius:8px; padding:28px 32px; width:100%; max-width:400px; box-shadow:0 16px 64px rgba(0,0,0,0.7); text-align:center;">
  <div style="font-size:14px; font-weight:700; color:#e0e8f0; margin-bottom:6px;">Choose Default Base Map</div>
@@ -128,7 +214,11 @@
  </svg>
  </div>
  <h1 style="font-size:16px; font-weight:700; color:#e0e8f0; letter-spacing:1.4px; margin:0 0 4px 0;">CANDOOKA OSPO</h1>
- <h2 style="font-size:11px; font-weight:400; color:#8a9bb0; letter-spacing:0.3px; margin:0 0 16px 0;">Offshore Survey Planner &amp; Route Optimizer</h2>
+ <h2 style="font-size:11px; font-weight:400; color:#8a9bb0; letter-spacing:0.3px; margin:0 0 12px 0;">Offshore Survey Planner &amp; Route Optimizer</h2>
+ <div style="display:flex; gap:8px; justify-content:center; margin-bottom:16px; flex-wrap:wrap;">
+  <span style="font-size:9px; padding:4px 8px; border-radius:999px; border:1px solid #1e3a52; color:#7dd3fc; background:#0a1220;">After sign-in: Planning</span>
+  <span style="font-size:9px; padding:4px 8px; border-radius:999px; border:1px solid #3f2e1a; color:#fbbf24; background:#14100a;">or Timing Database</span>
+ </div>
  <div style="text-align:left; margin-bottom:20px; padding:10px 14px; background:#0a0a12; border:1px solid #1a1a24; border-radius:4px;">
  <h2 style="font-size:9px; color:#5a6a7a; font-weight:600; letter-spacing:0.5px; text-transform:uppercase; margin:0 0 8px 0;">Offshore Survey Planning Features</h2>
  <ul style="margin:0; padding:0 0 0 14px; font-size:10px; color:#a0aebb; line-height:1.9; list-style:disc;">
@@ -243,7 +333,7 @@
  <div id="app">
  <!-- ===== TIER 1: App Bar (Top Tier) ===== -->
  <header id="tier1" style="display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 0 20px;">
- <span class="logo" onclick="showToast('Resetting...'); setTimeout(() =>window.location.reload(), 600);" style="margin-right: 12px; flex-shrink: 0; cursor: pointer;" title="Reset Planner">OSPO <span style="font-size:9px;color:#5a6a7a;font-weight:400;">v3.5</span></span>
+ <span class="logo" onclick="showWorkspaceChooser()" style="margin-right: 12px; flex-shrink: 0; cursor: pointer;" title="Switch workspace (Planning / Timing Database)">OSPO <span style="font-size:9px;color:#5a6a7a;font-weight:400;">v3.5</span></span>
  <div class="t1-menu-wrapper" style="display: flex; flex: 1; gap: 6px; align-items: center; margin-right: 8px;">
  <!-- Load P1 -->
  <label class="corp-btn btn-load" for="file-input" style="flex: 1; text-align: center; margin: 0; cursor: pointer;">LOAD P1</label>
@@ -1859,9 +1949,9 @@
  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
  <script src="https://unpkg.com/shpjs@latest/dist/shp.min.js"></script>
  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
- <script src="app.js?v=16.27"></script>
- <script src="ray_tracing_module.js?v=16.27"></script>
- <script src="wmm_declination.js?v=16.27"></script>
- <script src="magnetic_isogones.js?v=16.27"></script>
+ <script src="app.js?v=16.28"></script>
+ <script src="ray_tracing_module.js?v=16.28"></script>
+ <script src="wmm_declination.js?v=16.28"></script>
+ <script src="magnetic_isogones.js?v=16.28"></script>
 </body>
 </html>
