@@ -15698,7 +15698,8 @@ const TDB_ACTIVITIES = [
 
 const TDB_HSE_DEFAULT = {
  pob: 0,
- exposureHours: null, // null = auto from POB × 24
+ manHours: null, // null = auto from POB × 24; also accepts legacy exposureHours
+ exposureHours: null, // legacy alias — migrated on read
  lti: 0,
  recordable: 0,
  firstAid: 0,
@@ -15869,7 +15870,7 @@ function _tdbGetDaySegs(proj, day) {
 }
 
 const TDB_HSE_NUM_KEYS = [
- 'pob', 'exposureHours', 'lti', 'recordable', 'firstAid', 'nearMiss',
+ 'pob', 'manHours', 'lti', 'recordable', 'firstAid', 'nearMiss',
  'observations', 'stopWork', 'envIncidents', 'mmoSightings'
 ];
 
@@ -15877,22 +15878,52 @@ function _tdbGetDayHse(proj, day) {
  _tdbGetDaySegs(proj, day);
  const raw = (proj.days[day] && proj.days[day].hse) || {};
  const out = Object.assign({}, TDB_HSE_DEFAULT, raw);
+ // Migrate legacy exposureHours → manHours
+ if ((out.manHours == null || out.manHours === '') && raw.exposureHours != null && raw.exposureHours !== '') {
+  out.manHours = raw.exposureHours;
+ }
  TDB_HSE_NUM_KEYS.forEach((k) => {
-  if (k === 'exposureHours' && (raw.exposureHours == null || raw.exposureHours === '')) {
-   out.exposureHours = null;
+  if (k === 'manHours' && (out.manHours == null || out.manHours === '')) {
+   out.manHours = null;
    return;
   }
   const n = Number(out[k]);
   out[k] = Number.isFinite(n) && n >= 0 ? n : 0;
  });
  out.note = String(out.note || '');
+ delete out.exposureHours; // normalised to manHours
  return out;
 }
 
-function _tdbEffectiveExposure(hse) {
- if (hse.exposureHours != null && Number(hse.exposureHours) > 0) return Number(hse.exposureHours);
+/** Total man-hours for HSE rates: override, else POB × 24. */
+function _tdbEffectiveManHours(hse) {
+ if (hse.manHours != null && Number(hse.manHours) > 0) return Number(hse.manHours);
  if (hse.pob > 0) return Math.round(hse.pob * 24 * 10) / 10;
  return 0;
+}
+
+/** Category / activity man-hours from time blocks × POB (clock hours × people). */
+function _tdbManHoursFromTiming(proj, day, pob) {
+ const p = Number(pob) || 0;
+ const a = _tdbAnalyseDay(_tdbGetDaySegs(proj, day));
+ const byCategory = {};
+ const byActivity = {};
+ Object.keys(a.byCategory || {}).forEach((cid) => {
+  byCategory[cid] = Math.round(((a.byCategory[cid] || 0) / 60) * p * 100) / 100;
+ });
+ Object.keys(a.byActivity || {}).forEach((aid) => {
+  byActivity[aid] = Math.round(((a.byActivity[aid] || 0) / 60) * p * 100) / 100;
+ });
+ const fromBlocks = Math.round((a.covered / 60) * p * 100) / 100;
+ const fullDay = Math.round(24 * p * 100) / 100;
+ return {
+  pob: p,
+  coveredMinutes: a.covered,
+  fromBlocks,
+  fullDay,
+  byCategory,
+  byActivity
+ };
 }
 
 function tdbSaveHseFromForm() {
@@ -15910,8 +15941,8 @@ function tdbSaveHseFromForm() {
  };
  const hse = {
   pob: Math.round(num('tdb-hse-pob') || 0),
-  exposureHours: (() => {
-   const v = num('tdb-hse-exposure');
+  manHours: (() => {
+   const v = num('tdb-hse-manhours');
    return v == null ? null : Math.round(v * 10) / 10;
   })(),
   lti: Math.round(num('tdb-hse-lti') || 0),
@@ -15930,14 +15961,14 @@ function tdbSaveHseFromForm() {
 }
 
 function tdbLoadHseIntoForm(hse) {
- const set = (id, v, blankZero) => {
+ const set = (id, v, blankNull) => {
   const el = document.getElementById(id);
   if (!el) return;
-  if (v == null || (blankZero && !v)) el.value = '';
+  if (v == null || (blankNull && (v === '' || v == null))) el.value = '';
   else el.value = String(v);
  };
  set('tdb-hse-pob', hse.pob || 0);
- set('tdb-hse-exposure', hse.exposureHours, true);
+ set('tdb-hse-manhours', hse.manHours, true);
  set('tdb-hse-lti', hse.lti || 0);
  set('tdb-hse-recordable', hse.recordable || 0);
  set('tdb-hse-firstaid', hse.firstAid || 0);
@@ -15952,8 +15983,10 @@ function tdbLoadHseIntoForm(hse) {
 
 function tdbProjectHseTotals(proj) {
  const totals = {
-  pob: 0, exposureHours: 0, lti: 0, recordable: 0, firstAid: 0, nearMiss: 0,
-  observations: 0, stopWork: 0, envIncidents: 0, mmoSightings: 0, _days: 0
+  pob: 0, manHours: 0, manHoursFromBlocks: 0,
+  lti: 0, recordable: 0, firstAid: 0, nearMiss: 0,
+  observations: 0, stopWork: 0, envIncidents: 0, mmoSightings: 0,
+  byCategoryManHours: {}, _days: 0
  };
  const days = Object.keys(proj.days || {}).sort();
  let maxPob = 0;
@@ -15961,13 +15994,17 @@ function tdbProjectHseTotals(proj) {
   const h = _tdbGetDayHse(proj, d);
   const hasAny = h.pob || h.lti || h.recordable || h.firstAid || h.nearMiss
    || h.observations || h.stopWork || h.envIncidents || h.mmoSightings
-   || h.exposureHours != null || (h.note && h.note.length);
-  // Count days that have segments or any HSE entry
+   || h.manHours != null || (h.note && h.note.length);
   const segs = _tdbGetDaySegs(proj, d);
   if (!segs.length && !hasAny) return;
   totals._days += 1;
   maxPob = Math.max(maxPob, h.pob || 0);
-  totals.exposureHours += _tdbEffectiveExposure(h);
+  totals.manHours += _tdbEffectiveManHours(h);
+  const mh = _tdbManHoursFromTiming(proj, d, h.pob || 0);
+  totals.manHoursFromBlocks += mh.fromBlocks;
+  Object.keys(mh.byCategory).forEach((cid) => {
+   totals.byCategoryManHours[cid] = (totals.byCategoryManHours[cid] || 0) + mh.byCategory[cid];
+  });
   totals.lti += h.lti || 0;
   totals.recordable += h.recordable || 0;
   totals.firstAid += h.firstAid || 0;
@@ -15978,12 +16015,16 @@ function tdbProjectHseTotals(proj) {
   totals.mmoSightings += h.mmoSightings || 0;
  });
  totals.pob = maxPob;
- totals.exposureHours = Math.round(totals.exposureHours * 10) / 10;
- totals._trir = totals.exposureHours > 0
-  ? ((totals.recordable + totals.lti) * 200000) / totals.exposureHours
+ totals.manHours = Math.round(totals.manHours * 10) / 10;
+ totals.manHoursFromBlocks = Math.round(totals.manHoursFromBlocks * 100) / 100;
+ Object.keys(totals.byCategoryManHours).forEach((k) => {
+  totals.byCategoryManHours[k] = Math.round(totals.byCategoryManHours[k] * 100) / 100;
+ });
+ totals._trir = totals.manHours > 0
+  ? ((totals.recordable + totals.lti) * 200000) / totals.manHours
   : null;
- totals._ltir = totals.exposureHours > 0
-  ? (totals.lti * 200000) / totals.exposureHours
+ totals._ltir = totals.manHours > 0
+  ? (totals.lti * 200000) / totals.manHours
   : null;
  return totals;
 }
@@ -15991,10 +16032,12 @@ function tdbProjectHseTotals(proj) {
 function tdbRenderHse(proj) {
  const dayLabel = document.getElementById('tdb-hse-day-label');
  const summary = document.getElementById('tdb-hse-summary');
+ const mhEl = document.getElementById('tdb-hse-manhours-by-cat');
  const projEl = document.getElementById('tdb-hse-project-summary');
  if (!proj) {
   if (dayLabel) dayLabel.textContent = '';
   if (summary) summary.textContent = 'Select a project to log HSE metrics.';
+  if (mhEl) mhEl.innerHTML = '';
   if (projEl) projEl.textContent = '';
   tdbLoadHseIntoForm(Object.assign({}, TDB_HSE_DEFAULT));
   return;
@@ -16008,14 +16051,18 @@ function tdbRenderHse(proj) {
   .map(_tdbNormalizeSeg)
   .filter((s) => s.categoryId === 'HSE')
   .reduce((acc, s) => acc + Math.max(0, (s.endMin || 0) - (s.startMin || 0)), 0);
- const exp = _tdbEffectiveExposure(hse);
- const expLabel = hse.exposureHours == null && hse.pob > 0
-  ? (exp + ' h (auto POB×24)')
-  : (exp + ' h');
+ const mhTotal = _tdbEffectiveManHours(hse);
+ const mhTiming = _tdbManHoursFromTiming(proj, day, hse.pob || 0);
+ const mhLabel = hse.manHours == null && hse.pob > 0
+  ? (mhTotal + ' (auto POB×24)')
+  : String(mhTotal);
  if (summary) {
   summary.innerHTML =
    '<strong style="color:#e2e8f0">' + _escHtml(day) + '</strong> — POB ' + (hse.pob || 0) +
-   ' · Exposure ' + expLabel +
+   ' · <strong style="color:#fb7185">Man-hours ' + mhLabel + '</strong>' +
+   (hse.pob > 0 && mhTiming.fromBlocks
+    ? ' · From time blocks ' + mhTiming.fromBlocks
+    : '') +
    (hseMins ? ' · HSE time logged ' + hseMins + ' min' : '') +
    (hse.lti || hse.recordable || hse.firstAid || hse.nearMiss
     ? ' · Events: LTI ' + hse.lti + ' / Rec ' + hse.recordable + ' / FA ' + hse.firstAid + ' / NM ' + hse.nearMiss
@@ -16028,18 +16075,51 @@ function tdbRenderHse(proj) {
     : '') +
    (hse.note ? ' · <span style="color:#94a3b8">' + _escHtml(hse.note) + '</span>' : '');
  }
+ if (mhEl) {
+  if (!(hse.pob > 0) || !Object.keys(mhTiming.byCategory).length) {
+   mhEl.innerHTML = hse.pob > 0
+    ? '<span style="color:#64748b;">Category man-hours appear once time blocks are logged (hours × POB).</span>'
+    : '<span style="color:#64748b;">Set POB to calculate man-hours by category from time blocks.</span>';
+  } else {
+   let html = '<div style="font-size:10px;color:#fb7185;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;margin-bottom:6px;">Man-hours by category (time × POB)</div>';
+   TDB_CATEGORIES.forEach((cat) => {
+    const v = mhTiming.byCategory[cat.id] || 0;
+    if (!(v > 0)) return;
+    html += '<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #1a0f14;">'
+     + '<span style="color:' + cat.color + ';font-weight:700;">' + _escHtml(cat.label) + '</span>'
+     + '<span style="color:#e2e8f0;font-weight:700;">' + v + ' mh</span></div>';
+   });
+   html += '<div style="display:flex;justify-content:space-between;padding:6px 0 0;margin-top:4px;">'
+    + '<span style="color:#fb7185;font-weight:700;">From blocks</span>'
+    + '<span style="color:#fb7185;font-weight:800;">' + mhTiming.fromBlocks + ' mh</span></div>'
+    + '<div style="display:flex;justify-content:space-between;padding:2px 0;">'
+    + '<span style="color:#94a3b8;">Full-day (POB×24)</span>'
+    + '<span style="color:#cbd5e1;font-weight:700;">' + mhTiming.fullDay + ' mh</span></div>'
+    + '<div style="display:flex;justify-content:space-between;padding:2px 0;">'
+    + '<span style="color:#94a3b8;">HSE rate basis</span>'
+    + '<span style="color:#cbd5e1;font-weight:700;">' + mhTotal + ' mh</span></div>';
+   mhEl.innerHTML = html;
+  }
+ }
  const tot = tdbProjectHseTotals(proj);
  if (projEl) {
   const trir = tot._trir != null ? tot._trir.toFixed(2) : '—';
   const ltir = tot._ltir != null ? tot._ltir.toFixed(2) : '—';
+  let catBits = TDB_CATEGORIES
+   .filter((c) => (tot.byCategoryManHours[c.id] || 0) > 0)
+   .map((c) => c.label + ' ' + tot.byCategoryManHours[c.id])
+   .join(' · ');
   projEl.innerHTML =
    '<strong style="color:#e2e8f0">Project roll-up</strong> (' + tot._days + ' day' + (tot._days === 1 ? '' : 's') + ') — ' +
-   'Exposure ' + tot.exposureHours + ' h · Peak POB ' + tot.pob +
+   '<strong style="color:#fb7185">Man-hours ' + tot.manHours + '</strong>' +
+   (tot.manHoursFromBlocks ? ' · From blocks ' + tot.manHoursFromBlocks : '') +
+   ' · Peak POB ' + tot.pob +
    ' · LTI ' + tot.lti + ' · Recordable ' + tot.recordable + ' · First aid ' + tot.firstAid +
    ' · Near miss ' + tot.nearMiss + ' · Observations ' + tot.observations +
    ' · Stop work ' + tot.stopWork + ' · Env ' + tot.envIncidents + ' · MMO ' + tot.mmoSightings +
    ' · TRIR ' + trir + ' · LTIR ' + ltir +
-   ' <span style="opacity:.65">(rates per 200,000 exposure hours)</span>';
+   ' <span style="opacity:.65">(rates per 200,000 man-hours)</span>' +
+   (catBits ? '<div style="margin-top:6px;color:#64748b;">Category mh: ' + _escHtml(catBits) + '</div>' : '');
  }
 }
 
@@ -16405,6 +16485,9 @@ function tdbRenderDay(proj) {
  }
 
  if (roll) {
+  const dayHse = _tdbGetDayHse(proj, day);
+  const pob = dayHse.pob || 0;
+  const mhTiming = pob > 0 ? _tdbManHoursFromTiming(proj, day, pob) : null;
   if (!Object.keys(a.byCategory || {}).length && a.gapMinutes === TDB_DAY_MINUTES) {
    roll.textContent = 'No blocks yet — pick Category → Activity and add blocks until 1,440 minutes are covered.';
   } else {
@@ -16412,16 +16495,18 @@ function tdbRenderDay(proj) {
    TDB_CATEGORIES.forEach(cat => {
     const catMins = a.byCategory[cat.id] || 0;
     if (!(catMins > 0)) return;
+    const catMh = mhTiming ? (mhTiming.byCategory[cat.id] || 0) : 0;
     html += `<div style="display:flex;justify-content:space-between;padding:6px 0 2px;margin-top:4px;border-top:1px solid #1a1a24;">
       <span style="color:${cat.color};font-weight:800;letter-spacing:0.3px;text-transform:uppercase;font-size:10px;">${_escHtml(cat.label)}</span>
-      <span style="color:#e2e8f0;font-weight:800;">${catMins} min <span style="color:#64748b;font-weight:500;">(${(catMins / 60).toFixed(2)} h)</span></span>
+      <span style="color:#e2e8f0;font-weight:800;">${catMins} min <span style="color:#64748b;font-weight:500;">(${(catMins / 60).toFixed(2)} h)</span>${catMh ? ` <span style="color:#fb7185;font-weight:700;">· ${catMh} mh</span>` : ''}</span>
      </div>`;
     _tdbActsForCategory(cat.id).forEach(act => {
      const mins = a.byActivity[act.id] || 0;
      if (!(mins > 0)) return;
+     const actMh = mhTiming ? (mhTiming.byActivity[act.id] || 0) : 0;
      html += `<div style="display:flex;justify-content:space-between;padding:2px 0 2px 12px;border-bottom:1px solid #14141c;">
        <span style="color:${act.color};font-weight:600;">${_escHtml(act.label)}</span>
-       <span style="color:#cbd5e1;font-weight:600;">${mins} min <span style="color:#64748b;font-weight:500;">(${(mins / 60).toFixed(2)} h)</span></span>
+       <span style="color:#cbd5e1;font-weight:600;">${mins} min <span style="color:#64748b;font-weight:500;">(${(mins / 60).toFixed(2)} h)</span>${actMh ? ` <span style="color:#fb7185;font-weight:600;">· ${actMh} mh</span>` : ''}</span>
       </div>`;
     });
    });
@@ -16438,7 +16523,7 @@ function tdbRenderDay(proj) {
    html += (a.gapMinutes > 0
      ? `<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #14141c;"><span style="color:#ef4444;font-weight:700;">UNACCOUNTED</span><span style="color:#ef4444;font-weight:700;">${a.gapMinutes} min</span></div>`
      : '')
-    + `<div style="display:flex;justify-content:space-between;padding:8px 0 0;margin-top:4px;"><span style="color:#fbbf24;font-weight:700;">DAY TOTAL</span><span style="color:#fbbf24;font-weight:800;">${a.covered} / 1,440 min</span></div>`;
+    + `<div style="display:flex;justify-content:space-between;padding:8px 0 0;margin-top:4px;"><span style="color:#fbbf24;font-weight:700;">DAY TOTAL</span><span style="color:#fbbf24;font-weight:800;">${a.covered} / 1,440 min${mhTiming && mhTiming.fromBlocks ? ` · <span style="color:#fb7185;">${mhTiming.fromBlocks} mh</span>` : ''}</span></div>`;
    roll.innerHTML = html;
   }
  }
@@ -16496,7 +16581,8 @@ function tdbExportJson() {
   byCategory: analysis.byCategory,
   byActivity: analysis.byActivity,
   hseDay: dayHse,
-  hseDayExposureEffective: _tdbEffectiveExposure(dayHse),
+  manHoursDay: _tdbEffectiveManHours(dayHse),
+  manHoursFromTiming: _tdbManHoursFromTiming(proj, day, dayHse.pob || 0),
   hseProjectTotals: hseTotals,
   project: proj
  }, null, 2)], { type: 'application/json' });

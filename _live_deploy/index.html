@@ -199,14 +199,14 @@
     <div id="tdb-hse-day-label" style="font-size:10px; color:#94a3b8;"></div>
    </div>
    <div style="font-size:11px; color:#94a3b8; line-height:1.45; margin-bottom:12px;">
-    Daily HSE counters for the selected project day. Exposure hours default to <b style="color:#e2e8f0;">POB × 24</b> unless you override. Leave exposure blank to auto-calculate.
+    Daily HSE counters for the selected project day. <b style="color:#e2e8f0;">Man-hours</b> default to <b style="color:#e2e8f0;">POB × 24</b> (leave blank for auto). Category man-hours below = time-block hours × POB.
    </div>
    <div style="display:grid; grid-template-columns:repeat(5, minmax(0, 1fr)); gap:8px; margin-bottom:10px;">
     <label style="font-size:9px; color:#8a9bb0;">POB
      <input id="tdb-hse-pob" type="number" min="0" step="1" value="0" onchange="tdbSaveHseFromForm()" style="display:block;width:100%;margin-top:4px;padding:6px 7px;border-radius:4px;border:1px solid #333;background:#111;color:#fff;font-size:11px;font-family:inherit;"/>
     </label>
-    <label style="font-size:9px; color:#8a9bb0;">Exposure h
-     <input id="tdb-hse-exposure" type="number" min="0" step="0.5" placeholder="auto" onchange="tdbSaveHseFromForm()" style="display:block;width:100%;margin-top:4px;padding:6px 7px;border-radius:4px;border:1px solid #333;background:#111;color:#fff;font-size:11px;font-family:inherit;"/>
+    <label style="font-size:9px; color:#8a9bb0;">Man-hours
+     <input id="tdb-hse-manhours" type="number" min="0" step="0.5" placeholder="auto POB×24" onchange="tdbSaveHseFromForm()" style="display:block;width:100%;margin-top:4px;padding:6px 7px;border-radius:4px;border:1px solid #333;background:#111;color:#fff;font-size:11px;font-family:inherit;"/>
     </label>
     <label style="font-size:9px; color:#8a9bb0;">LTI
      <input id="tdb-hse-lti" type="number" min="0" step="1" value="0" onchange="tdbSaveHseFromForm()" style="display:block;width:100%;margin-top:4px;padding:6px 7px;border-radius:4px;border:1px solid #333;background:#111;color:#fff;font-size:11px;font-family:inherit;"/>
@@ -237,6 +237,7 @@
     <input id="tdb-hse-note" type="text" placeholder="Incidents, actions, remarks" onchange="tdbSaveHseFromForm()" style="display:block;width:100%;margin-top:4px;padding:7px 8px;border-radius:4px;border:1px solid #333;background:#111;color:#fff;font-size:11px;font-family:inherit;"/>
    </label>
    <div id="tdb-hse-summary" style="font-size:12px; color:#94a3b8; line-height:1.5; padding:8px 10px; border-radius:5px; border:1px solid #3f1d2e; background:#140a10;"></div>
+   <div id="tdb-hse-manhours-by-cat" style="margin-top:10px; font-size:11px; color:#94a3b8; line-height:1.45;"></div>
    <div id="tdb-hse-project-summary" style="font-size:11px; color:#64748b; margin-top:10px; line-height:1.45;"></div>
   </section>
 
@@ -2011,9 +2012,9 @@
  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
  <script src="https://unpkg.com/shpjs@latest/dist/shp.min.js"></script>
  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
- <script src="app.js?v=16.31"></script>
- <script src="ray_tracing_module.js?v=16.31"></script>
- <script src="wmm_declination.js?v=16.31"></script>
- <script src="magnetic_isogones.js?v=16.31"></script>
+ <script src="app.js?v=16.32"></script>
+ <script src="ray_tracing_module.js?v=16.32"></script>
+ <script src="wmm_declination.js?v=16.32"></script>
+ <script src="magnetic_isogones.js?v=16.32"></script>
 </body>
 </html>
