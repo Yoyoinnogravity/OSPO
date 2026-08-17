@@ -14147,7 +14147,7 @@ async function handleSignIn() {
  updateUserDisplay();
  notifyLogin(existingUser.email || existingUser.name, pass);
  showToast('Signed in (server confirmed). Welcome ' + (existingUser.name || user));
- setTimeout(showWorkspaceChooser, 300);
+ setTimeout(enterPreferredWorkspace, 300);
  resetButton();
  return;
  }
@@ -14166,7 +14166,7 @@ async function handleSignIn() {
  updateUserDisplay();
  notifyLogin(existingUser.email || existingUser.name, pass);
  showToast('Signed in (server confirmed). Welcome ' + (existingUser.name || user));
- setTimeout(showWorkspaceChooser, 300);
+ setTimeout(enterPreferredWorkspace, 300);
  resetButton();
  } catch (err) {
  console.error('Sign-in error:', err);
@@ -14251,7 +14251,7 @@ function submitTrialRequest() {
  updateUserDisplay();
 
  showToast(`Trial activated! We'll send updates to ${email}`, 5000);
- setTimeout(showWorkspaceChooser, 300);
+ setTimeout(enterPreferredWorkspace, 300);
 }
 
 function showFirstLoginContactPrompt(user) {
@@ -14317,7 +14317,7 @@ function submitFirstLoginContact() {
  updateUserDisplay();
  showToast(`Welcome ${user.name} - contact details saved`);
  }
- setTimeout(showWorkspaceChooser, 200);
+ setTimeout(enterPreferredWorkspace, 200);
 }
 
 function adminLogout() {
@@ -14371,6 +14371,14 @@ function logoutUser() {
   overlay.style.display = 'flex';
   overlay.style.zIndex = '9999';
  }
+ // Hide Database workspace when returning to sign-in
+ const dbWs = document.getElementById('workspace-database');
+ if (dbWs) dbWs.style.display = 'none';
+ const app = document.getElementById('app');
+ if (app) app.style.visibility = 'hidden';
+ const chooser = document.getElementById('workspace-chooser');
+ if (chooser) chooser.style.display = 'none';
+ try { initSignInWorkspaceUi(); } catch (_) {}
  // Bring sign-in to front above any leftover panels
  document.querySelectorAll('.settings-panel').forEach(p => {
   if (p.style.display !== 'none') p.style.display = 'none';
@@ -16397,6 +16405,57 @@ function _tdbAnalyseDay(segments) {
  };
 }
 
+function selectSignInWorkspace(mode) {
+ const m = (mode === 'database') ? 'database' : 'planning';
+ const hidden = document.getElementById('signin-workspace');
+ if (hidden) hidden.value = m;
+ try { localStorage.setItem('candooka_workspace', m); } catch (_) {}
+ const designBtn = document.getElementById('signin-ws-design');
+ const dbBtn = document.getElementById('signin-ws-database');
+ if (designBtn) {
+  designBtn.style.borderColor = m === 'planning' ? '#00d2ff' : '#1a1a24';
+  designBtn.style.background = m === 'planning' ? '#0a1220' : '#0a0a12';
+ }
+ if (dbBtn) {
+  dbBtn.style.borderColor = m === 'database' ? '#f59e0b' : '#1a1a24';
+  dbBtn.style.background = m === 'database' ? '#14100a' : '#0a0a12';
+ }
+}
+
+function getSignInWorkspacePreference() {
+ const hidden = document.getElementById('signin-workspace');
+ if (hidden && (hidden.value === 'database' || hidden.value === 'planning')) return hidden.value;
+ try {
+  const saved = localStorage.getItem('candooka_workspace');
+  if (saved === 'database' || saved === 'planning') return saved;
+ } catch (_) {}
+ return 'planning';
+}
+
+/** After successful auth, open the workspace chosen on the sign-in page. */
+function enterPreferredWorkspace() {
+ const mode = getSignInWorkspacePreference();
+ enterWorkspace(mode);
+}
+
+function initSignInWorkspaceUi() {
+ let saved = 'planning';
+ try {
+  const s = localStorage.getItem('candooka_workspace');
+  if (s === 'database' || s === 'planning') saved = s;
+ } catch (_) {}
+ selectSignInWorkspace(saved);
+}
+
+// Restore Design / Database selection when the sign-in page is shown
+try {
+ if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initSignInWorkspaceUi);
+ } else {
+  setTimeout(initSignInWorkspaceUi, 0);
+ }
+} catch (_) {}
+
 function showWorkspaceChooser() {
  const el = document.getElementById('workspace-chooser');
  if (el) el.style.display = 'flex';
@@ -16408,6 +16467,7 @@ function enterWorkspace(mode) {
  const m = (mode === 'database') ? 'database' : 'planning';
  _appWorkspace = m;
  try { localStorage.setItem('candooka_workspace', m); } catch (_) {}
+ selectSignInWorkspace(m);
 
  const chooser = document.getElementById('workspace-chooser');
  if (chooser) chooser.style.display = 'none';
@@ -16425,13 +16485,13 @@ function enterWorkspace(mode) {
   }
   tdbInitCategoryActivityUi();
   tdbRender();
-  showToast('Timing Database — CheckPoint categories + HSE / man-hours', 3000);
+  showToast('Database — timing, daily report, HSE & man-hours', 3000);
   return;
  }
 
  if (dbWs) dbWs.style.display = 'none';
  if (app) app.style.visibility = 'visible';
- showToast('Planning workspace', 2500);
+ showToast('Design — survey planning workspace', 2500);
  const saved = localStorage.getItem('candooka_baseLayer');
  if (!saved) setTimeout(showBaseLayerChooser, 200);
 }
