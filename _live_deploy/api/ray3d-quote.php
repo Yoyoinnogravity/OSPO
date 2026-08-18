@@ -22,6 +22,14 @@ if (!$input || empty($input['email']) || strpos($input['email'], '@') === false)
     exit;
 }
 
+$metricsIn = isset($input['metrics']) && is_array($input['metrics']) ? $input['metrics'] : [];
+$apertureM = isset($metricsIn['apertureM']) ? floatval($metricsIn['apertureM']) : 0;
+if ($apertureM <= 0) {
+    http_response_code(400);
+    echo json_encode(['error' => '3D migration aperture (m) is required']);
+    exit;
+}
+
 $entry = [
     'id' => time() . '_' . rand(1000, 9999),
     'email' => filter_var($input['email'], FILTER_SANITIZE_EMAIL),
@@ -31,7 +39,7 @@ $entry = [
     'algorithm' => isset($input['algorithm']) ? substr(preg_replace('/[^a-z0-9_\-]/', '', strtolower($input['algorithm'])), 0, 32) : '',
     'quoteUsd' => isset($input['quoteUsd']) ? floatval($input['quoteUsd']) : null,
     'gpuHours' => isset($input['gpuHours']) ? floatval($input['gpuHours']) : null,
-    'metrics' => isset($input['metrics']) && is_array($input['metrics']) ? $input['metrics'] : [],
+    'metrics' => $metricsIn,
     'summary' => isset($input['summary']) ? substr(strip_tags($input['summary']), 0, 4000) : '',
     'requestedAt' => date('c'),
     'ip' => $_SERVER['REMOTE_ADDR'] ?? 'unknown'
@@ -51,6 +59,7 @@ $body = "=== CANDOOKA 3D RAY-TRACE GPU QUOTE ===\n\n";
 $body .= "Contact: {$entry['name']} | {$entry['email']} | {$entry['phone']}\n";
 $body .= "Company: {$entry['company']}\n";
 $body .= "Algorithm: {$entry['algorithm']}\n";
+$body .= "3D migration aperture (m): " . number_format($apertureM, 0) . "\n";
 $body .= "GPU hours (est.): {$hours}\n";
 $body .= "Quote USD: {$quote}\n";
 $body .= "Time: {$entry['requestedAt']}\n";

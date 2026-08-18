@@ -1272,12 +1272,27 @@ function ray3dCollectMetrics() {
  const vtype = document.getElementById('ray3d-vtype')?.value || 'volume';
  const from = document.getElementById('ray3d-from')?.value || 'shots';
  const rush = document.getElementById('ray3d-rush')?.value || 'std';
- const sideM = Math.sqrt(Math.max(1, area) * 1e6);
- const nx = Math.max(8, Math.round(sideM / dx));
+ const apertureRaw = parseFloat(document.getElementById('ray3d-aperture')?.value);
+ const apertureM = (isFinite(apertureRaw) && apertureRaw > 0) ? apertureRaw : null;
+ const dipRaw = parseFloat(document.getElementById('ray3d-dip')?.value);
+ const dipDeg = (isFinite(dipRaw) && dipRaw >= 5 && dipRaw <= 80) ? dipRaw : 40;
+ const suggestedAperture = Math.round(zMax * Math.tan(dipDeg * Math.PI / 180));
+ const imageSideM = Math.sqrt(Math.max(1, area) * 1e6);
+ const volSideM = imageSideM + (apertureM ? 2 * apertureM : 0);
+ const nx = Math.max(8, Math.round(volSideM / dx));
  const ny = nx;
  const nz = Math.max(8, Math.round(zMax / dz));
  const cells = nx * ny * nz;
- return { area, zMax, dx, dz, shots, rcv, takeoff, vtype, from, rush, nx, ny, nz, cells, algorithm: ray3dAlgo() };
+ const computeKm2 = (volSideM * volSideM) / 1e6;
+ return {
+  area, zMax, dx, dz, shots, rcv, takeoff, vtype, from, rush,
+  apertureM, dipDeg, suggestedAperture,
+  imageSideM: Math.round(imageSideM),
+  volSideM: Math.round(volSideM),
+  computeKm2,
+  nx, ny, nz, cells,
+  algorithm: ray3dAlgo()
+ };
 }
 
 function ray3dComplexity(vtype) {
@@ -1314,9 +1329,12 @@ function ray3dEstimate(m) {
  const vName = m.vtype === 'vz' ? '1D V(z) extruded' : m.vtype === 'complex' ? '3D + complex/salt' : '3D velocity volume';
  const lines = [
   algoName,
+  '3D migration aperture  ±' + m.apertureM.toLocaleString() + ' m  (half-width at target)',
+  'Image ' + m.area.toFixed(0) + ' km² (' + m.imageSideM.toLocaleString() + ' m side)  →  compute '
+   + m.computeKm2.toFixed(1) + ' km²  (image + 2×aperture halo)',
   'Volume  ' + m.nx.toLocaleString() + ' × ' + m.ny.toLocaleString() + ' × ' + m.nz.toLocaleString()
    + '  (' + (m.cells / 1e6).toFixed(1) + ' million cells @ ' + m.dx + ' × ' + m.dz + ' m)',
-  'Area ' + m.area.toFixed(0) + ' km² · depth ' + m.zMax.toFixed(0) + ' m · ' + vName,
+  'Depth ' + m.zMax.toFixed(0) + ' m · ' + vName,
   'Shots ' + m.shots.toLocaleString() + ' · receivers ' + m.rcv.toLocaleString()
    + (m.algorithm !== 'eikonal' ? (' · pairs ' + nPairs.toLocaleString()) : ''),
   m.algorithm === 'twopoint' ? '' : ('Eikonal sources ' + nSrc.toLocaleString()),
@@ -1342,10 +1360,59 @@ function ray3dEstimate(m) {
  };
 }
 
+function ray3dAdviseAperture(m) {
+ const hint = document.getElementById('ray3d-aperture-hint');
+ if (!hint) return;
+ m = m || ray3dCollectMetrics();
+ const guess = m.suggestedAperture;
+ if (!m.apertureM) {
+  hint.textContent = 'Required. Typical starting guess from target depth: '
+   + guess.toLocaleString() + ' m  (= ' + m.zMax.toLocaleString() + ' m × tan ' + m.dipDeg
+   + '°). Confirm against the processing / migration spec. Quote is held until aperture is set.';
+  return;
+ }
+ let note = 'Aperture ±' + m.apertureM.toLocaleString() + ' m · compute span '
+  + m.volSideM.toLocaleString() + ' m (image ' + m.imageSideM.toLocaleString() + ' m + 2×halo).';
+ if (m.apertureM < guess * 0.6) {
+  note += ' This is well below Z·tan θ (' + guess.toLocaleString()
+   + ' m) — steep dips / long offsets may be under-illuminated.';
+ } else if (Math.abs(m.apertureM - guess) / Math.max(guess, 1) < 0.15) {
+  note += ' Close to Z·tan ' + m.dipDeg + '° (' + guess.toLocaleString() + ' m).';
+ }
+ if (m.apertureM / Math.max(m.imageSideM, 1) > 1.5) {
+  note += ' Halo is large vs image — check the spec is half-width, not full aperture diameter.';
+ }
+ hint.textContent = note;
+}
+
+function ray3dSuggestAperture() {
+ const m = ray3dCollectMetrics();
+ const inp = document.getElementById('ray3d-aperture');
+ if (inp) inp.value = String(m.suggestedAperture);
+ const dipEl = document.getElementById('ray3d-dip');
+ if (dipEl && !String(dipEl.value || '').trim()) dipEl.value = String(m.dipDeg);
+ ray3dAdviseAperture();
+ ray3dEstimateUi();
+}
+
 function ray3dEstimateUi(toast) {
- const est = ray3dEstimate(ray3dCollectMetrics());
- _ray3dLast = est;
+ const m = ray3dCollectMetrics();
+ ray3dAdviseAperture(m);
  const el = document.getElementById('ray3d-quote-out');
+ if (!m.apertureM) {
+  _ray3dLast = null;
+  if (el) {
+   el.textContent = 'Quote held — 3D migration aperture required.\n\n'
+    + 'Image area ' + m.area.toFixed(1) + ' km² (' + m.imageSideM.toLocaleString()
+    + ' m side). Enter the processing-spec half-width (m), or use Use Z·tan θ as a starting guess (~'
+    + m.suggestedAperture.toLocaleString() + ' m at ' + m.dipDeg + '° / ' + m.zMax.toLocaleString() + ' m).\n\n'
+    + 'GPU volume is image + aperture halo on all sides. We will not price a job that omits this.';
+  }
+  if (toast) showToast('3D migration aperture (m) is required before we can quote', 4000);
+  return null;
+ }
+ const est = ray3dEstimate(m);
+ _ray3dLast = est;
  if (el) el.textContent = est.summary;
  if (toast) showToast('GPU estimate ' + est.gpuHours.toFixed(2) + ' h · $' + est.quoteUsd.toLocaleString(), 4000);
  return est;
@@ -1410,6 +1477,11 @@ function ray3dFillFromJob() {
 
 function ray3dRequestQuote() {
  const est = ray3dEstimateUi();
+ if (!est || !est.metrics.apertureM) {
+  showToast('Enter the 3D migration aperture (m) from the processing spec');
+  document.getElementById('ray3d-aperture')?.focus();
+  return;
+ }
  const email = (document.getElementById('ray3d-email')?.value || '').trim();
  if (!email || email.indexOf('@') < 0) {
   showToast('Enter a contact email to send the quote');

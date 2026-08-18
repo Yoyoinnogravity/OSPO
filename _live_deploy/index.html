@@ -1139,7 +1139,7 @@
     <input id="ray3d-area" type="number" min="1" step="1" value="400" oninput="ray3dEstimateUi()" style="width:100%;box-sizing:border-box;padding:5px 6px;border-radius:3px;border:1px solid #333;background:#111;color:#fff;font-size:11px;outline:none;"/>
    </label>
    <label style="font-size:10px;color:#94a3b8;">Max depth (m)<br>
-    <input id="ray3d-zmax" type="number" min="100" step="50" value="3000" oninput="ray3dEstimateUi()" style="width:100%;box-sizing:border-box;padding:5px 6px;border-radius:3px;border:1px solid #333;background:#111;color:#fff;font-size:11px;outline:none;"/>
+    <input id="ray3d-zmax" type="number" min="100" step="50" value="3000" oninput="ray3dAdviseAperture();ray3dEstimateUi()" style="width:100%;box-sizing:border-box;padding:5px 6px;border-radius:3px;border:1px solid #333;background:#111;color:#fff;font-size:11px;outline:none;"/>
    </label>
    <label style="font-size:10px;color:#94a3b8;">Grid dx=dy (m)<br>
     <input id="ray3d-dx" type="number" min="5" step="5" value="25" oninput="ray3dEstimateUi()" style="width:100%;box-sizing:border-box;padding:5px 6px;border-radius:3px;border:1px solid #333;background:#111;color:#fff;font-size:11px;outline:none;"/>
@@ -1177,9 +1177,30 @@
     <input id="ray3d-takeoff" type="number" min="1" max="64" step="1" value="1" oninput="ray3dEstimateUi()" style="width:100%;box-sizing:border-box;padding:5px 6px;border-radius:3px;border:1px solid #333;background:#111;color:#fff;font-size:11px;outline:none;"/>
    </label>
   </div>
-  <div style="font-size:9px;color:#64748b;margin-bottom:8px;line-height:1.4;">Products included: first-arrival travel times, illumination / hit count at target, incidence at image points, QC plots. You supply the velocity model; we do not store it on the planner VPS.</div>
+
+  <div style="margin:4px 0 10px;padding:10px 12px;border:1px solid #f59e0b;border-radius:6px;background:#1a1205;">
+   <div style="font-size:10px;color:#fbbf24;font-weight:800;letter-spacing:0.4px;text-transform:uppercase;margin-bottom:6px;">You must provide — 3D migration aperture</div>
+   <div style="font-size:11px;color:#e8e0b0;line-height:1.5;margin-bottom:8px;">
+    This is the <b>half-width</b> of the 3D migration operator at target depth (metres), from your processing spec — not the sail-line length.
+    The velocity model and GPU volume must extend this far <b>beyond the image area</b> on all sides, or edge bins lose dip and illumination is wrong.
+    If the spec gives a max dip instead, enter the angle and we convert: aperture ≈ Z × tan(θ).
+   </div>
+   <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+    <label style="font-size:10px;color:#fbbf24;">3D migration aperture (m) — required<br>
+     <input id="ray3d-aperture" type="number" min="50" step="50" placeholder="e.g. 2500 from spec" oninput="ray3dAdviseAperture();ray3dEstimateUi()" style="width:100%;box-sizing:border-box;padding:5px 6px;border-radius:3px;border:1px solid #f59e0b;background:#111;color:#fff;font-size:11px;outline:none;"/>
+    </label>
+    <label style="font-size:10px;color:#94a3b8;">Max dip θ (optional helper)<br>
+     <span style="display:flex;gap:6px;">
+      <input id="ray3d-dip" type="number" min="5" max="70" step="1" placeholder="e.g. 40" oninput="ray3dAdviseAperture()" style="flex:1;min-width:0;padding:5px 6px;border-radius:3px;border:1px solid #333;background:#111;color:#fff;font-size:11px;outline:none;"/>
+      <button type="button" onclick="ray3dSuggestAperture()" style="padding:5px 8px;border-radius:3px;border:1px solid #f59e0b;background:#1a1205;color:#fbbf24;font-size:10px;font-weight:700;cursor:pointer;white-space:nowrap;">Use Z·tan θ</button>
+     </span>
+    </label>
+   </div>
+   <div id="ray3d-aperture-hint" style="font-size:10px;color:#fde68a;line-height:1.45;margin-top:8px;">Enter the aperture from the processing spec, or a max dip to suggest one. Quote is held until aperture is set.</div>
+  </div>
+  <div style="font-size:9px;color:#64748b;margin-bottom:8px;line-height:1.4;">Products included: first-arrival travel times, illumination / hit count at target, incidence at image points, QC plots. You supply the velocity model <b>plus 3D migration aperture</b>; we do not store the model on the planner VPS.</div>
   <button type="button" onclick="ray3dEstimateUi(true)" style="padding:8px 14px;border-radius:4px;border:none;background:#7c3aed;color:#fff;font-weight:800;cursor:pointer;font-size:11px;margin-bottom:8px;">Calculate GPU time &amp; quote</button>
-  <div id="ray3d-quote-out" style="font-size:11px;color:#e2e8f0;line-height:1.55;padding:10px;background:#0c0a12;border:1px solid #3b0764;border-radius:6px;margin-bottom:10px;white-space:pre-wrap;">Enter the area and metrics, then calculate. Quote is a one-off GPU job (A100-class + operator), not a yearly 3D modelling seat.</div>
+  <div id="ray3d-quote-out" style="font-size:11px;color:#e2e8f0;line-height:1.55;padding:10px;background:#0c0a12;border:1px solid #3b0764;border-radius:6px;margin-bottom:10px;white-space:pre-wrap;">Enter the 3D migration aperture (required) plus area and metrics, then calculate. Quote is a one-off GPU job (A100-class + operator), not a yearly 3D modelling seat.</div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
    <label style="font-size:10px;color:#94a3b8;">Name<br>
     <input id="ray3d-name" type="text" placeholder="Name" style="width:100%;box-sizing:border-box;padding:5px 6px;border-radius:3px;border:1px solid #333;background:#111;color:#fff;font-size:11px;outline:none;"/>
@@ -2126,7 +2147,7 @@
  <script src="https://unpkg.com/shpjs@latest/dist/shp.min.js"></script>
  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
  <script src="app.js?v=16.51"></script>
- <script src="ray_tracing_module.js?v=16.52"></script>
+ <script src="ray_tracing_module.js?v=16.53"></script>
  <script src="wmm_declination.js?v=16.49"></script>
  <script src="magnetic_isogones.js?v=16.49"></script>
  <script src="bathymetry_contours.js?v=16.51"></script>
