@@ -98,6 +98,7 @@ function showRayTracing() {
  rayUpdateSummary();
  rayRenderResultsTable();
  rayDrawProfile();
+ if (typeof ray3dEstimateUi === 'function') ray3dEstimateUi();
  if (!layerRayTrace && map) layerRayTrace = L.layerGroup().addTo(map);
 }
 
@@ -1239,3 +1240,272 @@ function rayDrawProfile() {
  ctx.arc(xToPx(0), zToPx(zs), 4, 0, Math.PI * 2);
  ctx.fill();
 }
+
+// ===== 3D GPU RAY-TRACE QUOTE (not run on this host) =====
+var _ray3dLast = null;
+var RAY3D_GPU_USD_PER_HR = 2.20; // A100-class silicon
+var RAY3D_BLENDED_USD_PER_HR = 95; // GPU + operator / QC time
+var RAY3D_SETUP_USD = 400;
+var RAY3D_QC_USD = 120;
+var RAY3D_MIN_USD = 850;
+var RAY3D_CELLS_PER_SEC = 1.2e8; // eikonal sweep throughput, A100-class
+var RAY3D_PAIRS_PER_SEC = 8e4; // batched two-point
+
+function ray3dNum(id, fallback) {
+ const v = parseFloat(document.getElementById(id)?.value);
+ return (isFinite(v) && v > 0) ? v : fallback;
+}
+
+function ray3dAlgo() {
+ const el = document.querySelector('input[name="ray3d-algo"]:checked');
+ return (el && el.value) ? el.value : 'eikonal';
+}
+
+function ray3dCollectMetrics() {
+ const area = ray3dNum('ray3d-area', 400);
+ const zMax = ray3dNum('ray3d-zmax', 3000);
+ const dx = ray3dNum('ray3d-dx', 25);
+ const dz = ray3dNum('ray3d-dz', 25);
+ const shots = Math.max(1, Math.round(ray3dNum('ray3d-shots', 8000)));
+ const rcv = Math.max(1, Math.round(ray3dNum('ray3d-rcv', 600)));
+ const takeoff = Math.max(1, Math.round(ray3dNum('ray3d-takeoff', 1)));
+ const vtype = document.getElementById('ray3d-vtype')?.value || 'volume';
+ const from = document.getElementById('ray3d-from')?.value || 'shots';
+ const rush = document.getElementById('ray3d-rush')?.value || 'std';
+ const apertureRaw = parseFloat(document.getElementById('ray3d-aperture')?.value);
+ const apertureM = (isFinite(apertureRaw) && apertureRaw > 0) ? apertureRaw : null;
+ const dipRaw = parseFloat(document.getElementById('ray3d-dip')?.value);
+ const dipDeg = (isFinite(dipRaw) && dipRaw >= 5 && dipRaw <= 80) ? dipRaw : 40;
+ const suggestedAperture = Math.round(zMax * Math.tan(dipDeg * Math.PI / 180));
+ const imageSideM = Math.sqrt(Math.max(1, area) * 1e6);
+ const volSideM = imageSideM + (apertureM ? 2 * apertureM : 0);
+ const nx = Math.max(8, Math.round(volSideM / dx));
+ const ny = nx;
+ const nz = Math.max(8, Math.round(zMax / dz));
+ const cells = nx * ny * nz;
+ const computeKm2 = (volSideM * volSideM) / 1e6;
+ return {
+  area, zMax, dx, dz, shots, rcv, takeoff, vtype, from, rush,
+  apertureM, dipDeg, suggestedAperture,
+  imageSideM: Math.round(imageSideM),
+  volSideM: Math.round(volSideM),
+  computeKm2,
+  nx, ny, nz, cells,
+  algorithm: ray3dAlgo()
+ };
+}
+
+function ray3dComplexity(vtype) {
+ if (vtype === 'vz') return 1;
+ if (vtype === 'complex') return 3.4;
+ return 2.2;
+}
+
+function ray3dEikonalSources(m) {
+ if (m.from === 'nodes') return m.rcv;
+ if (m.from === 'both') return m.shots + m.rcv;
+ return m.shots;
+}
+
+function ray3dEstimate(m) {
+ const c = ray3dComplexity(m.vtype);
+ const nSrc = ray3dEikonalSources(m);
+ const tEikonalSec = nSrc * (m.cells / RAY3D_CELLS_PER_SEC) * c;
+ const nPairs = m.shots * m.rcv * m.takeoff;
+ const tRaySec = (nPairs / RAY3D_PAIRS_PER_SEC) * c;
+ let computeSec = 0;
+ if (m.algorithm === 'eikonal') computeSec = tEikonalSec;
+ else if (m.algorithm === 'twopoint') computeSec = tRaySec;
+ else computeSec = tEikonalSec + tRaySec * 0.7;
+ const overheadHr = 0.12;
+ const gpuHoursRaw = computeSec / 3600 + overheadHr;
+ const gpuHours = Math.max(0.05, Math.ceil(gpuHoursRaw * 20) / 20);
+ let quote = RAY3D_SETUP_USD + RAY3D_QC_USD + gpuHours * RAY3D_BLENDED_USD_PER_HR;
+ if (m.rush === 'rush') quote *= 1.35;
+ quote = Math.max(RAY3D_MIN_USD, Math.round(quote / 10) * 10);
+ const algoName = m.algorithm === 'eikonal' ? 'Eikonal wavefront (GPU)'
+  : m.algorithm === 'twopoint' ? 'Two-point kinematic rays (GPU)'
+  : 'Bundle (eikonal + two-point)';
+ const vName = m.vtype === 'vz' ? '1D V(z) extruded' : m.vtype === 'complex' ? '3D + complex/salt' : '3D velocity volume';
+ const lines = [
+  algoName,
+  '3D migration aperture  ±' + m.apertureM.toLocaleString() + ' m  (half-width at target)',
+  'Image ' + m.area.toFixed(0) + ' km² (' + m.imageSideM.toLocaleString() + ' m side)  →  compute '
+   + m.computeKm2.toFixed(1) + ' km²  (image + 2×aperture halo)',
+  'Volume  ' + m.nx.toLocaleString() + ' × ' + m.ny.toLocaleString() + ' × ' + m.nz.toLocaleString()
+   + '  (' + (m.cells / 1e6).toFixed(1) + ' million cells @ ' + m.dx + ' × ' + m.dz + ' m)',
+  'Depth ' + m.zMax.toFixed(0) + ' m · ' + vName,
+  'Shots ' + m.shots.toLocaleString() + ' · receivers ' + m.rcv.toLocaleString()
+   + (m.algorithm !== 'eikonal' ? (' · pairs ' + nPairs.toLocaleString()) : ''),
+  m.algorithm === 'twopoint' ? '' : ('Eikonal sources ' + nSrc.toLocaleString()),
+  'GPU time  ~' + gpuHours.toFixed(2) + ' h  on A100-class',
+  'Rate $' + RAY3D_BLENDED_USD_PER_HR + '/h (GPU $' + RAY3D_GPU_USD_PER_HR.toFixed(2) + ' + operator/QC) · setup $' + RAY3D_SETUP_USD + ' · plots $' + RAY3D_QC_USD
+   + (m.rush === 'rush' ? ' + 48-hour rush 35%' : ' · 5 working days'),
+  '',
+  'QUOTE  $' + quote.toLocaleString() + ' USD  (one-off GPU job)',
+  'Not a NORSAR / ACTeQ seat — you send the velocity model, we return times, illumination and QC. Model is not kept on the planner VPS.'
+ ].filter(s => s !== '');
+ return {
+  metrics: m,
+  cells: m.cells,
+  nSrc,
+  nPairs,
+  gpuHours,
+  gpuHoursRaw,
+  quoteUsd: quote,
+  algoName,
+  summary: lines.join('\n'),
+  tEikonalSec,
+  tRaySec
+ };
+}
+
+function ray3dAdviseAperture(m) {
+ const hint = document.getElementById('ray3d-aperture-hint');
+ if (!hint) return;
+ m = m || ray3dCollectMetrics();
+ const guess = m.suggestedAperture;
+ if (!m.apertureM) {
+  hint.textContent = 'Required. Typical starting guess from target depth: '
+   + guess.toLocaleString() + ' m  (= ' + m.zMax.toLocaleString() + ' m × tan ' + m.dipDeg
+   + '°). Confirm against the processing / migration spec. Quote is held until aperture is set.';
+  return;
+ }
+ let note = 'Aperture ±' + m.apertureM.toLocaleString() + ' m · compute span '
+  + m.volSideM.toLocaleString() + ' m (image ' + m.imageSideM.toLocaleString() + ' m + 2×halo).';
+ if (m.apertureM < guess * 0.6) {
+  note += ' This is well below Z·tan θ (' + guess.toLocaleString()
+   + ' m) — steep dips / long offsets may be under-illuminated.';
+ } else if (Math.abs(m.apertureM - guess) / Math.max(guess, 1) < 0.15) {
+  note += ' Close to Z·tan ' + m.dipDeg + '° (' + guess.toLocaleString() + ' m).';
+ }
+ if (m.apertureM / Math.max(m.imageSideM, 1) > 1.5) {
+  note += ' Halo is large vs image — check the spec is half-width, not full aperture diameter.';
+ }
+ hint.textContent = note;
+}
+
+function ray3dSuggestAperture() {
+ const m = ray3dCollectMetrics();
+ const inp = document.getElementById('ray3d-aperture');
+ if (inp) inp.value = String(m.suggestedAperture);
+ const dipEl = document.getElementById('ray3d-dip');
+ if (dipEl && !String(dipEl.value || '').trim()) dipEl.value = String(m.dipDeg);
+ ray3dAdviseAperture();
+ ray3dEstimateUi();
+}
+
+function ray3dEstimateUi(toast) {
+ const m = ray3dCollectMetrics();
+ ray3dAdviseAperture(m);
+ const el = document.getElementById('ray3d-quote-out');
+ if (!m.apertureM) {
+  _ray3dLast = null;
+  if (el) {
+   el.textContent = 'Quote held — 3D migration aperture required.\n\n'
+    + 'Image area ' + m.area.toFixed(1) + ' km² (' + m.imageSideM.toLocaleString()
+    + ' m side). Enter the processing-spec half-width (m), or use Use Z·tan θ as a starting guess (~'
+    + m.suggestedAperture.toLocaleString() + ' m at ' + m.dipDeg + '° / ' + m.zMax.toLocaleString() + ' m).\n\n'
+    + 'GPU volume is image + aperture halo on all sides. We will not price a job that omits this.';
+  }
+  if (toast) showToast('3D migration aperture (m) is required before we can quote', 4000);
+  return null;
+ }
+ const est = ray3dEstimate(m);
+ _ray3dLast = est;
+ if (el) el.textContent = est.summary;
+ if (toast) showToast('GPU estimate ' + est.gpuHours.toFixed(2) + ' h · $' + est.quoteUsd.toLocaleString(), 4000);
+ return est;
+}
+
+function ray3dFillFromMap() {
+ if (!map) { showToast('Switch to the 2D map first'); return; }
+ const b = map.getBounds();
+ const lat0 = (b.getSouth() + b.getNorth()) / 2;
+ const mLat = 111320;
+ const mLon = 111320 * Math.cos(lat0 * Math.PI / 180);
+ const ly = Math.abs(b.getNorth() - b.getSouth()) * mLat / 1000;
+ const lx = Math.abs(b.getEast() - b.getWest()) * mLon / 1000;
+ const area = Math.max(1, lx * ly);
+ const el = document.getElementById('ray3d-area');
+ if (el) el.value = String(Math.round(area));
+ showToast('Area from map view: ' + Math.round(area) + ' km²', 2500);
+ ray3dEstimateUi();
+}
+
+function ray3dFillFromJob() {
+ const nodes = (typeof _rayState !== 'undefined' && _rayState.nodes && _rayState.nodes.length)
+  ? _rayState.nodes
+  : ((typeof state !== 'undefined' && state.obnNodes) ? state.obnNodes : []);
+ if (nodes.length) {
+  const rEl = document.getElementById('ray3d-rcv');
+  if (rEl) rEl.value = String(nodes.length);
+  if (nodes.length >= 2 && map && typeof L !== 'undefined') {
+   const latlngs = nodes.map(n => [n.lat, n.lon]).filter(p => isFinite(p[0]) && isFinite(p[1]));
+   if (latlngs.length >= 2) {
+    const b = L.latLngBounds(latlngs).pad(0.15);
+    const lat0 = (b.getSouth() + b.getNorth()) / 2;
+    const ly = Math.abs(b.getNorth() - b.getSouth()) * 111320 / 1000;
+    const lx = Math.abs(b.getEast() - b.getWest()) * 111320 * Math.cos(lat0 * Math.PI / 180) / 1000;
+    const aEl = document.getElementById('ray3d-area');
+    if (aEl) aEl.value = String(Math.max(1, Math.round(lx * ly)));
+   }
+  }
+ }
+ const zr = parseFloat(document.getElementById('ray-rcv-z')?.value);
+ if (isFinite(zr) && zr > 50) {
+  const zEl = document.getElementById('ray3d-zmax');
+  if (zEl) zEl.value = String(Math.round(zr));
+ }
+ let nShots = 0;
+ if (typeof state !== 'undefined' && Array.isArray(state.lines)) {
+  state.lines.forEach(L => {
+   if (!L || !L.start || !L.end) return;
+   const dLat = (L.end[0] - L.start[0]) * 111320;
+   const dLon = (L.end[1] - L.start[1]) * 111320 * Math.cos(((L.start[0] + L.end[0]) / 2) * Math.PI / 180);
+   const len = Math.sqrt(dLat * dLat + dLon * dLon);
+   nShots += Math.max(2, Math.round(len / 25));
+  });
+ }
+ if (nShots > 0) {
+  const sEl = document.getElementById('ray3d-shots');
+  if (sEl) sEl.value = String(nShots);
+ }
+ showToast('Filled from job geometry' + (nodes.length ? (' · ' + nodes.length + ' nodes') : '') + (nShots ? (' · ~' + nShots + ' shots') : ''), 3500);
+ ray3dEstimateUi();
+}
+
+function ray3dRequestQuote() {
+ const est = ray3dEstimateUi();
+ if (!est || !est.metrics.apertureM) {
+  showToast('Enter the 3D migration aperture (m) from the processing spec');
+  document.getElementById('ray3d-aperture')?.focus();
+  return;
+ }
+ const email = (document.getElementById('ray3d-email')?.value || '').trim();
+ if (!email || email.indexOf('@') < 0) {
+  showToast('Enter a contact email to send the quote');
+  document.getElementById('ray3d-email')?.focus();
+  return;
+ }
+ const payload = {
+  email,
+  name: (document.getElementById('ray3d-name')?.value || '').trim(),
+  company: (document.getElementById('ray3d-company')?.value || '').trim(),
+  phone: (document.getElementById('ray3d-phone')?.value || '').trim(),
+  algorithm: est.metrics.algorithm,
+  quoteUsd: est.quoteUsd,
+  gpuHours: est.gpuHours,
+  metrics: est.metrics,
+  summary: est.summary
+ };
+ fetch('/api/ray3d-quote.php', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(payload)
+ }).then(r => r.json()).then(data => {
+  if (data && data.success) showToast('Quote sent — we will confirm GPU slot and model ingest', 5000);
+  else showToast((data && data.error) || 'Quote request failed', 4000);
+ }).catch(() => showToast('Could not reach quote API — email admin@candooka.world', 5000));
+}
+
