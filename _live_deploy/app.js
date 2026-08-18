@@ -303,6 +303,43 @@ function isMobileDevice() {
  (window.innerWidth <= 768);
 }
 
+/** Phones only (not desktop, not iPad). Used to warn that the planner is a desktop app. */
+function isMobilePhone() {
+ const ua = navigator.userAgent || '';
+ if (/iPhone|iPod|Windows Phone|IEMobile|Opera Mini|webOS|BlackBerry/i.test(ua)) return true;
+ if (/Android/i.test(ua) && /Mobile/i.test(ua)) return true;
+ return false;
+}
+
+function showMobileNotDesignedDialog(onContinue) {
+ let wrap = document.getElementById('mobile-not-designed-dialog');
+ if (wrap) wrap.remove();
+ wrap = document.createElement('div');
+ wrap.id = 'mobile-not-designed-dialog';
+ wrap.style.cssText = 'position:fixed;inset:0;z-index:10060;background:rgba(6,6,12,0.88);display:flex;align-items:center;justify-content:center;padding:20px;';
+ wrap.innerHTML =
+  '<div role="alertdialog" aria-labelledby="mobile-not-designed-title" style="width:100%;max-width:400px;background:#0e0e16;border:1px solid #d97706;border-radius:8px;padding:22px 20px;box-shadow:0 16px 48px rgba(0,0,0,0.75);text-align:left;">'
+  + '<div id="mobile-not-designed-title" style="font-size:16px;font-weight:800;color:#fbbf24;line-height:1.35;margin-bottom:10px;">This App is not designed for Mobile phones</div>'
+  + '<div style="font-size:13px;color:#fde68a;line-height:1.5;margin-bottom:18px;">Candooka OSPO is built for a desktop or laptop. Maps, preplots and planning tools will not work well on this screen.</div>'
+  + '<button type="button" id="mobile-not-designed-ok" style="width:100%;padding:12px;background:#92400e;color:#fef3c7;border:1px solid #d97706;border-radius:4px;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit;">I understand — continue anyway</button>'
+  + '</div>';
+ document.body.appendChild(wrap);
+ const go = () => {
+  try { wrap.remove(); } catch (_) {}
+  if (typeof onContinue === 'function') onContinue();
+ };
+ const btn = document.getElementById('mobile-not-designed-ok');
+ if (btn) btn.onclick = go;
+}
+
+function warnMobilePhoneThen(onContinue) {
+ if (!isMobilePhone()) {
+  if (typeof onContinue === 'function') onContinue();
+  return;
+ }
+ showMobileNotDesignedDialog(onContinue);
+}
+
 // ===== CESIUM 3D GLOBE =====
 var cesiumViewer = null;
 var globeActive = isWebGLSupported() && !isMobileDevice() && (typeof Cesium !== 'undefined');
@@ -4172,6 +4209,18 @@ function promptLoadP1OrSample() {
 const SAMPLE_PREPLOT_URL = 'samples/candooka-demo-north-sea.p190';
 const SAMPLE_PREPLOT_LABEL = 'candooka-demo-north-sea.p190 (sample)';
 
+function maybePromptSamplePreplot() {
+ if (_samplePreplotPromptShown) return;
+ if (document.getElementById('signin-overlay')?.style.display !== 'none') return;
+ if (state.lines && state.lines.length) return;
+ _samplePreplotPromptShown = true;
+ setTimeout(() => {
+  if (state.lines && state.lines.length) return;
+  if (document.getElementById('load-p1-chooser')) return;
+  promptLoadP1OrSample();
+ }, 450);
+}
+
 /** Fetch the bundled demo P1 and run the normal UTM → criteria → load flow. */
 async function loadSamplePreplot() {
  try {
@@ -7499,6 +7548,7 @@ function setLines(lines) {
  // Hard rule: line names are English letters/digits/basic punctuation only.
  sanitizeAllLineNames(lines);
  state.lines = lines;
+ _samplePreplotPromptShown = true;
  // Clear any cached full-line set from a previous Line-Manager route so reports
  // and stats never read a stale preplot (which would blank the acquired split).
  state._allLines = null;
@@ -9944,6 +9994,7 @@ function quickAddObstruction(lat, lng, hazardType) {
 var _startLineChooserShown = false;
 var _pendingStartReversed = false;
 var _pendingPlanRouteContinue = null;
+var _samplePreplotPromptShown = false;
 
 /** Ask 2D / 3D / OBN before every route plan so the wrong acquisition mode is never silent. */
 function confirmSurveyPlanTypeThen(continueFn) {
@@ -14301,6 +14352,7 @@ async function handleSignIn() {
  const isAdminish = roleLower === 'senior surveyor' || roleLower === 'admin' || (existingUser.name || '').toLowerCase() === 'admin';
 
  if (isAdminish) {
+ warnMobilePhoneThen(() => {
  document.getElementById('signin-overlay').style.display = 'none';
  adminLoggedIn = true;
  updateAdminButton();
@@ -14309,6 +14361,7 @@ async function handleSignIn() {
  showToast('Signed in (server confirmed). Welcome ' + (existingUser.name || user));
  setTimeout(enterPreferredWorkspace, 300);
  resetButton();
+ });
  return;
  }
 
@@ -14320,6 +14373,7 @@ async function handleSignIn() {
  return;
  }
 
+ warnMobilePhoneThen(() => {
  document.getElementById('signin-overlay').style.display = 'none';
  adminLoggedIn = false;
  updateAdminButton();
@@ -14328,6 +14382,7 @@ async function handleSignIn() {
  showToast('Signed in (server confirmed). Welcome ' + (existingUser.name || user));
  setTimeout(enterPreferredWorkspace, 300);
  resetButton();
+ });
  } catch (err) {
  console.error('Sign-in error:', err);
  const errEl = document.getElementById('signin-error');
@@ -14404,6 +14459,7 @@ function submitTrialRequest() {
  });
 
  // Grant trial access immediately (don't block on server response)
+ warnMobilePhoneThen(() => {
  const overlay = document.getElementById('signin-overlay');
  if (overlay) overlay.style.display = 'none';
  currentUser = { name: name || email.split('@')[0], role: 'trial', email, phone };
@@ -14412,6 +14468,7 @@ function submitTrialRequest() {
 
  showToast(`Trial activated! We'll send updates to ${email}`, 5000);
  setTimeout(enterPreferredWorkspace, 300);
+ });
 }
 
 function showFirstLoginContactPrompt(user) {
@@ -14461,6 +14518,7 @@ function submitFirstLoginContact() {
  localStorage.setItem(contactKey, JSON.stringify({ email, phone, savedAt: new Date().toISOString() }));
 
  // Complete the login
+ warnMobilePhoneThen(() => {
  document.getElementById('signin-overlay').style.display = 'none';
 
  const roleLower = (user.role || '').toLowerCase();
@@ -14478,6 +14536,7 @@ function submitFirstLoginContact() {
  showToast(`Welcome ${user.name} - contact details saved`);
  }
  setTimeout(enterPreferredWorkspace, 200);
+ });
 }
 
 function adminLogout() {
@@ -14591,6 +14650,7 @@ function finishLogout() {
  if (typeof switchSignInTab === 'function') {
   try { switchSignInTab('login'); } catch (_) {}
  }
+ _samplePreplotPromptShown = false;
 
  const overlay = document.getElementById('signin-overlay');
  if (overlay) {
@@ -14814,10 +14874,11 @@ function requestTrialLicense() {
  renderDBStats();
 
  // Automatically sign in the user and hide sign-in overlay
+ warnMobilePhoneThen(() => {
  const overlay = document.getElementById('signin-overlay');
  if (overlay) overlay.style.display = 'none';
-
  showToast('Trial license activated! Email & WhatsApp notifications initiated.');
+ });
 }
 
 function hideAdminPanel() {
@@ -16077,6 +16138,7 @@ function enterWorkspace(mode) {
  showToast('Maps & GIS — survey planning workspace', 2500);
  const saved = localStorage.getItem('candooka_baseLayer');
  if (!saved) setTimeout(showBaseLayerChooser, 200);
+ maybePromptSamplePreplot();
 }
 
 function showWorkspaceChooser() {
