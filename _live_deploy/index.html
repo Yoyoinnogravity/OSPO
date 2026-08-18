@@ -1108,6 +1108,94 @@
  <div style="font-size:10px;color:#fbbf24;font-weight:700;margin:10px 0 6px;text-transform:uppercase;letter-spacing:0.4px;">Travel-time table</div>
  <div id="ray-results-table" style="max-height:180px;overflow:auto;margin-bottom:8px;background:#0a0a12;border:1px solid #1a1a24;border-radius:4px;padding:4px 6px;"></div>
  <div style="font-size:9px;color:#556;line-height:1.4;">Rays coloured by travel time on the map (hover for TT). Profile shows depth downward. Critical / turning rays that cannot reach node depth are skipped and counted. Chunked tracing keeps the UI responsive on large OBN patches.</div>
+
+ <div style="margin-top:16px;padding:12px;border:1px solid #7c3aed;border-radius:8px;background:linear-gradient(180deg,#12081c 0%,#0a0a12 100%);">
+  <div style="font-size:10px;color:#c4b5fd;font-weight:800;letter-spacing:0.5px;text-transform:uppercase;margin-bottom:6px;">3D ray tracing (NORSAR-class) — GPU job quote</div>
+  <div style="font-size:11px;color:#cbd5e1;line-height:1.5;margin-bottom:10px;">
+   Water-column Snell tracing stays in the browser. <b style="color:#e9d5ff;">3D illumination through a user velocity model</b> runs on hired GPU, not this planner host.
+   Pick the algorithm, enter the survey metrics, and we estimate GPU time and a one-off quote — typically far below a yearly 3D modelling seat.
+  </div>
+  <div style="font-size:10px;color:#a78bfa;font-weight:700;margin-bottom:6px;">Algorithm</div>
+  <label style="display:flex;align-items:flex-start;gap:8px;font-size:11px;color:#e2e8f0;margin-bottom:6px;cursor:pointer;">
+   <input type="radio" name="ray3d-algo" value="eikonal" checked onchange="ray3dEstimateUi()" style="accent-color:#a78bfa;margin-top:2px;"/>
+   <span><b>Eikonal wavefront (GPU)</b> — first-arrival volume / illumination and hit count at target. One sweep per source (or per node).</span>
+  </label>
+  <label style="display:flex;align-items:flex-start;gap:8px;font-size:11px;color:#e2e8f0;margin-bottom:6px;cursor:pointer;">
+   <input type="radio" name="ray3d-algo" value="twopoint" onchange="ray3dEstimateUi()" style="accent-color:#a78bfa;margin-top:2px;"/>
+   <span><b>Two-point kinematic rays (GPU)</b> — NORSAR-style source → image → receiver pairs through the model.</span>
+  </label>
+  <label style="display:flex;align-items:flex-start;gap:8px;font-size:11px;color:#e2e8f0;margin-bottom:10px;cursor:pointer;">
+   <input type="radio" name="ray3d-algo" value="bundle" onchange="ray3dEstimateUi()" style="accent-color:#a78bfa;margin-top:2px;"/>
+   <span><b>Bundle</b> — eikonal illumination plus two-point travel times (shared model load).</span>
+  </label>
+
+  <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">
+   <button type="button" onclick="ray3dFillFromMap()" style="padding:5px 10px;border-radius:3px;border:1px solid #5b21b6;background:#1e1b4b;color:#ddd6fe;font-size:10px;font-weight:700;cursor:pointer;">Use map view as area</button>
+   <button type="button" onclick="ray3dFillFromJob()" style="padding:5px 10px;border-radius:3px;border:1px solid #5b21b6;background:#1e1b4b;color:#ddd6fe;font-size:10px;font-weight:700;cursor:pointer;">Use OBN / nodes on map</button>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+   <label style="font-size:10px;color:#94a3b8;">Area (km²)<br>
+    <input id="ray3d-area" type="number" min="1" step="1" value="400" oninput="ray3dEstimateUi()" style="width:100%;box-sizing:border-box;padding:5px 6px;border-radius:3px;border:1px solid #333;background:#111;color:#fff;font-size:11px;outline:none;"/>
+   </label>
+   <label style="font-size:10px;color:#94a3b8;">Max depth (m)<br>
+    <input id="ray3d-zmax" type="number" min="100" step="50" value="3000" oninput="ray3dEstimateUi()" style="width:100%;box-sizing:border-box;padding:5px 6px;border-radius:3px;border:1px solid #333;background:#111;color:#fff;font-size:11px;outline:none;"/>
+   </label>
+   <label style="font-size:10px;color:#94a3b8;">Grid dx=dy (m)<br>
+    <input id="ray3d-dx" type="number" min="5" step="5" value="25" oninput="ray3dEstimateUi()" style="width:100%;box-sizing:border-box;padding:5px 6px;border-radius:3px;border:1px solid #333;background:#111;color:#fff;font-size:11px;outline:none;"/>
+   </label>
+   <label style="font-size:10px;color:#94a3b8;">Grid dz (m)<br>
+    <input id="ray3d-dz" type="number" min="5" step="5" value="25" oninput="ray3dEstimateUi()" style="width:100%;box-sizing:border-box;padding:5px 6px;border-radius:3px;border:1px solid #333;background:#111;color:#fff;font-size:11px;outline:none;"/>
+   </label>
+   <label style="font-size:10px;color:#94a3b8;">Shots<br>
+    <input id="ray3d-shots" type="number" min="1" step="1" value="8000" oninput="ray3dEstimateUi()" style="width:100%;box-sizing:border-box;padding:5px 6px;border-radius:3px;border:1px solid #333;background:#111;color:#fff;font-size:11px;outline:none;"/>
+   </label>
+   <label style="font-size:10px;color:#94a3b8;">Receivers / nodes<br>
+    <input id="ray3d-rcv" type="number" min="1" step="1" value="600" oninput="ray3dEstimateUi()" style="width:100%;box-sizing:border-box;padding:5px 6px;border-radius:3px;border:1px solid #333;background:#111;color:#fff;font-size:11px;outline:none;"/>
+   </label>
+   <label style="font-size:10px;color:#94a3b8;">Velocity model<br>
+    <select id="ray3d-vtype" onchange="ray3dEstimateUi()" style="width:100%;padding:5px 6px;border-radius:3px;border:1px solid #333;background:#111;color:#e9d5ff;font-size:11px;outline:none;">
+     <option value="vz">1D V(z) extruded to 3D</option>
+     <option value="volume" selected>3D velocity volume (user-supplied)</option>
+     <option value="complex">3D + complex / salt</option>
+    </select>
+   </label>
+   <label style="font-size:10px;color:#94a3b8;">Eikonal from<br>
+    <select id="ray3d-from" onchange="ray3dEstimateUi()" style="width:100%;padding:5px 6px;border-radius:3px;border:1px solid #333;background:#111;color:#fff;font-size:11px;outline:none;">
+     <option value="shots" selected>Each shot</option>
+     <option value="nodes">Each node</option>
+     <option value="both">Shots and nodes</option>
+    </select>
+   </label>
+   <label style="font-size:10px;color:#94a3b8;">Turnaround<br>
+    <select id="ray3d-rush" onchange="ray3dEstimateUi()" style="width:100%;padding:5px 6px;border-radius:3px;border:1px solid #333;background:#111;color:#fff;font-size:11px;outline:none;">
+     <option value="std" selected>Standard (5 working days)</option>
+     <option value="rush">48-hour rush (+35%)</option>
+    </select>
+   </label>
+   <label style="font-size:10px;color:#94a3b8;">Take-off samples (two-point extra)<br>
+    <input id="ray3d-takeoff" type="number" min="1" max="64" step="1" value="1" oninput="ray3dEstimateUi()" style="width:100%;box-sizing:border-box;padding:5px 6px;border-radius:3px;border:1px solid #333;background:#111;color:#fff;font-size:11px;outline:none;"/>
+   </label>
+  </div>
+  <div style="font-size:9px;color:#64748b;margin-bottom:8px;line-height:1.4;">Products included: first-arrival travel times, illumination / hit count at target, incidence at image points, QC plots. You supply the velocity model; we do not store it on the planner VPS.</div>
+  <button type="button" onclick="ray3dEstimateUi(true)" style="padding:8px 14px;border-radius:4px;border:none;background:#7c3aed;color:#fff;font-weight:800;cursor:pointer;font-size:11px;margin-bottom:8px;">Calculate GPU time &amp; quote</button>
+  <div id="ray3d-quote-out" style="font-size:11px;color:#e2e8f0;line-height:1.55;padding:10px;background:#0c0a12;border:1px solid #3b0764;border-radius:6px;margin-bottom:10px;white-space:pre-wrap;">Enter the area and metrics, then calculate. Quote is a one-off GPU job (A100-class + operator), not a yearly 3D modelling seat.</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+   <label style="font-size:10px;color:#94a3b8;">Name<br>
+    <input id="ray3d-name" type="text" placeholder="Name" style="width:100%;box-sizing:border-box;padding:5px 6px;border-radius:3px;border:1px solid #333;background:#111;color:#fff;font-size:11px;outline:none;"/>
+   </label>
+   <label style="font-size:10px;color:#94a3b8;">Company<br>
+    <input id="ray3d-company" type="text" placeholder="Company" style="width:100%;box-sizing:border-box;padding:5px 6px;border-radius:3px;border:1px solid #333;background:#111;color:#fff;font-size:11px;outline:none;"/>
+   </label>
+   <label style="font-size:10px;color:#94a3b8;">Email<br>
+    <input id="ray3d-email" type="email" placeholder="name@company.com" style="width:100%;box-sizing:border-box;padding:5px 6px;border-radius:3px;border:1px solid #333;background:#111;color:#fff;font-size:11px;outline:none;"/>
+   </label>
+   <label style="font-size:10px;color:#94a3b8;">Phone<br>
+    <input id="ray3d-phone" type="tel" placeholder="+60 …" style="width:100%;box-sizing:border-box;padding:5px 6px;border-radius:3px;border:1px solid #333;background:#111;color:#fff;font-size:11px;outline:none;"/>
+   </label>
+  </div>
+  <button type="button" onclick="ray3dRequestQuote()" style="padding:8px 14px;border-radius:4px;border:1px solid #c4b5fd;background:#1e1b4b;color:#ede9fe;font-weight:800;cursor:pointer;font-size:11px;">Email this quote to Candooka</button>
+ </div>
  </div>
  <!-- NOAA Panel (tier-1) — point readout + real-time map overlays -->
  <div id="panel-noaa" class="settings-panel" style="display:none; min-width:340px; max-width:440px; max-height:90vh; overflow-y:auto;">
@@ -2038,7 +2126,7 @@
  <script src="https://unpkg.com/shpjs@latest/dist/shp.min.js"></script>
  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
  <script src="app.js?v=16.51"></script>
- <script src="ray_tracing_module.js?v=16.51"></script>
+ <script src="ray_tracing_module.js?v=16.52"></script>
  <script src="wmm_declination.js?v=16.49"></script>
  <script src="magnetic_isogones.js?v=16.49"></script>
  <script src="bathymetry_contours.js?v=16.51"></script>
