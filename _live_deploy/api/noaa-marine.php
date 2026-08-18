@@ -100,16 +100,32 @@ function cardinal($deg) {
 $qlat = snapHalf($lat);
 $qlon = lon360($lon);
 
+function erddapTimeTokens() {
+    return [
+        '(' . gmdate('Y-m-d\TH:00:00\Z') . ')',
+        '(last)',
+    ];
+}
+
+function erddapBracket($inner) {
+    return '%5B' . rawurlencode($inner) . '%5D';
+}
+
 if ($mode === 'wind') {
     // NCEP GFS 10 m — NOAA public domain (PacIOOS / CoastWatch ERDDAP)
-    $q = sprintf(
-        '?ugrd10m%%5B(last)%%5D%%5B(%.1f)%%5D%%5B(%.1f)%%5D,vgrd10m%%5B(last)%%5D%%5B(%.1f)%%5D%%5B(%.1f)%%5D',
-        $qlat, $qlon, $qlat, $qlon
-    );
-    $csv = fetchMarineCsv([
-        'https://pae-paha.pacioos.hawaii.edu/erddap/griddap/ncep_global.csv' . $q,
-        'https://coastwatch.pfeg.noaa.gov/erddap/griddap/NCEP_Global_Best.csv' . $q,
-    ]);
+    $csv = null;
+    foreach (erddapTimeTokens() as $tTok) {
+        $tb = erddapBracket($tTok);
+        $q = sprintf(
+            '?ugrd10m%s%%5B(%.1f)%%5D%%5B(%.1f)%%5D,vgrd10m%s%%5B(%.1f)%%5D%%5B(%.1f)%%5D',
+            $tb, $qlat, $qlon, $tb, $qlat, $qlon
+        );
+        $csv = fetchMarineCsv([
+            'https://pae-paha.pacioos.hawaii.edu/erddap/griddap/ncep_global.csv' . $q,
+            'https://coastwatch.pfeg.noaa.gov/erddap/griddap/NCEP_Global_Best.csv' . $q,
+        ]);
+        if ($csv) break;
+    }
     $row = $csv ? parseErddapCsv($csv) : null;
     if (!$row || !isset($row['ugrd10m']) || !isset($row['vgrd10m'])
         || !is_numeric($row['ugrd10m']) || !is_numeric($row['vgrd10m'])) {
@@ -148,28 +164,21 @@ if ($mode === 'wind') {
 // Combined sea: Thgt / Tper / Tdir
 // Swell (surf): shgt / sper / sdir
 // Wind sea: whgt / wper / wdir
-$q = sprintf(
-    '?Thgt%%5B(last)%%5D%%5B(0.0)%%5D%%5B(%.1f)%%5D%%5B(%.1f)%%5D'
-    . ',Tdir%%5B(last)%%5D%%5B(0.0)%%5D%%5B(%.1f)%%5D%%5B(%.1f)%%5D'
-    . ',Tper%%5B(last)%%5D%%5B(0.0)%%5D%%5B(%.1f)%%5D%%5B(%.1f)%%5D'
-    . ',shgt%%5B(last)%%5D%%5B(0.0)%%5D%%5B(%.1f)%%5D%%5B(%.1f)%%5D'
-    . ',sper%%5B(last)%%5D%%5B(0.0)%%5D%%5B(%.1f)%%5D%%5B(%.1f)%%5D'
-    . ',sdir%%5B(last)%%5D%%5B(0.0)%%5D%%5B(%.1f)%%5D%%5B(%.1f)%%5D'
-    . ',whgt%%5B(last)%%5D%%5B(0.0)%%5D%%5B(%.1f)%%5D%%5B(%.1f)%%5D'
-    . ',wper%%5B(last)%%5D%%5B(0.0)%%5D%%5B(%.1f)%%5D%%5B(%.1f)%%5D'
-    . ',wdir%%5B(last)%%5D%%5B(0.0)%%5D%%5B(%.1f)%%5D%%5B(%.1f)%%5D',
-    $qlat, $qlon, $qlat, $qlon, $qlat, $qlon,
-    $qlat, $qlon, $qlat, $qlon, $qlat, $qlon,
-    $qlat, $qlon, $qlat, $qlon, $qlat, $qlon
-);
-$csv = fetchMarineCsv([
-    'https://pae-paha.pacioos.hawaii.edu/erddap/griddap/ww3_global.csv' . $q,
-    // CoastWatch legacy may lack swell split — fall back to combined only
-    'https://coastwatch.pfeg.noaa.gov/erddap/griddap/NWW3_Global_Best.csv' . sprintf(
-        '?Thgt%%5B(last)%%5D%%5B(0.0)%%5D%%5B(%.1f)%%5D%%5B(%.1f)%%5D,Tdir%%5B(last)%%5D%%5B(0.0)%%5D%%5B(%.1f)%%5D%%5B(%.1f)%%5D,Tper%%5B(last)%%5D%%5B(0.0)%%5D%%5B(%.1f)%%5D%%5B(%.1f)%%5D',
-        $qlat, $qlon, $qlat, $qlon, $qlat, $qlon
-    ),
-]);
+$csv = null;
+foreach (erddapTimeTokens() as $tTok) {
+    $tb = erddapBracket($tTok);
+    $z = '%5B(0.0)%5D';
+    $pt = sprintf('%s%s%%5B(%.1f)%%5D%%5B(%.1f)%%5D', $tb, $z, $qlat, $qlon);
+    $q = '?Thgt' . $pt . ',Tdir' . $pt . ',Tper' . $pt
+     . ',shgt' . $pt . ',sper' . $pt . ',sdir' . $pt
+     . ',whgt' . $pt . ',wper' . $pt . ',wdir' . $pt;
+    $qFallback = '?Thgt' . $pt . ',Tdir' . $pt . ',Tper' . $pt;
+    $csv = fetchMarineCsv([
+        'https://pae-paha.pacioos.hawaii.edu/erddap/griddap/ww3_global.csv' . $q,
+        'https://coastwatch.pfeg.noaa.gov/erddap/griddap/NWW3_Global_Best.csv' . $qFallback,
+    ]);
+    if ($csv) break;
+}
 $row = $csv ? parseErddapCsv($csv) : null;
 if (!$row || ((!isset($row['Thgt']) || !is_numeric($row['Thgt']))
     && (!isset($row['shgt']) || !is_numeric($row['shgt'])))) {

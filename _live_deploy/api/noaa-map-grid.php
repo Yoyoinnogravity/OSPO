@@ -28,16 +28,16 @@ if ($maxCells > 96) $maxCells = 96;
 
 if ($south === null || $north === null || $west === null || $east === null
     || $south < -90 || $north > 90 || $south >= $north
-    || $west < -180 || $east > 180) {
+    || $west < -180 || $east > 180 || $east <= $west) {
     http_response_code(400);
-    echo json_encode(['error' => 'Valid south, west, north, east required (WGS84, west<=east, no antimeridian wrap)']);
+    echo json_encode(['error' => 'Valid south, west, north, east required (WGS84, west<east)']);
     exit;
 }
 
-// Limit span so ERDDAP stays responsive
-if (($north - $south) > 80 || ($east - $west) > 120) {
+// Coarse stride (maxCells) keeps ERDDAP payloads small even at world view
+if (($north - $south) > 170 || ($east - $west) > 360) {
     http_response_code(400);
-    echo json_encode(['error' => 'Map span too large — zoom in (max ~80° lat × 120° lon)']);
+    echo json_encode(['error' => 'Map span too large — zoom in']);
     exit;
 }
 
@@ -85,8 +85,33 @@ function axisSpec($a, $b, $maxCells, $step = 0.5) {
     $n = (int)round(($b - $a) / $step) + 1;
     if ($n < 2) { $b = $a + $step; $n = 2; }
     $stride = (int)max(1, (int)ceil($n / $maxCells));
-    // ERDDAP stride syntax: (start):stride:(stop) — stride is index step
     return [$a, $b, $stride];
+}
+
+/** ERDDAP 0–360 grids: split boxes that cross Greenwich (lon 0), not the antimeridian. */
+function lonRanges360($west, $east) {
+    if ($west < 0 && $east > 0) {
+        $w = lon360($west);
+        if ($w > 359.5) $w = 359.5;
+        return [[$w, 359.5], [0.0, $east]];
+    }
+    $w = lon360($west);
+    $e = lon360($east);
+    if ($e < $w) {
+        return [[$w, 359.5], [0.0, $e]];
+    }
+    return [[$w, $e]];
+}
+
+function erddapTimeTokens() {
+    return [
+        '(' . gmdate('Y-m-d\TH:00:00\Z') . ')',
+        '(last)',
+    ];
+}
+
+function erddapBracket($inner) {
+    return '%5B' . rawurlencode($inner) . '%5D';
 }
 
 $meta = [
@@ -113,62 +138,87 @@ $meta = [
 ];
 $m = $meta[$mode];
 
-// Currents (altimetry geostrophic) use ±180 lon and 0.25° cells.
-// Wind/waves use 0–360 lon on PacIOOS / CoastWatch WW3+GFS grids.
+$json = null;
+$used = null;
+$timeTokens = erddapTimeTokens();
+
 if ($mode === 'currents') {
     list($lat0, $lat1, $latStride) = axisSpec($south, $north, $maxCells, 0.25);
     list($lon0, $lon1, $lonStride) = axisSpec($west, $east, $maxCells, 0.25);
-    $q = sprintf(
-        '?ugos%%5B(last)%%5D%%5B(%.2f):%d:(%.2f)%%5D%%5B(%.2f):%d:(%.2f)%%5D'
-        . ',vgos%%5B(last)%%5D%%5B(%.2f):%d:(%.2f)%%5D%%5B(%.2f):%d:(%.2f)%%5D',
-        $lat0, $latStride, $lat1, $lon0, $lonStride, $lon1,
-        $lat0, $latStride, $lat1, $lon0, $lonStride, $lon1
-    );
-    $urls = [
-        'https://coastwatch.pfeg.noaa.gov/erddap/griddap/nesdisSSH1day.json' . $q,
-    ];
+    foreach ($timeTokens as $tTok) {
+        $tb = erddapBracket($tTok);
+        $q = sprintf(
+            '?ugos%s%%5B(%.2f):%d:(%.2f)%%5D%%5B(%.2f):%d:(%.2f)%%5D'
+            . ',vgos%s%%5B(%.2f):%d:(%.2f)%%5D%%5B(%.2f):%d:(%.2f)%%5D',
+            $tb, $lat0, $latStride, $lat1, $lon0, $lonStride, $lon1,
+            $tb, $lat0, $latStride, $lat1, $lon0, $lonStride, $lon1
+        );
+        $url = 'https://coastwatch.pfeg.noaa.gov/erddap/griddap/nesdisSSH1day.json' . $q;
+        $json = fetchErddapJson($url);
+        if ($json && isset($json['table']['rows']) && count($json['table']['rows']) > 0) {
+            $used = $url;
+            break;
+        }
+        $json = null;
+    }
 } else {
-    $w360 = lon360($west);
-    $e360 = lon360($east);
-    // Refuse antimeridian for this endpoint (client should split or zoom)
-    if ($e360 < $w360) {
-        http_response_code(400);
-        echo json_encode(['error' => 'Antimeridian spans are not supported — pan so the view does not cross 180°']);
-        exit;
-    }
     list($lat0, $lat1, $latStride) = axisSpec($south, $north, $maxCells, 0.5);
-    list($lon0, $lon1, $lonStride) = axisSpec($w360, $e360, $maxCells, 0.5);
+    $lonStride = (int)max(1, (int)ceil(((($east - $west) / 0.5) + 1) / $maxCells));
+    $ranges = lonRanges360($west, $east);
 
-    if ($mode === 'wind') {
-        $q = sprintf(
-            '?ugrd10m%%5B(last)%%5D%%5B(%.1f):%d:(%.1f)%%5D%%5B(%.1f):%d:(%.1f)%%5D'
-            . ',vgrd10m%%5B(last)%%5D%%5B(%.1f):%d:(%.1f)%%5D%%5B(%.1f):%d:(%.1f)%%5D',
-            $lat0, $latStride, $lat1, $lon0, $lonStride, $lon1,
-            $lat0, $latStride, $lat1, $lon0, $lonStride, $lon1
-        );
-        $urls = [
-            'https://pae-paha.pacioos.hawaii.edu/erddap/griddap/ncep_global.json' . $q,
-            'https://coastwatch.pfeg.noaa.gov/erddap/griddap/NCEP_Global_Best.json' . $q,
-        ];
-    } else {
-        $q = sprintf(
-            '?%s%%5B(last)%%5D%%5B(0.0)%%5D%%5B(%.1f):%d:(%.1f)%%5D%%5B(%.1f):%d:(%.1f)%%5D',
-            $m['var'], $lat0, $latStride, $lat1, $lon0, $lonStride, $lon1
-        );
-        $urls = [
-            'https://pae-paha.pacioos.hawaii.edu/erddap/griddap/ww3_global.json' . $q,
-            'https://coastwatch.pfeg.noaa.gov/erddap/griddap/NWW3_Global_Best.json' . $q,
-        ];
-    }
-}
+    foreach ($timeTokens as $tTok) {
+        $tb = erddapBracket($tTok);
+        $allRows = [];
+        $cols = null;
+        $usedSlice = null;
+        foreach ($ranges as $rng) {
+            $lon0 = snapHalf($rng[0]);
+            $lon1 = snapHalf($rng[1]);
+            if ($lon1 < $lon0) { $t = $lon0; $lon0 = $lon1; $lon1 = $t; }
+            if ($lon1 <= $lon0) $lon1 = $lon0 + 0.5;
 
-$json = null;
-$used = null;
-foreach ($urls as $url) {
-    $json = fetchErddapJson($url);
-    if ($json && isset($json['table']['rows']) && count($json['table']['rows']) > 0) {
-        $used = $url;
-        break;
+            if ($mode === 'wind') {
+                $q = sprintf(
+                    '?ugrd10m%s%%5B(%.1f):%d:(%.1f)%%5D%%5B(%.1f):%d:(%.1f)%%5D'
+                    . ',vgrd10m%s%%5B(%.1f):%d:(%.1f)%%5D%%5B(%.1f):%d:(%.1f)%%5D',
+                    $tb, $lat0, $latStride, $lat1, $lon0, $lonStride, $lon1,
+                    $tb, $lat0, $latStride, $lat1, $lon0, $lonStride, $lon1
+                );
+                $hosts = [
+                    'https://pae-paha.pacioos.hawaii.edu/erddap/griddap/ncep_global.json',
+                    'https://coastwatch.pfeg.noaa.gov/erddap/griddap/NCEP_Global_Best.json',
+                ];
+            } else {
+                $q = sprintf(
+                    '?%s%s%%5B(0.0)%%5D%%5B(%.1f):%d:(%.1f)%%5D%%5B(%.1f):%d:(%.1f)%%5D',
+                    $m['var'], $tb, $lat0, $latStride, $lat1, $lon0, $lonStride, $lon1
+                );
+                $hosts = [
+                    'https://pae-paha.pacioos.hawaii.edu/erddap/griddap/ww3_global.json',
+                    'https://coastwatch.pfeg.noaa.gov/erddap/griddap/NWW3_Global_Best.json',
+                ];
+            }
+
+            $slice = null;
+            foreach ($hosts as $host) {
+                $url = $host . $q;
+                $slice = fetchErddapJson($url);
+                if ($slice && isset($slice['table']['rows']) && count($slice['table']['rows']) > 0) {
+                    $usedSlice = $url;
+                    break;
+                }
+                $slice = null;
+            }
+            if ($slice) {
+                $cols = $slice['table']['columnNames'];
+                $allRows = array_merge($allRows, $slice['table']['rows']);
+            }
+        }
+        if ($cols && count($allRows) > 0) {
+            $json = ['table' => ['columnNames' => $cols, 'rows' => $allRows]];
+            $used = $usedSlice;
+            break;
+        }
     }
 }
 

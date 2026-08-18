@@ -25270,6 +25270,7 @@ async function openWeatherMode(mode, force) {
  const cached = !force ? _readWeatherCache(window._weatherMode, lat, lon) : null;
  if (cached && cached.marine && cached.marine.ok) {
   _applyNoaaMarine(sstEl, cached.marine);
+  if (typeof setNoaaMapOverlay === 'function') setNoaaMapOverlay(window._weatherMode);
   showToast(modeLabel + ' (NOAA, cached 1h)');
   return;
  }
@@ -25290,6 +25291,9 @@ async function openWeatherMode(mode, force) {
   const marine = res.ok ? await res.json() : null;
   const ok = marine && marine.ok;
   _applyNoaaMarine(sstEl, ok ? marine : null);
+  if (typeof setNoaaMapOverlay === 'function') {
+   setNoaaMapOverlay(window._weatherMode);
+  }
   if (!ok && sstEl) {
    sstEl.style.display = 'block';
    sstEl.innerHTML = '<div style="font-size:11px;color:#fbbf24;">'
@@ -25419,7 +25423,7 @@ function _applyNoaaMarine(el, data) {
 // ===== NOAA real-time map overlays (WW3 / GFS / altimetry currents via /api/noaa-map-grid.php) =====
 let noaaMapMode = null; // waves | swell | swell_period | wind | currents | null
 let noaaMapLayer = null;
-let noaaMapOpacity = 0.65;
+let noaaMapOpacity = 0.78;
 let noaaMapBusy = false;
 let noaaMapMoveTimer = null;
 let noaaMapListenersBound = false;
@@ -25492,6 +25496,8 @@ function setNoaaMapOverlay(mode) {
    return;
   }
   noaaMapMode = mode;
+  const radio = document.querySelector('input[name="noaa-map-overlay"][value="' + mode + '"]');
+  if (radio) radio.checked = true;
   syncNoaaLayerCheckboxes();
   bindNoaaMapListeners();
   refreshNoaaMapOverlay(true);
@@ -25503,6 +25509,7 @@ function clearNoaaMapOverlay() {
    try { map.removeLayer(noaaMapLayer); } catch (_) {}
   }
   noaaMapLayer = null;
+  showNoaaMapLegend(null);
   const off = document.querySelector('input[name="noaa-map-overlay"][value="off"]');
   if (off) off.checked = true;
   syncNoaaLayerCheckboxes();
@@ -25555,7 +25562,9 @@ function paintNoaaGridDataUrl(grid) {
  canvas.height = h;
  const ctx = canvas.getContext('2d');
  const img = ctx.createImageData(w, h);
- const vmax = Math.max(Number(grid.paletteMax) || 1, Number(grid.max) || 1, 0.1);
+ // Stretch colour to the data in this view — a 5–8 m global cap made calm seas invisible
+ const dataMax = Number(grid.max);
+ const vmax = Math.max(isFinite(dataMax) ? dataMax * 1.08 : 0, 0.15);
  for (let y = 0; y < h; y++) {
   for (let x = 0; x < w; x++) {
    const v = rows[y][x];
@@ -25573,7 +25582,41 @@ function paintNoaaGridDataUrl(grid) {
   }
  }
  ctx.putImageData(img, 0, 0);
- return canvas.toDataURL('image/png');
+ const scale = Math.max(6, Math.min(16, Math.floor(640 / Math.max(w, h))));
+ const out = document.createElement('canvas');
+ out.width = w * scale;
+ out.height = h * scale;
+ const octx = out.getContext('2d');
+ octx.imageSmoothingEnabled = true;
+ octx.drawImage(canvas, 0, 0, out.width, out.height);
+ return out.toDataURL('image/png');
+}
+
+function showNoaaMapLegend(grid) {
+ let el = document.getElementById('noaa-map-legend');
+ if (!grid) {
+  if (el) el.style.display = 'none';
+  return;
+ }
+ if (!el) {
+  el = document.createElement('div');
+  el.id = 'noaa-map-legend';
+  el.style.cssText = 'position:absolute;bottom:28px;left:12px;z-index:650;pointer-events:none;background:rgba(8,12,22,0.92);border:1px solid #155e75;border-radius:8px;padding:8px 10px;color:#e2e8f0;font:11px/1.35 system-ui,sans-serif;box-shadow:0 8px 20px rgba(0,0,0,0.45);min-width:180px;';
+  const host = document.getElementById('main') || document.body;
+  host.appendChild(el);
+ }
+ const unit = grid.unit || '';
+ const t = (grid.time || '').replace('T', ' ').replace('Z', ' UTC');
+ el.style.display = 'block';
+ const sst = document.getElementById('sst-legend');
+ el.style.bottom = (sst && sst.style.display !== 'none') ? '150px' : '28px';
+ el.innerHTML =
+  '<div style="font-weight:700;color:#67e8f9;margin-bottom:4px;">' + (grid.label || 'NOAA') + '</div>'
+  + '<div style="height:10px;border-radius:3px;background:linear-gradient(90deg,#082f49,#0e7490,#22d3ee,#4ade80,#facc15,#ef4444);"></div>'
+  + '<div style="display:flex;justify-content:space-between;font-size:9px;color:#94a3b8;margin-top:3px;font-family:ui-monospace,monospace;">'
+  + '<span>' + Number(grid.min).toFixed(1) + ' ' + unit + '</span>'
+  + '<span>' + Number(grid.max).toFixed(1) + ' ' + unit + '</span></div>'
+  + (t ? ('<div style="font-size:9px;color:#64748b;margin-top:4px;">' + t + '</div>') : '');
 }
 
 async function refreshNoaaMapOverlay(forceToast) {
@@ -25595,11 +25638,15 @@ async function refreshNoaaMapOverlay(forceToast) {
  east = Math.min(180, east + dLon);
 
  if (east <= west) {
-  setNoaaMapStatus('Pan so the view does not cross the antimeridian (180°)', true);
+  const msg = 'Pan so the view does not wrap 180°';
+  setNoaaMapStatus(msg, true);
+  if (forceToast) showToast(msg);
   return;
  }
- if ((north - south) > 80 || (east - west) > 120) {
-  setNoaaMapStatus('Zoom in for NOAA overlays (max ~80° × 120°)', true);
+ if ((north - south) > 170 || (east - west) > 360) {
+  const msg = 'Zoom in for NOAA overlays';
+  setNoaaMapStatus(msg, true);
+  if (forceToast) showToast(msg);
   return;
  }
 
@@ -25640,8 +25687,10 @@ async function refreshNoaaMapOverlay(forceToast) {
   noaaMapLayer = L.imageOverlay(url, bounds, {
    opacity: noaaMapOpacity,
    interactive: false,
-   className: 'noaa-map-overlay'
+   className: 'noaa-map-overlay',
+   zIndex: 450
   }).addTo(map);
+  showNoaaMapLegend(data);
   const unit = data.unit || '';
   setNoaaMapStatus(
    (data.label || noaaMapMode)
