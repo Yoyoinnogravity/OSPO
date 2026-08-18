@@ -56,24 +56,30 @@ function snapQuarter($v) {
 }
 
 function fetchErddapJson($url) {
-    $ch = curl_init($url);
-    curl_setopt_array($ch, [
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_FOLLOWLOCATION => true,
-        CURLOPT_MAXREDIRS => 5,
-        CURLOPT_TIMEOUT => 45,
-        CURLOPT_CONNECTTIMEOUT => 10,
-        CURLOPT_HTTPHEADER => [
-            'User-Agent: CandookaOSPO/1.0 (admin@candooka.world)',
-            'Accept: application/json',
-        ],
-    ]);
-    $raw = curl_exec($ch);
-    $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
-    if ($code < 200 || $code >= 300 || !$raw) return null;
-    $j = json_decode($raw, true);
-    return is_array($j) ? $j : null;
+    for ($attempt = 0; $attempt < 2; $attempt++) {
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_MAXREDIRS => 5,
+            CURLOPT_TIMEOUT => 45,
+            CURLOPT_CONNECTTIMEOUT => 10,
+            CURLOPT_HTTPHEADER => [
+                'User-Agent: CandookaOSPO/1.0 (admin@candooka.world)',
+                'Accept: application/json',
+            ],
+        ]);
+        $raw = curl_exec($ch);
+        $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        if ($code >= 200 && $code < 300 && $raw) {
+            $j = json_decode($raw, true);
+            if (is_array($j) && isset($j['table']['rows']) && count($j['table']['rows']) > 0) {
+                return $j;
+            }
+        }
+    }
+    return null;
 }
 
 /** Snap and stride an axis so we stay near maxCells. */
@@ -325,6 +331,5 @@ echo json_encode([
         : ($mode === 'currents'
             ? 'NOAA CoastWatch altimetry geostrophic currents (nesdisSSH1day)'
             : 'NOAA WAVEWATCH III (PacIOOS / CoastWatch ERDDAP)'),
-    'attribution' => 'NOAA public-domain model / altimetry field',
     'datasetHint' => $used,
 ]);
