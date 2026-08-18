@@ -4,7 +4,7 @@
 // Negative altitude = depth below sea level. Worldwide, not Europe-only.
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
-header('Cache-Control: public, max-age=120');
+header('Cache-Control: no-store');
 
 function bathy_fail($msg, $code = 400) {
     http_response_code($code);
@@ -74,26 +74,29 @@ function bathy_reshape($rows) {
     $vals = [];
     foreach ($rows as $r) {
         if (!isset($r[0], $r[1], $r[2])) continue;
-        $lat = round(floatval($r[0]), 6);
-        $lon = round(floatval($r[1]), 6);
+        // PHP casts float array keys to int — keep coordinates as strings.
+        $lat = sprintf('%.6f', floatval($r[0]));
+        $lon = sprintf('%.6f', floatval($r[1]));
         $z = floatval($r[2]);
         $latSet[$lat] = true;
         $lonSet[$lon] = true;
         $vals[$lat . '_' . $lon] = $z;
     }
-    $lats = array_map('floatval', array_keys($latSet));
-    $lons = array_map('floatval', array_keys($lonSet));
-    sort($lats, SORT_NUMERIC);
-    sort($lons, SORT_NUMERIC);
+    $latKeys = array_keys($latSet);
+    $lonKeys = array_keys($lonSet);
+    usort($latKeys, function ($a, $b) { return floatval($a) <=> floatval($b); });
+    usort($lonKeys, function ($a, $b) { return floatval($a) <=> floatval($b); });
     $grid = [];
-    foreach ($lats as $lat) {
+    foreach ($latKeys as $latK) {
         $row = [];
-        foreach ($lons as $lon) {
-            $k = $lat . '_' . $lon;
+        foreach ($lonKeys as $lonK) {
+            $k = $latK . '_' . $lonK;
             $row[] = array_key_exists($k, $vals) ? $vals[$k] : null;
         }
         $grid[] = $row;
     }
+    $lats = array_map('floatval', $latKeys);
+    $lons = array_map('floatval', $lonKeys);
     return [$lats, $lons, $grid];
 }
 
@@ -128,5 +131,7 @@ echo json_encode([
     'negativeIsDepth' => true,
     'lats' => $lats,
     'lons' => $lons,
-    'z' => $grid
+    'z' => $grid,
+    'nx' => count($lons),
+    'ny' => count($lats)
 ]);
