@@ -179,6 +179,20 @@
  </div>
  <h1 style="font-size:16px; font-weight:700; color:#e0e8f0; letter-spacing:1.4px; margin:0 0 4px 0;">CANDOOKA OSPO</h1>
  <h2 style="font-size:11px; font-weight:400; color:#8a9bb0; letter-spacing:0.3px; margin:0 0 14px 0;">Offshore Survey Planner &amp; Route Optimizer</h2>
+ <div id="signin-mobile-notice" role="alert" style="display:none; text-align:left; margin:0 0 16px 0; padding:12px 14px; background:#1c1408; border:1px solid #d97706; border-radius:6px;">
+  <div style="font-size:13px; font-weight:800; color:#fbbf24; letter-spacing:0.2px; line-height:1.35;">This App is not designed for Mobile phones</div>
+  <div style="font-size:11px; color:#fde68a; margin-top:6px; line-height:1.45;">Use a desktop or laptop computer. Maps, preplots and planning tools need a large screen.</div>
+ </div>
+ <script>
+ (function () {
+  var ua = navigator.userAgent || '';
+  var phone = /iPhone|iPod|Windows Phone|IEMobile|Opera Mini|webOS|BlackBerry/i.test(ua)
+   || (/Android/i.test(ua) && /Mobile/i.test(ua));
+  if (!phone) return;
+  var el = document.getElementById('signin-mobile-notice');
+  if (el) el.style.display = 'block';
+ })();
+ </script>
  <div style="text-align:left; margin-bottom:20px; padding:10px 14px; background:#0a0a12; border:1px solid #1a1a24; border-radius:4px;">
  <h2 style="font-size:9px; color:#5a6a7a; font-weight:600; letter-spacing:0.5px; text-transform:uppercase; margin:0 0 8px 0;">Offshore Survey Planning Features</h2>
  <ul style="margin:0; padding:0 0 0 14px; font-size:10px; color:#a0aebb; line-height:1.9; list-style:disc;">
@@ -2146,7 +2160,7 @@
  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
  <script src="https://unpkg.com/shpjs@latest/dist/shp.min.js"></script>
  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
- <script src="app.js?v=16.54"></script>
+ <script src="app.js?v=16.55"></script>
  <script src="ray_tracing_module.js?v=16.53"></script>
  <script src="wmm_declination.js?v=16.49"></script>
  <script src="magnetic_isogones.js?v=16.49"></script>
