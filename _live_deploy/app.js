@@ -16973,6 +16973,14 @@ function toggleMapLayer(layerName) {
  showToast('Sea surface temp on - hover for degC, use date controls for prior days', 5000);
  }
  } else if (layerName === 'bathymetry') {
+ // Global isobaths generated from ETOPO (see bathymetry_contours.js)
+ if (typeof bathyIsoToggle === 'function') {
+  const cb = document.getElementById('layer-overlay-bathy');
+  bathyIsoToggle(!!(cb && cb.checked));
+ } else {
+  showToast('Bathymetry contour module not loaded');
+ }
+ } else if (layerName === 'bathymetry-emodnet') {
  if (mapLayers.bathy) {
  map.removeLayer(mapLayers.bathy);
  mapLayers.bathy = null;
@@ -16986,6 +16994,7 @@ function toggleMapLayer(layerName) {
  opacity: 0.9,
  version: '1.3.0'
  }).addTo(map);
+ showToast('EMODnet contours on (European waters only)');
  }
  } else if (layerName === 'gebco') {
  if (mapLayers.gebco) {
@@ -19185,7 +19194,7 @@ async function copyMapToClipboard(mode = 'full') {
  transparent = true;
  hide(currentBaseLayer);
  if (typeof mapLayers === 'object' && mapLayers) {
- hide(mapLayers.bathy); hide(mapLayers.gebco); hide(mapLayers.nav);
+ hide(mapLayers.bathy); hide(mapLayers.bathyIso); hide(mapLayers.gebco); hide(mapLayers.nav);
  }
  } else if (mode === 'preplot') {
  hide(layerRoute); hide(layerArrows);
