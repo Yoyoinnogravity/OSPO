@@ -1300,8 +1300,26 @@
  <input type="checkbox" id="layer-overlay-mpa" onchange="toggleMapLayer('mpa')" style="accent-color:#00d2ff;"/>Marine protected areas (EMODnet)
  </label>
  <div style="font-size:9px;color:#64748b;margin:10px 0 4px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;">Bathymetry &amp; traffic</div>
- <label style="display:flex; align-items:center; gap:8px; font-size:11px; color:#ccc; cursor:pointer;">
- <input type="checkbox" id="layer-overlay-bathy" onchange="toggleMapLayer('bathymetry')" style="accent-color:#00d2ff;"/>Bathymetry Contours (EMODnet)
+ <label title="Isobaths generated in Candooka from the global ETOPO 1-arc-minute grid (NOAA). Worldwide — not limited to Europe or US waters. Click the map for a point depth." style="display:flex; align-items:center; gap:8px; font-size:11px; color:#ccc; cursor:pointer;">
+ <input type="checkbox" id="layer-overlay-bathy" onchange="toggleMapLayer('bathymetry')" style="accent-color:#38bdf8;"/>Bathymetry Contours (global)
+ </label>
+ <div id="bathy-iso-controls" style="display:flex;align-items:center;gap:8px;margin:2px 0 6px 28px;flex-wrap:wrap;">
+  <label style="font-size:10px;color:#8a9bb0;display:flex;align-items:center;gap:4px;">Interval
+   <select id="bathy-iso-interval" onchange="bathyIsoIntervalChanged()" style="padding:3px 6px;border-radius:3px;border:1px solid #333;background:#111;color:#fff;font-size:10px;outline:none;">
+    <option value="auto" selected>Auto</option>
+    <option value="20">20 m</option>
+    <option value="50">50 m</option>
+    <option value="100">100 m</option>
+    <option value="200">200 m</option>
+    <option value="500">500 m</option>
+    <option value="1000">1000 m</option>
+    <option value="2000">2000 m</option>
+   </select>
+  </label>
+  <span id="bathy-iso-status" style="font-size:9px;color:#7dd3fc;"></span>
+ </div>
+ <label title="Pre-drawn EMODnet vector isobaths. European waters only — use with the global contours if you need finer shelf detail in Europe." style="display:flex; align-items:center; gap:8px; font-size:11px; color:#ccc; cursor:pointer;">
+ <input type="checkbox" id="layer-overlay-bathy-emodnet" onchange="toggleMapLayer('bathymetry-emodnet')" style="accent-color:#00d2ff;"/>EMODnet contours (Europe only)
  </label>
  <label title="NASA GIBS JPL MUR SST heatmap. Fetched only when checked - not loaded at startup." style="display:flex; align-items:center; gap:8px; font-size:11px; color:#ccc; cursor:pointer;">
  <input type="checkbox" id="layer-overlay-sst" onchange="toggleMapLayer('sst')" style="accent-color:#00d2ff;"/>Sea Surface Temp (GIBS MUR) - on request
@@ -2019,9 +2037,10 @@
  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
  <script src="https://unpkg.com/shpjs@latest/dist/shp.min.js"></script>
  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
- <script src="app.js?v=16.49"></script>
- <script src="ray_tracing_module.js?v=16.49"></script>
+ <script src="app.js?v=16.51"></script>
+ <script src="ray_tracing_module.js?v=16.51"></script>
  <script src="wmm_declination.js?v=16.49"></script>
  <script src="magnetic_isogones.js?v=16.49"></script>
+ <script src="bathymetry_contours.js?v=16.51"></script>
 </body>
 </html>
