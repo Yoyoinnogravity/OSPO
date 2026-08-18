@@ -4209,6 +4209,18 @@ function promptLoadP1OrSample() {
 const SAMPLE_PREPLOT_URL = 'samples/candooka-demo-north-sea.p190';
 const SAMPLE_PREPLOT_LABEL = 'candooka-demo-north-sea.p190 (sample)';
 
+function maybePromptSamplePreplot() {
+ if (_samplePreplotPromptShown) return;
+ if (document.getElementById('signin-overlay')?.style.display !== 'none') return;
+ if (state.lines && state.lines.length) return;
+ _samplePreplotPromptShown = true;
+ setTimeout(() => {
+  if (state.lines && state.lines.length) return;
+  if (document.getElementById('load-p1-chooser')) return;
+  promptLoadP1OrSample();
+ }, 450);
+}
+
 /** Fetch the bundled demo P1 and run the normal UTM → criteria → load flow. */
 async function loadSamplePreplot() {
  try {
@@ -7536,6 +7548,7 @@ function setLines(lines) {
  // Hard rule: line names are English letters/digits/basic punctuation only.
  sanitizeAllLineNames(lines);
  state.lines = lines;
+ _samplePreplotPromptShown = true;
  // Clear any cached full-line set from a previous Line-Manager route so reports
  // and stats never read a stale preplot (which would blank the acquired split).
  state._allLines = null;
@@ -9981,6 +9994,7 @@ function quickAddObstruction(lat, lng, hazardType) {
 var _startLineChooserShown = false;
 var _pendingStartReversed = false;
 var _pendingPlanRouteContinue = null;
+var _samplePreplotPromptShown = false;
 
 /** Ask 2D / 3D / OBN before every route plan so the wrong acquisition mode is never silent. */
 function confirmSurveyPlanTypeThen(continueFn) {
@@ -14636,6 +14650,7 @@ function finishLogout() {
  if (typeof switchSignInTab === 'function') {
   try { switchSignInTab('login'); } catch (_) {}
  }
+ _samplePreplotPromptShown = false;
 
  const overlay = document.getElementById('signin-overlay');
  if (overlay) {
@@ -16123,6 +16138,7 @@ function enterWorkspace(mode) {
  showToast('Maps & GIS — survey planning workspace', 2500);
  const saved = localStorage.getItem('candooka_baseLayer');
  if (!saved) setTimeout(showBaseLayerChooser, 200);
+ maybePromptSamplePreplot();
 }
 
 function showWorkspaceChooser() {
