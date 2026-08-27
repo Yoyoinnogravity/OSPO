@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * Node checks: P1 auto-loads (16.81); named/clear CSV auto-loads;
- * ambiguous delimited files get a QGIS-simple sample + X field / Y field dialog.
+ * Node checks: P1 auto-loads; CSV with known X/Y headers auto-loads;
+ * anything else is skipped with a short format hint (no column wizard).
  * Loads app.js with a tiny DOM stub.
  */
 import fs from 'fs';
@@ -107,12 +107,16 @@ const {
   resultIsAutoLoad,
   dataRowsForPreplotMapping,
   layoutHasKnownXY,
-  CSV_COLUMN_SAMPLE_ROWS,
-  buildDelimitedTextDialogHtml,
-  delimitedTextFieldLabel,
+  PREPLOT_FORMAT_HINT,
+  skipUnsupportedPreplot,
 } = ctx;
 
 assert(typeof parsePreplotBestEffort === 'function', 'parsePreplotBestEffort missing');
+assert(typeof skipUnsupportedPreplot === 'function', 'skipUnsupportedPreplot missing');
+assert(typeof PREPLOT_FORMAT_HINT === 'string' && PREPLOT_FORMAT_HINT.length > 10, 'PREPLOT_FORMAT_HINT missing');
+assert(/P1/.test(PREPLOT_FORMAT_HINT), 'skip message must mention P1');
+assert(/X and Y/i.test(PREPLOT_FORMAT_HINT), 'skip message must mention X and Y');
+assert(/easting\/northing/i.test(PREPLOT_FORMAT_HINT), 'skip message must mention easting/northing');
 
 function vRec(line, sp, latDeg, lonDeg, e, n) {
   const lat = String(Math.round(latDeg)).padStart(2, '0') + '0000.00N';
@@ -154,7 +158,7 @@ const namedCsv = [
 const named = parsePreplotBestEffort(namedCsv, 31, 'N');
 assert(named.lines && named.lines.length >= 2, 'named CSV must produce lines, got ' + (named.lines && named.lines.length) + ' conf=' + named.confidence);
 assert(layoutHasKnownXY(named.layout) === true, 'easting/northing headers mean X/Y are already known');
-assert(resultIsAutoLoad(named) === true, 'named CSV headers must auto-map, conf=' + named.confidence);
+assert(resultIsAutoLoad(named) === true, 'named CSV headers must auto-map, conf=' + named.confidence + ' layout=' + JSON.stringify(named.layout && { colX: named.layout.colX, colY: named.layout.colY, conf: named.layout.confidence }));
 
 const xyCsv = [
   'line,x,y',
@@ -187,57 +191,30 @@ const unlabeledClear = [
   'L2 1003 514365.6 6210200.0',
 ].join('\n');
 const clear = parsePreplotBestEffort(unlabeledClear, 31, 'N');
-assert(clear.lines && clear.lines.length >= 1, 'whitespace numeric with UTM pair should parse');
 assert(layoutHasKnownXY(clear.layout) !== true, 'unlabeled columns are not already-known X/Y');
-assert(resultIsAutoLoad(clear) === true, 'clear unlabeled UTM should auto-map (16.81), conf=' + clear.confidence);
+assert(resultIsAutoLoad(clear) === false, 'unlabeled CSV must skip, not auto-load or ask. conf=' + clear.confidence);
 
 const unlabeledAmbiguous = [
   '1001 512345.6 6210000.0 412345.6 5310000.0',
   '1002 512355.6 6210100.0 412355.6 5310100.0',
   '1003 512365.6 6210200.0 412365.6 5310200.0',
   '1004 512375.6 6210300.0 412375.6 5310300.0',
-  '1005 512385.6 6210400.0 412385.6 5310500.0',
+  '1005 512385.6 6210400.0 412385.6 5310400.0',
   '1006 512395.6 6210500.0 412395.6 5310500.0',
 ].join('\n');
-const ambLayout = inferDelimitedLayout(unlabeledAmbiguous.split('\n'));
-assert(ambLayout, 'ambiguous file must still infer a layout');
-assert(ambLayout.headers.length >= 4, 'sample must expose multiple real columns, got ' + ambLayout.headers.length);
 const amb = parsePreplotBestEffort(unlabeledAmbiguous, 31, 'N');
-const table = preparePreplotMapperTable(unlabeledAmbiguous, amb.layout || ambLayout);
-assert(table.headerCols.length >= 4, 'picker must show >=4 columns, got ' + table.headerCols.length);
-assert(!table.headerCols.some(h => /^H0100/i.test(String(h))), 'picker must not repeat H0100 in headers');
-assert((table.sampleRows[0] || []).length >= 4, 'sample row must have multiple fields');
-assert(resultIsAutoLoad(amb) === false, 'ambiguous unlabeled must ask (QGIS dialog). conf=' + amb.confidence);
-
-const manyRows = Array.from({ length: 14 }, (_, i) =>
-  `L1,${1001 + i},${512345.6 + i},${6210000.0 + i * 10}`
-).join('\n');
-const manyTable = preparePreplotMapperTable(manyRows, inferDelimitedLayout(manyRows.split('\n')));
-assert(CSV_COLUMN_SAMPLE_ROWS === 10, 'sample size constant must be 10, got ' + CSV_COLUMN_SAMPLE_ROWS);
-assert(manyTable.sampleRows.length === 10, 'picker must show first ~10 data rows, got ' + manyTable.sampleRows.length);
-assert(manyTable.sampleRows[0][0] === 'L1', 'sample cells must be real parsed values, got ' + JSON.stringify(manyTable.sampleRows[0]));
+assert(resultIsAutoLoad(amb) === false, 'ambiguous unlabeled must skip (not auto, not wizard). conf=' + amb.confidence);
 
 assert(!src.includes('CONFIRM COLUMNS'), 'old CONFIRM COLUMNS title must be gone');
 assert(!src.includes('This is X') && !src.includes('This is Y'), 'click-wizard This is X/Y must be gone');
+assert(!src.includes('csv-column-mapper'), 'csv-column-mapper dialog must be gone');
+assert(!src.includes('_showColumnMapperDialog'), 'column mapper dialog function must be gone');
+assert(!src.includes('buildDelimitedTextDialogHtml'), 'QGIS/sample dialog builder must be gone');
 assert(!src.includes('csv-coord-type'), 'coordinate-type extra step must be gone');
 assert(!src.includes('csv-col-line'), 'Line Name dropdown must be gone');
-assert(typeof buildDelimitedTextDialogHtml === 'function', 'QGIS dialog builder missing');
-assert(delimitedTextFieldLabel('easting', 0) === 'easting', 'named columns keep their names');
-assert(delimitedTextFieldLabel('Column 3', 2) === 'field_3', 'unlabeled columns use QGIS field_N');
-const dlgHtml = buildDelimitedTextDialogHtml(
-  ['line', 'sp', 'easting', 'northing'],
-  [['A', '1', '512345.6', '6210000.0'], ['A', '2', '512445.6', '6210100.0']],
-  { colX: 2, colY: 3 }
-);
-assert(dlgHtml.includes('Delimited Text'), 'dialog title must be Delimited Text');
-assert(dlgHtml.includes('X field') && dlgHtml.includes('Y field'), 'QGIS X field and Y field labels required');
-assert(dlgHtml.includes('>Import</button>'), 'Import button required');
-assert(dlgHtml.includes('Cancel'), 'Cancel button required');
-assert(dlgHtml.includes('easting') && dlgHtml.includes('northing'), 'dropdowns use column names from the sample');
-assert(dlgHtml.includes('512345.6') && dlgHtml.includes('6210000.0'), 'sample table shows first data rows');
-assert(!dlgHtml.includes('Click a sample'), 'no click-column wizard copy');
-assert(!dlgHtml.includes('Line Name'), 'no Line Name extra step');
-assert(!dlgHtml.includes('Shotpoint'), 'no SP extra step');
+assert(!src.includes('X field'), 'QGIS X field dropdown must be gone');
+assert(!src.includes('Choose X and Y coordinates'), 'sample picker title must be gone');
+assert(src.includes('PREPLOT_FORMAT_HINT'), 'skip-message constant must exist');
 
 const hOnlyTrap = [
   'H0100 Survey Area, KK',
@@ -252,12 +229,18 @@ const trap = parsePreplotBestEffort(hOnlyTrap, 31, 'N');
 assert(resultIsAutoLoad(trap) === true, 'comma-in-H P1 must auto-load as P1, not CSV. conf=' + trap.confidence + ' fmt=' + trap.format);
 assert(dataRowsForPreplotMapping(hOnlyTrap.split('\n')).every(r => !/^H\d{4}/.test(r.trim())), 'mapping rows skip H-records');
 
+const p1Table = preparePreplotMapperTable(p1, null);
+assert(p1Table && p1Table.headerCols, 'P1 internal field table still builds');
+assert(!p1Table.headerCols.some(h => /^H0100/i.test(String(h))), 'P1 must not expose H0100 as a CSV column');
+
 console.log(JSON.stringify({
   ok: true,
-  p1: { lines: p1Parsed.lines.length, conf: p1Parsed.confidence, format: p1Parsed.format, skipColumnMap: !!p1Parsed.skipColumnMap },
-  namedCsv: { lines: named.lines.length, conf: named.confidence, knownXY: layoutHasKnownXY(named.layout) },
-  unlabeledClear: { lines: clear.lines.length, conf: clear.confidence, auto: resultIsAutoLoad(clear) },
-  unlabeledAmbiguous: { conf: amb.confidence, cols: table.headerCols.length, auto: resultIsAutoLoad(amb) },
-  sampleRows: manyTable.sampleRows.length,
+  skipMessage: PREPLOT_FORMAT_HINT,
+  p1: { lines: p1Parsed.lines.length, conf: p1Parsed.confidence, format: p1Parsed.format, skipColumnMap: !!p1Parsed.skipColumnMap, auto: resultIsAutoLoad(p1Parsed) },
+  namedCsv: { lines: named.lines.length, conf: named.confidence, knownXY: layoutHasKnownXY(named.layout), auto: resultIsAutoLoad(named) },
+  xyCsv: { lines: xy.lines && xy.lines.length, auto: resultIsAutoLoad(xy) },
+  lonLatCsv: { lines: ll.lines && ll.lines.length, auto: resultIsAutoLoad(ll) },
+  unlabeledClear: { conf: clear.confidence, auto: resultIsAutoLoad(clear) },
+  unlabeledAmbiguous: { conf: amb.confidence, auto: resultIsAutoLoad(amb) },
 }, null, 2));
 process.exit(0);
