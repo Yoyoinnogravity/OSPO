@@ -4633,7 +4633,7 @@ function layoutHasKnownXY(layout) {
  return _headerLooksLikeX(headers[xi]) && _headerLooksLikeY(headers[yi]);
 }
 
-/** QGIS-style field name: header text, else field_1 / field_2 / … */
+/** Column header for the sample table: real header text, else field_1 / field_2 / … */
 function delimitedTextFieldLabel(h, i) {
  const name = String(h == null ? '' : h).trim();
  if (!name || /^H\d{4}/i.test(name)) return 'field_' + (i + 1);
@@ -8155,7 +8155,7 @@ function promptPreplotColumnMap(text, zone, hemi, opts) {
  confirmUtmZoneFirst({
  zone,
  hemi,
- message: 'Confirm UTM zone first, then map X field and Y field if the file is not a known P1 layout.'
+ message: 'Confirm UTM zone first, then choose the X and Y columns from a sample of the file.'
  }, (z, h) =>openMapper(z, h));
 }
 

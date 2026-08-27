@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * Node checks: P1 auto-loads (16.81); named/clear CSV auto-loads;
- * ambiguous delimited files get a QGIS-simple sample + X field / Y field dialog.
+ * Node checks: P1 auto-loads; CSV with known X/Y headers auto-loads;
+ * unlabeled CSV shows a ~10-row column sample so the user picks X and Y.
  * Loads app.js with a tiny DOM stub.
  */
 import fs from 'fs';
@@ -107,7 +107,6 @@ const {
   resultIsAutoLoad,
   dataRowsForPreplotMapping,
   layoutHasKnownXY,
-  CSV_COLUMN_SAMPLE_ROWS,
   buildDelimitedTextDialogHtml,
   delimitedTextFieldLabel,
 } = ctx;
@@ -167,7 +166,7 @@ const unlabeledClear = [
 const clear = parsePreplotBestEffort(unlabeledClear, 31, 'N');
 assert(clear.lines && clear.lines.length >= 1, 'whitespace numeric with UTM pair should parse');
 assert(layoutHasKnownXY(clear.layout) !== true, 'unlabeled columns are not already-known X/Y');
-assert(resultIsAutoLoad(clear) === true, 'clear unlabeled UTM should auto-map (16.81), conf=' + clear.confidence);
+assert(resultIsAutoLoad(clear) === false, 'unlabeled CSV must show the sample picker, not auto-load. conf=' + clear.confidence);
 
 const unlabeledAmbiguous = [
   '1001 512345.6 6210000.0 412345.6 5310000.0',
@@ -191,31 +190,26 @@ const manyRows = Array.from({ length: 14 }, (_, i) =>
   `L1,${1001 + i},${512345.6 + i},${6210000.0 + i * 10}`
 ).join('\n');
 const manyTable = preparePreplotMapperTable(manyRows, inferDelimitedLayout(manyRows.split('\n')));
-assert(CSV_COLUMN_SAMPLE_ROWS === 10, 'sample size constant must be 10, got ' + CSV_COLUMN_SAMPLE_ROWS);
 assert(manyTable.sampleRows.length === 10, 'picker must show first ~10 data rows, got ' + manyTable.sampleRows.length);
 assert(manyTable.sampleRows[0][0] === 'L1', 'sample cells must be real parsed values, got ' + JSON.stringify(manyTable.sampleRows[0]));
 
 assert(!src.includes('CONFIRM COLUMNS'), 'old CONFIRM COLUMNS title must be gone');
-assert(!src.includes('This is X') && !src.includes('This is Y'), 'click-wizard This is X/Y must be gone');
-assert(!src.includes('csv-coord-type'), 'coordinate-type extra step must be gone');
-assert(!src.includes('csv-col-line'), 'Line Name dropdown must be gone');
-assert(typeof buildDelimitedTextDialogHtml === 'function', 'QGIS dialog builder missing');
+assert(src.includes('This is X') && src.includes('This is Y'), 'picker must offer This is X / This is Y');
+assert(!src.includes('id="csv-col-x" style="flex:1'), 'old X/Y dropdowns must not remain');
+assert(typeof buildDelimitedTextDialogHtml === 'function', 'sample dialog builder missing');
 assert(delimitedTextFieldLabel('easting', 0) === 'easting', 'named columns keep their names');
-assert(delimitedTextFieldLabel('Column 3', 2) === 'field_3', 'unlabeled columns use QGIS field_N');
 const dlgHtml = buildDelimitedTextDialogHtml(
   ['line', 'sp', 'easting', 'northing'],
   [['A', '1', '512345.6', '6210000.0'], ['A', '2', '512445.6', '6210100.0']],
-  { colX: 2, colY: 3 }
+  2
 );
-assert(dlgHtml.includes('Delimited Text'), 'dialog title must be Delimited Text');
-assert(dlgHtml.includes('X field') && dlgHtml.includes('Y field'), 'QGIS X field and Y field labels required');
-assert(dlgHtml.includes('>Import<') || dlgHtml.includes('>Import</button>'), 'Import button required');
+assert(dlgHtml.includes('Choose X and Y coordinates'), 'dialog title must ask for X and Y');
+assert(dlgHtml.includes('This is X') && dlgHtml.includes('This is Y'), 'This is X / This is Y buttons required');
+assert(dlgHtml.includes('Import'), 'Import button required');
 assert(dlgHtml.includes('Cancel'), 'Cancel button required');
-assert(dlgHtml.includes('easting') && dlgHtml.includes('northing'), 'dropdowns use column names from the sample');
-assert(dlgHtml.includes('512345.6') && dlgHtml.includes('6210000.0'), 'sample table shows first data rows');
-assert(!dlgHtml.includes('Click a sample'), 'no click-column wizard copy');
 assert(!dlgHtml.includes('Line Name'), 'no Line Name extra step');
 assert(!dlgHtml.includes('Shotpoint'), 'no SP extra step');
+assert(!dlgHtml.includes('X field'), 'no QGIS X field dropdown');
 
 const hOnlyTrap = [
   'H0100 Survey Area, KK',
