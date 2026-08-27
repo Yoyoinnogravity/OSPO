@@ -14157,13 +14157,82 @@ const valRunInOutEl = document.getElementById('val-run-inout');
 if (valRunInOutEl) valRunInOutEl.textContent = state.settings.runIn + '/' + state.settings.runOut + 'm';
 
 // ===== ADMIN LOGIN & USER MANAGEMENT =====
-// Source of truth is the SERVER file api/users-db.json (via api/users.php + api/auth-login.php).
-// localStorage is only a cache - admin changes must be confirmed by the server or they are not live.
+// Source of truth is the SERVER file users-db.json (via api/users.php + api/auth-login.php).
+// localStorage is a recovery cache: never overwrite a populated cache with an empty server list.
 const ADMIN_PASSWORD = 'candooka2024'; // Change this to your desired admin password
+const GUEST_USERNAME = 'GUEST';
+const GUEST_PASSWORD = 'candooka-ospo';
 var adminLoggedIn = false;
 var registeredUsers = [];
 var usersDbServerUpdated = null;
 var usersDbSyncState = 'loading'; // loading | synced | error | local-only
+
+function readLocalUserCache() {
+ try {
+ const cached = JSON.parse(localStorage.getItem('candooka_users') || '[]');
+ return Array.isArray(cached) ? cached : [];
+ } catch (_) {
+ return [];
+ }
+}
+
+function builtinAccounts() {
+ return [
+ { id: 'admin', name: 'admin', email: 'admin@candooka.world', role: 'Admin', password: ADMIN_PASSWORD },
+ { id: 'guest', name: GUEST_USERNAME, email: 'guest@candooka.world', role: 'Viewer', password: GUEST_PASSWORD }
+ ];
+}
+
+function accountKey(u) {
+ return String((u && (u.name || u.email)) || '').trim().toLowerCase();
+}
+
+function mergeUserLists(primary, secondary) {
+ const byKey = new Map();
+ for (const list of [secondary, primary]) {
+ if (!Array.isArray(list)) continue;
+ for (const u of list) {
+ if (!u) continue;
+ const key = accountKey(u);
+ if (!key) continue;
+ const prev = byKey.get(key);
+ if (!prev) { byKey.set(key, u); continue; }
+ const prevScore = (prev.password ? 1e12 : 0) + (Date.parse(prev.addedAt || '') || 0);
+ const nextScore = (u.password ? 1e12 : 0) + (Date.parse(u.addedAt || '') || 0);
+ byKey.set(key, nextScore >= prevScore ? u : prev);
+ }
+ }
+ return Array.from(byKey.values());
+}
+
+function findAccountMatch(list, identity, password) {
+ const id = String(identity || '').trim().toLowerCase();
+ const pass = String(password || '');
+ if (!id || !pass || !Array.isArray(list)) return null;
+ for (const u of list) {
+ if (!u) continue;
+ const name = String(u.name || '').trim().toLowerCase();
+ const email = String(u.email || '').trim().toLowerCase();
+ if (id !== name && id !== email) continue;
+ if (String(u.password || '') !== pass) continue;
+ return u;
+ }
+ return null;
+}
+
+function fallbackSignInUser(identity, password) {
+ return findAccountMatch(builtinAccounts(), identity, password)
+ || findAccountMatch(registeredUsers, identity, password)
+ || findAccountMatch(readLocalUserCache(), identity, password);
+}
+
+function persistUserCache() {
+ if (!registeredUsers.length) return;
+ try {
+ localStorage.setItem('candooka_users', JSON.stringify(registeredUsers));
+ localStorage.setItem('candooka_users_updated', new Date().toISOString());
+ } catch (_) {}
+}
 
 async function loadUsersFromServer(forAdmin) {
  try {
@@ -14176,16 +14245,31 @@ async function loadUsersFromServer(forAdmin) {
  if (!data || !Array.isArray(data.users)) throw new Error('Bad user payload');
  // Only replace the admin list when we received passwords (admin key).
  if (forAdmin) {
- registeredUsers = data.users;
+ const incoming = data.users;
+ const cached = readLocalUserCache();
+ registeredUsers = mergeUserLists(incoming, cached);
  const cleaned = dedupeRegisteredUsers(true);
- try {
- localStorage.setItem('candooka_users', JSON.stringify(registeredUsers));
- if (data.updated) localStorage.setItem('candooka_users_updated', data.updated);
- } catch (_) {}
- if (cleaned > 0) {
- // Persist cleanup so clients never hit the old first-match login trap
+ persistUserCache();
+ if (data.updated) {
+ try { localStorage.setItem('candooka_users_updated', data.updated); } catch (_) {}
+ }
+ const restored = registeredUsers.length - incoming.length;
+ if (incoming.length === 0 && cached.length > 0) {
+ usersDbSyncState = 'local-only';
+ usersDbServerUpdated = data.updated || null;
+ saveUserDB({ quiet: true }).then(function(ok) {
+ if (ok) {
+ usersDbSyncState = 'synced';
+ showToast('Restored ' + registeredUsers.length + ' account(s) from this browser to the server');
+ try { renderUserList(); renderDBStats(); } catch (_) {}
+ }
+ });
+ return true;
+ }
+ if (cleaned > 0 || restored > 0) {
  await saveUserDB({ quiet: true });
- showToast('Cleaned ' + cleaned + ' duplicate username(s) on server');
+ if (cleaned > 0) showToast('Cleaned ' + cleaned + ' duplicate username(s) on server');
+ if (restored > 0) showToast('Re-added ' + restored + ' cached account(s) to the server');
  }
  }
  usersDbServerUpdated = data.updated || null;
@@ -14194,10 +14278,8 @@ async function loadUsersFromServer(forAdmin) {
  } catch (err) {
  console.warn('User DB load failed:', err);
  usersDbSyncState = 'error';
- try {
- const cached = JSON.parse(localStorage.getItem('candooka_users') || '[]');
- if (forAdmin && Array.isArray(cached) && cached.length) registeredUsers = cached;
- } catch (_) {}
+ const cached = readLocalUserCache();
+ if (forAdmin && cached.length) registeredUsers = cached;
  return false;
  }
 }
@@ -14323,6 +14405,7 @@ async function handleSignIn() {
  errEl.style.display = 'none';
 
  let data;
+ let signedInVia = 'server';
  try {
  const res = await fetch('api/auth-login.php', {
  method: 'POST',
@@ -14332,19 +14415,30 @@ async function handleSignIn() {
  });
  data = await res.json().catch(() => ({}));
  if (!res.ok || !data.ok) {
+ const local = fallbackSignInUser(user, pass);
+ if (!local) {
  errEl.textContent = (data && data.error) || 'Invalid account or password.';
  errEl.style.display = 'block';
  resetButton();
  return;
  }
+ data = { ok: true, confirmed: true, source: 'local', user: local };
+ signedInVia = 'local';
+ }
  } catch (netErr) {
+ const local = fallbackSignInUser(user, pass);
+ if (!local) {
  errEl.textContent = 'Cannot reach sign-in server. Check your connection and try again.';
  errEl.style.display = 'block';
  resetButton();
  return;
  }
+ data = { ok: true, confirmed: true, source: 'local', user: local };
+ signedInVia = 'local';
+ }
 
  const existingUser = data.user || {};
+ const welcomeHow = signedInVia === 'server' ? 'server confirmed' : 'restored from this device';
  state.currentUser = existingUser.email || existingUser.name || user;
  window.currentUser = existingUser;
 
@@ -14358,7 +14452,7 @@ async function handleSignIn() {
  updateAdminButton();
  updateUserDisplay();
  notifyLogin(existingUser.email || existingUser.name, pass);
- showToast('Signed in (server confirmed). Welcome ' + (existingUser.name || user));
+ showToast('Signed in (' + welcomeHow + '). Welcome ' + (existingUser.name || user));
  setTimeout(enterPreferredWorkspace, 300);
  resetButton();
  });
@@ -14379,7 +14473,7 @@ async function handleSignIn() {
  updateAdminButton();
  updateUserDisplay();
  notifyLogin(existingUser.email || existingUser.name, pass);
- showToast('Signed in (server confirmed). Welcome ' + (existingUser.name || user));
+ showToast('Signed in (' + welcomeHow + '). Welcome ' + (existingUser.name || user));
  setTimeout(enterPreferredWorkspace, 300);
  resetButton();
  });
@@ -15167,11 +15261,12 @@ function renderUserList() {
 async function saveUserDB(opts) {
  const quiet = !!(opts && opts.quiet);
  dedupeRegisteredUsers(true);
- // Cache locally for admin UI resilience
- try {
- localStorage.setItem('candooka_users', JSON.stringify(registeredUsers));
- localStorage.setItem('candooka_users_updated', new Date().toISOString());
- } catch (_) {}
+ if (!registeredUsers.length) {
+ usersDbSyncState = 'error';
+ if (!quiet) showToast('Refusing to save an empty user list to the server');
+ return false;
+ }
+ persistUserCache();
 
  try {
  const res = await fetch('api/users.php', {
