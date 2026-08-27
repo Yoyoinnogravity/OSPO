@@ -374,16 +374,6 @@ body {
   color: #a5b4fc !important;
 }
 
-/* PRIORITY — purple */
-.btn-priority {
-  border-color: #7e22ce !important;
-  color: #a78bfa !important;
-}
-.btn-priority:hover {
-  background: rgba(167, 139, 250, 0.08) !important;
-  color: #c4b5fd !important;
-}
-
 /* LINES — green */
 .btn-lines {
   border-color: #22863a !important;
@@ -1010,7 +1000,6 @@ body {
   body.printing-report #panel-tides,
   body.printing-report #panel-geodesy,
   body.printing-report #panel-licensing,
-  body.printing-report #panel-priority,
   body.printing-report #panel-layers,
   body.printing-report #panel-obstructions,
   body.printing-report #panel-measure,
