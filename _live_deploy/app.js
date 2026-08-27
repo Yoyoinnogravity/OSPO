@@ -4368,20 +4368,21 @@ function beginPreplotLoad(items) {
  });
 }
 
-/** Parse one/many texts with known UTM. P1 or named X/Y CSV auto-loads; otherwise skip. */
+/** Parse one/many texts with known UTM; if auto-detect fails, ask the user to map columns. */
 function finishPreplotLoad(items, zone, hemi, label) {
  const allLines = [];
  const failed = [];
- const skipped = [];
+ const ambiguous = [];
 
  items.forEach(it => {
  const result = parsePreplotBestEffort(it.text, zone, hemi);
- // P1/90 and P1/11 always auto-load via existing P1 parsers — never CSV-map those.
- // Delimited files auto-load only when headers already name X/Y (or easting/northing, lon/lat).
+ // P1/UKOOA always auto-load — never the CSV sample UI.
+ // CSV/table auto-loads only when X/Y headers are already known.
+ // Otherwise show a column-form sample (~10 rows) so the user picks X and Y.
  if (resultIsAutoLoad(result)) {
   const plaus = assessPreplotPlausibility(result.lines);
   if (!plaus.ok && result.format !== 'p190' && result.format !== 'p111' && !result.skipColumnMap) {
-   skipped.push({ item: it, result: Object.assign({}, result, { confidence: 'low', reason: plaus.reason, detail: plaus.detail }) });
+   ambiguous.push({ item: it, result: Object.assign({}, result, { confidence: 'low', reason: plaus.reason, detail: plaus.detail }) });
   } else {
    result.lines.forEach(l => {
     allLines.push(Object.assign({}, l, {
@@ -4391,30 +4392,86 @@ function finishPreplotLoad(items, zone, hemi, label) {
     }));
    });
   }
+ } else if (result.lines.length > 0) {
+ ambiguous.push({ item: it, result });
  } else {
-  failed.push({ item: it, result });
+ failed.push({ item: it, result });
  }
  });
 
+ // If everything failed/ambiguous, open mapper on the first problem file
  if (allLines.length === 0) {
- const problem = skipped[0] || failed[0];
+ const problem = ambiguous[0] || failed[0];
  if (problem) {
  const fmt = problem.result && problem.result.format;
  if (fmt === 'p190' || fmt === 'p111' || (problem.result && problem.result.skipColumnMap)) {
   showToast('Could not read coordinates from this P1/UKOOA file. It was not opened as CSV.', 7000);
   return;
  }
- skipUnsupportedPreplot(problem.item && problem.item.name);
+ const why = problem.result?.detail || problem.result?.reason || '';
+ const whyMsg = why
+  ? (`Could not confidently identify columns (${why}). `)
+  : '';
+ showToast(whyMsg + 'Choose X and Y from a sample of "' + problem.item.name + '"');
+ promptPreplotColumnMap(problem.item.text, zone, hemi, {
+ message: '',
+ guess: problem.result.layout || null,
+ mapperTable: problem.result.mapperTable || null,
+ skipZoneConfirm: true,
+ onDone: (lines) => {
+ if (!lines || !lines.length) {
+ showToast('Still no valid lines - check column choices and UTM vs lat/lon');
  return;
  }
- skipUnsupportedPreplot();
+ const plaus = assessPreplotPlausibility(lines);
+ if (!plaus.ok) {
+  showToast((plaus.detail || 'Imported extent still looks unrealistic') +
+   ' - check columns / coordinate type and try again', 7000);
+  return;
+ }
+ const z = state.settings.utmZone || zone;
+ const hh = state.settings.utmHemi || hemi;
+ setLines(lines);
+ showToast('Loaded ' + lines.length + ' lines from ' + label + ' | UTM ' + z + hh, 4000);
+ }
+ });
+ return;
+ }
+ showToast('No valid lines found - check file format or map columns manually');
  return;
  }
 
- if (skipped.length || failed.length) {
- const nSkip = skipped.length + failed.length;
+ // Optional: also map remaining ambiguous files and merge
+ if (ambiguous.length || failed.length) {
+ const skipped = ambiguous.length + failed.length;
+ showToast('Loaded ' + allLines.length + ' lines; ' + skipped + ' file(s) need a column sample');
+ // Prompt for the first remaining file after accepting the good ones
  setLines(allLines);
- showToast('Loaded ' + allLines.length + ' lines; ' + nSkip + ' file(s) skipped. ' + PREPLOT_FORMAT_HINT, 8000);
+ const next = ambiguous[0] || failed[0];
+ if (next) {
+ if (next.result && (next.result.format === 'p190' || next.result.format === 'p111' || next.result.skipColumnMap)) {
+  return;
+ }
+ promptPreplotColumnMap(next.item.text, zone, hemi, {
+ message: '',
+ guess: next.result.layout || null,
+ mapperTable: next.result.mapperTable || null,
+ skipZoneConfirm: true,
+ onDone: (extra) => {
+ if (extra && extra.length) {
+ const plaus = assessPreplotPlausibility(extra);
+ if (!plaus.ok) {
+  showToast((plaus.detail || 'Extent looks wrong') + ' - columns not merged', 6000);
+  return;
+ }
+ const merged = state.lines.slice();
+ extra.forEach(l =>merged.push(Object.assign({}, l, { id: merged.length })));
+ setLines(merged);
+ showToast('Merged +' + extra.length + ' lines from ' + next.item.name);
+ }
+ }
+ });
+ }
  return;
  }
 
@@ -4422,7 +4479,7 @@ function finishPreplotLoad(items, zone, hemi, label) {
  showToast('Loaded ' + allLines.length + ' lines from ' + label + ' | UTM ' + zone + hemi, 4000);
 }
 
-// ===== LOAD CSV (named X/Y headers only — no column wizard) =====
+// ===== LOAD CSV WITH MANUAL COLUMN MAPPING =====
 function loadCSVManual(event) {
  const file = event.target.files[0];
  if (!file) return;
@@ -4432,22 +4489,13 @@ function loadCSVManual(event) {
  const rows = text.split('\n').map(r =>r.trimEnd()).filter(r =>r.length > 0);
  if (rows.length < 2) { showToast('File appears empty or has too few rows.'); return; }
 
- const peekZone = (state.settings && state.settings.utmZone) || 31;
- const peekHemi = (state.settings && state.settings.utmHemi) || 'N';
- const peek = parsePreplotBestEffort(text, peekZone, peekHemi);
- const isP1 = peek.format === 'p190' || peek.format === 'p111' || peek.skipColumnMap;
- if (!resultIsAutoLoad(peek) && !isP1) {
-  skipUnsupportedPreplot(file.name);
-  return;
- }
-
  const detected = detectUtmZone(rows);
+ // Always confirm UTM zone before asking for X/Y columns
  confirmUtmZoneFirst({
- zone: detected.zone || peekZone,
- hemi: detected.hemi || peekHemi,
- message: 'Confirm UTM zone first while loading this file. Wrong zone places the survey in the wrong part of the world.',
- okLabel: 'Import',
- fileLabel: file.name
+ zone: detected.zone || state.settings.utmZone || 31,
+ hemi: detected.hemi || state.settings.utmHemi || 'N',
+ message: 'Confirm UTM zone before choosing X and Y columns.',
+ okLabel: 'Continue to columns'
  }, (zone, hemi) => {
  const auto = parsePreplotBestEffort(text, zone, hemi);
  if (resultIsAutoLoad(auto)) {
@@ -4462,7 +4510,18 @@ function loadCSVManual(event) {
   showToast('Could not read coordinates from this P1/UKOOA file.', 6000);
   return;
  }
- skipUnsupportedPreplot(file.name);
+ promptPreplotColumnMap(text, zone, hemi, {
+ message: '',
+ skipZoneConfirm: true, // already confirmed above
+ onDone: (lines) => {
+ if (!lines || !lines.length) {
+ showToast('Still no valid lines - check column choices');
+ return;
+ }
+ setLines(lines);
+ showToast('Imported ' + lines.length + ' lines | UTM ' + zone + hemi, 4000);
+ }
+ });
  });
  };
  reader.readAsText(file);
@@ -4543,15 +4602,12 @@ function confirmUtmZoneFirst({ zone, hemi, message, okLabel, fileLabel, detected
  if (zoneInput) { zoneInput.focus(); zoneInput.select(); }
 }
 
-var CSV_COLUMN_SAMPLE_ROWS = 10;
-
-/** Short skip copy when the file is not a P1 and not a named X/Y CSV. */
-var PREPLOT_FORMAT_HINT = 'Use a P1, or a CSV with X and Y (or easting/northing) column headers.';
-
-function skipUnsupportedPreplot(fileName) {
- const prefix = fileName ? ('"' + fileName + '": ') : '';
- showToast(prefix + PREPLOT_FORMAT_HINT, 8000);
+function _escMapperCell(s) {
+ return String(s == null ? '' : s)
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
+
+var CSV_COLUMN_SAMPLE_ROWS = 10;
 
 function _headerLooksLikeX(h) {
  const s = String(h == null ? '' : h).toLowerCase().replace(/[\s_\-]/g, '');
@@ -4575,6 +4631,232 @@ function layoutHasKnownXY(layout) {
  const xi = layout.colX, yi = layout.colY;
  if (!(xi >= 0) || !(yi >= 0) || xi === yi) return false;
  return _headerLooksLikeX(headers[xi]) && _headerLooksLikeY(headers[yi]);
+}
+
+/** QGIS-style field name: header text, else field_1 / field_2 / … */
+function delimitedTextFieldLabel(h, i) {
+ const name = String(h == null ? '' : h).trim();
+ if (!name || /^H\d{4}/i.test(name)) return 'field_' + (i + 1);
+ const colN = name.match(/^column\s*(\d+)$/i);
+ if (colN) return 'field_' + colN[1];
+ return name;
+}
+
+function resolvePreplotLineCol(nCols, colX, colY, guessedLine) {
+ if (guessedLine >= 0 && guessedLine !== colX && guessedLine !== colY && guessedLine < nCols) {
+  return guessedLine;
+ }
+ for (let i = 0; i < nCols; i++) {
+  if (i !== colX && i !== colY) return i;
+ }
+ return -1;
+}
+
+function xySampleLooksGeographic(sampleRows, colX, colY) {
+ let absX = 0, absY = 0, n = 0;
+ for (const r of sampleRows || []) {
+  const x = parseFloat(r && r[colX]);
+  const y = parseFloat(r && r[colY]);
+  if (!isFinite(x) || !isFinite(y)) continue;
+  absX = Math.max(absX, Math.abs(x));
+  absY = Math.max(absY, Math.abs(y));
+  if (++n >= 20) break;
+ }
+ return n > 0 && absX <= 180 && absY <= 90;
+}
+
+function buildDelimitedTextSampleTable(headerCols, sampleRows, colX, colY) {
+ const esc = _escMapperCell;
+ const labels = (headerCols || []).map((h, i) => delimitedTextFieldLabel(h, i));
+ const ths = labels.map((name, i) => {
+  const isX = i === colX, isY = i === colY;
+  const col = isX ? '#ffd60a' : isY ? '#30d158' : '#2a2a36';
+  const fg = isX ? '#ffd60a' : isY ? '#30d158' : '#94a3b8';
+  return '<th style="padding:6px 8px;border:1px solid ' + col + ';color:' + fg + ';background:#12121a;text-align:left;white-space:nowrap;font-weight:700;">' + esc(name) + '</th>';
+ }).join('');
+ const body = (sampleRows || []).slice(0, CSV_COLUMN_SAMPLE_ROWS).map(r => {
+  const cells = labels.map((_, i) => {
+   const isX = i === colX, isY = i === colY;
+   const col = isX ? '#ffd60a' : isY ? '#30d158' : '#1a1a24';
+   const bg = isX ? 'rgba(255,214,10,0.06)' : isY ? 'rgba(48,209,88,0.06)' : 'transparent';
+   return '<td style="padding:5px 8px;border:1px solid ' + col + ';color:#e0e8f0;white-space:nowrap;max-width:160px;overflow:hidden;text-overflow:ellipsis;background:' + bg + ';">' + esc(r && r[i] != null ? r[i] : '') + '</td>';
+  }).join('');
+  return '<tr>' + cells + '</tr>';
+ }).join('');
+ return '<table style="width:100%;font-size:11px;border-collapse:collapse;"><thead><tr>' + ths + '</tr></thead><tbody>' + body + '</tbody></table>';
+}
+
+/**
+ * QGIS Delimited Text, stripped down: sample preview, X field, Y field,
+ * Import / Cancel. No click-wizard, Confirm Columns, Line/SP, or CRS extras.
+ */
+function buildDelimitedTextDialogHtml(headerCols, sampleRows, opts) {
+ opts = opts || {};
+ const esc = _escMapperCell;
+ const labels = (headerCols || []).map((h, i) => delimitedTextFieldLabel(h, i));
+ const selX = opts.colX >= 0 ? opts.colX : 0;
+ const selY = opts.colY >= 0 ? opts.colY : Math.min(1, Math.max(0, labels.length - 1));
+ const colOpts = labels.map((name, i) => {
+  return '<option value="' + i + '">' + esc(name) + '</option>';
+ }).join('');
+ return (
+  '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;" data-dialog-header>' +
+   '<div style="font-size:14px;font-weight:700;color:#e2e8f0;letter-spacing:0.2px;">Delimited Text</div>' +
+   '<button type="button" onclick="document.getElementById(\'csv-column-mapper\').remove()" style="background:none;border:none;color:#666;font-size:16px;cursor:pointer;">×</button>' +
+  '</div>' +
+  '<div style="font-size:10px;color:#8a9bb0;font-weight:600;letter-spacing:0.3px;margin-bottom:6px;">Sample</div>' +
+  '<div id="csv-sample-wrap" style="overflow:auto;max-height:240px;margin-bottom:16px;border:1px solid #1a1a24;border-radius:4px;">' +
+   buildDelimitedTextSampleTable(headerCols, sampleRows, selX, selY) +
+  '</div>' +
+  '<div class="panel-row" style="margin-bottom:10px;align-items:center;">' +
+   '<label for="csv-col-x" style="width:88px;color:#e2e8f0;font-weight:600;">X field</label>' +
+   '<select id="csv-col-x" style="flex:1;padding:7px 8px;border-radius:4px;border:1px solid #2a2a36;background:#111;color:#fff;font-size:12px;outline:none;">' + colOpts + '</select>' +
+  '</div>' +
+  '<div class="panel-row" style="margin-bottom:16px;align-items:center;">' +
+   '<label for="csv-col-y" style="width:88px;color:#e2e8f0;font-weight:600;">Y field</label>' +
+   '<select id="csv-col-y" style="flex:1;padding:7px 8px;border-radius:4px;border:1px solid #2a2a36;background:#111;color:#fff;font-size:12px;outline:none;">' + colOpts + '</select>' +
+  '</div>' +
+  '<div style="display:flex;gap:10px;justify-content:flex-end;">' +
+   '<button type="button" onclick="_executeCSVColumnMap()" style="padding:9px 18px;border-radius:4px;border:none;background:#30d158;color:#000;font-weight:700;cursor:pointer;font-size:12px;">Import</button>' +
+   '<button type="button" onclick="document.getElementById(\'csv-column-mapper\').remove()" style="padding:9px 18px;border-radius:4px;border:1px solid #333;background:#1a1a2e;color:#e0e8f0;cursor:pointer;font-size:12px;">Cancel</button>' +
+  '</div>'
+ );
+}
+
+function _showColumnMapperDialog(rawText, rows, headerCols, sampleRows, delimiter, opts) {
+ opts = opts || {};
+ let dlg = document.getElementById('csv-column-mapper');
+ if (dlg) dlg.remove();
+ dlg = document.createElement('div');
+ dlg.id = 'csv-column-mapper';
+ dlg.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#0e0e16;border:1px solid #2a2a36;border-radius:6px;padding:20px 24px;z-index:9999;min-width:480px;max-width:760px;max-height:90vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.8);color:#fff;font-family:inherit;';
+ document.body.appendChild(dlg);
+
+ const guess = opts.guess || {};
+ let gX = guess.colX >= 0 ? guess.colX : -1;
+ let gY = guess.colY >= 0 ? guess.colY : -1;
+ if (gX < 0) {
+  for (let i = 0; i < headerCols.length; i++) { if (_headerLooksLikeX(headerCols[i])) { gX = i; break; } }
+ }
+ if (gY < 0) {
+  for (let i = 0; i < headerCols.length; i++) { if (i !== gX && _headerLooksLikeY(headerCols[i])) { gY = i; break; } }
+ }
+ if (gX < 0) gX = 0;
+ if (gY < 0) gY = Math.min(1, Math.max(0, headerCols.length - 1));
+ if (gY === gX && headerCols.length > 1) gY = gX === 0 ? 1 : 0;
+
+ dlg.innerHTML = buildDelimitedTextDialogHtml(headerCols, sampleRows, { colX: gX, colY: gY });
+
+ dlg._csvData = {
+  rawText,
+  rows,
+  headerCols,
+  sampleRows: sampleRows || [],
+  delimiter,
+  hasHeader: opts.hasHeader !== false,
+  colLine: guess.colLine,
+  colSP: guess.colSP,
+  zone: opts.zone || 31,
+  hemi: opts.hemi || 'N',
+  guess,
+  onDone: typeof opts.onDone === 'function' ? opts.onDone : null
+ };
+
+ const xSel = document.getElementById('csv-col-x');
+ const ySel = document.getElementById('csv-col-y');
+ if (xSel) xSel.value = String(gX);
+ if (ySel) ySel.value = String(gY);
+
+ const onXyChange = () => {
+  const wrap = dlg.querySelector('#csv-sample-wrap');
+  if (!wrap) return;
+  const colX = parseInt(xSel && xSel.value, 10);
+  const colY = parseInt(ySel && ySel.value, 10);
+  wrap.innerHTML = buildDelimitedTextSampleTable(headerCols, sampleRows, colX, colY);
+ };
+ if (xSel) xSel.addEventListener('change', onXyChange);
+ if (ySel) ySel.addEventListener('change', onXyChange);
+
+ makeDialogInteractive(dlg);
+}
+
+function _executeCSVColumnMap() {
+ const dlg = document.getElementById('csv-column-mapper');
+ if (!dlg || !dlg._csvData) return;
+ let { rows, delimiter, hasHeader, onDone, rawText, headerCols, sampleRows, colLine, colSP, zone, hemi, guess } = dlg._csvData;
+
+ const colX = parseInt(document.getElementById('csv-col-x').value, 10);
+ const colY = parseInt(document.getElementById('csv-col-y').value, 10);
+ if (!(colX >= 0) || !(colY >= 0)) { showToast('Choose X field and Y field.'); return; }
+ if (colX === colY) { showToast('X field and Y field must be different.'); return; }
+
+ const nCols = (headerCols && headerCols.length) || 0;
+ colLine = resolvePreplotLineCol(nCols, colX, colY, colLine);
+ if (colSP === colX || colSP === colY || colSP === colLine || !(colSP >= 0)) {
+  colSP = (guess && guess.colSP >= 0 && guess.colSP !== colX && guess.colSP !== colY && guess.colSP !== colLine) ? guess.colSP : -1;
+ }
+
+ let useRows = rows;
+ let useHasHeader = hasHeader !== false;
+ let useLine = colLine;
+ let useX = colX;
+ let useY = colY;
+ let useSP = colSP;
+ if (useLine < 0) {
+  useRows = rows.map((row, i) => (useHasHeader && i === 0 ? 'line,' + row : 'L1,' + row));
+  useLine = 0;
+  useX = colX + 1;
+  useY = colY + 1;
+  useSP = colSP >= 0 ? colSP + 1 : -1;
+  useHasHeader = true;
+ }
+
+ const utmZone = parseInt(zone, 10) || (state.settings && state.settings.utmZone) || 31;
+ const utmHemi = (hemi === 'S' || hemi === 's') ? 'S' : 'N';
+ const isLatLon = xySampleLooksGeographic(sampleRows, colX, colY);
+
+ const layout = {
+  delimiter,
+  hasHeader: useHasHeader,
+  headers: headerCols || [],
+  colLine: useLine, colSP: useSP, colX: useX, colY: useY,
+  isLatLon,
+  confidence: 1
+ };
+ const lines = parseDelimitedWithLayout(useRows, layout, utmZone, utmHemi);
+
+ if (lines.length === 0) {
+  showToast('No valid lines. Check X field and Y field.', 7000);
+  return;
+ }
+ const plaus = assessPreplotPlausibility(lines);
+ if (!plaus.ok) {
+  showToast(
+   (plaus.detail || 'Imported extent looks unrealistic') +
+   ' — pick different X field / Y field',
+   8000
+  );
+  return;
+ }
+
+ dlg.remove();
+ state.rawText = rawText;
+ state.rawRows = rows;
+ state.settings.utmZone = utmZone;
+ state.settings.utmHemi = utmHemi;
+ if (onDone) {
+  onDone(lines);
+ } else {
+  setLines(lines);
+  showToast('Imported ' + lines.length + ' lines (' + (isLatLon ? 'Lat/Lon' : ('UTM ' + utmZone + utmHemi)) + ')', 4000);
+ }
+}
+
+var PREPLOT_FORMAT_HINT = 'Use a P1, or choose X field and Y field from the sample.';
+
+function skipUnsupportedPreplot(fileName) {
+ const prefix = fileName ? ('"' + fileName + '": ') : '';
+ showToast(prefix + PREPLOT_FORMAT_HINT, 8000);
 }
 
 // Toggle 2D/3D options in the survey criteria dialog
@@ -5585,9 +5867,19 @@ function askSurveyCriteria({ zone, hemi }, callback) {
  if (!resultIsAutoLoad(parsed)) {
   if (parsed.format === 'p190' || parsed.format === 'p111' || parsed.skipColumnMap) {
    showToast('Could not read coordinates from this P1/UKOOA file.', 7000);
-  } else {
-   skipUnsupportedPreplot();
+   return;
   }
+  promptPreplotColumnMap(state.rawText, z, h, {
+   message: '',
+   guess: parsed.layout || null,
+   skipZoneConfirm: true,
+   onDone: (lines) => {
+    if (!lines || !lines.length) { showToast('No valid lines found'); return; }
+    state.lines = _mergeExistingInfill(lines);
+    renderSurveyLines(); updateSurveyList(); fitMapToLines();
+    showToast('Viewing ' + state.lines.length + ' lines | UTM ' + z + h, 3000);
+   }
+  });
   return;
  }
  const lines = _mergeExistingInfill(parsed.lines);
@@ -7172,7 +7464,7 @@ function parseCSV(text) {
  * Best-effort preplot parse across P1 flavours (2D and 3D).
  * Returns { lines, confidence: 'high'|'medium'|'low'|'none', layout }.
  * Hard-coded: P1 parsers, or CSV with X/Y (easting/northing, lon/lat) headers.
- * Anything else is skipped — no column wizard.
+ * Unlabeled/ambiguous delimited files open a QGIS-simple X field / Y field dialog.
  */
 function preplotFilterValidGeo(lines) {
  if (!lines || !lines.length) return [];
@@ -7185,12 +7477,11 @@ function preplotFilterValidGeo(lines) {
 
 function resultIsAutoLoad(result) {
  if (!result || !result.lines || !result.lines.length) return false;
- // P1/90 and P1/11 always auto-load via existing P1 parsers. Never CSV-map those.
+ // P1/90 and P1/11 always skip the delimited-text dialog (16.81 / 188f29e).
  if (result.skipColumnMap) return true;
  if (result.format === 'p190' || result.format === 'p111') return true;
- // Delimited: auto-map only when headers already name X/Y (or easting/northing, lon/lat).
- if (layoutHasKnownXY(result.layout)) return true;
- return false;
+ // Named headers / clear numeric ranges auto-load. Only low confidence opens X/Y.
+ return result.confidence === 'high' || result.confidence === 'medium';
 }
 
 /** Re-parse extracted P1 fields as UTM and as lat/lon; pick the plausible set. */
@@ -7797,10 +8088,43 @@ function parseP190LooseWhitespace(rows, zone, hemi) {
  }, zone, hemi);
 }
 
-/** Never open a column wizard. P1 or named X/Y CSV only; otherwise a short skip message. */
+/** Open column mapper - always confirm UTM zone first (unless skipZoneConfirm). */
 function promptPreplotColumnMap(text, zone, hemi, opts) {
- skipUnsupportedPreplot(opts && opts.fileName);
+ opts = opts || {};
+ const openMapper = (z, h) => {
+ const table = opts.mapperTable || preparePreplotMapperTable(text, opts.guess);
+ if (!table || !table.headerCols || !table.headerCols.length) {
+  showToast('File appears empty or has too few rows.');
+  return;
+ }
+ if (table.headerCols.length < 2) {
+  showToast('Could not split columns — check the file is a P1 or a delimited table.', 6000);
+ }
+ const msgParts = [];
+ if (opts.message) msgParts.push(opts.message);
+ if (table.note) msgParts.push(table.note);
+ _showColumnMapperDialog(table.text || text, table.rows, table.headerCols, table.sampleRows || [], table.delimiter, {
+ message: '',
+ zone: z,
+ hemi: h,
+ guess: table.layout || opts.guess || {},
+ onDone: opts.onDone || null,
+ hasHeader: table.hasHeader
+ });
+ };
+
+ if (opts.skipZoneConfirm) {
+ openMapper(zone, hemi);
+ return;
+ }
+
+ confirmUtmZoneFirst({
+ zone,
+ hemi,
+ message: 'Confirm UTM zone first, then map X field and Y field if the file is not a known P1 layout.'
+ }, (z, h) =>openMapper(z, h));
 }
+
 
 // Simple lat/lon fallback: name, lat1, lon1, lat2, lon2
 function fallbackParseCSV(text) {
