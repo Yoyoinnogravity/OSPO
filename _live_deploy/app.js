@@ -4376,8 +4376,9 @@ function finishPreplotLoad(items, zone, hemi, label) {
 
  items.forEach(it => {
  const result = parsePreplotBestEffort(it.text, zone, hemi);
- // Auto-load when parsers are confident (including P1/UKOOA). Never default
- // to Confirm Columns — only the unlabeled/ambiguous sample picker remains.
+ // P1/UKOOA always auto-load — never the CSV sample UI.
+ // CSV/table auto-loads only when X/Y headers are already known.
+ // Otherwise show a column-form sample (~10 rows) so the user picks X and Y.
  if (resultIsAutoLoad(result)) {
   const plaus = assessPreplotPlausibility(result.lines);
   if (!plaus.ok && result.format !== 'p190' && result.format !== 'p111' && !result.skipColumnMap) {
@@ -4411,10 +4412,9 @@ function finishPreplotLoad(items, zone, hemi, label) {
  const whyMsg = why
   ? (`Could not confidently identify columns (${why}). `)
   : '';
- showToast(whyMsg + 'Select Line, X and Y from a sample of "' + problem.item.name + '"');
+ showToast(whyMsg + 'Choose X and Y from a sample of "' + problem.item.name + '"');
  promptPreplotColumnMap(problem.item.text, zone, hemi, {
- message: whyMsg +
-  'Click a sample column to set Line, then X, then Y. We only ask when the file is not a known P1 layout and headers/ranges are ambiguous.',
+ message: '',
  guess: problem.result.layout || null,
  mapperTable: problem.result.mapperTable || null,
  skipZoneConfirm: true,
@@ -4453,8 +4453,7 @@ function finishPreplotLoad(items, zone, hemi, label) {
   return;
  }
  promptPreplotColumnMap(next.item.text, zone, hemi, {
- message: 'File "' + next.item.name + '" is ambiguous — click sample columns for Line, X and Y.' +
-  (next.result?.detail ? (' ' + next.result.detail) : ''),
+ message: '',
  guess: next.result.layout || null,
  mapperTable: next.result.mapperTable || null,
  skipZoneConfirm: true,
@@ -4495,7 +4494,7 @@ function loadCSVManual(event) {
  confirmUtmZoneFirst({
  zone: detected.zone || state.settings.utmZone || 31,
  hemi: detected.hemi || state.settings.utmHemi || 'N',
- message: 'Confirm UTM zone before choosing Line / X / Y columns.',
+ message: 'Confirm UTM zone before choosing X and Y columns.',
  okLabel: 'Continue to columns'
  }, (zone, hemi) => {
  const auto = parsePreplotBestEffort(text, zone, hemi);
@@ -4512,7 +4511,7 @@ function loadCSVManual(event) {
   return;
  }
  promptPreplotColumnMap(text, zone, hemi, {
- message: 'Click a sample column to set Line, then X, then Y. Zone UTM ' + zone + hemi + ' will be used for grid conversion.',
+ message: '',
  skipZoneConfirm: true, // already confirmed above
  onDone: (lines) => {
  if (!lines || !lines.length) {
@@ -4608,212 +4607,266 @@ function _escMapperCell(s) {
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+var CSV_COLUMN_SAMPLE_ROWS = 10;
+
+function _headerLooksLikeX(h) {
+ const s = String(h == null ? '' : h).toLowerCase().replace(/[\s_\-]/g, '');
+ if (!s || /^h\d{4}/i.test(String(h))) return false;
+ if (/^(x|east|easting|eastings|utme|utmeasting|lon|long|longitude|xcoord|xcoordinate)$/.test(s)) return true;
+ if (s.indexOf('easting') >= 0 || s.indexOf('longitude') >= 0) return true;
+ return false;
+}
+
+function _headerLooksLikeY(h) {
+ const s = String(h == null ? '' : h).toLowerCase().replace(/[\s_\-]/g, '');
+ if (!s || /^h\d{4}/i.test(String(h))) return false;
+ if (/^(y|north|northing|northings|utmn|utmnorthing|lat|latitude|ycoord|ycoordinate)$/.test(s)) return true;
+ if (s.indexOf('northing') >= 0 || s.indexOf('latitude') >= 0) return true;
+ return false;
+}
+
+function layoutHasKnownXY(layout) {
+ if (!layout || layout.hasHeader === false) return false;
+ const headers = layout.headers || [];
+ const xi = layout.colX, yi = layout.colY;
+ if (!(xi >= 0) || !(yi >= 0) || xi === yi) return false;
+ return _headerLooksLikeX(headers[xi]) && _headerLooksLikeY(headers[yi]);
+}
+
+/** QGIS-style field name: header text, else field_1 / field_2 / … */
+function delimitedTextFieldLabel(h, i) {
+ const name = String(h == null ? '' : h).trim();
+ if (!name || /^H\d{4}/i.test(name)) return 'field_' + (i + 1);
+ const colN = name.match(/^column\s*(\d+)$/i);
+ if (colN) return 'field_' + colN[1];
+ return name;
+}
+
+function resolvePreplotLineCol(nCols, colX, colY, guessedLine) {
+ if (guessedLine >= 0 && guessedLine !== colX && guessedLine !== colY && guessedLine < nCols) {
+  return guessedLine;
+ }
+ for (let i = 0; i < nCols; i++) {
+  if (i !== colX && i !== colY) return i;
+ }
+ return -1;
+}
+
+function xySampleLooksGeographic(sampleRows, colX, colY) {
+ let absX = 0, absY = 0, n = 0;
+ for (const r of sampleRows || []) {
+  const x = parseFloat(r && r[colX]);
+  const y = parseFloat(r && r[colY]);
+  if (!isFinite(x) || !isFinite(y)) continue;
+  absX = Math.max(absX, Math.abs(x));
+  absY = Math.max(absY, Math.abs(y));
+  if (++n >= 20) break;
+ }
+ return n > 0 && absX <= 180 && absY <= 90;
+}
+
+function buildDelimitedTextSampleTable(headerCols, sampleRows, colX, colY, selected) {
+ const esc = _escMapperCell;
+ const labels = (headerCols || []).map((h, i) => delimitedTextFieldLabel(h, i));
+ const ths = labels.map((name, i) => {
+  const isX = i === colX, isY = i === colY, isSel = i === selected;
+  const col = isX ? '#ffd60a' : isY ? '#30d158' : (isSel ? '#00d2ff' : '#2a2a36');
+  const fg = isX ? '#ffd60a' : isY ? '#30d158' : (isSel ? '#00d2ff' : '#94a3b8');
+  const badge = isX ? 'X' : isY ? 'Y' : '';
+  const badgeHtml = badge ? '<div style="font-size:8px;font-weight:800;letter-spacing:0.4px;color:' + col + ';">' + badge + '</div>' : '';
+  return '<th data-col="' + i + '" style="padding:6px 8px;border:1px solid ' + col + ';color:' + fg + ';background:' + (isSel ? '#141428' : '#12121a') + ';text-align:left;white-space:nowrap;font-weight:700;cursor:pointer;position:sticky;top:0;">' + badgeHtml + esc(name) + '</th>';
+ }).join('');
+ const body = (sampleRows || []).slice(0, CSV_COLUMN_SAMPLE_ROWS).map(r => {
+  const cells = labels.map((_, i) => {
+   const isX = i === colX, isY = i === colY, isSel = i === selected;
+   const col = isX ? '#ffd60a' : isY ? '#30d158' : (isSel ? '#00d2ff' : '#1a1a24');
+   const bg = isX ? 'rgba(255,214,10,0.06)' : isY ? 'rgba(48,209,88,0.06)' : (isSel ? 'rgba(0,210,255,0.06)' : 'transparent');
+   return '<td data-col="' + i + '" style="padding:5px 8px;border:1px solid ' + col + ';color:#e0e8f0;white-space:nowrap;max-width:160px;overflow:hidden;text-overflow:ellipsis;background:' + bg + ';cursor:pointer;">' + esc(r && r[i] != null ? r[i] : '') + '</td>';
+  }).join('');
+  return '<tr>' + cells + '</tr>';
+ }).join('');
+ return '<table style="width:100%;font-size:11px;border-collapse:collapse;"><thead><tr>' + ths + '</tr></thead><tbody>' + body + '</tbody></table>';
+}
+
+/**
+ * Sample of the file in column form. User chooses X and Y by clicking a
+ * header or This is X / This is Y. No Confirm Columns dropdowns.
+ */
+function buildDelimitedTextDialogHtml(headerCols, sampleRows, nRows) {
+ const nCols = (headerCols || []).length;
+ const shown = Math.min(CSV_COLUMN_SAMPLE_ROWS, (sampleRows || []).length);
+ return (
+  '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;" data-dialog-header>' +
+   '<div style="font-size:14px;font-weight:700;color:#00d2ff;letter-spacing:0.3px;">Choose X and Y coordinates</div>' +
+   '<button type="button" onclick="document.getElementById(\'csv-column-mapper\').remove()" style="background:none;border:none;color:#666;font-size:16px;cursor:pointer;">×</button>' +
+  '</div>' +
+  '<div style="font-size:11px;color:#a0aebb;margin-bottom:10px;line-height:1.5;">Sample of this file in column form — <strong style="color:#e0e8f0;">' + nCols + '</strong> columns, first ' + shown + ' of ' + nRows + ' data rows. Click a column header, or select a column and press <strong style="color:#ffd60a;">This is X</strong> / <strong style="color:#30d158;">This is Y</strong>. Then import.</div>' +
+  '<div id="csv-xy-status" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px;"></div>' +
+  '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;">' +
+   '<button type="button" id="csv-btn-this-x" style="padding:7px 12px;border-radius:4px;border:1px solid #ffd60a;background:rgba(255,214,10,0.12);color:#ffd60a;font-weight:800;cursor:pointer;font-size:11px;">This is X</button>' +
+   '<button type="button" id="csv-btn-this-y" style="padding:7px 12px;border-radius:4px;border:1px solid #30d158;background:rgba(48,209,88,0.12);color:#30d158;font-weight:800;cursor:pointer;font-size:11px;">This is Y</button>' +
+   '<span id="csv-xy-hint" style="font-size:10px;color:#5a6a7a;align-self:center;"></span>' +
+  '</div>' +
+  '<div style="font-size:9px;color:#5a6a7a;font-weight:600;letter-spacing:0.4px;margin-bottom:6px;text-transform:uppercase;">File sample (click a column)</div>' +
+  '<div id="csv-sample-wrap" style="overflow:auto;max-height:min(42vh,360px);margin-bottom:16px;border:1px solid #1a1a24;border-radius:4px;"></div>' +
+  '<input type="hidden" id="csv-col-x" value="-1"/>' +
+  '<input type="hidden" id="csv-col-y" value="-1"/>' +
+  '<div style="display:flex;gap:10px;">' +
+   '<button type="button" id="csv-import-btn" style="flex:2;padding:10px;border-radius:4px;border:none;background:#30d158;color:#000;font-weight:700;cursor:pointer;font-size:12px;">Import</button>' +
+   '<button type="button" onclick="document.getElementById(\'csv-column-mapper\').remove()" style="flex:1;padding:10px;border-radius:4px;border:1px solid #333;background:#1a1a2e;color:#e0e8f0;cursor:pointer;font-size:12px;">Cancel</button>' +
+  '</div>'
+ );
+}
+
 function _showColumnMapperDialog(rawText, rows, headerCols, sampleRows, delimiter, opts) {
  opts = opts || {};
  let dlg = document.getElementById('csv-column-mapper');
  if (dlg) dlg.remove();
  dlg = document.createElement('div');
  dlg.id = 'csv-column-mapper';
- dlg.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#0e0e16;border:1px solid #1a1a24;border-radius:8px;padding:24px 28px;z-index:9999;min-width:560px;max-width:860px;max-height:90vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.8);color:#fff;font-family:inherit;';
+ dlg.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#0e0e16;border:1px solid #1a1a24;border-radius:8px;padding:22px 24px;z-index:9999;min-width:560px;max-width:min(960px,96vw);max-height:90vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.8);color:#fff;font-family:inherit;';
  document.body.appendChild(dlg);
 
- const esc = _escMapperCell;
- const optionLabel = (i, h) => {
-  const samples = (sampleRows || []).map(r => r && r[i]).filter(v => v != null && String(v).trim() !== '').slice(0, 3);
-  let name = h && !/^H\d{4}/i.test(String(h)) ? String(h) : ('Column ' + (i + 1));
-  if (samples.length) name += '  —  ' + samples.join(' · ');
-  return esc(name);
- };
- const colOpts = headerCols.map((h, i) => `<option value="${i}">${optionLabel(i, h)}</option>`).join('');
- const noneOpt = '<option value="-1">(none)</option>';
+ const nRows = Math.max(0, (rows || []).length - (opts.hasHeader === false ? 0 : 1));
+ dlg.innerHTML = buildDelimitedTextDialogHtml(headerCols, sampleRows, nRows);
 
- const banner = opts.message
- ? `<div style="font-size:11px;color:#ffd60a;background:rgba(255,214,10,0.08);border:1px solid rgba(255,214,10,0.35);border-radius:4px;padding:8px 10px;margin-bottom:12px;line-height:1.45;">${opts.message}</div>`
- : '';
-
- const nCols = headerCols.length;
- const nRows = Math.max(0, rows.length - (opts.hasHeader === false ? 0 : 1));
-
- dlg.innerHTML = `
- <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;" data-dialog-header>
- <div style="font-size:13px;font-weight:700;color:#00d2ff;letter-spacing:0.5px;">Which columns are Line, X and Y?</div>
- <button type="button" onclick="document.getElementById('csv-column-mapper').remove()" style="background:none;border:none;color:#666;font-size:16px;cursor:pointer;">×</button>
- </div>
- ${banner}
- <div style="font-size:10px;color:#a0aebb;margin-bottom:10px;line-height:1.5;">
- ${nRows} data rows · <strong style="color:#e0e8f0;">${nCols}</strong> columns.
- Click a sample column to assign <strong style="color:#00d2ff;">Line</strong>, then <strong style="color:#ffd60a;">X</strong>, then <strong style="color:#30d158;">Y</strong>.
- </div>
- <div style="font-size:9px;color:#5a6a7a;font-weight:600;letter-spacing:0.4px;margin-bottom:6px;text-transform:uppercase;">Sample (click a column)</div>
- <div id="csv-sample-wrap" style="overflow-x:auto;margin-bottom:14px;"></div>
- <div style="font-size:9px;color:#5a6a7a;font-weight:600;letter-spacing:0.4px;margin-bottom:8px;text-transform:uppercase;">Or pick from the lists</div>
- <div class="panel-row" style="margin-bottom:8px;">
- <label style="width:140px;color:#fff;">Line Name *</label>
- <select id="csv-col-line" style="flex:1;padding:5px 8px;border-radius:4px;border:1px solid #222;background:#111;color:#fff;font-size:11px;outline:none;">${colOpts}</select>
- </div>
- <div class="panel-row" style="margin-bottom:8px;">
- <label style="width:140px;color:#fff;">Shotpoint / SP</label>
- <select id="csv-col-sp" style="flex:1;padding:5px 8px;border-radius:4px;border:1px solid #222;background:#111;color:#fff;font-size:11px;outline:none;">${noneOpt + colOpts}</select>
- </div>
- <div class="panel-row" style="margin-bottom:8px;">
- <label style="width:140px;color:#fff;">X / Easting / Lon *</label>
- <select id="csv-col-x" style="flex:1;padding:5px 8px;border-radius:4px;border:1px solid #222;background:#111;color:#fff;font-size:11px;outline:none;">${colOpts}</select>
- </div>
- <div class="panel-row" style="margin-bottom:8px;">
- <label style="width:140px;color:#fff;">Y / Northing / Lat *</label>
- <select id="csv-col-y" style="flex:1;padding:5px 8px;border-radius:4px;border:1px solid #222;background:#111;color:#fff;font-size:11px;outline:none;">${colOpts}</select>
- </div>
- <div class="panel-row" style="margin-bottom:12px;">
- <label style="width:140px;color:#fff;">Coordinate Type *</label>
- <select id="csv-coord-type" style="flex:1;padding:5px 8px;border-radius:4px;border:1px solid #222;background:#111;color:#fff;font-size:11px;outline:none;">
- <option value="utm">UTM (Easting/Northing)</option>
- <option value="latlon">Lat/Lon (Decimal Degrees)</option>
- </select>
- </div>
- <div id="csv-utm-zone-row" class="panel-row" style="margin-bottom:12px;">
- <label style="width:140px;color:#fff;">UTM Zone</label>
- <input id="csv-utm-zone" type="number" min="1" max="60" value="${opts.zone || 31}" style="width:60px;padding:5px 8px;border-radius:4px;border:1px solid #ffd60a;background:#111;color:#fff;font-size:12px;outline:none;text-align:center;"/>
- <select id="csv-utm-hemi" style="padding:5px 8px;border-radius:4px;border:1px solid #ffd60a;background:#111;color:#fff;font-size:12px;outline:none;margin-left:8px;">
- <option value="N" ${(opts.hemi || 'N') === 'N' ? 'selected' : ''}>North</option>
- <option value="S" ${(opts.hemi || 'N') === 'S' ? 'selected' : ''}>South</option>
- </select>
- </div>
- <div style="display:flex;gap:10px;margin-top:14px;">
- <button onclick="_executeCSVColumnMap()" style="flex:2;padding:10px;border-radius:4px;border:none;background:#30d158;color:#000;font-weight:700;cursor:pointer;font-size:12px;">Import Lines</button>
- <button onclick="document.getElementById('csv-column-mapper').remove()" style="flex:1;padding:10px;border-radius:4px;border:1px solid #333;background:#1a1a2e;color:#e0e8f0;cursor:pointer;font-size:12px;">Cancel</button>
- </div>`;
-
- // Store data for the execute function
  dlg._csvData = {
- rawText,
- rows,
- headerCols,
- delimiter,
- hasHeader: opts.hasHeader !== false,
- onDone: typeof opts.onDone === 'function' ? opts.onDone : null
+  rawText,
+  rows,
+  headerCols,
+  sampleRows: sampleRows || [],
+  delimiter,
+  hasHeader: opts.hasHeader !== false,
+  colLine: opts.guess && opts.guess.colLine,
+  colSP: opts.guess && opts.guess.colSP,
+  zone: opts.zone || 31,
+  hemi: opts.hemi || 'N',
+  guess: opts.guess || {},
+  onDone: typeof opts.onDone === 'function' ? opts.onDone : null
  };
 
- const guess = opts.guess || {};
- const lc = headerCols.map(h => String(h).toLowerCase());
- const guessPat = (patterns) => { for (const p of patterns) { const i = lc.findIndex(h => h === p || h.includes(p)); if (i >= 0) return i; } return -1; };
- const gLine = guess.colLine >= 0 ? guess.colLine : guessPat(['line', 'name', 'id']);
- const gSP = guess.colSP >= 0 ? guess.colSP : guessPat(['sp', 'shot', 'point']);
- const gX = guess.colX >= 0 ? guess.colX : guessPat(['east', 'lon', 'long', 'x']);
- const gY = guess.colY >= 0 ? guess.colY : guessPat(['north', 'lat', 'y']);
- if (gLine >= 0) document.getElementById('csv-col-line').value = String(gLine);
- if (gSP >= 0) document.getElementById('csv-col-sp').value = String(gSP);
- if (gX >= 0) document.getElementById('csv-col-x').value = String(gX);
- if (gY >= 0) document.getElementById('csv-col-y').value = String(gY);
-
- if (guess.isLatLon) {
- document.getElementById('csv-coord-type').value = 'latlon';
- } else if (sampleRows.length > 0 && gX >= 0) {
- const sampleVal = parseFloat(sampleRows[0][gX]);
- if (isFinite(sampleVal) && Math.abs(sampleVal) <= 180) document.getElementById('csv-coord-type').value = 'latlon';
- }
-
- document.getElementById('csv-coord-type').onchange = () => {
- document.getElementById('csv-utm-zone-row').style.display = document.getElementById('csv-coord-type').value === 'utm' ? '' : 'none';
+ const esc = _escMapperCell;
+ let selected = -1;
+ const colLabel = (i) => delimitedTextFieldLabel(headerCols[i], i);
+ const sampleOf = (i) => {
+  const vals = (sampleRows || []).map(r => r && r[i]).filter(v => v != null && String(v).trim() !== '').slice(0, 2);
+  return vals.map(v => String(v)).join(' · ');
  };
- document.getElementById('csv-coord-type').onchange();
+ const getX = () => parseInt(document.getElementById('csv-col-x').value, 10);
+ const getY = () => parseInt(document.getElementById('csv-col-y').value, 10);
+ const setHidden = (id, v) => { const el = document.getElementById(id); if (el) el.value = String(v); };
 
- const roleColor = { line: '#00d2ff', sp: '#a78bfa', x: '#ffd60a', y: '#30d158' };
- const roleLabel = { line: 'LINE', sp: 'SP', x: 'X', y: 'Y' };
- const clickOrder = ['line', 'x', 'y', 'sp', ''];
- const selOf = { line: 'csv-col-line', sp: 'csv-col-sp', x: 'csv-col-x', y: 'csv-col-y' };
-
- const roleOfCol = (i) => {
-  const n = String(i);
-  if (document.getElementById('csv-col-line').value === n) return 'line';
-  if (document.getElementById('csv-col-x').value === n) return 'x';
-  if (document.getElementById('csv-col-y').value === n) return 'y';
-  if (document.getElementById('csv-col-sp').value === n) return 'sp';
-  return '';
+ const assignX = (i) => {
+  if (getY() === i) setHidden('csv-col-y', -1);
+  setHidden('csv-col-x', i);
+  selected = i;
+ };
+ const assignY = (i) => {
+  if (getX() === i) setHidden('csv-col-x', -1);
+  setHidden('csv-col-y', i);
+  selected = i;
  };
 
- const paintSample = () => {
+ const paint = () => {
+  const xi = getX(), yi = getY();
+  const status = dlg.querySelector('#csv-xy-status');
+  if (status) {
+   const chip = (label, col, idx) => {
+    const ok = idx >= 0;
+    return '<span style="display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border-radius:4px;border:1px solid ' + col + ';background:' + (ok ? 'rgba(255,255,255,0.04)' : 'transparent') + ';font-size:11px;"><strong style="color:' + col + ';">' + label + '</strong><span style="color:' + (ok ? '#e0e8f0' : '#5a6a7a') + ';">' + (ok ? (esc(colLabel(idx)) + (sampleOf(idx) ? '  ·  ' + esc(sampleOf(idx)) : '')) : 'not set — click a column') + '</span></span>';
+   };
+   status.innerHTML = chip('X', '#ffd60a', xi) + chip('Y', '#30d158', yi);
+  }
+  const hint = dlg.querySelector('#csv-xy-hint');
+  if (hint) hint.textContent = selected < 0 ? 'Click a column, then This is X or This is Y.' : ('Selected: ' + colLabel(selected));
   const wrap = dlg.querySelector('#csv-sample-wrap');
   if (!wrap) return;
-  const ths = headerCols.map((h, i) => {
-   const role = roleOfCol(i);
-   const col = roleColor[role] || '#333';
-   const badge = role ? `<div style="font-size:8px;font-weight:800;letter-spacing:0.4px;color:${col};">${roleLabel[role]}</div>` : '';
-   const label = (h && !/^H\d{4}/i.test(String(h))) ? h : ('Col ' + (i + 1));
-   return `<th data-col="${i}" style="padding:5px 7px;border:1px solid ${col};color:${role ? col : '#00d2ff'};background:#0a0a14;text-align:left;white-space:nowrap;cursor:pointer;">${badge}${esc(label)}</th>`;
-  }).join('');
-  const body = (sampleRows || []).map(r => {
-   const cells = headerCols.map((_, i) => {
-    const role = roleOfCol(i);
-    const col = roleColor[role] || '#1a1a24';
-    return `<td data-col="${i}" style="padding:4px 7px;border:1px solid ${col};color:#e0e8f0;white-space:nowrap;max-width:140px;overflow:hidden;text-overflow:ellipsis;cursor:pointer;background:${role ? 'rgba(255,255,255,0.03)' : 'transparent'};">${esc(r && r[i] != null ? r[i] : '')}</td>`;
-   }).join('');
-   return `<tr>${cells}</tr>`;
-  }).join('');
-  wrap.innerHTML = `<table style="width:100%;font-size:10px;border-collapse:collapse;margin-bottom:4px;"><tr>${ths}</tr>${body}</table>`;
+  wrap.innerHTML = buildDelimitedTextSampleTable(headerCols, sampleRows, xi, yi, selected);
   wrap.querySelectorAll('[data-col]').forEach(el => {
    el.onclick = (ev) => {
     ev.preventDefault();
     const idx = parseInt(el.getAttribute('data-col'), 10);
-    const cur = roleOfCol(idx);
-    const next = clickOrder[(clickOrder.indexOf(cur) + 1) % clickOrder.length];
-    ['line', 'sp', 'x', 'y'].forEach(r => {
-     const sel = document.getElementById(selOf[r]);
-     if (sel && sel.value === String(idx) && r !== next) sel.value = '-1';
-    });
-    if (next) document.getElementById(selOf[next]).value = String(idx);
-    paintSample();
+    selected = idx;
+    if (getX() < 0) assignX(idx);
+    else if (getY() < 0 && idx !== getX()) assignY(idx);
+    paint();
    };
   });
  };
- ['csv-col-line', 'csv-col-sp', 'csv-col-x', 'csv-col-y'].forEach(id => {
-  const el = document.getElementById(id);
-  if (el) el.addEventListener('change', paintSample);
- });
- paintSample();
 
+ const btnX = dlg.querySelector('#csv-btn-this-x');
+ const btnY = dlg.querySelector('#csv-btn-this-y');
+ if (btnX) btnX.onclick = () => {
+  if (selected < 0) { showToast('Click a sample column first, then This is X'); return; }
+  assignX(selected);
+  paint();
+ };
+ if (btnY) btnY.onclick = () => {
+  if (selected < 0) { showToast('Click a sample column first, then This is Y'); return; }
+  assignY(selected);
+  paint();
+ };
+ const importBtn = dlg.querySelector('#csv-import-btn');
+ if (importBtn) importBtn.onclick = () => _executeCSVColumnMap();
+
+ paint();
  makeDialogInteractive(dlg);
 }
 
 function _executeCSVColumnMap() {
  const dlg = document.getElementById('csv-column-mapper');
  if (!dlg || !dlg._csvData) return;
- const { rows, delimiter, hasHeader, onDone, rawText } = dlg._csvData;
+ let { rows, delimiter, hasHeader, onDone, rawText, headerCols, sampleRows, colLine, colSP, zone, hemi, guess } = dlg._csvData;
 
- const colLine = parseInt(document.getElementById('csv-col-line').value);
- const colSP = parseInt(document.getElementById('csv-col-sp').value);
- const colX = parseInt(document.getElementById('csv-col-x').value);
- const colY = parseInt(document.getElementById('csv-col-y').value);
- const coordType = document.getElementById('csv-coord-type').value;
- const utmZone = parseInt(document.getElementById('csv-utm-zone').value) || 31;
- const utmHemi = document.getElementById('csv-utm-hemi').value || 'N';
-
- if (colLine < 0 || colX < 0 || colY < 0) { showToast('Please assign Line, X, and Y columns.'); return; }
+ const colX = parseInt(document.getElementById('csv-col-x').value, 10);
+ const colY = parseInt(document.getElementById('csv-col-y').value, 10);
+ if (!(colX >= 0) || !(colY >= 0)) { showToast('Choose the X and Y columns from the sample.'); return; }
  if (colX === colY) { showToast('X and Y must be different columns.'); return; }
 
+ const nCols = (headerCols && headerCols.length) || 0;
+ colLine = resolvePreplotLineCol(nCols, colX, colY, colLine);
+ if (colSP === colX || colSP === colY || colSP === colLine || !(colSP >= 0)) {
+  colSP = (guess && guess.colSP >= 0 && guess.colSP !== colX && guess.colSP !== colY && guess.colSP !== colLine) ? guess.colSP : -1;
+ }
+
+ let useRows = rows;
+ let useHasHeader = hasHeader !== false;
+ let useLine = colLine;
+ let useX = colX;
+ let useY = colY;
+ let useSP = colSP;
+ if (useLine < 0) {
+  useRows = rows.map((row, i) => (useHasHeader && i === 0 ? 'line,' + row : 'L1,' + row));
+  useLine = 0;
+  useX = colX + 1;
+  useY = colY + 1;
+  useSP = colSP >= 0 ? colSP + 1 : -1;
+  useHasHeader = true;
+ }
+
+ const utmZone = parseInt(zone, 10) || (state.settings && state.settings.utmZone) || 31;
+ const utmHemi = (hemi === 'S' || hemi === 's') ? 'S' : 'N';
+ const isLatLon = xySampleLooksGeographic(sampleRows, colX, colY);
+
  const layout = {
- delimiter,
- hasHeader: hasHeader !== false,
- headers: dlg._csvData.headerCols || [],
- colLine, colSP, colX, colY,
- isLatLon: coordType === 'latlon',
- confidence: 1
+  delimiter,
+  hasHeader: useHasHeader,
+  headers: headerCols || [],
+  colLine: useLine, colSP: useSP, colX: useX, colY: useY,
+  isLatLon,
+  confidence: 1
  };
- const lines = parseDelimitedWithLayout(rows, layout, utmZone, utmHemi);
+ const lines = parseDelimitedWithLayout(useRows, layout, utmZone, utmHemi);
 
  if (lines.length === 0) {
-  showToast(
-   coordType === 'latlon'
-    ? 'No valid lines. If values look like metres (e.g. 500000), choose UTM — not lat/lon.'
-    : 'No valid lines found. Check column assignments and UTM zone.',
-   7000
-  );
+  showToast('No valid lines. Check the X and Y columns.', 7000);
   return;
  }
  const plaus = assessPreplotPlausibility(lines);
  if (!plaus.ok) {
   showToast(
    (plaus.detail || 'Imported extent looks unrealistic') +
-   ' - switch UTM vs lat/lon or pick different X/Y columns',
+   ' — pick different X and Y columns',
    8000
   );
   return;
@@ -4825,10 +4878,10 @@ function _executeCSVColumnMap() {
  state.settings.utmZone = utmZone;
  state.settings.utmHemi = utmHemi;
  if (onDone) {
- onDone(lines);
+  onDone(lines);
  } else {
- setLines(lines);
- showToast(`Imported ${lines.length} lines from CSV (${coordType === 'latlon' ? 'Lat/Lon' : 'UTM ' + utmZone + utmHemi})`, 4000);
+  setLines(lines);
+  showToast('Imported ' + lines.length + ' lines (' + (isLatLon ? 'Lat/Lon' : ('UTM ' + utmZone + utmHemi)) + ')', 4000);
  }
 }
 
@@ -6505,7 +6558,7 @@ function mapperTableFromRecords(records, note) {
   reason: note || 'ukooa fields',
   _synthetic: true
  };
- const sampleRows = lines.slice(1, 6).map(row => splitRow(row, ','));
+ const sampleRows = lines.slice(1, 1 + CSV_COLUMN_SAMPLE_ROWS).map(row => splitRow(row, ','));
  return {
   text: lines.join('\n'),
   rows: lines,
@@ -6581,7 +6634,7 @@ function preparePreplotMapperTable(text, guess) {
   const rows = String(text || '').split(/\r?\n/).filter(r => r.length > 0);
   const split = (r) => splitRow(r, guess.delimiter || ',');
   const headerCols = guess.headers;
-  const sampleSource = guess.hasHeader !== false ? rows.slice(1, 6) : rows.slice(0, 5);
+  const sampleSource = guess.hasHeader !== false ? rows.slice(1, 1 + CSV_COLUMN_SAMPLE_ROWS) : rows.slice(0, CSV_COLUMN_SAMPLE_ROWS);
   return {
    text,
    rows: guess.hasHeader !== false ? rows : [headerCols.join(',')].concat(rows),
@@ -6624,12 +6677,12 @@ function preparePreplotMapperTable(text, guess) {
   ? layout.headers
   : (hasHeader ? splitRows[0] : splitRows[0].map((_, i) => 'Column ' + (i + 1)));
  const body = hasHeader && layout.headers ? splitRows.slice(1) : splitRows;
- const sampleRows = body.slice(0, 5);
+ const sampleRows = body.slice(0, CSV_COLUMN_SAMPLE_ROWS);
  const skipped = rawRows.length - data.length;
  const note = skipped > 0
-  ? ('Skipped ' + skipped + ' header/H-records. Assign Line, X and Y from the data columns.')
+  ? ('Skipped ' + skipped + ' header/H-records. Choose X and Y from the data columns.')
   : '';
- // Rebuild row text so execute uses the same split as the dropdowns
+ // Rebuild row text so import uses the same split as the sample table
  const outRows = hasHeader
   ? [headerCols.map(csvEscapeCell).join(',')].concat(body.map(cols => cols.map(csvEscapeCell).join(',')))
   : body.map(cols => cols.map(csvEscapeCell).join(','));
@@ -7456,9 +7509,12 @@ function preplotFilterValidGeo(lines) {
 
 function resultIsAutoLoad(result) {
  if (!result || !result.lines || !result.lines.length) return false;
+ // P1/90 and P1/11 always auto-load — never the CSV sample picker.
  if (result.skipColumnMap) return true;
  if (result.format === 'p190' || result.format === 'p111') return true;
- return result.confidence === 'high' || result.confidence === 'medium';
+ // CSV/table: skip the sample UI only when headers already name X and Y.
+ if (layoutHasKnownXY(result.layout) && (result.confidence === 'high' || result.confidence === 'medium')) return true;
+ return false;
 }
 
 /** Re-parse extracted P1 fields as UTM and as lat/lon; pick the plausible set. */
@@ -7514,7 +7570,7 @@ function preplotLinesFromQcFile(text, zone, hemi) {
 }
 
 /**
- * P1/UKOOA never goes to Confirm Columns. Infer Line/SP/X/Y from the spec
+ * P1/UKOOA never opens the delimited-text dialog. Infer Line/SP/X/Y from the spec
  * (fixed-width, P1/11 commas, or extracted fields) and load.
  */
 function finalizeP1Parse(lines, zone, hemi, rows, fmt, reason, text) {
@@ -7907,9 +7963,10 @@ function parseDelimitedWithLayout(rows, layout, zone, hemi) {
  const cols = splitRow(row, layout.delimiter);
  if (cols.length <= Math.max(layout.colLine, layout.colX, layout.colY)) continue;
  // Skip leftover header-like rows
- if (/^line$/i.test(cols[layout.colLine]) || /^hc/i.test(cols[0] || '') || /^H\d{4}/i.test(cols[0] || '')) continue;
+ const lineCell = layout.colLine >= 0 ? cols[layout.colLine] : '';
+ if (/^line$/i.test(lineCell) || /^hc/i.test(cols[0] || '') || /^H\d{4}/i.test(cols[0] || '')) continue;
  if (isIgnorablePreplotHeaderRow(row)) continue;
- const name = cols[layout.colLine];
+ const name = (lineCell != null && String(lineCell).trim() !== '') ? String(lineCell).trim() : 'LINE';
  const sp = layout.colSP >= 0 ? parseFloat(cols[layout.colSP]) : NaN;
  const x = parseFloat(cols[layout.colX]);
  const y = parseFloat(cols[layout.colY]);
@@ -8075,13 +8132,13 @@ function promptPreplotColumnMap(text, zone, hemi, opts) {
   return;
  }
  if (table.headerCols.length < 2) {
-  showToast('Could not split Line / X / Y columns — check the file is a P1 or delimited table.', 6000);
+  showToast('Could not split columns — check the file is a P1 or a delimited table.', 6000);
  }
  const msgParts = [];
  if (opts.message) msgParts.push(opts.message);
  if (table.note) msgParts.push(table.note);
  _showColumnMapperDialog(table.text || text, table.rows, table.headerCols, table.sampleRows || [], table.delimiter, {
- message: msgParts.join(' ') || 'Click a sample column to set Line, then X, then Y.',
+ message: '',
  zone: z,
  hemi: h,
  guess: table.layout || opts.guess || {},
@@ -8098,7 +8155,7 @@ function promptPreplotColumnMap(text, zone, hemi, opts) {
  confirmUtmZoneFirst({
  zone,
  hemi,
- message: 'Confirm UTM zone first, then choose which columns are Line, X and Y.'
+ message: 'Confirm UTM zone first, then map X field and Y field if the file is not a known P1 layout.'
  }, (z, h) =>openMapper(z, h));
 }
 
