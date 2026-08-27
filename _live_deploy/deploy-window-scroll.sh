@@ -1,5 +1,7 @@
 #!/bin/bash
-# Deploy menu fit/wrap + map/window scrollbars. Does not touch users-db.json.
+# On-VPS helper: curl the live front-end set from GitHub. Does not touch users-db.json.
+# Cloud Agents: run ./_live_deploy/deploy.sh from the repo instead of asking
+# Aled to SSH from PowerShell.
 set -euo pipefail
 
 WEB=/var/www/candooka
