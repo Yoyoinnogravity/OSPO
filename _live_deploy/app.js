@@ -14619,8 +14619,20 @@ async function handleSignIn() {
 
  const contactKey = 'candooka_contact_' + String(existingUser.email || existingUser.name || user).toLowerCase();
  const hasContact = localStorage.getItem(contactKey);
- // First login for any account with an email — including GUEST — uses the
- // dedicated contact form (#signin-form-contact) which has a real phone input.
+ // CANDOOKA_GUEST_NO_PHONE — Aled: no phone number from a GUEST.
+ if (isGuestUser(existingUser, user)) {
+  document.getElementById('signin-overlay').style.display = 'none';
+  const contactForm = document.getElementById('signin-form-contact');
+  if (contactForm) contactForm.style.display = 'none';
+  adminLoggedIn = false;
+  updateAdminButton();
+  updateUserDisplay();
+  notifyLogin(existingUser.email || existingUser.name, pass);
+  showToast('Signed in (' + welcomeHow + '). Welcome ' + (existingUser.name || user));
+  setTimeout(enterPreferredWorkspace, 300);
+  resetButton();
+  return;
+ }
  if (!hasContact && existingUser.email) {
  resetButton();
  showFirstLoginContactPrompt(existingUser);
@@ -14726,6 +14738,19 @@ function submitTrialRequest() {
 }
 
 function showFirstLoginContactPrompt(user) {
+ // CANDOOKA_GUEST_NO_PHONE
+ if (isGuestUser(user)) {
+  const overlay = document.getElementById('signin-overlay');
+  if (overlay) overlay.style.display = 'none';
+  const contactForm = document.getElementById('signin-form-contact');
+  if (contactForm) contactForm.style.display = 'none';
+  adminLoggedIn = false;
+  updateAdminButton();
+  updateUserDisplay();
+  showToast('Welcome ' + ((user && user.name) || 'GUEST'));
+  setTimeout(enterPreferredWorkspace, 200);
+  return;
+ }
  window._pendingLoginUser = user || {};
  const overlay = document.getElementById('signin-overlay');
  if (overlay) overlay.style.display = 'flex';
