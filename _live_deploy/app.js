@@ -7826,43 +7826,37 @@ function renderSwathOverlays() {
 }
 
 function _syncMapDisplayToggles() {
- var names = ['labels', 'annotations'];
- for (var i = 0; i < names.length; i++) {
-  var src = document.getElementById('layer-toggle-' + names[i]);
-  var dst = document.getElementById('map-toggle-' + names[i]);
-  if (src && dst) dst.checked = !!src.checked;
- }
+ _paintMapDisplayBtn('labels', 'map-btn-labels', 'Line labels');
+ _paintMapDisplayBtn('annotations', 'map-btn-annotations', 'Annotations');
+}
+
+function _paintMapDisplayBtn(layerName, btnId, label) {
+ var src = document.getElementById('layer-toggle-' + layerName);
+ var btn = document.getElementById(btnId);
+ if (!btn) return;
+ var on = src ? !!src.checked : true;
+ btn.textContent = label + (on ? '  ON' : '  OFF');
+ btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+ btn.style.background = on ? 'rgba(0,210,255,0.22)' : '#15151e';
+ btn.style.borderColor = on ? '#00d2ff' : '#3a3a4e';
+ btn.style.color = on ? '#7dd3fc' : '#8a9bb0';
 }
 
 function toggleMapDisplayLayer(layerName) {
- var mapCb = document.getElementById('map-toggle-' + layerName);
  var layerCb = document.getElementById('layer-toggle-' + layerName);
- if (layerCb && mapCb) layerCb.checked = !!mapCb.checked;
+ if (layerCb) layerCb.checked = !layerCb.checked;
  if (typeof toggleSurveyLayer === 'function') toggleSurveyLayer(layerName, { silent: true });
 }
 
-function _ensureMapDisplayToggle(stack) {
- var panel = document.getElementById('map-display-overlay');
- if (panel) {
-  _syncMapDisplayToggles();
-  return panel;
- }
- panel = document.createElement('div');
- panel.id = 'map-display-overlay';
- panel.style.cssText = 'pointer-events:auto;cursor:default;background:rgba(8,8,16,0.88);border:1px solid #1a1a2e;border-radius:6px;padding:8px 14px;' +
-  'color:#e0e0e4;font-size:11px;line-height:1.6;box-shadow:0 4px 20px rgba(0,0,0,0.6);backdrop-filter:blur(6px);user-select:none;';
- panel.innerHTML =
-  '<div style="font-size:10px;color:#00d2ff;font-weight:700;letter-spacing:0.6px;margin-bottom:4px;">MAP LABELS</div>' +
-  '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:#e0e0e4;">' +
-  '<input type="checkbox" id="map-toggle-labels" checked onchange="toggleMapDisplayLayer(\'labels\')" style="width:14px;height:14px;accent-color:#00d2ff;cursor:pointer;flex:none;" />' +
-  'Line labels (No. &amp; SP)</label>' +
-  '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:#e0e0e4;">' +
-  '<input type="checkbox" id="map-toggle-annotations" checked onchange="toggleMapDisplayLayer(\'annotations\')" style="width:14px;height:14px;accent-color:#00d2ff;cursor:pointer;flex:none;" />' +
-  'Annotations &amp; arrows</label>' +
-  '<div style="font-size:9px;color:#8a9bb0;margin-top:4px;">Turn off when zoomed out — labels do not scale</div>';
- stack.appendChild(panel);
- _syncMapDisplayToggles();
- return panel;
+function _mapDisplayBarHTML() {
+ return (
+  '<div id="map-display-overlay" style="border:1px solid #00d2ff;border-radius:5px;padding:7px 8px;margin:0 0 8px 0;background:rgba(0,40,55,0.55);">' +
+  '<div style="font-size:9px;color:#00d2ff;font-weight:800;letter-spacing:0.5px;margin-bottom:5px;">MAP LABELS <span style="color:#8a9bb0;font-weight:600;">— turn off when zoomed out</span></div>' +
+  '<div style="display:flex;gap:6px;flex-wrap:wrap;">' +
+  '<button type="button" id="map-btn-labels" onclick="event.stopPropagation();toggleMapDisplayLayer(\'labels\')" style="flex:1;min-width:108px;padding:7px 8px;border-radius:4px;border:1px solid #00d2ff;background:rgba(0,210,255,0.22);color:#7dd3fc;font-size:10px;font-weight:800;cursor:pointer;font-family:inherit;letter-spacing:0.3px;">Line labels  ON</button>' +
+  '<button type="button" id="map-btn-annotations" onclick="event.stopPropagation();toggleMapDisplayLayer(\'annotations\')" style="flex:1;min-width:108px;padding:7px 8px;border-radius:4px;border:1px solid #00d2ff;background:rgba(0,210,255,0.22);color:#7dd3fc;font-size:10px;font-weight:800;cursor:pointer;font-family:inherit;letter-spacing:0.3px;">Annotations  ON</button>' +
+  '</div></div>'
+ );
 }
 
 function _ensureSurveySummaryStack() {
@@ -7931,7 +7925,6 @@ function updateSurveySummary(extraStats) {
   box.style.zIndex = '';
   stack.insertBefore(box, stack.firstChild);
  }
- _ensureMapDisplayToggle(stack);
  stack.style.display = 'flex';
  // Always use full original line set for summary (route solver may have replaced state.lines)
  var allLines = state._allLines || state.lines;
@@ -8042,6 +8035,7 @@ function updateSurveySummary(extraStats) {
  var is3D = (state.settings.surveyType || '3d') === '3d';
  var html =
  '<div style="font-size:10px;color:#00d2ff;font-weight:700;letter-spacing:0.6px;margin-bottom:4px;">PREPLOT SUMMARY <span style="color:#ffd60a;font-size:9px;margin-left:6px;">UTM ' + utmLabel + '</span></div>' +
+ _mapDisplayBarHTML() +
  '<div><span style="color:#8a9bb0;">Prime Lines:</span> <strong>' + primeCount + '</strong>' + (infillCount > 0 ? ' <span style="color:#ff44ff;font-size:9px;">+ ' + infillCount + ' infill</span>' : '') + '</div>' +
  (is3D ? '<div><span style="color:#8a9bb0;">Line Separation:</span> <strong>' + lineSepM.toFixed(0) + ' m</strong></div>' : '') +
  '<div><span style="color:#8a9bb0;">Line Bearing:</span> <strong>' + gridBrg.toFixed(2) + ' deg / ' + gridRecip.toFixed(2) + ' deg (Grid) | ' + geoBrg.toFixed(2) + ' deg / ' + geoRecip.toFixed(2) + ' deg (Geo)</strong></div>' +
@@ -8104,6 +8098,7 @@ function updateSurveySummary(extraStats) {
  }
  box.innerHTML = html;
  box.style.display = 'block';
+ if (typeof _syncMapDisplayToggles === 'function') _syncMapDisplayToggles();
 }
 
 function highlightLine(id) {
