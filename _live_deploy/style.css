@@ -1,5 +1,20 @@
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
+html, body {
+  scrollbar-width: thin;
+  scrollbar-color: #5a5a6e #12121a;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-track { background: #12121a; }
+*::-webkit-scrollbar-thumb {
+  background: #55556a;
+  border-radius: 4px;
+}
+*::-webkit-scrollbar-thumb:hover { background: #6e6e86; }
+
 body {
   font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
   background: #0a0a0f;
@@ -20,12 +35,32 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   background: linear-gradient(180deg, #101018 0%, #0c0c14 100%);
   border-bottom: 1px solid #1a1a24;
-  padding: 0 20px;
-  height: 42px;
+  padding: 4px 12px;
+  height: auto;
+  min-height: 42px;
+  gap: 6px;
+  row-gap: 4px;
   flex-shrink: 0;
   z-index: 200;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.t1-menu-wrapper {
+  display: flex;
+  flex: 1 1 640px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+.t1-menu-wrapper > * {
+  flex: 0 0 auto !important;
 }
 
 .t1-left {
@@ -40,6 +75,7 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
+  flex-shrink: 0;
 }
 
 .logo {
@@ -163,17 +199,33 @@ body {
 #tier2 {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   background: linear-gradient(180deg, #0c0c14 0%, #0a0a10 100%);
   border-bottom: 1px solid #1a1a24;
-  padding: 0 20px;
-  height: 36px;
+  padding: 4px 12px;
+  height: auto;
+  min-height: 36px;
   flex-shrink: 0;
   z-index: 200;
-  gap: 4px;
+  gap: 6px;
+  row-gap: 4px;
   overflow-x: auto;
   overflow-y: hidden;
 }
-#tier2::-webkit-scrollbar { height: 0; }
+
+.t2-menu-wrapper {
+  display: flex;
+  flex: 1 1 640px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+.t2-menu-wrapper > * {
+  flex: 0 0 auto !important;
+}
 
 .t2-btn {
   display: inline-flex;
@@ -193,9 +245,6 @@ body {
   transition: all 0.12s;
   font-family: inherit;
 }
-.t2-menu-wrapper::-webkit-scrollbar { height: 3px; }
-.t2-menu-wrapper::-webkit-scrollbar-track { background: transparent; }
-.t2-menu-wrapper::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
 .t2-btn:hover {
   background: #1a1a2a;
   border-color: #3a3a4e;
@@ -875,10 +924,10 @@ body {
 .leaflet-control-attribution { background: rgba(10,10,15,0.8) !important; color: #2d3748 !important; font-size: 8px; }
 
 /* Scrollbar */
-::-webkit-scrollbar { width: 4px; }
-::-webkit-scrollbar-track { background: #0a0a12; }
-::-webkit-scrollbar-thumb { background: #1e1e2e; border-radius: 2px; }
-::-webkit-scrollbar-thumb:hover { background: #2a2a3e; }
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: #12121a; }
+::-webkit-scrollbar-thumb { background: #55556a; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #6e6e86; }
 
 /* ===== PRINT STYLES ===== */
 @media print {
@@ -994,6 +1043,39 @@ body {
 
   /* Page break control */
   body.printing-report #rep-line-schedule { page-break-before: auto; }
+}
+
+/* ===== MEDIUM WIDTH: scale menus, then wrap instead of clipping ===== */
+@media (max-width: 1600px) {
+  .t1-menu-wrapper .corp-btn,
+  .t1-menu-wrapper .corp-nav-btn,
+  .t1-menu-wrapper .corp-view-btn {
+    padding: 4px 8px !important;
+    font-size: 9px !important;
+  }
+  .t2-menu-wrapper .t2-btn,
+  .t2-menu-wrapper .corp-view-btn,
+  #tier2 .t2-btn {
+    padding: 3px 8px !important;
+    font-size: 9px !important;
+    height: 26px !important;
+  }
+}
+
+@media (max-width: 1280px) {
+  .t1-menu-wrapper .corp-btn,
+  .t1-menu-wrapper .corp-nav-btn {
+    padding: 4px 6px !important;
+    font-size: 8.5px !important;
+    letter-spacing: 0.2px !important;
+  }
+  .t2-menu-wrapper .t2-btn,
+  .t2-menu-wrapper .corp-view-btn,
+  #tier2 .t2-btn {
+    padding: 3px 6px !important;
+    font-size: 8.5px !important;
+    height: 24px !important;
+  }
 }
 
 /* ===== MOBILE RESPONSIVE ===== */
