@@ -35,7 +35,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   background: linear-gradient(180deg, #101018 0%, #0c0c14 100%);
   border-bottom: 1px solid #1a1a24;
   padding: 4px 12px;
@@ -51,7 +51,7 @@ body {
 
 .t1-menu-wrapper {
   display: flex;
-  flex: 1 1 640px;
+  flex: 1 1 auto;
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
@@ -199,7 +199,7 @@ body {
 #tier2 {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   background: linear-gradient(180deg, #0c0c14 0%, #0a0a10 100%);
   border-bottom: 1px solid #1a1a24;
   padding: 4px 12px;
@@ -215,7 +215,7 @@ body {
 
 .t2-menu-wrapper {
   display: flex;
-  flex: 1 1 640px;
+  flex: 1 1 auto;
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;

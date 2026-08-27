@@ -319,9 +319,9 @@
  </div>
  <div id="app">
  <!-- ===== TIER 1: App Bar (Top Tier) ===== -->
- <header id="tier1" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; width: 100%; padding: 4px 12px; height: auto; overflow-x: auto;">
+ <header id="tier1" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: nowrap; width: 100%; padding: 4px 12px; height: auto; overflow-x: auto;">
  <span class="logo" style="margin-right: 12px; flex-shrink: 0;" title="Candooka OSPO — maps & GIS">OSPO <span style="font-size:9px;color:#5a6a7a;font-weight:400;">v3.5</span></span>
- <div class="t1-menu-wrapper" style="display: flex; flex: 1 1 640px; flex-wrap: wrap; gap: 6px; align-items: center; margin-right: 8px; min-width: 0; overflow-x: auto;">
+ <div class="t1-menu-wrapper" style="display: flex; flex: 1 1 auto; flex-wrap: wrap; gap: 6px; align-items: center; margin-right: 8px; min-width: 0; overflow-x: auto;">
  <!-- Load P1 -->
  <label class="corp-btn btn-load" for="file-input" style="flex: 1; text-align: center; margin: 0; cursor: pointer;">LOAD P1</label>
  <input type="file" id="file-input" accept=".csv,.xlsx,.xls,.txt,.p190,.p111,.p1,.a190,.pp1" multiple style="display:none" onchange="loadFile(event)"/>
@@ -369,8 +369,8 @@
  </div>
  </header>
  <!-- ===== TIER 2: Toolbar (Bottom Tier) ===== -->
- <nav id="tier2" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px; width: 100%; padding: 4px 12px; height: auto; overflow-x: auto;">
- <div class="t2-menu-wrapper" style="display: flex; flex: 1 1 640px; flex-wrap: wrap; gap: 6px; align-items: center; min-width: 0; overflow-x: auto;">
+ <nav id="tier2" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: nowrap; gap: 6px; width: 100%; padding: 4px 12px; height: auto; overflow-x: auto;">
+ <div class="t2-menu-wrapper" style="display: flex; flex: 1 1 auto; flex-wrap: wrap; gap: 6px; align-items: center; min-width: 0; overflow-x: auto;">
  <!-- Plan Survey Tab -->
  <button class="t2-btn btn-criteria needs-attention" id="tab-plan" onclick="switchTab('plan')" title="Open Critical Survey Criteria (UTM, geometry, timing, costs)" style="text-align: center; justify-content: center; margin: 0; height: 28px; padding: 4px 12px; font-weight: 800;">SURVEY CRITERIA</button>
  <!-- Highlighted orange Start Pt button -->
