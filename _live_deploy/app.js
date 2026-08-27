@@ -3363,6 +3363,7 @@ function _ppgEditCommit() {
   id: i, name: n.name, lat: n.lat, lon: n.lon
  }));
  if (typeof renderObnNodes === 'function') renderObnNodes();
+ if (typeof updateSurveyTypeIndicator === 'function') updateSurveyTypeIndicator();
  _ppgClearPreview();
  document.getElementById('ppg-edit-dialog').style.display = 'none';
  const nNodes = state.obnNodes.length;
@@ -4688,10 +4689,22 @@ function toggleSurveyTypeOptions() {
  }
 }
 
+function surveyHasLoadedGeometry() {
+ const lines = (state._allLines && state._allLines.length) ? state._allLines : (state.lines || []);
+ if (lines && lines.length) return true;
+ if (state.obnNodes && state.obnNodes.length) return true;
+ return false;
+}
+
 function updateSurveyTypeIndicator(type) {
  const indicator = document.getElementById('survey-type-indicator');
+ if (!indicator) return;
+ // Empty workspace: do not imply 3D before a preplot / OBN patch exists.
+ if (!surveyHasLoadedGeometry()) {
+  indicator.style.display = 'none';
+  return;
+ }
  if (!type) type = (state.settings.surveyType || '3d');
- if (indicator) {
  if (type === '2d') {
  indicator.textContent = '2D SURVEY';
  indicator.style.borderColor = '#ff9500';
@@ -4706,7 +4719,6 @@ function updateSurveyTypeIndicator(type) {
  indicator.style.color = '#00d2ff';
  }
  indicator.style.display = 'block';
- }
  // Area (sq km) is a 3D full-fold coverage concept - hide for 2D planning.
  setAreaStatsVisible(type !== '2d');
 }
@@ -8057,6 +8069,7 @@ function updateSurveyList() {
  };
  container.appendChild(div);
  });
+ try { updateSurveyTypeIndicator(); } catch (_) {}
 }
 
 function fitMapToLines() {
@@ -14824,6 +14837,7 @@ function resetWorkspaceForLogout() {
   }
   state.obnNodes = [];
   _ppgEditNodes = [];
+  try { updateSurveyTypeIndicator(); } catch (_) {}
   if (typeof rayTraceStopPick === 'function') {
    try { rayTraceStopPick(); } catch (_) {}
   }
@@ -15698,6 +15712,7 @@ function applyPersonalPlanSnapshot(savedState, opts) {
  if (typeof updateUserLayersList === 'function') {
   try { updateUserLayersList(); } catch (_) {}
  }
+ try { updateSurveyTypeIndicator(); } catch (_) {}
  return true;
 }
 
