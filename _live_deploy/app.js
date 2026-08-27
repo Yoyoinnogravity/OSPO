@@ -55,11 +55,11 @@ function sanitizeAllLineNames(lines) {
 // ===== DIALOG WINDOW CONTROLS (Drag, Minimize, Maximize, Scroll) =====
 function ensureDialogScrollable(dlg) {
  if (!dlg || !dlg.style) return;
- // Cap height so overflow-y can create a scrollbar (admin + all windows)
+ // Cap height so overflow can create a scrollbar (admin + all windows)
  if (!dlg.style.maxHeight || dlg.style.maxHeight === 'none') {
   dlg.style.maxHeight = 'min(90vh, calc(100vh - 24px))';
  }
- dlg.style.overflowX = 'hidden';
+ dlg.style.overflowX = 'auto';
  dlg.style.overflowY = 'auto';
  dlg.style.webkitOverflowScrolling = 'touch';
  try { dlg.style.overscrollBehavior = 'contain'; } catch (_) {}
@@ -77,6 +77,138 @@ function ensureDialogScrollable(dlg) {
   } catch (_) {}
  }
 }
+
+function applyWindowScrollbars() {
+ document.querySelectorAll('.settings-panel, [id^="panel-"]').forEach(ensureDialogScrollable);
+ ['weather-panel', 'weather-chooser'].forEach((id) => {
+  const el = document.getElementById(id);
+  if (el) ensureDialogScrollable(el);
+ });
+}
+
+function resizeMapViews() {
+ try { if (typeof cesiumViewer !== 'undefined' && cesiumViewer) cesiumViewer.resize(); } catch (_) {}
+ try {
+  if (typeof map !== 'undefined' && map && typeof map.invalidateSize === 'function') map.invalidateSize();
+ } catch (_) {}
+}
+
+// Shrink toolbar buttons to stay on one row. When they hit a readable
+// minimum, wrap onto extra rows instead of shrinking further.
+const MENU_FIT_T1 = {
+ font: 10, padY: 5, padX: 14, ls: 0.4, height: 26, gap: 6,
+ minFont: 8, minPadY: 3, minPadX: 5, minLs: 0.1, minHeight: 22, minGap: 3
+};
+const MENU_FIT_T2 = {
+ font: 9.5, padY: 4, padX: 10, ls: 0.3, height: 28, gap: 6,
+ minFont: 8, minPadY: 3, minPadX: 5, minLs: 0.1, minHeight: 22, minGap: 3
+};
+
+function _menuLerp(a, b, scale) {
+ return b + (a - b) * scale;
+}
+
+function _applyMenuScale(wrap, spec, scale) {
+ const s = Math.max(0, Math.min(1, scale));
+ wrap.style.setProperty('--menu-font', _menuLerp(spec.font, spec.minFont, s).toFixed(2) + 'px');
+ wrap.style.setProperty('--menu-pad-y', _menuLerp(spec.padY, spec.minPadY, s).toFixed(2) + 'px');
+ wrap.style.setProperty('--menu-pad-x', _menuLerp(spec.padX, spec.minPadX, s).toFixed(2) + 'px');
+ wrap.style.setProperty('--menu-ls', _menuLerp(spec.ls, spec.minLs, s).toFixed(2) + 'px');
+ wrap.style.setProperty('--menu-height', Math.round(_menuLerp(spec.height, spec.minHeight, s)) + 'px');
+ wrap.style.setProperty('--menu-gap', _menuLerp(spec.gap, spec.minGap, s).toFixed(2) + 'px');
+ wrap.style.gap = _menuLerp(spec.gap, spec.minGap, s).toFixed(2) + 'px';
+ wrap.dataset.menuScale = s.toFixed(2);
+}
+
+function _menuVisibleKids(wrap) {
+ return Array.from(wrap.children).filter((el) => {
+  if (el.tagName === 'INPUT' && el.type === 'file') return false;
+  const cs = window.getComputedStyle(el);
+  return cs.display !== 'none' && cs.visibility !== 'hidden';
+ });
+}
+
+function _menuRowOverflows(wrap) {
+ const kids = _menuVisibleKids(wrap);
+ if (!kids.length) return false;
+ const gap = parseFloat(window.getComputedStyle(wrap).gap) || 0;
+ let w = 0;
+ kids.forEach((el) => { w += el.offsetWidth; });
+ w += Math.max(0, kids.length - 1) * gap;
+ return w > wrap.clientWidth + 1;
+}
+
+function _fitOneToolbar(wrap, spec) {
+ if (!wrap || wrap.clientWidth < 8) return;
+ wrap.style.flexWrap = 'nowrap';
+ _applyMenuScale(wrap, spec, 1);
+ if (!_menuRowOverflows(wrap)) {
+  wrap.dataset.menuWrapped = '0';
+  return;
+ }
+ let lo = 0, hi = 1, best = 0;
+ for (let i = 0; i < 9; i++) {
+  const mid = (lo + hi) / 2;
+  _applyMenuScale(wrap, spec, mid);
+  if (_menuRowOverflows(wrap)) hi = mid;
+  else { best = mid; lo = mid; }
+ }
+ _applyMenuScale(wrap, spec, best);
+ if (_menuRowOverflows(wrap) || best < 0.02) {
+  _applyMenuScale(wrap, spec, 0);
+  wrap.style.flexWrap = 'wrap';
+  wrap.dataset.menuWrapped = '1';
+ } else {
+  wrap.style.flexWrap = 'nowrap';
+  wrap.dataset.menuWrapped = '0';
+ }
+}
+
+let _fittingMenus = false;
+function fitToolbarMenus() {
+ if (_fittingMenus) return;
+ _fittingMenus = true;
+ try {
+  const t1 = document.querySelector('.t1-menu-wrapper');
+  const t2 = document.querySelector('.t2-menu-wrapper');
+  if (t1) _fitOneToolbar(t1, MENU_FIT_T1);
+  if (t2) _fitOneToolbar(t2, MENU_FIT_T2);
+ } finally {
+  _fittingMenus = false;
+ }
+}
+
+function scheduleChromeLayout() {
+ if (scheduleChromeLayout._raf) cancelAnimationFrame(scheduleChromeLayout._raf);
+ scheduleChromeLayout._raf = requestAnimationFrame(() => {
+  fitToolbarMenus();
+  resizeMapViews();
+ });
+}
+
+function initChromeLayout() {
+ applyWindowScrollbars();
+ fitToolbarMenus();
+ if (typeof ResizeObserver !== 'undefined') {
+  const ro = new ResizeObserver(() => { if (!_fittingMenus) scheduleChromeLayout(); });
+  ['.t1-menu-wrapper', '.t2-menu-wrapper', '#tier1', '#tier2', '#main'].forEach((sel) => {
+   const el = document.querySelector(sel);
+   if (el) ro.observe(el);
+  });
+ }
+ const logout = document.getElementById('btn-logout');
+ if (logout && typeof MutationObserver !== 'undefined') {
+  new MutationObserver(scheduleChromeLayout).observe(logout, { attributes: true, attributeFilter: ['style', 'class'] });
+ }
+}
+
+if (document.readyState === 'loading') {
+ document.addEventListener('DOMContentLoaded', initChromeLayout);
+} else {
+ initChromeLayout();
+}
+window.addEventListener('resize', scheduleChromeLayout);
+window.addEventListener('load', scheduleChromeLayout);
 
 function makeDialogInteractive(dlg, opts = {}) {
  if (!dlg || dlg._interactive) {
@@ -447,12 +579,15 @@ try {
  setTimeout(waitForLeaflet, 100);
  }
 
- // Force resize on load and window resize
+ // Force resize on load and window resize (toolbars wrapping change #main size)
  window.addEventListener('load', () => {
- if (cesiumViewer) cesiumViewer.resize();
+ if (typeof applyWindowScrollbars === 'function') applyWindowScrollbars();
+ if (typeof scheduleChromeLayout === 'function') scheduleChromeLayout();
+ else resizeMapViews();
  });
  window.addEventListener('resize', () => {
- if (cesiumViewer) cesiumViewer.resize();
+ if (typeof scheduleChromeLayout === 'function') scheduleChromeLayout();
+ else resizeMapViews();
  });
  setTimeout(() => {
  if (cesiumViewer) cesiumViewer.resize();

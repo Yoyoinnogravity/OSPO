@@ -115,7 +115,7 @@
 <link rel="dns-prefetch" href="https://cesium.com">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script>if(!/Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)&&window.innerWidth>768){document.write('<link rel="stylesheet" href="https://cesium.com/downloads/cesiumjs/releases/1.119/Build/Cesium/Widgets/widgets.css"/>')}</script>
-<link rel="stylesheet" href="style.min.css?v=3.10"/>
+<link rel="stylesheet" href="style.min.css?v=3.12"/>
 </head>
 <body>
  <!-- SEO landing content for crawlers when JavaScript is unavailable -->
@@ -319,9 +319,9 @@
  </div>
  <div id="app">
  <!-- ===== TIER 1: App Bar (Top Tier) ===== -->
- <header id="tier1" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: nowrap; width: 100%; padding: 4px 12px; height: auto; overflow-x: auto;">
+ <header id="tier1" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: nowrap; width: 100%; padding: 4px 12px; height: auto; overflow-x: auto; overflow-y: visible;">
  <span class="logo" style="margin-right: 12px; flex-shrink: 0;" title="Candooka OSPO — maps & GIS">OSPO <span style="font-size:9px;color:#5a6a7a;font-weight:400;">v3.5</span></span>
- <div class="t1-menu-wrapper" style="display: flex; flex: 1 1 auto; flex-wrap: wrap; gap: 6px; align-items: center; margin-right: 8px; min-width: 0; overflow-x: auto;">
+ <div class="t1-menu-wrapper" style="display: flex; flex: 1 1 auto; flex-wrap: nowrap; gap: 6px; align-items: center; margin-right: 8px; min-width: 0; overflow: visible;">
  <!-- Load P1 -->
  <label class="corp-btn btn-load" for="file-input" style="flex: 1; text-align: center; margin: 0; cursor: pointer;">LOAD P1</label>
  <input type="file" id="file-input" accept=".csv,.xlsx,.xls,.txt,.p190,.p111,.p1,.a190,.pp1" multiple style="display:none" onchange="loadFile(event)"/>
@@ -369,8 +369,8 @@
  </div>
  </header>
  <!-- ===== TIER 2: Toolbar (Bottom Tier) ===== -->
- <nav id="tier2" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: nowrap; gap: 6px; width: 100%; padding: 4px 12px; height: auto; overflow-x: auto;">
- <div class="t2-menu-wrapper" style="display: flex; flex: 1 1 auto; flex-wrap: wrap; gap: 6px; align-items: center; min-width: 0; overflow-x: auto;">
+ <nav id="tier2" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: nowrap; gap: 6px; width: 100%; padding: 4px 12px; height: auto; overflow-x: auto; overflow-y: visible;">
+ <div class="t2-menu-wrapper" style="display: flex; flex: 1 1 auto; flex-wrap: nowrap; gap: 6px; align-items: center; min-width: 0; overflow: visible;">
  <!-- Plan Survey Tab -->
  <button class="t2-btn btn-criteria needs-attention" id="tab-plan" onclick="switchTab('plan')" title="Open Critical Survey Criteria (UTM, geometry, timing, costs)" style="text-align: center; justify-content: center; margin: 0; height: 28px; padding: 4px 12px; font-weight: 800;">SURVEY CRITERIA</button>
  <!-- Highlighted orange Start Pt button -->
@@ -435,7 +435,7 @@
  </div>
  </nav>
  <!-- ===== MAIN CONTENT ===== -->
- <div id="main" style="flex:1; position:relative; overflow:hidden; background:#000; width:100%;">
+ <div id="main" style="flex:1; position:relative; overflow:auto; background:#000; width:100%; min-height:0;">
  <div id="survey-list-panel" style="display:none">
  <div id="survey-list-header">Survey Lines</div>
  <div id="survey-list"></div>
@@ -484,7 +484,7 @@
  </div>
  </div>
  <!-- Weather: Sea temp (NOAA) / Wind / Waves; 6h cache -->
- <div id="weather-chooser" style="display:none;position:fixed;bottom:80px;right:24px;z-index:10050;width:260px;background:#0d1526;border:1px solid #334155;border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,0.55);overflow:hidden;font-family:inherit;">
+ <div id="weather-chooser" style="display:none;position:fixed;bottom:80px;right:24px;z-index:10050;width:260px;max-height:70vh;background:#0d1526;border:1px solid #334155;border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,0.55);overflow:auto;font-family:inherit;">
  <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid #1e293b;">
  <span style="font-size:12px;font-weight:700;color:#fff;">Weather - choose layer</span>
  <button onclick="closeWeatherUI()" style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:16px;line-height:1;">&times;</button>
@@ -522,7 +522,7 @@
  <div style="font-size:9px;color:#556;margin-top:10px;line-height:1.4;">Swell: height + <b style="color:#94a3b8;">period</b> + direction · Wind sea split when available · SST: NOAA MUR/OISST</div>
  </div>
  </div>
- <div id="weather-panel" style="display:none;position:fixed;bottom:80px;right:24px;z-index:10050;width:360px;max-height:70vh;background:#0d1526;border:1px solid #334155;border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,0.55);overflow-x:hidden;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;font-family:inherit;">
+ <div id="weather-panel" style="display:none;position:fixed;bottom:80px;right:24px;z-index:10050;width:360px;max-height:70vh;background:#0d1526;border:1px solid #334155;border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,0.55);overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;font-family:inherit;">
  <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid #1e293b;gap:8px;">
  <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
  <span id="weather-panel-title" style="font-size:12px;font-weight:700;color:#fff;">Sea temp | 6h cache</span>
@@ -2164,7 +2164,7 @@
  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
  <script src="https://unpkg.com/shpjs@latest/dist/shp.min.js"></script>
  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
- <script src="app.js?v=16.59"></script>
+ <script src="app.js?v=16.61"></script>
  <script src="ray_tracing_module.js?v=16.53"></script>
  <script src="wmm_declination.js?v=16.49"></script>
  <script src="magnetic_isogones.js?v=16.49"></script>
