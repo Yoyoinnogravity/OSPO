@@ -7825,13 +7825,65 @@ function renderSwathOverlays() {
  }
 }
 
+function _syncMapDisplayToggles() {
+ var names = ['labels', 'annotations'];
+ for (var i = 0; i < names.length; i++) {
+  var src = document.getElementById('layer-toggle-' + names[i]);
+  var dst = document.getElementById('map-toggle-' + names[i]);
+  if (src && dst) dst.checked = !!src.checked;
+ }
+}
+
+function toggleMapDisplayLayer(layerName) {
+ var mapCb = document.getElementById('map-toggle-' + layerName);
+ var layerCb = document.getElementById('layer-toggle-' + layerName);
+ if (layerCb && mapCb) layerCb.checked = !!mapCb.checked;
+ if (typeof toggleSurveyLayer === 'function') toggleSurveyLayer(layerName, { silent: true });
+}
+
+function _ensureMapDisplayToggle(stack) {
+ var panel = document.getElementById('map-display-overlay');
+ if (panel) {
+  _syncMapDisplayToggles();
+  return panel;
+ }
+ panel = document.createElement('div');
+ panel.id = 'map-display-overlay';
+ panel.style.cssText = 'pointer-events:auto;cursor:default;background:rgba(8,8,16,0.88);border:1px solid #1a1a2e;border-radius:6px;padding:8px 14px;' +
+  'color:#e0e0e4;font-size:11px;line-height:1.6;box-shadow:0 4px 20px rgba(0,0,0,0.6);backdrop-filter:blur(6px);user-select:none;';
+ panel.innerHTML =
+  '<div style="font-size:10px;color:#00d2ff;font-weight:700;letter-spacing:0.6px;margin-bottom:4px;">MAP LABELS</div>' +
+  '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:#e0e0e4;">' +
+  '<input type="checkbox" id="map-toggle-labels" checked onchange="toggleMapDisplayLayer(\'labels\')" style="width:14px;height:14px;accent-color:#00d2ff;cursor:pointer;flex:none;" />' +
+  'Line labels (No. &amp; SP)</label>' +
+  '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:#e0e0e4;">' +
+  '<input type="checkbox" id="map-toggle-annotations" checked onchange="toggleMapDisplayLayer(\'annotations\')" style="width:14px;height:14px;accent-color:#00d2ff;cursor:pointer;flex:none;" />' +
+  'Annotations &amp; arrows</label>' +
+  '<div style="font-size:9px;color:#8a9bb0;margin-top:4px;">Turn off when zoomed out — labels do not scale</div>';
+ stack.appendChild(panel);
+ _syncMapDisplayToggles();
+ return panel;
+}
+
+function _ensureSurveySummaryStack() {
+ var stack = document.getElementById('survey-summary-stack');
+ if (stack) return stack;
+ stack = document.createElement('div');
+ stack.id = 'survey-summary-stack';
+ stack.style.cssText = 'position:absolute;top:8px;left:8px;z-index:1200;display:flex;flex-direction:column;align-items:stretch;gap:6px;pointer-events:none;';
+ var main = document.getElementById('main');
+ if (main) main.appendChild(stack);
+ _makeSummaryOverlayDraggable(stack);
+ return stack;
+}
+
 function _makeSummaryOverlayDraggable(box) {
  // Lightweight drag handler that lives on the box element, so it survives the
  // innerHTML rebuilds that happen on every summary refresh.
  var dragging = false, startX = 0, startY = 0, origLeft = 0, origTop = 0;
  box.addEventListener('mousedown', function(e) {
- // Ignore clicks on any interactive children (buttons/links/inputs)
- if (e.target.closest('button, a, input, select')) return;
+ // Ignore clicks on any interactive children (buttons/links/inputs/labels)
+ if (e.target.closest('button, a, input, select, label')) return;
  dragging = true;
  var rect = box.getBoundingClientRect();
  var parentRect = box.offsetParent ? box.offsetParent.getBoundingClientRect() : { left: 0, top: 0 };
@@ -7857,18 +7909,30 @@ function _makeSummaryOverlayDraggable(box) {
 function updateSurveySummary(extraStats) {
  var _srcLines = state._allLines || state.lines;
  if (!_srcLines || _srcLines.length === 0) return;
+ var stack = _ensureSurveySummaryStack();
  var box = document.getElementById('survey-summary-overlay');
  if (!box) {
  box = document.createElement('div');
  box.id = 'survey-summary-overlay';
- box.style.cssText = 'position:absolute;top:8px;left:8px;z-index:1200;' +
+ box.style.cssText =
  'background:rgba(8,8,16,0.88);border:1px solid #1a1a2e;border-radius:6px;padding:10px 14px;' +
  'color:#e0e0e4;font-size:11px;line-height:1.7;pointer-events:auto;min-width:180px;cursor:move;' +
  'box-shadow:0 4px 20px rgba(0,0,0,0.6);backdrop-filter:blur(6px);user-select:none;';
  box.title = 'Drag to move';
- document.getElementById('main').appendChild(box);
- _makeSummaryOverlayDraggable(box);
+ if (stack.firstChild) stack.insertBefore(box, stack.firstChild);
+ else stack.appendChild(box);
+ } else if (box.parentNode !== stack) {
+  // Migrate a leftover overlay from before the stack existed.
+  if (box.style.left && box.style.left !== 'auto') stack.style.left = box.style.left;
+  if (box.style.top && box.style.top !== 'auto') stack.style.top = box.style.top;
+  box.style.position = '';
+  box.style.left = '';
+  box.style.top = '';
+  box.style.zIndex = '';
+  stack.insertBefore(box, stack.firstChild);
  }
+ _ensureMapDisplayToggle(stack);
+ stack.style.display = 'flex';
  // Always use full original line set for summary (route solver may have replaced state.lines)
  var allLines = state._allLines || state.lines;
  var lineCount = allLines.length;
@@ -14044,9 +14108,10 @@ function toggleLabels() {
  renderSurveyLines();
  if (state.showLabels) layerLabels.addTo(map);
  else map.removeLayer(layerLabels);
- // Keep the Layers-menu checkbox in sync
+ // Keep the Layers-menu checkbox and on-map control in sync
  const cb = document.getElementById('layer-toggle-labels');
  if (cb) cb.checked = state.showLabels;
+ if (typeof _syncMapDisplayToggles === 'function') _syncMapDisplayToggles();
 }
 
 // ===== TAB: PLAN ROUTE button =====
@@ -19714,7 +19779,7 @@ function useDefaultStartPoint() {
  planRoute();
 }
 
-function toggleSurveyLayer(layerName) {
+function toggleSurveyLayer(layerName, opts) {
  if (!map) return;
  
  const el = document.getElementById(`layer-toggle-${layerName}`);
@@ -19747,8 +19812,11 @@ function toggleSurveyLayer(layerName) {
  } else if (layerName === 'obstructions') {
  if (show) map.addLayer(layerObstructions); else map.removeLayer(layerObstructions);
  }
- 
- showToast(`${layerName.charAt(0).toUpperCase() + layerName.slice(1)} layer toggled.`);
+
+ if (typeof _syncMapDisplayToggles === 'function') _syncMapDisplayToggles();
+ if (!(opts && opts.silent)) {
+  showToast(`${layerName.charAt(0).toUpperCase() + layerName.slice(1)} layer toggled.`);
+ }
 }
 
 function changeOptimizationStrategy(strategy) {
