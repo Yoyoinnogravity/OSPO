@@ -19890,12 +19890,6 @@ function toggleSurveyLayer(layerName, opts) {
  }
 }
 
-function changeOptimizationStrategy(strategy) {
- state.settings.priority = strategy;
- showToast(`Pathfinding priority optimized: ${strategy === 'shortest' ? 'Shortest Distance' : strategy === 'turns' ? 'Minimum Turn Complexity' : 'Sequential West-to-East'}`);
- planRoute();
-}
-
 // ===== REPORTS PANEL POPULATION =====
 
 function openReportsPanel() {

@@ -115,7 +115,7 @@
 <link rel="dns-prefetch" href="https://cesium.com">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script>if(!/Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)&&window.innerWidth>768){document.write('<link rel="stylesheet" href="https://cesium.com/downloads/cesiumjs/releases/1.119/Build/Cesium/Widgets/widgets.css"/>')}</script>
-<link rel="stylesheet" href="style.min.css?v=3.13"/>
+<link rel="stylesheet" href="style.min.css?v=3.14"/>
 </head>
 <body>
  <!-- SEO landing content for crawlers when JavaScript is unavailable -->
@@ -379,7 +379,6 @@
  <!-- Run In/Out -->
  <button class="t2-btn btn-runinout" onclick="togglePanel('run-inout')" style="text-align: center; justify-content: center; margin: 0; height: 28px; padding: 4px 12px;">RUN IN/OUT <span class="val" id="val-run-inout">0/0m</span></button>
  <button class="t2-btn btn-lines" onclick="showLineManager()" style="text-align: center; justify-content: center; margin: 0; height: 28px; padding: 4px 12px; color: #ff69b4; font-weight: 700;">LINES</button>
- <button class="t2-btn btn-priority" onclick="togglePanel('priority')" style="text-align: center; justify-content: center; margin: 0; height: 28px; padding: 4px 12px;">PRIORITY</button>
  <button class="t2-btn btn-obstruct" onclick="togglePanel('obstructions')" style="text-align: center; justify-content: center; margin: 0; height: 28px; padding: 4px 12px;">OBSTRUCTIONS</button>
  <button class="t2-btn btn-postplot-qc" onclick="showPostplotQC()" style="text-align: center; justify-content: center; margin: 0; height: 28px; padding: 4px 12px; border: 1px solid #a855f7; color: #c084fc; font-weight: 700;">POSTPLOT QC</button>
  <button class="t2-btn btn-fold-coverage" onclick="showFoldCoverage()" style="text-align: center; justify-content: center; margin: 0; height: 28px; padding: 4px 12px; border: 1px solid #2dd4bf; color: #5eead4; font-weight: 700;">FOLD COVERAGE</button>
@@ -1662,26 +1661,6 @@
  </div>
  </div>
  </div>
- <!-- Priority Panel -->
- <div id="panel-priority" class="settings-panel" style="display:none; min-width:320px;">
- <button class="panel-close-btn" onclick="hidePanel('priority')">&times;</button>
- <div class="panel-title">Execution Priority</div>
- <div style="font-size:11px;color:#a0aebb;margin-bottom:14px;line-height:1.4">Select the pathfinding solver optimization strategy.
- </div>
- <div class="panel-row" style="gap:12px; margin-bottom:12px; align-items:center;">
- <input type="radio" name="opt-strategy" id="opt-shortest" checked value="shortest" onchange="changeOptimizationStrategy('shortest')" style="flex:none; width:18px; height:18px; cursor:pointer;" />
- <label for="opt-shortest" style="width:auto; color:#ffffff; font-weight:600; cursor:pointer;">Shortest Distance (Standard)</label>
- </div>
- <div class="panel-row" style="gap:12px; margin-bottom:12px; align-items:center;">
- <input type="radio" name="opt-strategy" id="opt-turns" value="turns" onchange="changeOptimizationStrategy('turns')" style="flex:none; width:18px; height:18px; cursor:pointer;" />
- <label for="opt-turns" style="width:auto; color:#ffffff; cursor:pointer;">Minimum Turn Complexity</label>
- </div>
- <div class="panel-row" style="gap:12px; margin-bottom:14px; align-items:center;">
- <input type="radio" name="opt-strategy" id="opt-sequential" value="sequential" onchange="changeOptimizationStrategy('sequential')" style="flex:none; width:18px; height:18px; cursor:pointer;" />
- <label for="opt-sequential" style="width:auto; color:#ffffff; cursor:pointer;">Sequential Order (West to East)</label>
- </div>
- <button class="panel-cancel" onclick="hidePanel('priority')" style="width:100%; cursor:pointer;">Close</button>
- </div>
  <!-- Reports Panel -->
  <div id="panel-reports" class="settings-panel" style="display:none; min-width:420px; max-width:500px;">
  <button class="panel-close-btn" onclick="hidePanel('reports')">&times;</button>
@@ -2159,7 +2138,7 @@
  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
  <script src="https://unpkg.com/shpjs@latest/dist/shp.min.js"></script>
  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
- <script src="app.js?v=16.63"></script>
+ <script src="app.js?v=16.64"></script>
  <script src="ray_tracing_module.js?v=16.53"></script>
  <script src="wmm_declination.js?v=16.49"></script>
  <script src="magnetic_isogones.js?v=16.49"></script>
