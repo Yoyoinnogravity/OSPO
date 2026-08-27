@@ -1200,8 +1200,11 @@ body {
 }
 
 /* First-login contact step: phone/email must stay visible and typeable */
-#signin-form-contact input[type="email"],
-#signin-form-contact input[type="tel"] {
+#signin-form-contact[hidden] {
+  display: none !important;
+}
+#signin-form-contact:not([hidden]) input[type="email"],
+#signin-form-contact:not([hidden]) input[type="tel"] {
   display: block !important;
   visibility: visible !important;
   opacity: 1 !important;

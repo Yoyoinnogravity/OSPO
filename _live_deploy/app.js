@@ -14315,10 +14315,26 @@ const GUEST_USERNAME = 'GUEST';
 const GUEST_PASSWORD = 'candooka-ospo';
 
 function isGuestUser(user, identity) {
- const name = String((user && user.name) || identity || '').trim().toLowerCase();
+ const typed = String(identity || '').trim().toLowerCase();
+ if (typed === 'guest' || typed === 'guest@candooka.world') return true;
+ const name = String((user && (user.name || user.username)) || '').trim().toLowerCase();
  const email = String((user && user.email) || '').trim().toLowerCase();
  const id = String((user && user.id) || '').trim().toLowerCase();
  return name === 'guest' || id === 'guest' || email === 'guest@candooka.world';
+}
+
+function guestAlreadyOfferedContrib() {
+ try { return !!localStorage.getItem('candooka_guest_contrib'); } catch (_) { return false; }
+}
+
+function rememberGuestContrib(email) {
+ try {
+  localStorage.setItem('candooka_guest_contrib', JSON.stringify({
+   email: email || '',
+   skipped: !email,
+   savedAt: new Date().toISOString()
+  }));
+ } catch (_) {}
 }
 var adminLoggedIn = false;
 var registeredUsers = [];
@@ -14619,8 +14635,9 @@ async function handleSignIn() {
 
  const contactKey = 'candooka_contact_' + String(existingUser.email || existingUser.name || user).toLowerCase();
  const hasContact = localStorage.getItem(contactKey);
- // GUEST + candooka-ospo: username and password only — no phone or contact form.
- if (!isGuestUser(existingUser, user) && !hasContact && existingUser.email) {
+ const guestSignIn = isGuestUser(existingUser, user);
+ // GUEST + candooka-ospo: never require phone. Optional contrib email only.
+ if (!guestSignIn && !hasContact && existingUser.email) {
  resetButton();
  showFirstLoginContactPrompt(existingUser);
  return;
@@ -14636,9 +14653,16 @@ async function handleSignIn() {
  setTimeout(enterPreferredWorkspace, 300);
  resetButton();
  };
- if (isGuestUser(existingUser, user)) {
- finishGuestOrUser();
- return;
+ if (guestSignIn) {
+  hideGuestContactAndPhone();
+  if (guestAlreadyOfferedContrib()) {
+   finishGuestOrUser();
+  } else {
+   resetButton();
+   window._pendingGuestFinish = finishGuestOrUser;
+   showGuestOptionalEmail(existingUser);
+  }
+  return;
  }
  warnMobilePhoneThen(finishGuestOrUser);
  } catch (err) {
@@ -14665,11 +14689,13 @@ function switchSignInTab(tab) {
  const loginForm = document.getElementById('signin-form-login');
  const trialForm = document.getElementById('signin-form-trial');
  const contactForm = document.getElementById('signin-form-contact');
+ const guestEmailForm = document.getElementById('signin-form-guest-email');
  const tabs = document.getElementById('signin-tabs');
  const tabLogin = document.getElementById('signin-tab-login');
  const tabTrial = document.getElementById('signin-tab-trial');
  if (!loginForm || !trialForm) return;
- if (contactForm) contactForm.style.display = 'none';
+ if (contactForm) { contactForm.style.display = 'none'; contactForm.hidden = true; }
+ if (guestEmailForm) guestEmailForm.style.display = 'none';
  if (tabs) tabs.style.display = 'flex';
 
  if (tab === 'trial') {
@@ -14729,14 +14755,88 @@ function submitTrialRequest() {
  });
 }
 
-function showFirstLoginContactPrompt(user) {
- if (isGuestUser(user, user && user.name)) {
+function hideGuestContactAndPhone() {
+ const contactForm = document.getElementById('signin-form-contact');
+ const phoneEl = document.getElementById('firstlogin-phone');
+ if (contactForm) {
+  contactForm.style.display = 'none';
+  contactForm.hidden = true;
+ }
+ if (phoneEl) phoneEl.value = '';
+}
+
+function showGuestOptionalEmail(user) {
+ hideGuestContactAndPhone();
+ const overlay = document.getElementById('signin-overlay');
+ if (overlay) overlay.style.display = 'flex';
+ const loginForm = document.getElementById('signin-form-login');
+ const trialForm = document.getElementById('signin-form-trial');
+ const tabs = document.getElementById('signin-tabs');
+ const guestForm = document.getElementById('signin-form-guest-email');
+ if (loginForm) loginForm.style.display = 'none';
+ if (trialForm) trialForm.style.display = 'none';
+ if (tabs) tabs.style.display = 'none';
+ if (!guestForm) {
+  const finish = window._pendingGuestFinish;
+  if (typeof finish === 'function') finish();
+  return;
+ }
+ guestForm.style.display = 'block';
+ const emailEl = document.getElementById('guest-contrib-email');
+ if (emailEl) {
+  emailEl.value = '';
+  setTimeout(() => { try { emailEl.focus(); } catch (_) {} }, 40);
+ }
+}
+
+function finishGuestAfterContribChoice() {
+ const guestForm = document.getElementById('signin-form-guest-email');
+ if (guestForm) guestForm.style.display = 'none';
+ try { switchSignInTab('login'); } catch (_) {}
+ const finish = window._pendingGuestFinish;
+ window._pendingGuestFinish = null;
+ if (typeof finish === 'function') finish();
+ else {
   const overlay = document.getElementById('signin-overlay');
   if (overlay) overlay.style.display = 'none';
-  adminLoggedIn = false;
-  updateAdminButton();
-  updateUserDisplay();
-  setTimeout(enterPreferredWorkspace, 200);
+ }
+}
+
+function skipGuestContribEmail() {
+ rememberGuestContrib('');
+ finishGuestAfterContribChoice();
+}
+
+function submitGuestContribEmail() {
+ const emailEl = document.getElementById('guest-contrib-email');
+ const email = ((emailEl && emailEl.value) || '').trim();
+ if (email && !email.includes('@')) {
+  showToast('Enter a valid email, or skip', 3000);
+  if (emailEl) emailEl.focus();
+  return;
+ }
+ rememberGuestContrib(email);
+ if (email) showToast('Thank you — we will only use this if you want to contribute', 3500);
+ finishGuestAfterContribChoice();
+}
+
+function showFirstLoginContactPrompt(user) {
+ if (isGuestUser(user, user && user.name)) {
+  hideGuestContactAndPhone();
+  window._pendingGuestFinish = () => {
+   const overlay = document.getElementById('signin-overlay');
+   if (overlay) overlay.style.display = 'none';
+   adminLoggedIn = false;
+   updateAdminButton();
+   updateUserDisplay();
+   setTimeout(enterPreferredWorkspace, 200);
+  };
+  if (guestAlreadyOfferedContrib()) {
+   window._pendingGuestFinish();
+   window._pendingGuestFinish = null;
+  } else {
+   showGuestOptionalEmail(user);
+  }
   return;
  }
  window._pendingLoginUser = user || {};
@@ -14763,6 +14863,7 @@ function showFirstLoginContactPrompt(user) {
   return;
  }
 
+ contactForm.hidden = false;
  contactForm.style.display = 'block';
  const welcome = document.getElementById('firstlogin-welcome');
  if (welcome) welcome.textContent = 'Welcome, ' + (user && user.name ? user.name : 'user');

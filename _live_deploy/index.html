@@ -115,7 +115,7 @@
 <link rel="dns-prefetch" href="https://cesium.com">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script>if(!/Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)&&window.innerWidth>768){document.write('<link rel="stylesheet" href="https://cesium.com/downloads/cesiumjs/releases/1.119/Build/Cesium/Widgets/widgets.css"/>')}</script>
-<link rel="stylesheet" href="style.min.css?v=3.26"/>
+<link rel="stylesheet" href="style.min.css?v=3.27"/>
 </head>
 <body>
  <!-- SEO landing content for crawlers when JavaScript is unavailable -->
@@ -273,10 +273,21 @@
  </script>
 <div style="font-size:9px; color:#5a6a7a; text-align:center; line-height:1.6; margin-top:8px; padding-top:12px; border-top:1px solid #1a1a24;">
 <strong style="color:#7c8c9e;">Guest Access:</strong><br>Username: <span style="color:#4eba6f; font-family:monospace;">GUEST</span><br>Password: <span style="color:#4eba6f; font-family:monospace;">candooka-ospo</span>
-</div>
+ </div>
+ </div>
+ <!-- Optional GUEST email only — never a phone number -->
+ <div id="signin-form-guest-email" style="display:none; text-align:left;">
+ <div style="font-size:16px; font-weight:800; color:#ffffff; letter-spacing:1px; margin-bottom:6px;">Welcome, Guest</div>
+ <div style="font-size:11px; color:#a0aebb; line-height:1.5; margin-bottom:16px;">No phone number is needed. If you would like to contribute to the development, you can leave an <strong style="color:#e2e8f0;">optional</strong> email address.</div>
+ <div style="margin-bottom:14px;">
+ <label for="guest-contrib-email" style="display:block; font-size:10px; font-weight:700; color:#a0aebb; margin-bottom:6px; letter-spacing:0.5px; text-transform:uppercase;">Email (optional)</label>
+ <input type="email" id="guest-contrib-email" name="guest-contrib-email" autocomplete="email" placeholder="you@company.com" style="display:block; width:100%; min-height:42px; box-sizing:border-box; padding:10px 12px; background:#0a0a12; border:1px solid #1a1a24; border-radius:4px; color:#e2e8f0; font-size:14px; outline:none; font-family:inherit;" onkeydown="if(event.key==='Enter'){submitGuestContribEmail();}" />
+ </div>
+ <button type="button" onclick="submitGuestContribEmail()" style="width:100%; min-height:42px; padding:11px; background:#2a5580; color:#e2e8f0; border:none; border-radius:4px; font-size:12px; font-weight:800; letter-spacing:0.5px; cursor:pointer; outline:none; font-family:inherit; margin-bottom:8px;">Continue</button>
+ <button type="button" onclick="skipGuestContribEmail()" style="width:100%; min-height:38px; padding:10px; background:transparent; color:#94a3b8; border:1px solid #1a1a24; border-radius:4px; font-size:11px; font-weight:600; cursor:pointer; outline:none; font-family:inherit;">Skip — continue without email</button>
  </div>
  <!-- First-login contact for non-GUEST accounts only. GUEST never sees this form. -->
- <div id="signin-form-contact" style="display:none; text-align:left;">
+ <div id="signin-form-contact" hidden style="display:none; text-align:left;">
  <div id="firstlogin-welcome" style="font-size:10px; color:#a0aebb; letter-spacing:0.5px; margin-bottom:16px; text-transform:uppercase;">Welcome</div>
  <div style="background:#1a1a2e; border:1px solid #222; border-radius:6px; padding:14px; margin-bottom:18px;">
  <div style="font-size:11px; font-weight:700; color:#00d2ff; margin-bottom:8px; text-transform:uppercase; letter-spacing:0.5px;">Contact Details Required</div>
@@ -2155,7 +2166,7 @@
  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
  <script src="https://unpkg.com/shpjs@latest/dist/shp.min.js"></script>
  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
- <script src="app.js?v=16.78"></script>
+ <script src="app.js?v=16.79"></script>
  <script src="ray_tracing_module.js?v=16.53"></script>
  <script src="wmm_declination.js?v=16.49"></script>
  <script src="magnetic_isogones.js?v=16.49"></script>
