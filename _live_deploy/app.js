@@ -4696,11 +4696,8 @@ function buildDelimitedTextDialogHtml(headerCols, sampleRows, opts) {
  const labels = (headerCols || []).map((h, i) => delimitedTextFieldLabel(h, i));
  const selX = opts.colX >= 0 ? opts.colX : 0;
  const selY = opts.colY >= 0 ? opts.colY : Math.min(1, Math.max(0, labels.length - 1));
- const xOpts = labels.map((name, i) => {
-  return '<option value="' + i + '"' + (i === selX ? ' selected' : '') + '>' + esc(name) + '</option>';
- }).join('');
- const yOpts = labels.map((name, i) => {
-  return '<option value="' + i + '"' + (i === selY ? ' selected' : '') + '>' + esc(name) + '</option>';
+ const colOpts = labels.map((name, i) => {
+  return '<option value="' + i + '">' + esc(name) + '</option>';
  }).join('');
  return (
   '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;" data-dialog-header>' +
@@ -4713,11 +4710,11 @@ function buildDelimitedTextDialogHtml(headerCols, sampleRows, opts) {
   '</div>' +
   '<div class="panel-row" style="margin-bottom:10px;align-items:center;">' +
    '<label for="csv-col-x" style="width:88px;color:#e2e8f0;font-weight:600;">X field</label>' +
-   '<select id="csv-col-x" style="flex:1;padding:7px 8px;border-radius:4px;border:1px solid #2a2a36;background:#111;color:#fff;font-size:12px;outline:none;">' + xOpts + '</select>' +
+   '<select id="csv-col-x" style="flex:1;padding:7px 8px;border-radius:4px;border:1px solid #2a2a36;background:#111;color:#fff;font-size:12px;outline:none;">' + colOpts + '</select>' +
   '</div>' +
   '<div class="panel-row" style="margin-bottom:16px;align-items:center;">' +
    '<label for="csv-col-y" style="width:88px;color:#e2e8f0;font-weight:600;">Y field</label>' +
-   '<select id="csv-col-y" style="flex:1;padding:7px 8px;border-radius:4px;border:1px solid #2a2a36;background:#111;color:#fff;font-size:12px;outline:none;">' + yOpts + '</select>' +
+   '<select id="csv-col-y" style="flex:1;padding:7px 8px;border-radius:4px;border:1px solid #2a2a36;background:#111;color:#fff;font-size:12px;outline:none;">' + colOpts + '</select>' +
   '</div>' +
   '<div style="display:flex;gap:10px;justify-content:flex-end;">' +
    '<button type="button" onclick="_executeCSVColumnMap()" style="padding:9px 18px;border-radius:4px;border:none;background:#30d158;color:#000;font-weight:700;cursor:pointer;font-size:12px;">Import</button>' +

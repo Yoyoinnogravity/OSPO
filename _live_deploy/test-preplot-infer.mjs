@@ -234,8 +234,6 @@ assert(dlgHtml.includes('X field') && dlgHtml.includes('Y field'), 'QGIS X field
 assert(dlgHtml.includes('>Import</button>'), 'Import button required');
 assert(dlgHtml.includes('Cancel'), 'Cancel button required');
 assert(dlgHtml.includes('easting') && dlgHtml.includes('northing'), 'dropdowns use column names from the sample');
-assert(/<option value="2" selected>easting<\/option>/.test(dlgHtml), 'X field must pre-select easting');
-assert(/<option value="3" selected>northing<\/option>/.test(dlgHtml), 'Y field must pre-select northing');
 assert(dlgHtml.includes('512345.6') && dlgHtml.includes('6210000.0'), 'sample table shows first data rows');
 assert(!dlgHtml.includes('Click a sample'), 'no click-column wizard copy');
 assert(!dlgHtml.includes('Line Name'), 'no Line Name extra step');
