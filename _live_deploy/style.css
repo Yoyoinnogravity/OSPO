@@ -77,6 +77,10 @@ body {
   height: var(--menu-height) !important;
   line-height: 1 !important;
 }
+.t1-menu-wrapper.menu-fitting > .corp-btn,
+.t1-menu-wrapper.menu-fitting > .corp-nav-btn {
+  transition: none !important;
+}
 
 .t1-left {
   display: flex;
@@ -253,6 +257,10 @@ body {
   letter-spacing: var(--menu-ls) !important;
   height: var(--menu-height) !important;
   line-height: 1 !important;
+}
+.t2-menu-wrapper.menu-fitting .t2-btn,
+.t2-menu-wrapper.menu-fitting .corp-view-btn {
+  transition: none !important;
 }
 
 .t2-btn {

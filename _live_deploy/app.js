@@ -79,10 +79,16 @@ function ensureDialogScrollable(dlg) {
 }
 
 function applyWindowScrollbars() {
- document.querySelectorAll('.settings-panel, [id^="panel-"]').forEach(ensureDialogScrollable);
- ['weather-panel', 'weather-chooser'].forEach((id) => {
+ const seen = new Set();
+ const add = (el) => {
+  if (!el || seen.has(el)) return;
+  seen.add(el);
+  ensureDialogScrollable(el);
+ };
+ document.querySelectorAll('.settings-panel, [id^="panel-"]').forEach(add);
+ ['weather-panel', 'weather-chooser', 'survey-list-panel'].forEach((id) => {
   const el = document.getElementById(id);
-  if (el) ensureDialogScrollable(el);
+  if (el) add(el);
  });
 }
 
@@ -120,26 +126,20 @@ function _applyMenuScale(wrap, spec, scale) {
  wrap.dataset.menuScale = s.toFixed(2);
 }
 
-function _menuVisibleKids(wrap) {
- return Array.from(wrap.children).filter((el) => {
-  if (el.tagName === 'INPUT' && el.type === 'file') return false;
-  const cs = window.getComputedStyle(el);
-  return cs.display !== 'none' && cs.visibility !== 'hidden';
- });
-}
-
 function _menuRowOverflows(wrap) {
- const kids = _menuVisibleKids(wrap);
- if (!kids.length) return false;
- const gap = parseFloat(window.getComputedStyle(wrap).gap) || 0;
- let w = 0;
- kids.forEach((el) => { w += el.offsetWidth; });
- w += Math.max(0, kids.length - 1) * gap;
- return w > wrap.clientWidth + 1;
+ const prevOverflow = wrap.style.overflow;
+ wrap.style.overflow = 'hidden';
+ wrap.style.flexWrap = 'nowrap';
+ void wrap.offsetWidth;
+ const overflows = wrap.scrollWidth > wrap.clientWidth + 1;
+ wrap.style.overflow = prevOverflow;
+ return overflows;
 }
 
 function _fitOneToolbar(wrap, spec) {
  if (!wrap || wrap.clientWidth < 8) return;
+ wrap.classList.add('menu-fitting');
+ try {
  wrap.style.flexWrap = 'nowrap';
  _applyMenuScale(wrap, spec, 1);
  if (!_menuRowOverflows(wrap)) {
@@ -159,14 +159,19 @@ function _fitOneToolbar(wrap, spec) {
   wrap.style.flexWrap = 'wrap';
   wrap.dataset.menuWrapped = '1';
  } else {
+  _applyMenuScale(wrap, spec, best);
   wrap.style.flexWrap = 'nowrap';
   wrap.dataset.menuWrapped = '0';
+ }
+ } finally {
+  wrap.classList.remove('menu-fitting');
  }
 }
 
 let _fittingMenus = false;
+let _fitAgain = false;
 function fitToolbarMenus() {
- if (_fittingMenus) return;
+ if (_fittingMenus) { _fitAgain = true; return; }
  _fittingMenus = true;
  try {
   const t1 = document.querySelector('.t1-menu-wrapper');
@@ -175,6 +180,10 @@ function fitToolbarMenus() {
   if (t2) _fitOneToolbar(t2, MENU_FIT_T2);
  } finally {
   _fittingMenus = false;
+  if (_fitAgain) {
+   _fitAgain = false;
+   fitToolbarMenus();
+  }
  }
 }
 
