@@ -115,7 +115,7 @@
 <link rel="dns-prefetch" href="https://cesium.com">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script>if(!/Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)&&window.innerWidth>768){document.write('<link rel="stylesheet" href="https://cesium.com/downloads/cesiumjs/releases/1.119/Build/Cesium/Widgets/widgets.css"/>')}</script>
-<link rel="stylesheet" href="style.min.css?v=3.20"/>
+<link rel="stylesheet" href="style.min.css?v=3.23"/>
 </head>
 <body>
  <!-- SEO landing content for crawlers when JavaScript is unavailable -->
@@ -211,7 +211,7 @@
  </ul>
  </div>
  <!-- Tab Selector -->
- <div style="display:flex; gap:0; margin-bottom:20px; background:#0a0a12; border-radius:4px; border:1px solid #1a1a24; overflow:hidden;">
+ <div id="signin-tabs" style="display:flex; gap:0; margin-bottom:20px; background:#0a0a12; border-radius:4px; border:1px solid #1a1a24; overflow:hidden;">
  <button id="signin-tab-login" onclick="switchSignInTab('login')" style="flex:1; padding:9px; background:#1e1e2e; border:none; color:#e2e8f0; font-size:11px; font-weight:700; cursor:pointer; letter-spacing:0.4px; font-family:inherit; transition:all 0.15s;">SIGN IN</button>
  <button id="signin-tab-trial" onclick="switchSignInTab('trial')" style="flex:1; padding:9px; background:transparent; border:none; color:#7c8c9e; font-size:11px; font-weight:700; cursor:pointer; letter-spacing:0.4px; font-family:inherit; transition:all 0.15s;">1-MONTH FREE ACCESS</button>
  </div>
@@ -274,6 +274,23 @@
 <div style="font-size:9px; color:#5a6a7a; text-align:center; line-height:1.6; margin-top:8px; padding-top:12px; border-top:1px solid #1a1a24;">
 <strong style="color:#7c8c9e;">Guest Access:</strong><br>Username: <span style="color:#4eba6f; font-family:monospace;">GUEST</span><br>Password: <span style="color:#4eba6f; font-family:monospace;">candooka-ospo</span>
 </div>
+ </div>
+ <!-- First-login contact for non-GUEST accounts only. GUEST never sees this form. -->
+ <div id="signin-form-contact" style="display:none; text-align:left;">
+ <div id="firstlogin-welcome" style="font-size:10px; color:#a0aebb; letter-spacing:0.5px; margin-bottom:16px; text-transform:uppercase;">Welcome</div>
+ <div style="background:#1a1a2e; border:1px solid #222; border-radius:6px; padding:14px; margin-bottom:18px;">
+ <div style="font-size:11px; font-weight:700; color:#00d2ff; margin-bottom:8px; text-transform:uppercase; letter-spacing:0.5px;">Contact Details Required</div>
+ <div style="font-size:10px; color:#a0aebb; line-height:1.5;">Please provide your contact details so we can send you notifications of software updates and important announcements.</div>
+ </div>
+ <div style="margin-bottom:12px;">
+ <label for="firstlogin-email" style="display:block; font-size:10px; font-weight:700; color:#a0aebb; margin-bottom:6px; letter-spacing:0.5px; text-transform:uppercase;">Email Address</label>
+ <input type="email" id="firstlogin-email" name="firstlogin-email" autocomplete="email" placeholder="name@company.com" style="display:block; width:100%; min-height:42px; box-sizing:border-box; padding:10px 12px; background:#0a0a12; border:1px solid #2a5580; border-radius:4px; color:#e2e8f0; font-size:14px; outline:none; font-family:inherit;" onfocus="this.style.borderColor='#00d2ff'" onblur="this.style.borderColor='#2a5580'" />
+ </div>
+ <div style="margin-bottom:18px;">
+ <label for="firstlogin-phone" style="display:block; font-size:10px; font-weight:700; color:#a0aebb; margin-bottom:6px; letter-spacing:0.5px; text-transform:uppercase;">Phone (SMS / WhatsApp)</label>
+ <input type="tel" id="firstlogin-phone" name="firstlogin-phone" autocomplete="tel" inputmode="tel" placeholder="+60 123 456 789" style="display:block; width:100%; min-height:42px; box-sizing:border-box; padding:10px 12px; background:#0a0a12; border:1px solid #2a5580; border-radius:4px; color:#e2e8f0; font-size:14px; outline:none; font-family:inherit;" onfocus="this.style.borderColor='#00d2ff'" onblur="this.style.borderColor='#2a5580'" onkeydown="if(event.key==='Enter'){submitFirstLoginContact();}" />
+ </div>
+ <button type="button" id="firstlogin-continue" onclick="submitFirstLoginContact()" style="width:100%; min-height:42px; padding:11px; background:#00d2ff; color:#000; border:none; border-radius:4px; font-size:12px; font-weight:800; letter-spacing:0.5px; cursor:pointer; outline:none; font-family:inherit;">CONTINUE</button>
  </div>
  <!-- 1-Month Free Access Form -->
  <div id="signin-form-trial" style="display:none; text-align:left;">
@@ -2138,7 +2155,7 @@
  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
  <script src="https://unpkg.com/shpjs@latest/dist/shp.min.js"></script>
  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
- <script src="app.js?v=16.72"></script>
+ <script src="app.js?v=16.75"></script>
  <script src="ray_tracing_module.js?v=16.53"></script>
  <script src="wmm_declination.js?v=16.49"></script>
  <script src="magnetic_isogones.js?v=16.49"></script>

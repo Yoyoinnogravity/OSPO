@@ -1199,6 +1199,29 @@ body {
   }
 }
 
+/* First-login contact step: phone/email must stay visible and typeable */
+#signin-form-contact input[type="email"],
+#signin-form-contact input[type="tel"] {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  width: 100%;
+  min-height: 42px;
+  padding: 10px 12px !important;
+  background: #0a0a12 !important;
+  border: 1px solid #2a5580 !important;
+  border-radius: 4px;
+  color: #e2e8f0 !important;
+  font-size: 14px !important;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+#signin-form-contact input::placeholder {
+  color: #7c8c9e;
+  opacity: 1;
+}
+
 /* User layer permanent labels */
 .user-layer-label {
   background: rgba(0, 0, 0, 0.65) !important;

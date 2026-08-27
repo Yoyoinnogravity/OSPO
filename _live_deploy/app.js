@@ -14619,14 +14619,15 @@ async function handleSignIn() {
 
  const contactKey = 'candooka_contact_' + String(existingUser.email || existingUser.name || user).toLowerCase();
  const hasContact = localStorage.getItem(contactKey);
- // GUEST + candooka-ospo: no phone, email, sample, or other first-run gates.
- if (!isGuestUser(existingUser, user) && !hasContact && existingUser.email) {
+ // First login for any account with an email — including GUEST — uses the
+ // dedicated contact form (#signin-form-contact) which has a real phone input.
+ if (!hasContact && existingUser.email) {
  resetButton();
  showFirstLoginContactPrompt(existingUser);
  return;
  }
 
- const finishGuestOrUser = () => {
+ warnMobilePhoneThen(() => {
  document.getElementById('signin-overlay').style.display = 'none';
  adminLoggedIn = false;
  updateAdminButton();
@@ -14635,13 +14636,7 @@ async function handleSignIn() {
  showToast('Signed in (' + welcomeHow + '). Welcome ' + (existingUser.name || user));
  setTimeout(enterPreferredWorkspace, 300);
  resetButton();
- };
- // GUEST + candooka-ospo: username and password only.
- if (isGuestUser(existingUser, user)) {
- finishGuestOrUser();
- return;
- }
- warnMobilePhoneThen(finishGuestOrUser);
+ });
  } catch (err) {
  console.error('Sign-in error:', err);
  const errEl = document.getElementById('signin-error');
@@ -14665,24 +14660,24 @@ function openTrialFromSignIn() {
 function switchSignInTab(tab) {
  const loginForm = document.getElementById('signin-form-login');
  const trialForm = document.getElementById('signin-form-trial');
+ const contactForm = document.getElementById('signin-form-contact');
+ const tabs = document.getElementById('signin-tabs');
  const tabLogin = document.getElementById('signin-tab-login');
  const tabTrial = document.getElementById('signin-tab-trial');
  if (!loginForm || !trialForm) return;
+ if (contactForm) contactForm.style.display = 'none';
+ if (tabs) tabs.style.display = 'flex';
 
  if (tab === 'trial') {
  loginForm.style.display = 'none';
  trialForm.style.display = 'block';
- tabLogin.style.background = 'transparent';
- tabLogin.style.color = '#7c8c9e';
- tabTrial.style.background = '#1e1e2e';
- tabTrial.style.color = '#e2e8f0';
+ if (tabLogin) { tabLogin.style.background = 'transparent'; tabLogin.style.color = '#7c8c9e'; }
+ if (tabTrial) { tabTrial.style.background = '#1e1e2e'; tabTrial.style.color = '#e2e8f0'; }
  } else {
  loginForm.style.display = 'block';
  trialForm.style.display = 'none';
- tabLogin.style.background = '#1e1e2e';
- tabLogin.style.color = '#e2e8f0';
- tabTrial.style.background = 'transparent';
- tabTrial.style.color = '#7c8c9e';
+ if (tabLogin) { tabLogin.style.background = '#1e1e2e'; tabLogin.style.color = '#e2e8f0'; }
+ if (tabTrial) { tabTrial.style.background = 'transparent'; tabTrial.style.color = '#7c8c9e'; }
  }
 }
 
@@ -14731,61 +14726,87 @@ function submitTrialRequest() {
 }
 
 function showFirstLoginContactPrompt(user) {
- // GUEST never sees a contact/phone gate — username + password is enough.
- if (isGuestUser(user)) {
-  const overlay = document.getElementById('signin-overlay');
-  if (overlay) overlay.style.display = 'none';
-  adminLoggedIn = false;
-  updateAdminButton();
-  updateUserDisplay();
-  showToast('Welcome ' + (user.name || 'GUEST'));
-  setTimeout(enterPreferredWorkspace, 200);
+ window._pendingLoginUser = user || {};
+ const overlay = document.getElementById('signin-overlay');
+ if (overlay) overlay.style.display = 'flex';
+
+ const loginForm = document.getElementById('signin-form-login');
+ const trialForm = document.getElementById('signin-form-trial');
+ const contactForm = document.getElementById('signin-form-contact');
+ const tabs = document.getElementById('signin-tabs');
+ if (loginForm) loginForm.style.display = 'none';
+ if (trialForm) trialForm.style.display = 'none';
+ if (tabs) tabs.style.display = 'none';
+
+ if (!contactForm) {
+  showToast('Contact form is missing — continuing without it', 4000);
+  warnMobilePhoneThen(() => {
+   if (overlay) overlay.style.display = 'none';
+   adminLoggedIn = false;
+   updateAdminButton();
+   updateUserDisplay();
+   setTimeout(enterPreferredWorkspace, 200);
+  });
   return;
  }
- // Replace sign-in form content with contact details prompt
- const overlay = document.getElementById('signin-overlay');
- const formDiv = overlay.querySelector('div >div') || overlay.firstElementChild;
- formDiv.innerHTML = `
- <div style="font-size:16px; font-weight:800; color:#ffffff; letter-spacing:1px; margin-bottom:6px;">CANDOOKA ROUTE PLANNER</div>
- <div style="font-size:10px; color:#a0aebb; letter-spacing:0.5px; margin-bottom:20px; text-transform:uppercase;">Welcome, ${user.name}</div>
- <div style="background:#1a1a2e; border:1px solid #222; border-radius:6px; padding:14px; margin-bottom:18px; text-align:left;">
- <div style="font-size:11px; font-weight:700; color:#00d2ff; margin-bottom:8px; text-transform:uppercase; letter-spacing:0.5px;">Contact Details Required</div>
- <div style="font-size:10px; color:#a0aebb; line-height:1.5;">Please provide your contact details so we can send you notifications of software updates and important announcements.
- </div>
- </div>
- <div style="text-align:left; margin-bottom:12px;">
- <label style="display:block; font-size:10px; font-weight:700; color:#a0aebb; margin-bottom:4px; letter-spacing:0.5px; text-transform:uppercase;">Email Address</label>
- <input type="email" id="firstlogin-email" value="${user.email || ''}" placeholder="name@company.com" style="width:100%; padding:9px 12px; background:#1c1c1e; border:1px solid #2c2c2e; border-radius:4px; color:#ffffff; font-size:12px; outline:none;" />
- </div>
- <div style="text-align:left; margin-bottom:18px;">
- <label style="display:block; font-size:10px; font-weight:700; color:#a0aebb; margin-bottom:4px; letter-spacing:0.5px; text-transform:uppercase;">Phone (SMS / WhatsApp)</label>
- <input type="tel" id="firstlogin-phone" placeholder="+60 123 456 789" style="width:100%; padding:9px 12px; background:#1c1c1e; border:1px solid #2c2c2e; border-radius:4px; color:#ffffff; font-size:12px; outline:none;" />
- </div>
- <button onclick="submitFirstLoginContact()" style="width:100%; padding:11px; background:#00d2ff; color:#000; border:none; border-radius:4px; font-size:12px; font-weight:800; letter-spacing:0.5px; cursor:pointer; outline:none;">CONTINUE</button>
- `;
 
- // Store user reference for the submit handler
- window._pendingLoginUser = user;
+ contactForm.style.display = 'block';
+ const welcome = document.getElementById('firstlogin-welcome');
+ if (welcome) welcome.textContent = 'Welcome, ' + (user && user.name ? user.name : 'user');
+ const emailEl = document.getElementById('firstlogin-email');
+ const phoneEl = document.getElementById('firstlogin-phone');
+ if (emailEl) {
+  emailEl.value = (user && user.email) || '';
+  emailEl.removeAttribute('readonly');
+  emailEl.removeAttribute('disabled');
+ }
+ if (phoneEl) {
+  phoneEl.value = (user && user.phone) || '';
+  phoneEl.removeAttribute('readonly');
+  phoneEl.removeAttribute('disabled');
+  phoneEl.style.display = 'block';
+  phoneEl.style.visibility = 'visible';
+  phoneEl.style.opacity = '1';
+  phoneEl.style.pointerEvents = 'auto';
+  phoneEl.style.minHeight = '42px';
+ }
+ setTimeout(() => {
+  const focusEl = (phoneEl && !String(phoneEl.value || '').trim()) ? phoneEl : emailEl;
+  if (focusEl && typeof focusEl.focus === 'function') {
+   try { focusEl.focus(); } catch (_) {}
+   try { focusEl.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (_) {}
+  }
+ }, 50);
 }
 
 function submitFirstLoginContact() {
- const email = (document.getElementById('firstlogin-email').value || '').trim();
- const phone = (document.getElementById('firstlogin-phone').value || '').trim();
+ const emailEl = document.getElementById('firstlogin-email');
+ const phoneEl = document.getElementById('firstlogin-phone');
+ if (!emailEl || !phoneEl) {
+  showToast('Contact fields are missing — please refresh the page', 4000);
+  return;
+ }
+ const email = (emailEl.value || '').trim();
+ const phone = (phoneEl.value || '').trim();
 
  if (!email || !email.includes('@')) {
  showToast('Please enter a valid email address', 3000);
- document.getElementById('firstlogin-email').focus();
+ emailEl.focus();
  return;
  }
  if (!phone || phone.length < 8) {
  showToast('Please enter a valid phone number', 3000);
- document.getElementById('firstlogin-phone').focus();
+ phoneEl.focus();
+ try { phoneEl.scrollIntoView({ block: 'center' }); } catch (_) {}
  return;
  }
 
- const user = window._pendingLoginUser;
- const contactKey = `candooka_contact_${(user.email || email).toLowerCase()}`;
+ const user = window._pendingLoginUser || {};
+ const contactKey = `candooka_contact_${String(user.email || email).toLowerCase()}`;
  localStorage.setItem(contactKey, JSON.stringify({ email, phone, savedAt: new Date().toISOString() }));
+
+ // Restore the login form for the next session before hiding the overlay
+ try { switchSignInTab('login'); } catch (_) {}
 
  // Complete the login
  warnMobilePhoneThen(() => {
@@ -14797,13 +14818,13 @@ function submitFirstLoginContact() {
  updateAdminButton();
  state.currentUser = user.email || state.currentUser;
  updateUserDisplay();
- showToast(`Welcome ${user.name} - contact details saved`);
+ showToast(`Welcome ${user.name || ''} - contact details saved`);
  } else {
  adminLoggedIn = false;
  updateAdminButton();
  state.currentUser = user.email || state.currentUser;
  updateUserDisplay();
- showToast(`Welcome ${user.name} - contact details saved`);
+ showToast(`Welcome ${user.name || ''} - contact details saved`);
  }
  setTimeout(enterPreferredWorkspace, 200);
  });
