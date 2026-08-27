@@ -14731,6 +14731,17 @@ function submitTrialRequest() {
 }
 
 function showFirstLoginContactPrompt(user) {
+ // GUEST never sees a contact/phone gate — username + password is enough.
+ if (isGuestUser(user)) {
+  const overlay = document.getElementById('signin-overlay');
+  if (overlay) overlay.style.display = 'none';
+  adminLoggedIn = false;
+  updateAdminButton();
+  updateUserDisplay();
+  showToast('Welcome ' + (user.name || 'GUEST'));
+  setTimeout(enterPreferredWorkspace, 200);
+  return;
+ }
  // Replace sign-in form content with contact details prompt
  const overlay = document.getElementById('signin-overlay');
  const formDiv = overlay.querySelector('div >div') || overlay.firstElementChild;
