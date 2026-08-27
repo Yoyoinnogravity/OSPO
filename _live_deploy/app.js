@@ -972,7 +972,11 @@ function switchTab(tab) {
  
  if (tab === 'plan') {
  if (!state.lines || state.lines.length === 0) {
- promptLoadP1OrSample();
+ const fileInput = document.getElementById('file-input');
+ if (fileInput) {
+ showToast('Please select your P1/UKOOA survey file...');
+ fileInput.click();
+ }
  } else {
  // Re-trigger: UTM first, then full Survey Criteria
  const detected = detectUtmZone(state.rawRows || []);
@@ -4307,79 +4311,6 @@ function showToast(msg, duration = 2500) {
 // triggerLoad kept as fallback for any other callers.
 function triggerLoad() { document.getElementById('file-input').click(); }
 
-/** Newcomer prompt: load your own P1 or try the bundled sample survey. */
-function promptLoadP1OrSample() {
- const existing = document.getElementById('load-p1-chooser');
- if (existing) existing.remove();
-
- const overlay = document.createElement('div');
- overlay.id = 'load-p1-chooser';
- overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.65);z-index:10030;display:flex;align-items:center;justify-content:center;padding:16px;';
- overlay.innerHTML = `
- <div style="background:#0a0a12;border:1px solid #1e3a4a;border-radius:10px;padding:22px 24px;max-width:420px;width:100%;box-shadow:0 16px 48px rgba(0,0,0,0.85);color:#e2e8f0;font-family:inherit;">
-  <div style="font-size:15px;font-weight:800;color:#67e8f9;margin-bottom:8px;letter-spacing:0.2px;">Load a preplot</div>
-  <div style="font-size:11px;color:#94a3b8;line-height:1.45;margin-bottom:16px;">
-   Open your P1/UKOOA file, or try the Candooka sample survey (North Sea, UTM 31N) to explore the map tools first.
-  </div>
-  <button type="button" id="load-p1-own" style="width:100%;padding:11px 14px;margin-bottom:8px;border-radius:6px;border:1px solid #0e7490;background:#164e63;color:#ecfeff;font-weight:700;cursor:pointer;font-size:12px;font-family:inherit;text-align:left;">
-   Load my P1 / UKOOA file…
-  </button>
-  <button type="button" id="load-p1-sample" style="width:100%;padding:11px 14px;margin-bottom:8px;border-radius:6px;border:1px solid #155e75;background:#0c1929;color:#a5f3fc;font-weight:700;cursor:pointer;font-size:12px;font-family:inherit;text-align:left;">
-   Try sample survey (North Sea demo)
-  </button>
-  <button type="button" id="load-p1-cancel" style="width:100%;padding:8px 14px;border-radius:6px;border:1px solid #334155;background:transparent;color:#94a3b8;font-weight:600;cursor:pointer;font-size:11px;font-family:inherit;">
-   Cancel
-  </button>
-  <div style="font-size:9px;color:#556;margin-top:10px;line-height:1.35;">Sample is synthetic demo data — not a real survey.</div>
- </div>`;
- document.body.appendChild(overlay);
-
- const close = () => { try { overlay.remove(); } catch (_) {} };
- overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
- overlay.querySelector('#load-p1-cancel').onclick = close;
- overlay.querySelector('#load-p1-own').onclick = () => {
-  close();
-  const fileInput = document.getElementById('file-input');
-  if (fileInput) {
-   showToast('Select your P1/UKOOA survey file…');
-   fileInput.click();
-  }
- };
- overlay.querySelector('#load-p1-sample').onclick = () => {
-  close();
-  loadSamplePreplot();
- };
-}
-
-const SAMPLE_PREPLOT_URL = 'samples/candooka-demo-north-sea.p190';
-const SAMPLE_PREPLOT_LABEL = 'candooka-demo-north-sea.p190 (sample)';
-
-function maybePromptSamplePreplot() {
- if (_samplePreplotPromptShown) return;
- if (document.getElementById('signin-overlay')?.style.display !== 'none') return;
- if (state.lines && state.lines.length) return;
- _samplePreplotPromptShown = true;
- setTimeout(() => {
-  if (state.lines && state.lines.length) return;
-  if (document.getElementById('load-p1-chooser')) return;
-  promptLoadP1OrSample();
- }, 450);
-}
-
-/** Fetch the bundled demo P1 and run the normal UTM → criteria → load flow. */
-async function loadSamplePreplot() {
- try {
-  showToast('Loading sample North Sea survey…');
-  const res = await fetch(SAMPLE_PREPLOT_URL + '?v=16.45', { cache: 'no-store' });
-  if (!res.ok) throw new Error('Sample file not found (' + res.status + ')');
-  const text = await res.text();
-  if (!text || text.length < 80) throw new Error('Sample file is empty');
-  beginPreplotLoad([{ name: SAMPLE_PREPLOT_LABEL, text }]);
- } catch (err) {
-  showToast((err && err.message) || 'Could not load sample survey');
- }
-}
-
 function loadFile(event) {
  const files = Array.from(event.target.files || []);
  event.target.value = '';
@@ -7704,7 +7635,6 @@ function setLines(lines) {
  // Hard rule: line names are English letters/digits/basic punctuation only.
  sanitizeAllLineNames(lines);
  state.lines = lines;
- _samplePreplotPromptShown = true;
  // Clear any cached full-line set from a previous Line-Manager route so reports
  // and stats never read a stale preplot (which would blank the acquired split).
  state._allLines = null;
@@ -10215,7 +10145,6 @@ function quickAddObstruction(lat, lng, hazardType) {
 var _startLineChooserShown = false;
 var _pendingStartReversed = false;
 var _pendingPlanRouteContinue = null;
-var _samplePreplotPromptShown = false;
 
 /** Ask 2D / 3D / OBN before every route plan so the wrong acquisition mode is never silent. */
 function confirmSurveyPlanTypeThen(continueFn) {
@@ -14966,7 +14895,6 @@ function finishLogout() {
  if (typeof switchSignInTab === 'function') {
   try { switchSignInTab('login'); } catch (_) {}
  }
- _samplePreplotPromptShown = false;
 
  const overlay = document.getElementById('signin-overlay');
  if (overlay) {
@@ -16457,7 +16385,6 @@ function enterWorkspace(mode) {
  showToast('Maps & GIS — survey planning workspace', 2500);
  const saved = localStorage.getItem('candooka_baseLayer');
  if (!saved) setTimeout(showBaseLayerChooser, 200);
- maybePromptSamplePreplot();
 }
 
 function showWorkspaceChooser() {
@@ -19961,12 +19888,6 @@ function toggleSurveyLayer(layerName, opts) {
  if (!(opts && opts.silent)) {
   showToast(`${layerName.charAt(0).toUpperCase() + layerName.slice(1)} layer toggled.`);
  }
-}
-
-function changeOptimizationStrategy(strategy) {
- state.settings.priority = strategy;
- showToast(`Pathfinding priority optimized: ${strategy === 'shortest' ? 'Shortest Distance' : strategy === 'turns' ? 'Minimum Turn Complexity' : 'Sequential West-to-East'}`);
- planRoute();
 }
 
 // ===== REPORTS PANEL POPULATION =====
