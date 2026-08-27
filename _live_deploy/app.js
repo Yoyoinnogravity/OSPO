@@ -4376,11 +4376,11 @@ function finishPreplotLoad(items, zone, hemi, label) {
 
  items.forEach(it => {
  const result = parsePreplotBestEffort(it.text, zone, hemi);
- // Only auto-accept high confidence. Medium/low/none → ask for columns
- // (prevents UTM-as-degrees globe-spanning silent imports).
- if (result.lines.length > 0 && result.confidence === 'high') {
+ // Auto-load when parsers are confident (including P1/UKOOA). Never default
+ // to Confirm Columns — only the unlabeled/ambiguous sample picker remains.
+ if (resultIsAutoLoad(result)) {
   const plaus = assessPreplotPlausibility(result.lines);
-  if (!plaus.ok) {
+  if (!plaus.ok && result.format !== 'p190' && result.format !== 'p111' && !result.skipColumnMap) {
    ambiguous.push({ item: it, result: Object.assign({}, result, { confidence: 'low', reason: plaus.reason, detail: plaus.detail }) });
   } else {
    result.lines.forEach(l => {
@@ -4402,15 +4402,22 @@ function finishPreplotLoad(items, zone, hemi, label) {
  if (allLines.length === 0) {
  const problem = ambiguous[0] || failed[0];
  if (problem) {
+ const fmt = problem.result && problem.result.format;
+ if (fmt === 'p190' || fmt === 'p111' || (problem.result && problem.result.skipColumnMap)) {
+  showToast('Could not read coordinates from this P1/UKOOA file. It was not opened as CSV.', 7000);
+  return;
+ }
  const why = problem.result?.detail || problem.result?.reason || '';
  const whyMsg = why
-  ? (`Coordinates look wrong (${why}). `)
+  ? (`Could not confidently identify columns (${why}). `)
   : '';
- showToast(whyMsg + 'Confirm Line / X / Y columns for "' + problem.item.name + '"');
+ showToast(whyMsg + 'Select Line, X and Y from a sample of "' + problem.item.name + '"');
  promptPreplotColumnMap(problem.item.text, zone, hemi, {
  message: whyMsg +
-  'Confirm which columns are Line, X and Y, and whether values are UTM metres or lat/lon degrees. We pre-filled our best guess — please verify before importing.',
+  'Click a sample column to set Line, then X, then Y. We only ask when the file is not a known P1 layout and headers/ranges are ambiguous.',
  guess: problem.result.layout || null,
+ mapperTable: problem.result.mapperTable || null,
+ skipZoneConfirm: true,
  onDone: (lines) => {
  if (!lines || !lines.length) {
  showToast('Still no valid lines - check column choices and UTM vs lat/lon');
@@ -4437,15 +4444,20 @@ function finishPreplotLoad(items, zone, hemi, label) {
  // Optional: also map remaining ambiguous files and merge
  if (ambiguous.length || failed.length) {
  const skipped = ambiguous.length + failed.length;
- showToast('Loaded ' + allLines.length + ' lines; ' + skipped + ' file(s) need column confirmation');
+ showToast('Loaded ' + allLines.length + ' lines; ' + skipped + ' file(s) need a column sample');
  // Prompt for the first remaining file after accepting the good ones
  setLines(allLines);
  const next = ambiguous[0] || failed[0];
  if (next) {
+ if (next.result && (next.result.format === 'p190' || next.result.format === 'p111' || next.result.skipColumnMap)) {
+  return;
+ }
  promptPreplotColumnMap(next.item.text, zone, hemi, {
- message: 'Extra file "' + next.item.name + '" needs column confirmation to merge.' +
+ message: 'File "' + next.item.name + '" is ambiguous — click sample columns for Line, X and Y.' +
   (next.result?.detail ? (' ' + next.result.detail) : ''),
  guess: next.result.layout || null,
+ mapperTable: next.result.mapperTable || null,
+ skipZoneConfirm: true,
  onDone: (extra) => {
  if (extra && extra.length) {
  const plaus = assessPreplotPlausibility(extra);
@@ -4486,8 +4498,21 @@ function loadCSVManual(event) {
  message: 'Confirm UTM zone before choosing Line / X / Y columns.',
  okLabel: 'Continue to columns'
  }, (zone, hemi) => {
+ const auto = parsePreplotBestEffort(text, zone, hemi);
+ if (resultIsAutoLoad(auto)) {
+  const plaus = assessPreplotPlausibility(auto.lines);
+  if (plaus.ok || auto.format === 'p190' || auto.format === 'p111' || auto.skipColumnMap) {
+   setLines(auto.lines);
+   showToast('Imported ' + auto.lines.length + ' lines | UTM ' + zone + hemi, 4000);
+   return;
+  }
+ }
+ if (auto.format === 'p190' || auto.format === 'p111' || auto.skipColumnMap) {
+  showToast('Could not read coordinates from this P1/UKOOA file.', 6000);
+  return;
+ }
  promptPreplotColumnMap(text, zone, hemi, {
- message: 'Confirm which columns are Line, X and Y. Zone UTM ' + zone + hemi + ' will be used for grid conversion.',
+ message: 'Click a sample column to set Line, then X, then Y. Zone UTM ' + zone + hemi + ' will be used for grid conversion.',
  skipZoneConfirm: true, // already confirmed above
  onDone: (lines) => {
  if (!lines || !lines.length) {
@@ -4578,39 +4603,50 @@ function confirmUtmZoneFirst({ zone, hemi, message, okLabel, fileLabel, detected
  if (zoneInput) { zoneInput.focus(); zoneInput.select(); }
 }
 
+function _escMapperCell(s) {
+ return String(s == null ? '' : s)
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 function _showColumnMapperDialog(rawText, rows, headerCols, sampleRows, delimiter, opts) {
  opts = opts || {};
  let dlg = document.getElementById('csv-column-mapper');
  if (dlg) dlg.remove();
  dlg = document.createElement('div');
  dlg.id = 'csv-column-mapper';
- dlg.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#0e0e16;border:1px solid #1a1a24;border-radius:8px;padding:24px 28px;z-index:9999;min-width:520px;max-width:680px;max-height:90vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.8);color:#fff;font-family:inherit;';
+ dlg.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#0e0e16;border:1px solid #1a1a24;border-radius:8px;padding:24px 28px;z-index:9999;min-width:560px;max-width:860px;max-height:90vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.8);color:#fff;font-family:inherit;';
  document.body.appendChild(dlg);
 
- const colOpts = headerCols.map((h, i) => `<option value="${i}">${h || 'Column ' + (i+1)}</option>`).join('');
+ const esc = _escMapperCell;
+ const optionLabel = (i, h) => {
+  const samples = (sampleRows || []).map(r => r && r[i]).filter(v => v != null && String(v).trim() !== '').slice(0, 3);
+  let name = h && !/^H\d{4}/i.test(String(h)) ? String(h) : ('Column ' + (i + 1));
+  if (samples.length) name += '  —  ' + samples.join(' · ');
+  return esc(name);
+ };
+ const colOpts = headerCols.map((h, i) => `<option value="${i}">${optionLabel(i, h)}</option>`).join('');
  const noneOpt = '<option value="-1">(none)</option>';
-
- // Build sample data preview
- const previewHtml = `<table style="width:100%;font-size:10px;border-collapse:collapse;margin-bottom:14px;">
- <tr>${headerCols.map(h => `<th style="padding:4px 6px;border:1px solid #222;color:#00d2ff;background:#0a0a14;text-align:left;white-space:nowrap;">${h || '-'}</th>`).join('')}</tr>
- ${sampleRows.map(r => `<tr>${r.map(c => `<td style="padding:3px 6px;border:1px solid #1a1a24;color:#a0aebb;white-space:nowrap;max-width:120px;overflow:hidden;text-overflow:ellipsis;">${c}</td>`).join('')}</tr>`).join('')}
- </table>`;
 
  const banner = opts.message
  ? `<div style="font-size:11px;color:#ffd60a;background:rgba(255,214,10,0.08);border:1px solid rgba(255,214,10,0.35);border-radius:4px;padding:8px 10px;margin-bottom:12px;line-height:1.45;">${opts.message}</div>`
  : '';
 
+ const nCols = headerCols.length;
+ const nRows = Math.max(0, rows.length - (opts.hasHeader === false ? 0 : 1));
+
  dlg.innerHTML = `
- <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
- <div style="font-size:13px;font-weight:700;color:#00d2ff;letter-spacing:0.5px;">CONFIRM COLUMNS (Line / X / Y)</div>
- <button onclick="document.getElementById('csv-column-mapper').remove()" style="background:none;border:none;color:#666;font-size:16px;cursor:pointer;"></button>
+ <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;" data-dialog-header>
+ <div style="font-size:13px;font-weight:700;color:#00d2ff;letter-spacing:0.5px;">Which columns are Line, X and Y?</div>
+ <button type="button" onclick="document.getElementById('csv-column-mapper').remove()" style="background:none;border:none;color:#666;font-size:16px;cursor:pointer;">×</button>
  </div>
  ${banner}
- <div style="font-size:10px;color:#a0aebb;margin-bottom:12px;line-height:1.5;">Detected <strong style="color:#e0e8f0;">${Math.max(0, rows.length - (opts.hasHeader === false ? 0 : 1))}</strong>data rows with <strong style="color:#e0e8f0;">${headerCols.length}</strong>columns. Assign each required field - we guessed where we could.
+ <div style="font-size:10px;color:#a0aebb;margin-bottom:10px;line-height:1.5;">
+ ${nRows} data rows · <strong style="color:#e0e8f0;">${nCols}</strong> columns.
+ Click a sample column to assign <strong style="color:#00d2ff;">Line</strong>, then <strong style="color:#ffd60a;">X</strong>, then <strong style="color:#30d158;">Y</strong>.
  </div>
- <div style="font-size:9px;color:#5a6a7a;font-weight:600;letter-spacing:0.4px;margin-bottom:6px;text-transform:uppercase;">Data Preview (first ${sampleRows.length} rows)</div>
- <div style="overflow-x:auto;margin-bottom:14px;">${previewHtml}</div>
- <div style="font-size:9px;color:#5a6a7a;font-weight:600;letter-spacing:0.4px;margin-bottom:8px;text-transform:uppercase;">Column Assignments</div>
+ <div style="font-size:9px;color:#5a6a7a;font-weight:600;letter-spacing:0.4px;margin-bottom:6px;text-transform:uppercase;">Sample (click a column)</div>
+ <div id="csv-sample-wrap" style="overflow-x:auto;margin-bottom:14px;"></div>
+ <div style="font-size:9px;color:#5a6a7a;font-weight:600;letter-spacing:0.4px;margin-bottom:8px;text-transform:uppercase;">Or pick from the lists</div>
  <div class="panel-row" style="margin-bottom:8px;">
  <label style="width:140px;color:#fff;">Line Name *</label>
  <select id="csv-col-line" style="flex:1;padding:5px 8px;border-radius:4px;border:1px solid #222;background:#111;color:#fff;font-size:11px;outline:none;">${colOpts}</select>
@@ -4657,32 +4693,83 @@ function _showColumnMapperDialog(rawText, rows, headerCols, sampleRows, delimite
  onDone: typeof opts.onDone === 'function' ? opts.onDone : null
  };
 
- // Auto-guess column assignments: prefer inferDelimitedLayout guess, else header substrings
  const guess = opts.guess || {};
- const lc = headerCols.map(h =>h.toLowerCase());
- const guessPat = (patterns) => { for (const p of patterns) { const i = lc.findIndex(h =>h === p || h.includes(p)); if (i >= 0) return i; } return -1; };
+ const lc = headerCols.map(h => String(h).toLowerCase());
+ const guessPat = (patterns) => { for (const p of patterns) { const i = lc.findIndex(h => h === p || h.includes(p)); if (i >= 0) return i; } return -1; };
  const gLine = guess.colLine >= 0 ? guess.colLine : guessPat(['line', 'name', 'id']);
  const gSP = guess.colSP >= 0 ? guess.colSP : guessPat(['sp', 'shot', 'point']);
  const gX = guess.colX >= 0 ? guess.colX : guessPat(['east', 'lon', 'long', 'x']);
  const gY = guess.colY >= 0 ? guess.colY : guessPat(['north', 'lat', 'y']);
- if (gLine >= 0) document.getElementById('csv-col-line').value = gLine;
- if (gSP >= 0) document.getElementById('csv-col-sp').value = gSP;
- if (gX >= 0) document.getElementById('csv-col-x').value = gX;
- if (gY >= 0) document.getElementById('csv-col-y').value = gY;
+ if (gLine >= 0) document.getElementById('csv-col-line').value = String(gLine);
+ if (gSP >= 0) document.getElementById('csv-col-sp').value = String(gSP);
+ if (gX >= 0) document.getElementById('csv-col-x').value = String(gX);
+ if (gY >= 0) document.getElementById('csv-col-y').value = String(gY);
 
- // Auto-detect lat/lon vs UTM from sample values / guess
  if (guess.isLatLon) {
  document.getElementById('csv-coord-type').value = 'latlon';
  } else if (sampleRows.length > 0 && gX >= 0) {
  const sampleVal = parseFloat(sampleRows[0][gX]);
- if (Math.abs(sampleVal) <= 180) document.getElementById('csv-coord-type').value = 'latlon';
+ if (isFinite(sampleVal) && Math.abs(sampleVal) <= 180) document.getElementById('csv-coord-type').value = 'latlon';
  }
 
- // Toggle UTM zone row visibility
  document.getElementById('csv-coord-type').onchange = () => {
  document.getElementById('csv-utm-zone-row').style.display = document.getElementById('csv-coord-type').value === 'utm' ? '' : 'none';
  };
  document.getElementById('csv-coord-type').onchange();
+
+ const roleColor = { line: '#00d2ff', sp: '#a78bfa', x: '#ffd60a', y: '#30d158' };
+ const roleLabel = { line: 'LINE', sp: 'SP', x: 'X', y: 'Y' };
+ const clickOrder = ['line', 'x', 'y', 'sp', ''];
+ const selOf = { line: 'csv-col-line', sp: 'csv-col-sp', x: 'csv-col-x', y: 'csv-col-y' };
+
+ const roleOfCol = (i) => {
+  const n = String(i);
+  if (document.getElementById('csv-col-line').value === n) return 'line';
+  if (document.getElementById('csv-col-x').value === n) return 'x';
+  if (document.getElementById('csv-col-y').value === n) return 'y';
+  if (document.getElementById('csv-col-sp').value === n) return 'sp';
+  return '';
+ };
+
+ const paintSample = () => {
+  const wrap = dlg.querySelector('#csv-sample-wrap');
+  if (!wrap) return;
+  const ths = headerCols.map((h, i) => {
+   const role = roleOfCol(i);
+   const col = roleColor[role] || '#333';
+   const badge = role ? `<div style="font-size:8px;font-weight:800;letter-spacing:0.4px;color:${col};">${roleLabel[role]}</div>` : '';
+   const label = (h && !/^H\d{4}/i.test(String(h))) ? h : ('Col ' + (i + 1));
+   return `<th data-col="${i}" style="padding:5px 7px;border:1px solid ${col};color:${role ? col : '#00d2ff'};background:#0a0a14;text-align:left;white-space:nowrap;cursor:pointer;">${badge}${esc(label)}</th>`;
+  }).join('');
+  const body = (sampleRows || []).map(r => {
+   const cells = headerCols.map((_, i) => {
+    const role = roleOfCol(i);
+    const col = roleColor[role] || '#1a1a24';
+    return `<td data-col="${i}" style="padding:4px 7px;border:1px solid ${col};color:#e0e8f0;white-space:nowrap;max-width:140px;overflow:hidden;text-overflow:ellipsis;cursor:pointer;background:${role ? 'rgba(255,255,255,0.03)' : 'transparent'};">${esc(r && r[i] != null ? r[i] : '')}</td>`;
+   }).join('');
+   return `<tr>${cells}</tr>`;
+  }).join('');
+  wrap.innerHTML = `<table style="width:100%;font-size:10px;border-collapse:collapse;margin-bottom:4px;"><tr>${ths}</tr>${body}</table>`;
+  wrap.querySelectorAll('[data-col]').forEach(el => {
+   el.onclick = (ev) => {
+    ev.preventDefault();
+    const idx = parseInt(el.getAttribute('data-col'), 10);
+    const cur = roleOfCol(idx);
+    const next = clickOrder[(clickOrder.indexOf(cur) + 1) % clickOrder.length];
+    ['line', 'sp', 'x', 'y'].forEach(r => {
+     const sel = document.getElementById(selOf[r]);
+     if (sel && sel.value === String(idx) && r !== next) sel.value = '-1';
+    });
+    if (next) document.getElementById(selOf[next]).value = String(idx);
+    paintSample();
+   };
+  });
+ };
+ ['csv-col-line', 'csv-col-sp', 'csv-col-x', 'csv-col-y'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('change', paintSample);
+ });
+ paintSample();
 
  makeDialogInteractive(dlg);
 }
@@ -5759,6 +5846,7 @@ function askSurveyCriteria({ zone, hemi }, callback) {
    message: (plaus.detail ? plaus.detail + '. ' : '') +
     'Confirm Line / X / Y and UTM vs lat/lon before viewing the preplot.',
    guess: parsed.layout || null,
+   mapperTable: parsed.mapperTable || null,
    skipZoneConfirm: true,
    onDone: (mapped) => {
     if (!mapped || !mapped.length) { showToast('No valid lines'); return; }
@@ -6234,15 +6322,347 @@ function askSurveyCriteria({ zone, hemi }, callback) {
 }
 
 // ===== FORMAT DETECTION =====
+/** UKOOA / IOGP H-records (H0100, H0100,Survey Area,...) and comment lines. */
+function isIgnorablePreplotHeaderRow(row) {
+ const t = (row || '').trim();
+ if (!t) return true;
+ if (t[0] === '#' || t.startsWith('//')) return true;
+ if (/^H\d{4}/i.test(t)) return true;
+ if (/^H\d{2}([,\s]|$)/i.test(t)) return true;
+ if (/^HC\b/i.test(t)) return true;
+ return false;
+}
+
+function dataRowsForPreplotMapping(rows) {
+ const data = (rows || []).filter(r => r && String(r).trim() && !isIgnorablePreplotHeaderRow(r));
+ if (data.length >= 2) return data;
+ return (rows || []).filter(r => r && String(r).trim());
+}
+
+function looksLikeUkuaaP1(rows) {
+ if (!rows || !rows.length) return false;
+ const head = rows.slice(0, 120).join('\n');
+ if (/H01\d{2}/.test(head)) return true;
+ if (/P1\s*\/\s*90/i.test(head) || /UKOOA\s*P\s*1/i.test(head)) return true;
+ let h = 0, typed = 0;
+ const n = Math.min(rows.length, 800);
+ for (let i = 0; i < n; i++) {
+  const t = (rows[i] || '').trim();
+  if (/^H\d{4}/i.test(t)) h++;
+  else if (typeof isUkuaaTypePrefixRow === 'function' && isUkuaaTypePrefixRow(t) && t.length >= 30) typed++;
+ }
+ if (h >= 2) return true;
+ if (h >= 1 && typed >= 1) return true;
+ return rows.slice(0, 80).some(r => /^H0100/i.test((r || '').trim()));
+}
+
+function looksLikeP111(rows) {
+ if (!rows || !rows.length) return false;
+ const head = rows.slice(0, 80).join('\n');
+ if (/p1\/11|iogp p1|ogp p1/i.test(head)) return true;
+ let n = 0;
+ const scan = Math.min(rows.length, 2500);
+ for (let i = 0; i < scan; i++) {
+  const t = (rows[i] || '').trim();
+  if (/^[SRP]\d+\s*,/.test(t) && t.split(',').length >= 8) {
+   n++;
+   if (n >= 3) return true;
+  }
+ }
+ return false;
+}
+
+function csvEscapeCell(v) {
+ const s = v == null || v === '' ? '' : String(v);
+ if (/[",\n\r]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+ return s;
+}
+
+function medianColCount(splitRows) {
+ if (!splitRows.length) return 0;
+ const lens = splitRows.map(r => r.length).sort((a, b) => a - b);
+ return lens[Math.floor(lens.length / 2)] || 0;
+}
+
+/**
+ * Pull Line / SP / Easting / Northing / Lat / Lon from one UKOOA-style data row.
+ * Used when the CSV mapper would otherwise see a single blob (H-records + packed S rows).
+ */
+function extractUkuaaRowFields(row) {
+ const t = (row || '').trimEnd();
+ if (t.length < 20) return null;
+ const first = (t.charAt(0) || '').toUpperCase();
+ if (first === 'H' || first === '#' || first === 'E') return null;
+ if (isIgnorablePreplotHeaderRow(t)) return null;
+
+ let lineName = '', sp = '', easting = null, northing = null, lat = null, lon = null;
+
+ if (typeof isUkuaaTypePrefixRow === 'function' && isUkuaaTypePrefixRow(t) && t.length >= 40) {
+  const token = t.slice(1).match(/^(\S+)/);
+  lineName = token ? token[1] : t.substring(1, 13).trim();
+  const spSlice = parseFloat(t.substring(19, 25));
+  if (isFinite(spSlice) && spSlice > 0) sp = spSlice;
+  else {
+   const spAlt = parseFloat(t.substring(13, 21));
+   if (isFinite(spAlt) && spAlt > 0) sp = spAlt;
+  }
+  const eSlice = parseFloat(t.substring(46, 55));
+  const nSlice = parseFloat(t.substring(55, 64));
+  if (isFinite(eSlice) && isFinite(nSlice) && (Math.abs(eSlice) > 1000 || Math.abs(nSlice) > 1000)) {
+   easting = eSlice;
+   northing = nSlice;
+  }
+  if (typeof parseP190Angle === 'function' && t.length >= 46) {
+   const la = parseP190Angle(t.substring(25, 35).trim(), false);
+   const lo = parseP190Angle(t.substring(35, 46).trim(), true);
+   if (la != null && lo != null) { lat = la; lon = lo; }
+  }
+ } else if (/^\d{4}/.test(t.substring(0, 4).trim())) {
+  lineName = t.substring(4, 12).trim();
+  const spV = parseFloat(t.substring(12, 20));
+  if (isFinite(spV) && spV > 0) sp = spV;
+ }
+
+ const spGlued = (typeof extractP190Shotpoint === 'function') ? extractP190Shotpoint(t) : null;
+ if (spGlued != null) sp = spGlued;
+
+ const grid = (typeof extractP190GridCoords === 'function') ? extractP190GridCoords(t) : null;
+ if (grid && isFinite(grid.easting) && isFinite(grid.northing)) {
+  easting = grid.easting;
+  northing = grid.northing;
+ }
+
+ const geo = (typeof extractP190Geographic === 'function')
+  ? (extractP190Geographic(t) || (typeof extractP190SpacedDms === 'function' ? extractP190SpacedDms(t) : null))
+  : null;
+ if (geo) {
+  if (lat == null) lat = geo.lat;
+  if (lon == null) lon = geo.lon;
+ }
+
+ const parts = t.trim().split(/\s+/).filter(Boolean);
+ if (parts.length >= 1 && !lineName) {
+  lineName = parts[0];
+  if (typeof isUkuaaTypePrefixRow === 'function' && isUkuaaTypePrefixRow(t) && /^[SVGTZ]/i.test(parts[0])) {
+   lineName = parts[0].length > 1 ? parts[0].slice(1) : (parts[1] || parts[0]);
+  }
+ }
+ const nums = [];
+ for (const p of parts) {
+  if (/^-?\d+(\.\d+)?$/.test(p)) nums.push(parseFloat(p));
+ }
+ if (nums.length >= 2 && (easting == null || northing == null)) {
+  let e = null, n = null;
+  for (let i = 0; i + 1 < nums.length; i++) {
+   const a = nums[i], b = nums[i + 1];
+   if (a >= 100000 && a <= 900000 && b >= 0 && b <= 10000000) { e = a; n = b; }
+  }
+  if (e == null) {
+   e = nums[nums.length - 2];
+   n = nums[nums.length - 1];
+  }
+  if (easting == null) easting = e;
+  if (northing == null) northing = n;
+ }
+ if ((sp === '' || sp == null) && nums.length) {
+  const skip = new Set([easting, northing].filter(v => v != null && isFinite(v)));
+  const maybeSp = nums.find(n => !skip.has(n) && n > 0 && n < 1e6 && Number.isInteger(n));
+  if (maybeSp != null) sp = maybeSp;
+ }
+
+ const rawName = String(lineName || '').trim();
+ if (!rawName) return null;
+ lineName = (typeof sanitizeLineName === 'function') ? sanitizeLineName(rawName, rawName) : rawName;
+ if (!lineName) return null;
+ const hasGrid = isFinite(easting) && isFinite(northing) && !(easting === 0 && northing === 0);
+ const hasGeo = isFinite(lat) && isFinite(lon);
+ if (!hasGrid && !hasGeo) return null;
+ return { lineName, sp, easting: hasGrid ? easting : '', northing: hasGrid ? northing : '', lat: hasGeo ? lat : '', lon: hasGeo ? lon : '' };
+}
+
+function mapperTableFromRecords(records, note) {
+ if (!records || records.length < 2) return null;
+ const headers = ['Line', 'SP', 'Easting', 'Northing', 'Latitude', 'Longitude'];
+ const lines = [headers.join(',')];
+ let nGrid = 0, nGeo = 0;
+ for (const r of records) {
+  if (r.easting !== '' && r.northing !== '' && isFinite(r.easting) && isFinite(r.northing)
+   && (Math.abs(r.easting) > 180 || Math.abs(r.northing) > 180)) nGrid++;
+  if (r.lat !== '' && r.lon !== '' && isFinite(r.lat) && isFinite(r.lon)) nGeo++;
+  lines.push([r.lineName, r.sp, r.easting, r.northing, r.lat, r.lon].map(csvEscapeCell).join(','));
+ }
+ const useGeo = nGrid < Math.max(2, records.length * 0.25) && nGeo >= Math.max(2, records.length * 0.3);
+ const layout = {
+  delimiter: ',',
+  hasHeader: true,
+  headers,
+  colLine: 0,
+  colSP: 1,
+  colX: useGeo ? 5 : 2,
+  colY: useGeo ? 4 : 3,
+  isLatLon: useGeo,
+  confidence: 0.88,
+  reason: note || 'ukooa fields',
+  _synthetic: true
+ };
+ const sampleRows = lines.slice(1, 6).map(row => splitRow(row, ','));
+ return {
+  text: lines.join('\n'),
+  rows: lines,
+  headerCols: headers,
+  sampleRows,
+  delimiter: ',',
+  hasHeader: true,
+  layout,
+  note: note || ''
+ };
+}
+
+function extractUkuaaMapperTable(rows) {
+ const data = dataRowsForPreplotMapping(rows);
+ const recs = [];
+ for (const row of data) {
+  const f = extractUkuaaRowFields(row);
+  if (f) recs.push(f);
+ }
+ if (recs.length < 2) return null;
+ const skipped = Math.max(0, (rows || []).filter(r => r && String(r).trim()).length - data.length);
+ const note = skipped
+  ? ('Skipped ' + skipped + ' UKOOA H-records. Columns are Line / SP / Easting / Northing from the data records.')
+  : 'Columns extracted from UKOOA P1 fields (Line, SP, Easting, Northing).';
+ return mapperTableFromRecords(recs, note);
+}
+
+function extractP111MapperTable(rows) {
+ const recs = [];
+ const seen = new Set();
+ for (const row of rows || []) {
+  const t = (row || '').trim();
+  const m = t.match(/^([A-Z])\d+\s*,/);
+  if (!m || (m[1] !== 'S' && m[1] !== 'P')) continue;
+  const f = t.split(',').map(s => s.trim());
+  if (f.length < 14) continue;
+  const lineName = (typeof sanitizeLineName === 'function') ? sanitizeLineName(f[2] || '', '') : (f[2] || '');
+  if (!lineName) continue;
+  let sp = parseFloat(f[4]);
+  if (!isFinite(sp)) sp = parseFloat(f[3]);
+  const e = parseFloat(f[12]), n = parseFloat(f[13]);
+  const lat = f.length > 15 ? parseFloat(f[15]) : NaN;
+  const lon = f.length > 16 ? parseFloat(f[16]) : NaN;
+  const key = lineName + '|' + (isFinite(sp) ? sp : recs.length);
+  if (seen.has(key)) continue;
+  seen.add(key);
+  const hasGrid = isFinite(e) && isFinite(n);
+  const hasGeo = isFinite(lat) && isFinite(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180;
+  if (!hasGrid && !hasGeo) continue;
+  recs.push({
+   lineName, sp: isFinite(sp) ? sp : '',
+   easting: hasGrid ? e : '', northing: hasGrid ? n : '',
+   lat: hasGeo ? lat : '', lon: hasGeo ? lon : ''
+  });
+ }
+ if (recs.length < 2) return null;
+ return mapperTableFromRecords(recs, 'P1/11 columns: Line, SP, Easting, Northing (H-records omitted).');
+}
+
+function parseP111Preplot(rows, zone, hemi) {
+ const table = extractP111MapperTable(rows);
+ if (!table) return [];
+ return parseDelimitedWithLayout(table.rows, table.layout, zone, hemi);
+}
+
+/**
+ * Build a column-mapper table the user can actually assign Line / X / Y from.
+ * Never feed UKOOA H-records in as the only CSV column.
+ */
+function preparePreplotMapperTable(text, guess) {
+ const rawRows = String(text || '').split(/\r?\n/).map(r => r.trimEnd()).filter(r => r.length > 0);
+ if (guess && guess._synthetic && guess.headers && guess.headers.length >= 3) {
+  const rows = String(text || '').split(/\r?\n/).filter(r => r.length > 0);
+  const split = (r) => splitRow(r, guess.delimiter || ',');
+  const headerCols = guess.headers;
+  const sampleSource = guess.hasHeader !== false ? rows.slice(1, 6) : rows.slice(0, 5);
+  return {
+   text,
+   rows: guess.hasHeader !== false ? rows : [headerCols.join(',')].concat(rows),
+   headerCols,
+   sampleRows: sampleSource.map(split),
+   delimiter: guess.delimiter || ',',
+   hasHeader: guess.hasHeader !== false,
+   layout: guess,
+   note: guess.reason || ''
+  };
+ }
+
+ if (looksLikeP111(rawRows)) {
+  const t = extractP111MapperTable(rawRows);
+  if (t) return t;
+ }
+ if (looksLikeUkuaaP1(rawRows) || detectFormat(rawRows) === 'p190') {
+  const t = extractUkuaaMapperTable(rawRows);
+  if (t && t.headerCols.length >= 4) return t;
+ }
+
+ const data = dataRowsForPreplotMapping(rawRows);
+ let delimiter = (guess && guess.delimiter) || detectRowDelimiter(data);
+ let splitRows = data.map(r => splitRow(r, delimiter));
+ if (medianColCount(splitRows) <= 1) {
+  const ws = data.map(r => r.trim().split(/\s+/).filter(Boolean));
+  if (medianColCount(ws) >= 3) {
+   delimiter = /\s+/;
+   splitRows = ws;
+  } else {
+   const uk = extractUkuaaMapperTable(rawRows);
+   if (uk) return uk;
+  }
+ }
+
+ const layout = inferDelimitedLayout(data) || guess || {};
+ if (layout && !layout.delimiter) layout.delimiter = delimiter;
+ const hasHeader = layout.hasHeader !== false;
+ const headerCols = (layout.headers && layout.headers.length)
+  ? layout.headers
+  : (hasHeader ? splitRows[0] : splitRows[0].map((_, i) => 'Column ' + (i + 1)));
+ const body = hasHeader && layout.headers ? splitRows.slice(1) : splitRows;
+ const sampleRows = body.slice(0, 5);
+ const skipped = rawRows.length - data.length;
+ const note = skipped > 0
+  ? ('Skipped ' + skipped + ' header/H-records. Assign Line, X and Y from the data columns.')
+  : '';
+ // Rebuild row text so execute uses the same split as the dropdowns
+ const outRows = hasHeader
+  ? [headerCols.map(csvEscapeCell).join(',')].concat(body.map(cols => cols.map(csvEscapeCell).join(',')))
+  : body.map(cols => cols.map(csvEscapeCell).join(','));
+ const outDelim = ',';
+ const outLayout = Object.assign({}, layout, {
+  delimiter: outDelim,
+  hasHeader,
+  headers: headerCols
+ });
+ return {
+  text: outRows.join('\n'),
+  rows: hasHeader ? outRows : [''].concat(outRows),
+  headerCols,
+  sampleRows,
+  delimiter: outDelim,
+  hasHeader,
+  layout: outLayout,
+  note
+ };
+}
+
 function detectFormat(rows) {
+ if (looksLikeP111(rows)) return 'p111';
+ if (looksLikeUkuaaP1(rows)) return 'p190';
  for (const row of rows) {
  const t = row.trim();
+ if (/^H\d{4}/i.test(t)) return 'p190';
  if (t.startsWith('H') && t.length > 10) return 'p190';
  if (/^\d{4}\s/.test(t) && t.length >= 48) return 'p190';
  if (/^[SVGTR]\s*[A-Z0-9_\-]{1,20}/i.test(t) && t.length >= 30) return 'p190';
  if (/^[A-Z0-9_\-]{1,15}\s+\d+\s+\d/.test(t) && t.length >= 30) return 'p190';
  }
- for (const row of rows) {
+ for (const row of dataRowsForPreplotMapping(rows)) {
  if (row.includes(',') || row.includes('\t') || row.includes(';')) return 'csv';
  }
  // Whitespace-delimited numeric tables are common P1 exports
@@ -6769,9 +7189,21 @@ function parseP190FixedWidth(rows, zone, hemi) {
  if (grid) {
  easting = grid.easting;
  northing = grid.northing;
+ } else if (isUkuaaTypePrefixRow(row) && row.length >= 64) {
+  const eSlice = parseFloat(row.substring(46, 55));
+  const nSlice = parseFloat(row.substring(55, 64));
+  if (isFinite(eSlice) && isFinite(nSlice) && (Math.abs(eSlice) > 1000 || Math.abs(nSlice) > 1000)) {
+   easting = eSlice;
+   northing = nSlice;
+  }
  }
 
- const geo = extractP190Geographic(row) || extractP190SpacedDms(row);
+ let geo = extractP190Geographic(row) || extractP190SpacedDms(row);
+ if (!geo && row.length >= 46) {
+  const la = parseP190Angle(row.substring(25, 35).trim(), false);
+  const lo = parseP190Angle(row.substring(35, 46).trim(), true);
+  if (la != null && lo != null) geo = { lat: la, lon: lo };
+ }
  const gridLooksBad = grid && (
  !isFinite(grid.easting) || !isFinite(grid.northing) ||
  (Math.abs(grid.northing) < 1000 && Math.abs(grid.easting) < 1000) ||
@@ -7013,62 +7445,166 @@ function parseCSV(text) {
  * Returns { lines, confidence: 'high'|'medium'|'low'|'none', layout }.
  * Never silently invents coordinates when confidence is low - caller should ask user.
  */
+function preplotFilterValidGeo(lines) {
+ if (!lines || !lines.length) return [];
+ return lines.filter(l => l && l.start && l.end &&
+  [l.start[0], l.start[1], l.end[0], l.end[1]].every(isFinite) &&
+  Math.abs(l.start[0]) <= 90 && Math.abs(l.end[0]) <= 90 &&
+  Math.abs(l.start[1]) <= 180 && Math.abs(l.end[1]) <= 180
+ );
+}
+
+function resultIsAutoLoad(result) {
+ if (!result || !result.lines || !result.lines.length) return false;
+ if (result.skipColumnMap) return true;
+ if (result.format === 'p190' || result.format === 'p111') return true;
+ return result.confidence === 'high' || result.confidence === 'medium';
+}
+
+/** Re-parse extracted P1 fields as UTM and as lat/lon; pick the plausible set. */
+function tryParseP1MapperTable(table, zone, hemi) {
+ if (!table || !table.rows || !table.layout) return [];
+ const tries = [
+  Object.assign({}, table.layout, { isLatLon: false, colX: 2, colY: 3 }),
+  Object.assign({}, table.layout, { isLatLon: true, colX: 5, colY: 4 })
+ ];
+ let best = [];
+ for (const layout of tries) {
+  const lines = parseDelimitedWithLayout(table.rows, layout, zone, hemi);
+  const good = preplotFilterValidGeo(lines);
+  if (!good.length) continue;
+  const plaus = assessPreplotPlausibility(good);
+  if (plaus.ok) return good;
+  if (good.length > best.length) best = good;
+ }
+ return best;
+}
+
+function preplotLinesFromQcFile(text, zone, hemi) {
+ if (typeof _ppQcParseFile !== 'function') return [];
+ let qc;
+ try { qc = _ppQcParseFile(text, 'p1'); } catch (_) { return []; }
+ if (!qc || !qc.lines || !qc.lines.length) return [];
+ const out = [];
+ let idx = 0;
+ for (const L of qc.lines) {
+  const pts = L.points || [];
+  if (pts.length < 1) continue;
+  const first = pts[0], last = pts[pts.length - 1];
+  let start, end;
+  if (first.lat != null && first.lon != null && isFinite(first.lat) && isFinite(first.lon)) {
+   start = [first.lat, first.lon];
+   end = [last.lat, last.lon];
+  } else if (first.e != null && first.n != null && isFinite(first.e) && isFinite(first.n)) {
+   start = utmToLatLon(first.e, first.n, zone, hemi);
+   end = utmToLatLon(last.e, last.n, zone, hemi);
+   if (!Array.isArray(start)) start = [start.lat, start.lon];
+   if (!Array.isArray(end)) end = [end.lat, end.lon];
+  } else continue;
+  if (![start[0], start[1], end[0], end[1]].every(isFinite)) continue;
+  out.push({
+   id: idx++,
+   name: sanitizeLineName(L.base || L.name, 'L' + idx),
+   start, end,
+   spStart: first.sp, spEnd: last.sp,
+   spCount: pts.length
+  });
+ }
+ return out;
+}
+
+/**
+ * P1/UKOOA never goes to Confirm Columns. Infer Line/SP/X/Y from the spec
+ * (fixed-width, P1/11 commas, or extracted fields) and load.
+ */
+function finalizeP1Parse(lines, zone, hemi, rows, fmt, reason, text) {
+ const good = preplotFilterValidGeo(lines);
+ if (good.length) {
+  const plaus = assessPreplotPlausibility(good);
+  if (plaus.ok) {
+   return { lines: good, confidence: 'high', layout: null, format: fmt, skipColumnMap: true };
+  }
+ }
+ const table = fmt === 'p111' ? extractP111MapperTable(rows) : extractUkuaaMapperTable(rows);
+ const fromTable = tryParseP1MapperTable(table, zone, hemi);
+ const tableGood = preplotFilterValidGeo(fromTable);
+ if (tableGood.length) {
+  const plaus = assessPreplotPlausibility(tableGood);
+  return {
+   lines: tableGood,
+   confidence: plaus.ok ? 'high' : 'medium',
+   layout: null,
+   format: fmt,
+   skipColumnMap: true,
+   reason: plaus.ok ? (reason || fmt) : (plaus.reason || reason)
+  };
+ }
+ if (good.length) {
+  return { lines: good, confidence: 'medium', layout: null, format: fmt, skipColumnMap: true, reason: reason };
+ }
+ if (text && typeof preplotLinesFromQcFile === 'function') {
+  const qcLines = preplotFilterValidGeo(preplotLinesFromQcFile(text, zone, hemi));
+  if (qcLines.length) {
+   const plaus = assessPreplotPlausibility(qcLines);
+   return {
+    lines: qcLines,
+    confidence: plaus.ok ? 'high' : 'medium',
+    layout: null, format: fmt, skipColumnMap: true,
+    reason: 'p1-qc'
+   };
+  }
+ }
+ return {
+  lines: [],
+  confidence: 'none',
+  layout: null,
+  mapperTable: null,
+  format: fmt,
+  skipColumnMap: true,
+  reason: reason || 'p1_parse_failed'
+ };
+}
+
 function parsePreplotBestEffort(text, zone, hemi) {
  const rows = text.split('\n').map(r =>r.trimEnd());
  const fmt = detectFormat(rows);
+ const isP111 = fmt === 'p111' || looksLikeP111(rows);
+ const clearlyP190 = !isP111 && (fmt === 'p190' || looksLikeUkuaaP1(rows));
+ const isP190 = clearlyP190 || (!isP111 && fmt === 'unknown');
 
- if (fmt === 'p190' || fmt === 'unknown') {
+ if (isP111) {
+  const lines = parseP111Preplot(rows, zone, hemi);
+  return finalizeP1Parse(lines, zone, hemi, rows, 'p111', lines.length ? 'p111' : 'p111_parse_empty', text);
+ }
+
+ if (isP190) {
  let lines = parseP190FixedWidth(rows, zone, hemi);
  if (lines.length > 0) {
- // Sanity: drop lines with non-finite lat/lon (bad zone / bad columns)
- const good = lines.filter(l =>l.start && l.end &&
- [l.start[0], l.start[1], l.end[0], l.end[1]].every(isFinite) &&
- Math.abs(l.start[0]) <= 90 && Math.abs(l.end[0]) <= 90 &&
- Math.abs(l.start[1]) <= 180 && Math.abs(l.end[1]) <= 180
- );
- if (good.length === 0) {
- // Parsed numbers but projection looks wrong - ask user to map columns / confirm
- return { lines: [], confidence: 'none', layout: null, reason: 'coords_out_of_range' };
- }
- if (good.length < lines.length * 0.5) {
- return { lines: good, confidence: 'low', layout: null, reason: 'many_invalid_coords' };
- }
- const plaus = assessPreplotPlausibility(good);
- if (!plaus.ok) {
-  return { lines: good, confidence: 'low', layout: null, reason: plaus.reason };
- }
- return { lines: good, confidence: 'high', layout: null };
+  return finalizeP1Parse(lines, zone, hemi, rows, 'p190', 'p190-fixed', text);
  }
  lines = parseP190LooseWhitespace(rows, zone, hemi);
  if (lines.length > 0) {
-  const plaus = assessPreplotPlausibility(lines);
-  // Loose P1 is always unsure enough to confirm columns if extent looks wrong
-  if (!plaus.ok) return { lines, confidence: 'low', layout: null, reason: plaus.reason };
-  return { lines, confidence: 'medium', layout: null };
+  return finalizeP1Parse(lines, zone, hemi, rows, 'p190', 'p190-loose', text);
  }
+ if (clearlyP190) return finalizeP1Parse([], zone, hemi, rows, 'p190', 'p190_parse_empty', text);
  }
 
- const layout = inferDelimitedLayout(rows);
+ const mappingRows = dataRowsForPreplotMapping(rows);
+ const layout = inferDelimitedLayout(mappingRows);
  if (layout && layout.colX >= 0 && layout.colY >= 0 && layout.colLine >= 0) {
- const lines = parseDelimitedWithLayout(rows, layout, zone, hemi);
+ const lines = parseDelimitedWithLayout(mappingRows, layout, zone, hemi);
  if (lines.length > 0) {
  let conf = layout.confidence >= 0.7 ? 'high' : (layout.confidence >= 0.45 ? 'medium' : 'low');
  const plaus = assessPreplotPlausibility(lines);
  if (!plaus.ok) {
-  // World-spanning / absurd extents → always ask the user
-  return { lines, confidence: 'low', layout, reason: plaus.reason };
+  return { lines, confidence: 'low', layout, reason: plaus.reason, detail: plaus.detail };
  }
- // Delimited medium/low ->treat as unsure so UI asks the user to confirm columns
- return {
- lines,
- confidence: conf === 'high' ? 'high' : 'low',
- layout,
- reason: layout.reason
- };
+ // Named headers / clear numeric ranges auto-load (medium and high).
+ // Only low confidence asks the user with a sample of real columns.
+ return { lines, confidence: conf, layout, reason: layout.reason };
  }
- // Layout guessed lat/lon but values were metres → empty lines; still return layout for mapper
- if (layout.isLatLon === false || layout.confidence < 0.7) {
-  return { lines: [], confidence: 'low', layout, reason: 'need_column_confirm' };
+ if (layout.confidence < 0.7) {
+  return { lines: [], confidence: 'low', layout, reason: 'need_column_sample' };
  }
  }
 
@@ -7133,7 +7669,8 @@ function parseWithKnownUtm(rows, zone, hemi) {
 
 /** Pick delimiter from a sample of rows. */
 function detectRowDelimiter(rows) {
- const sample = rows.slice(0, 30).join('\n');
+ const data = (rows || []).filter(r => r && String(r).trim() && !isIgnorablePreplotHeaderRow(r));
+ const sample = (data.length ? data : rows).slice(0, 40).join('\n');
  const score = (ch) => (sample.match(new RegExp('\\' + ch === '\\' ? '\\\\' : ('\\' + ch), 'g')) || []).length;
  // Simpler counts:
  const cComma = (sample.match(/,/g) || []).length;
@@ -7141,7 +7678,9 @@ function detectRowDelimiter(rows) {
  const cSemi = (sample.match(/;/g) || []).length;
  if (cTab >= cComma && cTab >= cSemi && cTab > 0) return '\t';
  if (cSemi >cComma && cSemi >cTab) return ';';
- if (cComma > 0) return ',';
+ const probe = (data.length ? data : rows).slice(0, 40);
+ const rowsWithComma = probe.filter(r => String(r).indexOf(',') >= 0).length;
+ if (cComma > 0 && rowsWithComma >= Math.max(2, Math.floor(probe.length * 0.35))) return ',';
  return /\s+/; // whitespace
 }
 
@@ -7168,12 +7707,20 @@ function splitRow(row, delimiter) {
  * Uses header names when present, otherwise scores numeric columns by UTM vs lat/lon ranges.
  */
 function inferDelimitedLayout(rows) {
- const nonempty = rows.filter(r =>r && r.trim() && !r.trim().startsWith('#'));
+ const nonempty = dataRowsForPreplotMapping(rows.filter(r =>r && r.trim() && !r.trim().startsWith('#')));
  if (nonempty.length < 2) return null;
- const delimiter = detectRowDelimiter(nonempty);
- const split = (r) =>splitRow(r, delimiter);
+ let delimiter = detectRowDelimiter(nonempty);
+ let split = (r) =>splitRow(r, delimiter);
 
- const first = split(nonempty[0]);
+ let first = split(nonempty[0]);
+ if (first.length <= 1) {
+  const ws = nonempty[0].trim().split(/\s+/).filter(Boolean);
+  if (ws.length >= 3) {
+   delimiter = /\s+/;
+   split = (r) =>splitRow(r, delimiter);
+   first = split(nonempty[0]);
+  }
+ }
  const firstNums = first.filter(c => /^-?\d+(\.\d+)?$/.test(c)).length;
  const hasHeader = firstNums < Math.max(2, Math.floor(first.length / 2));
  const headers = hasHeader
@@ -7250,6 +7797,7 @@ function inferDelimitedLayout(rows) {
  };
 
  let bestPair = { score: 0, x: colX, y: colY, isLatLon: false };
+ let secondScore = 0;
  if (colX >= 0 && colY >= 0 && colX !== colY) {
  bestPair = Object.assign({ x: colX, y: colY }, scorePair(colX, colY));
  } else {
@@ -7257,7 +7805,12 @@ function inferDelimitedLayout(rows) {
  for (let j = 0; j < width; j++) {
  if (i === j) continue;
  const s = scorePair(i, j);
- if (s.score >bestPair.score) bestPair = { score: s.score, x: i, y: j, isLatLon: s.isLatLon };
+ if (s.score > bestPair.score) {
+  secondScore = bestPair.score;
+  bestPair = { score: s.score, x: i, y: j, isLatLon: s.isLatLon };
+ } else if (s.score > secondScore) {
+  secondScore = s.score;
+ }
  }
  }
  colX = bestPair.x;
@@ -7327,6 +7880,10 @@ function inferDelimitedLayout(rows) {
   isLatLon = false;
   confidence = Math.min(confidence, 0.35);
  }
+ // Two similar-scoring unlabeled pairs → not confident; show a sample to pick X/Y
+ if (!hasHeader && secondScore > 0 && (bestPair.score - secondScore) < 0.12 && secondScore >= 0.45) {
+  confidence = Math.min(confidence, 0.4);
+ }
 
  return {
  delimiter,
@@ -7350,7 +7907,8 @@ function parseDelimitedWithLayout(rows, layout, zone, hemi) {
  const cols = splitRow(row, layout.delimiter);
  if (cols.length <= Math.max(layout.colLine, layout.colX, layout.colY)) continue;
  // Skip leftover header-like rows
- if (/^line$/i.test(cols[layout.colLine]) || /^hc/i.test(cols[0] || '')) continue;
+ if (/^line$/i.test(cols[layout.colLine]) || /^hc/i.test(cols[0] || '') || /^H\d{4}/i.test(cols[0] || '')) continue;
+ if (isIgnorablePreplotHeaderRow(row)) continue;
  const name = cols[layout.colLine];
  const sp = layout.colSP >= 0 ? parseFloat(cols[layout.colSP]) : NaN;
  const x = parseFloat(cols[layout.colX]);
@@ -7511,24 +8069,24 @@ function parseP190LooseWhitespace(rows, zone, hemi) {
 function promptPreplotColumnMap(text, zone, hemi, opts) {
  opts = opts || {};
  const openMapper = (z, h) => {
- const rows = text.split('\n').map(r =>r.trimEnd()).filter(r =>r.length > 0);
- if (rows.length < 2) { showToast('File appears empty or has too few rows.'); return; }
- const layout = opts.guess || inferDelimitedLayout(rows) || {};
- const delimiter = layout.delimiter || detectRowDelimiter(rows);
- const split = (r) =>splitRow(r, delimiter);
- const hasHeader = layout.hasHeader !== false;
- const headerCols = (layout.headers && layout.headers.length)
- ? layout.headers
- : split(rows[0]).map((hdr, i) =>hdr || ('Column ' + (i + 1)));
- const sampleSource = hasHeader ? rows.slice(1, 6) : rows.slice(0, 5);
- const sampleRows = sampleSource.map(split);
- _showColumnMapperDialog(text, hasHeader ? rows : ([''].concat(rows)), headerCols, sampleRows, delimiter, {
- message: opts.message || 'Confirm which columns hold Line, X and Y. P1 files vary - your call wins.',
+ const table = opts.mapperTable || preparePreplotMapperTable(text, opts.guess);
+ if (!table || !table.headerCols || !table.headerCols.length) {
+  showToast('File appears empty or has too few rows.');
+  return;
+ }
+ if (table.headerCols.length < 2) {
+  showToast('Could not split Line / X / Y columns — check the file is a P1 or delimited table.', 6000);
+ }
+ const msgParts = [];
+ if (opts.message) msgParts.push(opts.message);
+ if (table.note) msgParts.push(table.note);
+ _showColumnMapperDialog(table.text || text, table.rows, table.headerCols, table.sampleRows || [], table.delimiter, {
+ message: msgParts.join(' ') || 'Click a sample column to set Line, then X, then Y.',
  zone: z,
  hemi: h,
- guess: layout,
+ guess: table.layout || opts.guess || {},
  onDone: opts.onDone || null,
- hasHeader: hasHeader
+ hasHeader: table.hasHeader
  });
  };
 
