@@ -14619,14 +14619,14 @@ async function handleSignIn() {
 
  const contactKey = 'candooka_contact_' + String(existingUser.email || existingUser.name || user).toLowerCase();
  const hasContact = localStorage.getItem(contactKey);
- // First login (including GUEST) must show a usable phone field, not skip or trap.
- if (!hasContact && existingUser.email) {
+ // GUEST + candooka-ospo: username and password only — no phone or contact form.
+ if (!isGuestUser(existingUser, user) && !hasContact && existingUser.email) {
  resetButton();
  showFirstLoginContactPrompt(existingUser);
  return;
  }
 
- warnMobilePhoneThen(() => {
+ const finishGuestOrUser = () => {
  document.getElementById('signin-overlay').style.display = 'none';
  adminLoggedIn = false;
  updateAdminButton();
@@ -14635,7 +14635,12 @@ async function handleSignIn() {
  showToast('Signed in (' + welcomeHow + '). Welcome ' + (existingUser.name || user));
  setTimeout(enterPreferredWorkspace, 300);
  resetButton();
- });
+ };
+ if (isGuestUser(existingUser, user)) {
+ finishGuestOrUser();
+ return;
+ }
+ warnMobilePhoneThen(finishGuestOrUser);
  } catch (err) {
  console.error('Sign-in error:', err);
  const errEl = document.getElementById('signin-error');
@@ -14725,6 +14730,15 @@ function submitTrialRequest() {
 }
 
 function showFirstLoginContactPrompt(user) {
+ if (isGuestUser(user, user && user.name)) {
+  const overlay = document.getElementById('signin-overlay');
+  if (overlay) overlay.style.display = 'none';
+  adminLoggedIn = false;
+  updateAdminButton();
+  updateUserDisplay();
+  setTimeout(enterPreferredWorkspace, 200);
+  return;
+ }
  window._pendingLoginUser = user || {};
  const overlay = document.getElementById('signin-overlay');
  if (overlay) overlay.style.display = 'flex';
