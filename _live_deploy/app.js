@@ -733,6 +733,11 @@ function initLeafletMap() {
   map.createPane('swathPane');
   map.getPane('swathPane').style.zIndex = 350; // under survey-line overlay (400)
  }
+ if (!map.getPane('routePane')) {
+  map.createPane('routePane');
+  map.getPane('routePane').style.zIndex = 450; // above preplot / swaths
+  map.getPane('routePane').style.pointerEvents = 'none';
+ }
 
  // Layer groups
  layerSurveyLines = L.layerGroup().addTo(map);
@@ -14187,9 +14192,10 @@ let _routeHighlight = null; // { startWpIdx, endWpIdx } or null
 
 function _routeTransitOverviewStyle() {
  return {
-  color: '#d4a04a',
-  weight: 1.35,
-  opacity: 0.7,
+  pane: 'routePane',
+  color: '#ffcc33',
+  weight: 2.6,
+  opacity: 0.95,
   lineCap: 'round',
   lineJoin: 'round',
   interactive: false,
@@ -14217,7 +14223,8 @@ function _routeSegFocused(i, hl) {
 
 function _drawRoutePolyline(latlngs, style) {
  if (!latlngs || latlngs.length < 2 || !layerRoute) return;
- L.polyline(latlngs, style).addTo(layerRoute);
+ if (typeof map !== 'undefined' && map && !map.hasLayer(layerRoute)) map.addLayer(layerRoute);
+ L.polyline(latlngs, Object.assign({ pane: 'routePane' }, style)).addTo(layerRoute);
 }
 
 function _drawFocusedTransit(arcPts) {
@@ -14237,6 +14244,11 @@ function _drawFocusedTransit(arcPts) {
 function renderRoute(waypoints, opts) {
  opts = opts || {};
  if (!waypoints || !waypoints.length) waypoints = state.route;
+ if (typeof map !== 'undefined' && map && layerRoute && !map.hasLayer(layerRoute)) {
+  map.addLayer(layerRoute);
+ }
+ const routeCb = document.getElementById('layer-toggle-route');
+ if (routeCb) routeCb.checked = true;
  if (layerRoute) layerRoute.clearLayers();
  if (layerAnnotations) layerAnnotations.clearLayers();
  if (layerArrows) layerArrows.clearLayers();
@@ -14281,8 +14293,8 @@ function renderRoute(waypoints, opts) {
    if (focused) {
     _drawRoutePolyline([a.pt, b.pt], { color: acqColor, weight: 2.5, opacity: 0.9, dashArray: '8,4', interactive: false });
     if (layerArrows) _addRouteArrow(a.pt, b.pt, acqColor, layerArrows, 0.9);
-   } else if (!overview) {
-    _drawRoutePolyline([a.pt, b.pt], { color: acqColor, weight: 1.2, opacity: 0.55, dashArray: '8,4', interactive: false });
+   } else {
+    _drawRoutePolyline([a.pt, b.pt], { color: '#ffcc33', weight: 2, opacity: 0.85, dashArray: '8,4', interactive: false });
    }
   } else if (a.type === 'runInStart' && b.type === 'lineStart' && a.lineName === b.lineName) {
    if (focused) {
@@ -14324,8 +14336,10 @@ function renderRoute(waypoints, opts) {
     });
    }
   } else {
-   // Transit / line turn — skip-k U-turns on Show All (not the same-heading hairball)
-   const arcPts = computeArcTurn(waypoints, i);
+   // Transit / line turn — always draw on Show All. This is the vessel route.
+   let arcPts;
+   try { arcPts = computeArcTurn(waypoints, i); }
+   catch (_) { arcPts = [a.pt, b.pt]; }
    if (focused) {
     _drawFocusedTransit(arcPts);
    } else {
@@ -14334,13 +14348,16 @@ function renderRoute(waypoints, opts) {
   }
  }
 
- L.circleMarker(pts[0], {
-  radius: 7, color: '#fff', fillColor: '#ff453a', fillOpacity: 1, weight: 2
- }).bindTooltip('Start', { permanent: false }).addTo(layerAnnotations);
-
- L.circleMarker(pts[pts.length - 1], {
-  radius: 7, color: '#fff', fillColor: '#30d158', fillOpacity: 1, weight: 2
- }).bindTooltip('End', { permanent: false }).addTo(layerAnnotations);
+ if (layerRoute && pts.length) {
+  L.circleMarker(pts[0], {
+   pane: 'routePane',
+   radius: 8, color: '#fff', fillColor: '#ff453a', fillOpacity: 1, weight: 2
+  }).bindTooltip('Start', { permanent: false }).addTo(layerRoute);
+  L.circleMarker(pts[pts.length - 1], {
+   pane: 'routePane',
+   radius: 8, color: '#fff', fillColor: '#30d158', fillOpacity: 1, weight: 2
+  }).bindTooltip('End', { permanent: false }).addTo(layerRoute);
+ }
 
  if (state.showAnnotations && !overview) {
   let lineNum = 1;

@@ -107,7 +107,9 @@ vm.runInContext(`
   else { const _t = showToast; showToast = function(){}; }
 `, ctx);
 
-assert(/app\.js\?v=17\.15/.test(html), 'app.js cache bump 17.15 missing');
+assert(/app\.js\?v=17\.16/.test(html), 'app.js cache bump 17.16 missing');
+assert(src.includes("createPane('routePane')"), 'planned route must have its own map pane');
+assert(src.includes(".addTo(layerRoute)"), 'Start/End markers must sit on the route layer');
 assert(src.includes('Load a preplot first, then click Route Planning'), 'empty Plan Route must toast, not silent-return');
 assert(src.includes('if (showStartLineChooser()) return'), 'chooser miss must still executePlanRoute');
 assert(html.includes('1500 sequences, keep the fastest'), 'chooser Auto must score 1500 then keep the fastest');
@@ -342,7 +344,7 @@ assert(src.includes('min="1" max="100"'), 'Line Manager UI 1-100 missing');
 
 console.log(JSON.stringify({
   ok: true,
-  cache: '17.15',
+  cache: '17.16',
   rule: 'skip-k racetrack from a corner; 3D skip-k racetrack per swath',
   kNom,
   nn: { visit: nn.nVisit, mode: nn.stats.mode, ms: nn.ms },
