@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * Auto scores up to N shooting sequences (default 1500), then stops.
- * The client gets the minimum-time plan only. Not ILS iteration count.
+ * Auto ships a skip-k racetrack from a survey corner (k ≈ 2R/spacing).
+ * 3D finishes each swath as a block — never 0, n/2, 1, n/2+1 zigzag.
  */
 import fs from 'fs';
 import vm from 'vm';
@@ -107,14 +107,20 @@ vm.runInContext(`
   else { const _t = showToast; showToast = function(){}; }
 `, ctx);
 
-assert(/app\.js\?v=17\.01/.test(html), 'app.js cache bump 17.01 missing');
-assert(html.includes('fastest of 1500 options'), 'chooser Auto is not fastest-of-1500');
+assert(/app\.js\?v=17\.10/.test(html), 'app.js cache bump 17.10 missing');
+assert(html.includes('skip-k racetrack'), 'chooser Auto must describe skip-k racetrack');
+assert(!html.includes('fastest of 1500 options'), 'chooser must not advertise 1500-option TSP');
 assert(html.includes('simple nearest neighbour'), 'auto-nn must stay real NN');
 assert(src.includes('showLabels: false'), 'labels must default off');
-assert(src.includes('optionsEvaluated >= targetOptions'), 'hard option cap missing');
-assert(!src.includes('for (let iter = 0; iter <'), 'ILS iteration loop must not run');
-assert(src.includes('then STOP. Not ILS iterations'), 'stop-at-N comment missing');
+assert(src.includes('lmSetPriority'), 'Line Manager priority setter missing');
+assert(src.includes('Math.max(1, Math.min(100, priorityNum))'), 'Line Manager 1-100 clamp missing');
+assert(src.includes('function _prioNorm'), 'priority normalizer missing');
+assert(src.includes('first !== lo && first !== hi'), 'corner-start guard missing');
+assert(src.includes('swath-blocks'), '3D block-complete stats missing');
+assert(!src.includes('fillBudget:'), 'Family E every-rank fill must be gone');
+assert(!src.includes('Mixed-radix'), 'mixed-radix line-level DP must stay gone');
 assert(!html.toLowerCase().includes('users-db.json'), 'index.html must not touch users-db');
+assert(!src.includes('fetch(') || !/users-db\.json/.test(src), 'app.js must not fetch users-db.json');
 
 function makeGrid(n, spacingM = 250, lengthM = 20000, east0 = 0) {
   const lat0 = -20.5, lon0 = 110.2;
@@ -161,26 +167,62 @@ function setup(lines, extra) {
   `, ctx);
 }
 
-function visitCount() {
+function visitNames() {
   return vm.runInContext(`
     (function() {
       const w = state._lastRoute || [];
+      const names = [];
       const seen = new Set();
       for (const x of w) {
-        if (x.type === 'lineStart' && x.lineName) seen.add(x.lineName);
+        if (x.type === 'lineStart' && x.lineName && !seen.has(x.lineName)) {
+          seen.add(x.lineName);
+          names.push(x.lineName);
+        }
       }
-      return seen.size;
+      return names;
     })()
   `, ctx);
+}
+
+function ranksFromNames(names) {
+  return names.map((nm) => parseInt(nm.slice(1), 10) - 1000);
+}
+
+function skipStats(ranks) {
+  const skips = [];
+  let flips = 0;
+  let prevDir = 0;
+  for (let i = 1; i < ranks.length; i++) {
+    const d = ranks[i] - ranks[i - 1];
+    skips.push(Math.abs(d));
+    const dir = Math.sign(d);
+    if (dir && prevDir && dir !== prevDir) flips++;
+    if (dir) prevDir = dir;
+  }
+  const mean = skips.reduce((a, b) => a + b, 0) / skips.length;
+  const std = Math.sqrt(skips.reduce((a, b) => a + (b - mean) * (b - mean), 0) / skips.length);
+  return {
+    first: ranks[0],
+    last: ranks[ranks.length - 1],
+    mean,
+    std,
+    max: Math.max(...skips),
+    pingPong: flips / (ranks.length - 1),
+    hops: skips.length,
+  };
 }
 
 function plan(lines, extra) {
   setup(lines, extra);
   const t0 = Date.now();
   vm.runInContext('state._lastRoute = computeRoute()', ctx);
+  const names = visitNames();
+  const ranks = ranksFromNames(names);
   return {
     ms: Date.now() - t0,
-    nVisit: visitCount(),
+    nVisit: names.length,
+    ranks,
+    skip: skipStats(ranks),
     stats: vm.runInContext('state._optimizerStats', ctx),
   };
 }
@@ -190,46 +232,75 @@ const nn = plan(grid12, { optimizerMode: 'nn', iterations: 1 });
 assert(nn.nVisit === 12, 'NN must visit all 12, got ' + nn.nVisit);
 assert(nn.stats && nn.stats.mode === 'nn', 'NN mode not recorded');
 
-const capped = plan(grid12, { optimizerMode: 'deep', iterations: 40 });
-assert(capped.nVisit === 12, 'capped Auto must visit all 12, got ' + capped.nVisit);
-assert(capped.stats.optionsEvaluated <= 40, 'must stop at 40 options, scored ' + capped.stats.optionsEvaluated);
-assert(capped.stats.optionsEvaluated >= 1, 'must score at least one option');
-assert(capped.stats.finalSec != null, 'Auto must report finalSec');
-assert(capped.stats.finalSec <= nn.stats.finalSec + 0.5,
-  `Auto ${capped.stats.finalSec.toFixed(1)}s slower than NN ${nn.stats.finalSec.toFixed(1)}s`);
+const auto12 = plan(grid12, { optimizerMode: 'deep', iterations: 40 });
+assert(auto12.nVisit === 12, 'Auto 12-line must visit all 12, got ' + auto12.nVisit);
+assert(auto12.stats.mode === 'racetrack', 'Auto mode should be racetrack, got ' + auto12.stats.mode);
+assert(auto12.skip.first === 0 || auto12.skip.first === 11,
+  '12-line Auto must start at a spatial corner, first=' + auto12.skip.first);
 
-const grid24 = makeGrid(24);
-const deep = plan(grid24, { optimizerMode: 'deep', iterations: 1500 });
-assert(deep.nVisit === 24, 'Auto 24-line must visit all 24, got ' + deep.nVisit);
-assert(deep.stats.optionsEvaluated <= 1500, 'must not exceed 1500, scored ' + deep.stats.optionsEvaluated);
-assert(deep.stats.optionsEvaluated === 1500,
-  '24-line family must fill the 1500 budget, scored ' + deep.stats.optionsEvaluated);
-assert(deep.stats.mode === 'fastest-of-n', 'mode should be fastest-of-n, got ' + deep.stats.mode);
-assert(!deep.stats.capped, '1500 options should finish before the time cap');
-if (deep.stats.candidateSec) {
-  const vals = Object.values(deep.stats.candidateSec).filter(v => typeof v === 'number' && isFinite(v));
-  if (vals.length) {
-    assert(deep.stats.finalSec <= Math.min(...vals) + 0.5,
-      'shipped plan slower than a recorded candidate');
-  }
-}
+const R = 3500, spacing = 250;
+const kNom = Math.max(1, Math.round((2 * R) / spacing));
+assert(kNom === 28, 'expected kNom 28 for R=3500 spacing=250, got ' + kNom);
 
-const t3d = plan(makeGrid(24), { surveyType: '3d', progression: 'interleaved', numSwaths: 2, iterations: 1500 });
-assert(t3d.nVisit === 24, '3D interleave must visit all 24, got ' + t3d.nVisit);
-assert((t3d.stats.optionsEvaluated || 0) <= 1500, '3D must stop at 1500 options');
+const grid164 = makeGrid(164);
+const t2d = plan(grid164, { surveyType: '2d', progression: 'auto', optimizerMode: 'deep' });
+assert(t2d.nVisit === 164, '2D Auto must visit all 164, got ' + t2d.nVisit);
+assert(t2d.stats.mode === 'racetrack', '2D mode should be racetrack, got ' + t2d.stats.mode);
+assert(t2d.skip.first === 0 || t2d.skip.first === 163,
+  '2D Auto must start at a spatial corner, first=' + t2d.skip.first);
+assert(Math.abs(t2d.skip.mean - kNom) < 8,
+  `2D skip mean ${t2d.skip.mean.toFixed(2)} not near k=${kNom}`);
+assert(t2d.skip.pingPong < 0.35,
+  `2D ping-pong ${t2d.skip.pingPong.toFixed(3)} looks like a tangled tour`);
+assert(t2d.stats.constructor === 'racetrack',
+  '2D must ship racetrack, got ' + t2d.stats.constructor);
+
+const t3d = plan(grid164, { surveyType: '3d', progression: 'interleaved', numSwaths: 2 });
+assert(t3d.nVisit === 164, '3D must visit all 164, got ' + t3d.nVisit);
+assert(t3d.stats && t3d.stats.mode === 'swath-blocks',
+  '3D mode should be swath-blocks, got ' + (t3d.stats && t3d.stats.mode));
+const zig = t3d.ranks[0] === 0 && t3d.ranks[1] === 82 && t3d.ranks[2] === 1 && t3d.ranks[3] === 83;
+assert(!zig, '3D must not zigzag 0,82,1,83 (line-level swath interleave)');
+assert(t3d.skip.mean < 5,
+  `3D skip mean ${t3d.skip.mean.toFixed(2)} — block-complete is adjacent (~1), zigzag is ~82`);
+assert(t3d.skip.pingPong < 0.15,
+  `3D ping-pong ${t3d.skip.pingPong.toFixed(3)} — block-complete should almost never reverse`);
+
+// Line Manager 1-100: high-priority lines acquired first, still a racetrack within the bucket.
+vm.runInContext(`
+  state.lineStatus[0].priority = 1;
+  state.lineStatus[1].priority = 1;
+  state.lineStatus[2].priority = 100;
+`, ctx);
+const tPrio = plan(makeGrid(12), { surveyType: '2d', progression: 'auto' });
+assert(tPrio.nVisit === 12, 'priority Auto must visit all 12');
+assert(src.includes('min="1" max="100"'), 'Line Manager UI 1-100 missing');
 
 console.log(JSON.stringify({
   ok: true,
-  cache: '17.01',
-  rule: 'score N shooting sequences (default 1500), ship the fastest, stop',
-  cap40: { options: capped.stats.optionsEvaluated, ms: capped.ms, h: +(capped.stats.finalSec / 3600).toFixed(2) },
-  grid24: {
-    options: deep.stats.optionsEvaluated,
-    constructor: deep.stats.constructor,
-    candidates: deep.stats.candidateSec,
-    ms: deep.ms,
-    h: +(deep.stats.finalSec / 3600).toFixed(2),
+  cache: '17.10',
+  rule: 'skip-k racetrack from a corner; 3D block-complete swaths',
+  kNom,
+  nn: { visit: nn.nVisit, mode: nn.stats.mode, ms: nn.ms },
+  auto12: { first: auto12.skip.first, mean: +auto12.skip.mean.toFixed(2), mode: auto12.stats.mode },
+  t2d: {
+    first: t2d.skip.first,
+    mean: +t2d.skip.mean.toFixed(2),
+    std: +t2d.skip.std.toFixed(2),
+    pingPong: +t2d.skip.pingPong.toFixed(3),
+    k: t2d.stats.skipK,
+    constructor: t2d.stats.constructor,
+    options: t2d.stats.optionsEvaluated,
+    ms: t2d.ms,
+    h: t2d.stats.finalSec != null ? +(t2d.stats.finalSec / 3600).toFixed(2) : null,
   },
-  t3d: { visit: t3d.nVisit, options: t3d.stats.optionsEvaluated, ms: t3d.ms },
+  t3d: {
+    first4: t3d.ranks.slice(0, 4),
+    mean: +t3d.skip.mean.toFixed(2),
+    pingPong: +t3d.skip.pingPong.toFixed(3),
+    mode: t3d.stats.mode,
+    options: t3d.stats.optionsEvaluated,
+    ms: t3d.ms,
+  },
 }, null, 2));
 process.exit(0);

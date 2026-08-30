@@ -425,6 +425,7 @@ const state = {
  showAnnotations: false,
  sstMapDay: 'default', // GIBS SST tile day: 'default' or YYYY-MM-DD
  showLabels: false, // line / SP labels start OFF; each preplot load resets to off
+ showSwaths: true, // 3D streamer swath bands on the main map; user toggles OFF/ON
  coordFormat: 'utm', // 'utm' or 'latlon'
  currentUser: 'Guest'
 };
@@ -728,6 +729,11 @@ function initLeafletMap() {
  // Scale bar
  L.control.scale({ position: 'bottomleft', metric: true, imperial: true, maxWidth: 200 }).addTo(map);
 
+ if (!map.getPane('swathPane')) {
+  map.createPane('swathPane');
+  map.getPane('swathPane').style.zIndex = 350; // under survey-line overlay (400)
+ }
+
  // Layer groups
  layerSurveyLines = L.layerGroup().addTo(map);
  layerRoute = L.layerGroup().addTo(map);
@@ -736,7 +742,8 @@ function initLeafletMap() {
  layerAnnotations = L.layerGroup(); // default off; user toggles via Annotations button
  layerArrows = L.layerGroup().addTo(map);
  layerObstructions = L.layerGroup().addTo(map);
- layerSwaths = L.layerGroup().addTo(map);
+ layerSwaths = L.layerGroup();
+ if (state.showSwaths !== false) layerSwaths.addTo(map);
  layerStartPoint = L.layerGroup().addTo(map);
  layerRayTrace = L.layerGroup().addTo(map);
  layerObnNodes = L.layerGroup().addTo(map);
@@ -4634,6 +4641,8 @@ function updateSurveyTypeIndicator(type) {
  indicator.style.display = 'block';
  // Area (sq km) is a 3D full-fold coverage concept - hide for 2D planning.
  setAreaStatsVisible(type !== '2d');
+ if (typeof _syncSwathOnOffTabs === 'function') _syncSwathOnOffTabs();
+ if (typeof renderSwathOverlays === 'function') renderSwathOverlays();
 }
 
 /** Show or hide sq-km / area UI (2D surveys only need line / SP / time metrics). */
@@ -5034,7 +5043,7 @@ function askSurveyCriteria({ zone, hemi }, callback) {
  <div class="panel-row" style="margin-bottom:10px;">
  <label style="width:140px; color:#ffffff;">Progression</label>
  <select id="crit-progression-2d" style="flex:1;padding:5px 8px;border-radius:4px;border:1px solid #222222;background:#111111;color:#ffffff;font-size:13px;outline:none;cursor:pointer;">
- <option value="auto" ${(state.settings.progression || 'auto') === 'auto' ? 'selected' : ''}>Auto (fastest of ~1500 shooting sequences)</option>
+ <option value="auto" ${(state.settings.progression || 'auto') === 'auto' ? 'selected' : ''}>Auto (skip-k racetrack, k ≈ 2R / spacing)</option>
  <option value="west-east" ${state.settings.progression === 'west-east' ? 'selected' : ''}>West ' East</option>
  <option value="east-west" ${state.settings.progression === 'east-west' ? 'selected' : ''}>East ' West</option>
  <option value="south-north" ${state.settings.progression === 'south-north' ? 'selected' : ''}>South ' North</option>
@@ -7960,9 +7969,13 @@ function renderSurveyLines() {
  // vanish from the map on any redraw - draw from the cached full list instead.
  const allLines = (state._allLines && state._allLines.length) ? state._allLines : state.lines;
  const hasObs = (state.obstructions || []).length > 0;
+ const visit = (typeof _routeVisitOrder === 'function') ? _routeVisitOrder() : { byName: new Map(), n: 0 };
  allLines.forEach((line, idx) => {
  const ls = (state.lineStatus && state.lineStatus[line.id]) || { status: 'planned' };
- let lineColor = '#00ff88', lineOpacity = idx % 2 === 0 ? 0.9 : 0.7, lineWeight = 2.5, dashArr = null;
+ let lineColor = visit.n
+  ? visitColorForLine(line.name, visit)
+  : '#00ff88';
+ let lineOpacity = idx % 2 === 0 ? 0.9 : 0.7, lineWeight = 2.5, dashArr = null;
  if (ls.status === 'acquired') { lineColor = '#1a5f2a'; lineOpacity = 0.85; lineWeight = 2.5; }
  else if (ls.status === 'partial') { lineColor = '#f5a623'; lineOpacity = 0.8; lineWeight = 2.5; }
  else if (line._infill) { lineColor = '#ff44ff'; lineOpacity = 0.9; lineWeight = 2.5; dashArr = '6,3'; }
@@ -8103,11 +8116,33 @@ function _computeSwathGroups(numSwaths, progression) {
  return groups;
 }
 
-// Draw a label and a boundary line for each swath, positioned clear of the
-// preplot lines and the planned route (offset beyond the lines' start ends).
+const _SWATH_BAND_COLORS = ['#22d3ee', '#fbbf24', '#f472b6', '#a78bfa', '#34d399', '#fb7185', '#38bdf8', '#facc15', '#c084fc', '#4ade80'];
+
+function _swathBandLatLngs(grp) {
+ if (!grp || !grp.length) return null;
+ const a = grp[0];
+ if (grp.length === 1) {
+  const brg = bearing(a.start, a.end);
+  const half = Math.max(40, (state.settings.streamerSeparation || 100) / 2);
+  const left = (brg + 270) % 360, right = (brg + 90) % 360;
+  return [
+   destinationPoint(a.start, left, half),
+   destinationPoint(a.end, left, half),
+   destinationPoint(a.end, right, half),
+   destinationPoint(a.start, right, half)
+  ];
+ }
+ const b = grp[grp.length - 1];
+ let bStart = b.start, bEnd = b.end;
+ if (haversine(a.start, b.start) > haversine(a.start, b.end)) { bStart = b.end; bEnd = b.start; }
+ return [a.start, a.end, bEnd, bStart];
+}
+
+// Draw filled 3D swath bands on the preplot, plus a SWATH n label on each band.
 function renderSwathOverlays() {
  if (!layerSwaths) return;
  layerSwaths.clearLayers();
+ if (state.showSwaths === false) return;
  const s = state.settings;
  if ((s.surveyType || '3d') !== '3d') return;
  const numSwaths = s.numSwaths || 1;
@@ -8116,39 +8151,39 @@ function renderSwathOverlays() {
  const groups = _computeSwathGroups(numSwaths, progression);
  if (groups.length < 1) return;
  const swathDirections = s.swathDirections || [];
+ const paneOpts = (typeof map !== 'undefined' && map && map.getPane && map.getPane('swathPane'))
+  ? { pane: 'swathPane' } : {};
 
  groups.forEach((grp, g) => {
  if (!grp.length) return;
- const midLine = grp[Math.floor(grp.length / 2)];
- const brg = bearing(midLine.start, midLine.end);
- const lineLenM = haversine(midLine.start, midLine.end);
- // Cross-line centre of the group.
+ const color = _SWATH_BAND_COLORS[g % _SWATH_BAND_COLORS.length];
+ const ring = _swathBandLatLngs(grp);
+ if (ring) {
+  L.polygon(ring, Object.assign({
+   color, weight: 1.6, opacity: 0.85,
+   fillColor: color, fillOpacity: 0.22,
+   interactive: false
+  }, paneOpts)).addTo(layerSwaths);
+ }
  let latSum = 0, lonSum = 0;
  grp.forEach(l => { latSum += (l.start[0] + l.end[0]) / 2; lonSum += (l.start[1] + l.end[1]) / 2; });
  const centre = [latSum / grp.length, lonSum / grp.length];
- // Push the label beyond the "start" end of the lines so it clears the lines
- // and the run-in/turn loops of the route. Fixed at ~15 km to avoid overlap.
- const offsetM = 15000;
- const labelPt = destinationPoint(centre, (brg + 180) % 360, offsetM);
  const dir = swathDirections[g] || defaultSwathDirection(g);
  const dirTxt = dir === 'high-low' ? 'High\u2192Low SP' : 'Low\u2192High SP';
- L.marker(labelPt, {
- interactive: false,
- icon: L.divIcon({
- className: '',
- html: `<div style="background:rgba(4,16,30,0.82);border:1px solid #00d2ff;color:#00d2ff;font-size:11px;font-weight:700;padding:2px 7px;border-radius:3px;white-space:nowrap;text-shadow:1px 1px 2px #000;pointer-events:none;transform:translate(-50%,-50%);">SWATH ${g + 1}<span style="color:#9fb2c4;font-weight:400;font-size:9px;"> \u00b7 ${dirTxt}</span></div>`,
- iconAnchor: [0, 0]
- })
+ L.marker(centre, {
+  interactive: false,
+  icon: L.divIcon({
+   className: '',
+   html: `<div style="background:rgba(4,16,30,0.88);border:1px solid ${color};color:${color};font-size:11px;font-weight:700;padding:2px 7px;border-radius:3px;white-space:nowrap;text-shadow:1px 1px 2px #000;pointer-events:none;transform:translate(-50%,-50%);">SWATH ${g + 1}<span style="color:#9fb2c4;font-weight:400;font-size:9px;"> \u00b7 ${dirTxt}</span></div>`,
+   iconAnchor: [0, 0]
+  })
  }).addTo(layerSwaths);
  });
 
- // Dividing line between consecutive swaths (parallel to the survey lines,
- // midway between the two boundary lines, extended slightly past both ends).
  for (let g = 0; g < groups.length - 1; g++) {
  const a = groups[g][groups[g].length - 1];
  const b = groups[g + 1][0];
  if (!a || !b) continue;
- // Align b'endpoints with a'so averaging doesn't produce a diagonal.
  let bStart = b.start, bEnd = b.end;
  if (haversine(a.start, b.start) >haversine(a.start, b.end)) { bStart = b.end; bEnd = b.start; }
  const dS = [(a.start[0] + bStart[0]) / 2, (a.start[1] + bStart[1]) / 2];
@@ -8158,7 +8193,9 @@ function renderSwathOverlays() {
  const ext = dLen * 0.06 + 150;
  const p1 = destinationPoint(dS, (dBrg + 180) % 360, ext);
  const p2 = destinationPoint(dE, dBrg, ext);
- L.polyline([p1, p2], { color: '#00d2ff', weight: 1.5, opacity: 0.55, dashArray: '10,8', interactive: false }).addTo(layerSwaths);
+ L.polyline([p1, p2], Object.assign({
+  color: '#e2e8f0', weight: 1.2, opacity: 0.45, dashArray: '10,8', interactive: false
+ }, paneOpts)).addTo(layerSwaths);
  }
 }
 
@@ -11942,15 +11979,22 @@ function executePlanRoute() {
    8000
   );
  }
- // Report fastest-of-N (auto/2D and 3D swath enum)
+ // Report planner outcome (racetrack Auto / NN / 3D block swaths)
  const os = state._optimizerStats;
  if (os && os.mode === 'nn') {
  showToast(`Simple nearest-neighbour plan - ${(os.finalSec / 3600).toFixed(1)} h (no sequence search, as selected)`, 6000);
+ } else if (os && os.mode === 'racetrack') {
+ const h = os.finalSec != null ? (os.finalSec / 3600).toFixed(1) : '?';
+ const k = os.skipK != null ? os.skipK : '?';
+ showToast(`Skip-k racetrack (k=${k}, corner start): ${h} h total (on-line + Dubins line-changes)`, 8000);
+ } else if (os && os.mode === 'swath-blocks') {
+ const h = os.finalSec != null ? (os.finalSec / 3600).toFixed(1) : '?';
+ showToast(`3D block-complete swaths: ${h} h (adjacent within each swath, no line-level zigzag)`, 8000);
  } else if (os && (os.optionsEvaluated > 0 || os.mode === 'fastest-of-n')) {
  const nOpt = os.optionsEvaluated || os.iterations || 0;
  const h = os.finalSec != null ? (os.finalSec / 3600).toFixed(1) : '?';
  const secs = os.elapsedMs != null ? (os.elapsedMs / 1000).toFixed(1) : '?';
- showToast(`Fastest of ${nOpt} shooting sequences: ${h} h total (on-line + Dubins line-changes) in ${secs}s`, 8000);
+ showToast(`Planned ${nOpt} sequence(s): ${h} h total in ${secs}s`, 8000);
  }
  } catch (err) {
  console.error('Planning error:', err);
@@ -12058,11 +12102,9 @@ function buildTransitTimeModel(lines) {
  return { transitTimeSec, turnSpeedMs };
 }
 
-// ===== SPATIAL RACETRACK (one 2D auto CANDIDATE, scored by time) =====
-// Skip-k residue-class racetracks are often fast on regular parallel grids
-// (k ~= 2R / spacing). They are not preferred: Auto compares racetrack vs
-// nearest-neighbour vs 2-opt vs directional sweep on Dubins transit time
-// and ships the minimum. Pretty / skip-std is not a score.
+// ===== SPATIAL RACETRACK (2D Auto ships this; not a TSP bake-off) =====
+// Skip-k residue-class racetracks on regular parallel grids (k ~= 2R / spacing)
+// from a survey corner. Auto does not prefer a cheaper tangled TSP/NN tour.
 
 function _spatialLineOrder(lines) {
  const mids = lines.map(l => [
@@ -12315,14 +12357,12 @@ function _orderSkipStd(ord, spatial) {
 
 // ===== 3D PROGRESSIVE-SWATH INTERLEAVE OPTIMIZER =====
 // On 3D swath shooting each new line MUST be acquired adjacent to the last
-// line acquired on that swath (progressive infill requirement). Each swath is
-// therefore shot strictly in adjacent order and the planner'only freedom is
-// WHICH swath to shoot from next. This solves that sequencing for minimum
-// transit time - exact DP when the state space is small, beam search otherwise.
-// swaths: arrays of line indices in per-swath acquisition order.
-// revOf: acquisition direction (reversed flag) per line index.
-// Returns { seq: [lineIdx...], costSec } or null.
-function optimizeSwathInterleave(swaths, revOf, transitTimeSec, forceStartSwath, opts) {
+// line acquired on that swath (progressive infill). Interleaving swaths at
+// LINE level (0, n/2, 1, n/2+1) is what drew the 164-line orange hairball:
+// every hop crosses the prospect. Finish each swath as a BLOCK, then move
+// to the next swath. Freedom: swath visit order, and Low→High vs High→Low
+// within a swath (still adjacent). Skip-k inside a 3D swath is forbidden.
+function optimizeSwathInterleave(swaths, revOf, transitTimeSec, forceStartSwath) {
  const numSw = swaths.length;
  const lens = swaths.map(s => s.length);
  const total = lens.reduce((a, b) => a + b, 0);
@@ -12337,57 +12377,38 @@ function optimizeSwathInterleave(swaths, revOf, transitTimeSec, forceStartSwath,
   if (v === undefined) { v = transitTimeSec(a, revOf[a], b, revOf[b]); memo.set(mk, v); }
   return v;
  };
- function expandPick(swOrder, pick) {
+ function expand(swOrder, revMask) {
   const seq = [];
-  for (const g of swOrder) seq.push(...(pick[g] || swaths[g]));
+  for (const g of swOrder) {
+   const sw = swaths[g].slice();
+   if (revMask && revMask[g]) sw.reverse();
+   seq.push(...sw);
+  }
   if (seq.length !== total) return null;
   let cost = 0;
   for (let i = 0; i < seq.length - 1; i++) cost += T(seq[i], seq[i + 1]);
   return { seq, costSec: cost };
  }
- const palettes = swaths.map((sw) => {
-  const pal = [sw.slice(), sw.slice().reverse()];
-  for (let k = 1; k <= sw.length && pal.length < 40; k++) {
-   pal.push(_racetrackRanks(sw.length, k, false, false).map(e => sw[e.rank]));
-   pal.push(_racetrackRanks(sw.length, k, true, true).map(e => sw[e.rank]));
-  }
-  return pal;
- });
- const target = (opts && opts.targetOptions) || 1500;
- const timeUp = (opts && opts.timeUp) || function () { return false; };
- let best = null, evaluated = 0;
- const seen = new Set();
- const consider = (cand) => {
-  if (!cand || evaluated >= target || timeUp()) return;
-  const key = cand.seq.join(',');
-  if (seen.has(key)) return;
-  seen.add(key);
-  evaluated++;
-  if (!best || cand.costSec < best.costSec - 0.5) best = cand;
- };
  let order = active.slice();
  if (forceStartSwath >= 0 && order.includes(forceStartSwath)) {
   order = [forceStartSwath].concat(order.filter(g => g !== forceStartSwath));
  }
- const swOrders = [order, order.slice().reverse()];
- for (const swOrder of swOrders) {
-  const minPal = Math.min.apply(null, swOrder.map(g => palettes[g].length));
-  for (let p = 0; p < minPal; p++) {
-   consider(expandPick(swOrder, palettes.map(pal => pal[Math.min(p, pal.length - 1)])));
-  }
+ const swOrders = [order];
+ if (forceStartSwath >= 0) {
+  swOrders.push([order[0]].concat(order.slice(1).reverse()));
+ } else {
+  swOrders.push(order.slice().reverse());
  }
- if (active.length === 2) {
-  const a = palettes[active[0]], b = palettes[active[1]];
-  for (let i = 0; i < a.length && evaluated < target; i++) {
-   for (let j = 0; j < b.length && evaluated < target; j++) {
-    const seq1 = a[i].concat(b[j]);
-    const seq2 = b[j].concat(a[i]);
-    let c1 = 0, c2 = 0;
-    for (let k = 0; k < seq1.length - 1; k++) c1 += T(seq1[k], seq1[k + 1]);
-    for (let k = 0; k < seq2.length - 1; k++) c2 += T(seq2[k], seq2[k + 1]);
-    consider({ seq: seq1, costSec: c1 });
-    consider({ seq: seq2, costSec: c2 });
-   }
+ let best = null, evaluated = 0;
+ const nActive = active.length;
+ const maskLimit = 1 << Math.min(nActive, 8);
+ for (const swOrder of swOrders) {
+  for (let mask = 0; mask < maskLimit; mask++) {
+   const revMask = {};
+   for (let i = 0; i < nActive; i++) revMask[active[i]] = !!(mask & (1 << i));
+   const cand = expand(swOrder, revMask);
+   evaluated++;
+   if (cand && (!best || cand.costSec < best.costSec - 0.5)) best = cand;
   }
  }
  if (best) best.optionsEvaluated = evaluated;
@@ -12561,8 +12582,8 @@ function computeRoute() {
  });
  } else if (progression === 'interleaved' || progression === 'interleaved-reverse') {
  // Band lines into N swaths by ASCENDING line number (Swath 1 = lowest
- // lines), then round-robin across the bands so consecutive acquired lines
- // are spaced apart (wider transits for the turn radius).
+ // lines), then shoot each swath as a block (adjacent within). Line-level
+ // round-robin (0, n/2, 1, n/2+1) is the 164-line orange hairball.
  indices.sort((a, b) => {
  const prioA = priorities[a], prioB = priorities[b];
  if (prioA !== prioB) return prioA - prioB; // priority first
@@ -12629,48 +12650,34 @@ function computeRoute() {
  }
  }
 
- // Time-based interleave: score ~1500 block-complete shooting sequences
- // (swath order × within-swath racetrack/sweep × start end) and keep min time.
+ // Block-complete swaths: concatenate each swath (adjacent within), never
+ // round-robin 0, n/2, 1, n/2+1. That line-level interleave is the hairball.
  const model3d = buildTransitTimeModel(lines);
  const opt3dStart = Date.now();
- const opt = optimizeSwathInterleave(swaths, revOfLocal, model3d.transitTimeSec, forceStartSwath, {
-  targetOptions: Math.max(1, state.settings.optimizerIterations || 1500),
-  timeUp: () => (Date.now() - opt3dStart) > 25000
- });
+ const opt = optimizeSwathInterleave(swaths, revOfLocal, model3d.transitTimeSec, forceStartSwath);
 
- // Rigid round-robin sequence (fallback + reporting baseline)
- const interleaved = [];
- const maxLen = Math.max(...swaths.map(s =>s.length));
- for (let k = 0; k < maxLen; k++) {
+ const blockSeq = [];
  for (let g = 0; g < numSw; g++) {
- if (k < swaths[g].length) interleaved.push(swaths[g][k]);
- }
+  for (let k = 0; k < swaths[g].length; k++) blockSeq.push(swaths[g][k]);
  }
 
  indices.length = 0;
- if (opt && opt.seq.length === interleaved.length) {
+ if (opt && opt.seq.length === blockSeq.length) {
  indices.push(...opt.seq);
  interleaveOptimized = true;
- // Report time saved vs the rigid round-robin baseline
- let baseCost = 0;
- for (let k = 0; k < interleaved.length - 1; k++) {
- baseCost += model3d.transitTimeSec(
- interleaved[k], revOfLocal[interleaved[k]],
- interleaved[k + 1], revOfLocal[interleaved[k + 1]]);
- }
  const nOpt = opt.optionsEvaluated || 1;
  state._optimizerStats = {
-  mode: 'fastest-of-n',
-  solver: 'swath-enum',
+  mode: 'swath-blocks',
+  solver: 'swath-blocks',
   optionsEvaluated: nOpt,
-  optionsTarget: Math.max(1, state.settings.optimizerIterations || 1500),
+  optionsTarget: nOpt,
   finalSec: opt.costSec,
   transitSec: opt.costSec,
   elapsedMs: Date.now() - opt3dStart,
-  capped: (Date.now() - opt3dStart) > 25000
+  capped: false
  };
  } else {
- indices.push(...interleaved);
+ indices.push(...blockSeq);
  }
  }
 
@@ -12752,7 +12759,7 @@ function computeRoute() {
  order.push({ lineIdx: idx, reversed: rev });
  }
  } else {
- // --- Auto: score up to 1500 shooting sequences, ship the fastest, stop ---
+ // --- Auto: skip-k racetrack from a survey corner (k ~= 2R/spacing) ---
 
  // === ADVANCED ROUTE OPTIMIZER ===
  // When the user has explicitly chosen a start line or a custom start
@@ -12881,12 +12888,12 @@ function computeRoute() {
  }
 
  // User-selected optimizer mode: 'nn' = simple nearest-neighbour plan only
- // (quick, no enumeration); default = score ~1500 shooting sequences.
+ // (quick, no racetrack); default Auto = skip-k racetrack from a corner.
  const nnOnly = state.settings.optimizerMode === 'nn';
 
- // Fastest-of-N budget: evaluate this many feasible sequences (line order ×
- // heading × start family), then STOP. Not ILS iterations. A wall-clock
- // safety cap only aborts if scoring itself hangs.
+ // Auto scores a small window of skip-k racetracks (k ~= 2R/spacing, both
+ // survey ends, both first headings). Not a 1500-option TSP bake-off, and
+ // not ILS. A wall-clock safety cap only aborts if scoring hangs.
  const optimizerStart = Date.now();
  const targetOptions = Math.max(1, state.settings.optimizerIterations || 1500);
  const safetyCapMs = 60000;
@@ -13096,10 +13103,11 @@ function computeRoute() {
  return out.concat(ord.slice(hi + 1));
  }
 
- // --- Fastest of N shooting sequences ---
- // Score feasible plans (line order × heading × start family), each with
- // Dubins/turn-radius line-changes plus on-line length/speed. Ship only
- // the minimum-time plan, then STOP. Not ILS iterations. Not a global TSP proof.
+ // --- Skip-k racetrack Auto (corner start; not a TSP bake-off) ---
+ // On a regular parallel grid the marine plan is a residue-class racetrack
+ // with skip k ~= 2R/spacing, begun at a survey edge. Scoring 1500 TSP /
+ // NN / mid-spread snakes / 2-opt by Dubins time is what tangled the 164-
+ // line orange overlay: a cheaper tour is not a shootable racetrack.
  const spatial = _spatialLineOrder(lines);
  const spacingM = _medianLineSpacingM(lines, spatial);
  const kNom = _racetrackSkipK(spacingM, getEffectiveTurnRadius());
@@ -13136,6 +13144,12 @@ function computeRoute() {
   let use = applyFixed(sol);
   if (userStartLocked) use = applyFixed(_rotateOrderToStart(use, startIdx, startReversed));
   if (!use.length || use.length !== n) return Infinity;
+  // Parallel Auto: never accept a mid-spread start (164-line hairball).
+  if (!nnOnly && !userStartLocked && _linesFormParallelSweep(lines)) {
+   const lo = spatial.order[0], hi = spatial.order[spatial.order.length - 1];
+   const first = use[0].lineIdx;
+   if (first !== lo && first !== hi) return Infinity;
+  }
   const fp = _seqFingerprint(use);
   if (seenFp.has(fp)) return Infinity;
   seenFp.add(fp);
@@ -13177,19 +13191,13 @@ function computeRoute() {
   const sol = applyFixed(buildNNSolution(startIdx, startReversed));
   considerSol(sol, 'nn');
  } else {
-  // NN and a short sweep first so the budget always compares those families
-  // against racetrack. Fastest wins; racetrack is not preferred.
-  {
-   const nnStarts = [];
-   if (userStartLocked) nnStarts.push({ idx: startIdx, rev: startReversed });
-   else {
-    nnStarts.push({ idx: startIdx, rev: startReversed }, { idx: startIdx, rev: !startReversed });
-    nnStarts.push({ idx: spatial.order[0], rev: false }, { idx: spatial.order[0], rev: true });
-    nnStarts.push({ idx: spatial.order[n - 1], rev: false }, { idx: spatial.order[n - 1], rev: true });
-   }
-   for (const cand of nnStarts) {
-    if (optionsEvaluated >= targetOptions || timeUp()) break;
-    considerSol(buildNNSolution(cand.idx, cand.rev), 'nn');
+  // k window around 2R/spacing only — not every k from 1..n.
+  const kUse = Math.max(1, Math.min(kNom, n));
+  const kWindow = [];
+  for (let d = 0; d <= 2; d++) {
+   const ks = d === 0 ? [kUse] : [kUse - d, kUse + d];
+   for (const k of ks) {
+    if (k >= 1 && k <= n && kWindow.indexOf(k) < 0) kWindow.push(k);
    }
   }
   const cornerPairs = [
@@ -13198,106 +13206,50 @@ function computeRoute() {
    { startAtHigh: true, firstReversed: false },
    { startAtHigh: true, firstReversed: true }
   ];
-  // Family A: residue-class racetrack from each end, both headings, skip-k
-  for (const k of _kAroundNom(kNom, n)) {
-   if (optionsEvaluated >= targetOptions || timeUp()) break;
-   for (const corner of cornerPairs) {
-    if (optionsEvaluated >= targetOptions || timeUp()) break;
-    let rt = buildRacetrackOrder(lines, k, { spatial, ...corner });
-    considerSol(rt, 'racetrack');
-    maybeInfill(rt, 'racetrack');
-   }
-  }
-  // Family B: skip-k snake from start-line choices, both headings
-  const startIdxs = [];
+  const parallel = _linesFormParallelSweep(lines);
   if (userStartLocked) {
-   startIdxs.push(startIdx);
-  } else {
-   const lo = spatial.order[0], hi = spatial.order[spatial.order.length - 1];
-   startIdxs.push(lo, hi);
-  }
-  outerSnake:
-  for (const sIdx of startIdxs) {
-   if (optionsEvaluated >= targetOptions || timeUp()) break;
-   const revs = userStartLocked && sIdx === startIdx ? [startReversed] : [false, true];
-   for (const sRev of revs) {
-    for (const preferDir of [null, 1, -1]) {
-     for (const k of _kAroundNom(kNom, n)) {
-      if (optionsEvaluated >= targetOptions || timeUp()) break outerSnake;
-      const rt = buildRacetrackOrderFrom(lines, k, sIdx, sRev, spatial, preferDir);
-      considerSol(rt, 'racetrack');
-      maybeInfill(rt, 'racetrack');
-     }
-    }
-   }
-  }
-  // Family C: directional sweeps, both headings, alternate vs uniform
-  {
-   const numKey = lines.map((l, i) => {
-    const v = _lineNumOf(l, null);
-    return v != null ? v : i;
-   });
-   const idxAll = lines.map((_, i) => i);
-   const strategies = {
-    sweep: idxAll.slice().sort((a, b) => (spatial.byLon ? spatial.mids[a][1] - spatial.mids[b][1] : spatial.mids[a][0] - spatial.mids[b][0])),
-    'Low\u2192High': idxAll.slice().sort((a, b) => numKey[a] - numKey[b]),
-    'High\u2192Low': idxAll.slice().sort((a, b) => numKey[b] - numKey[a]),
-    'West\u2192East': idxAll.slice().sort((a, b) => midpoints[a][1] - midpoints[b][1]),
-    'East\u2192West': idxAll.slice().sort((a, b) => midpoints[b][1] - midpoints[a][1]),
-    'South\u2192North': idxAll.slice().sort((a, b) => midpoints[a][0] - midpoints[b][0]),
-    'North\u2192South': idxAll.slice().sort((a, b) => midpoints[b][0] - midpoints[a][0])
-   };
-   for (const [name, idxOrder] of Object.entries(strategies)) {
+   for (const k of kWindow) {
     if (optionsEvaluated >= targetOptions || timeUp()) break;
-    for (const firstRev of [false, true]) {
-     for (const alt of [false, true]) {
-      const ord = idxOrder.map((i, pos) => ({
-       lineIdx: i,
-       reversed: alt ? (((pos % 2) === 1) !== firstRev) : firstRev
-      }));
-      considerSol(ord, 'sweep');
-      maybeInfill(ord, 'sweep');
-     }
-    }
-   }
-  }
-  // Family D: nearest-neighbour from sampled starts (extra sequences)
-  const nnStarts = [];
-  if (userStartLocked) nnStarts.push({ idx: startIdx, rev: startReversed });
-  else {
-   nnStarts.push({ idx: spatial.order[0], rev: false }, { idx: spatial.order[0], rev: true });
-   nnStarts.push({ idx: spatial.order[n - 1], rev: false }, { idx: spatial.order[n - 1], rev: true });
-  }
-  for (const cand of nnStarts) {
-   if (optionsEvaluated >= targetOptions || timeUp()) break;
-   considerSol(buildNNSolution(cand.idx, cand.rev), 'nn');
-  }
-  // Family E: fill remaining budget from every spatial rank until 1500, then stop.
-  fillBudget:
-  for (let r = 0; r < n; r++) {
-   if (optionsEvaluated >= targetOptions || timeUp()) break;
-   const sIdx = spatial.order[r];
-   if (userStartLocked && sIdx !== startIdx) continue;
-   for (const sRev of (userStartLocked ? [startReversed] : [false, true])) {
     for (const preferDir of [null, 1, -1]) {
-     for (const k of _kAroundNom(kNom, n)) {
-      if (optionsEvaluated >= targetOptions || timeUp()) break fillBudget;
-      considerSol(buildRacetrackOrderFrom(lines, k, sIdx, sRev, spatial, preferDir), 'racetrack');
-     }
+     if (optionsEvaluated >= targetOptions || timeUp()) break;
+     const rt = buildRacetrackOrderFrom(lines, k, startIdx, startReversed, spatial, preferDir);
+     considerSol(rt, 'racetrack');
+     maybeInfill(rt, 'racetrack');
+    }
+   }
+  } else {
+   for (const k of kWindow) {
+    if (optionsEvaluated >= targetOptions || timeUp()) break;
+    for (const corner of cornerPairs) {
+     if (optionsEvaluated >= targetOptions || timeUp()) break;
+     const rt = buildRacetrackOrder(lines, k, { spatial, ...corner });
+     considerSol(rt, 'racetrack');
+     maybeInfill(rt, 'racetrack');
+    }
+   }
+   // Irregular (non-parallel) spreads: also score corner NN. Never on a
+   // regular grid — NN/2-opt is the tangled tour.
+   if (!parallel) {
+    const lo = spatial.order[0], hi = spatial.order[spatial.order.length - 1];
+    for (const cand of [
+     { idx: lo, rev: false }, { idx: lo, rev: true },
+     { idx: hi, rev: false }, { idx: hi, rev: true }
+    ]) {
+     if (optionsEvaluated >= targetOptions || timeUp()) break;
+     considerSol(buildNNSolution(cand.idx, cand.rev), 'nn');
     }
    }
   }
-  if (bestSolution && n >= 4 && !timeUp() && optionsEvaluated < targetOptions) {
-   considerSol(twoOptImprove(bestSolution.map(o => ({ ...o }))), '2opt');
-  }
+  // Do not 2-opt / or-opt / double-bridge: prefix reversals move the start
+  // into the interior and shred skip-k (rank 138/145/25 on 164 lines).
  }
 
  // Record optimizer stats for reporting. Client sees the min-time plan only.
  state._optimizerStats = {
- mode: nnOnly ? 'nn' : 'fastest-of-n',
- solver: bestConstructor || (nnOnly ? 'nn' : 'enum'),
+ mode: nnOnly ? 'nn' : 'racetrack',
+ solver: bestConstructor || (nnOnly ? 'nn' : 'racetrack'),
  constructor: bestConstructor,
- skipK: kNom,
+ skipK: Math.max(1, Math.min(kNom, n)),
  spacingM,
  optionsEvaluated,
  optionsTarget: targetOptions,
@@ -13326,7 +13278,7 @@ function computeRoute() {
 
  if (state._optimizerStats.capped && optionsEvaluated < targetOptions) {
  showToast(`Optimizer hit the ${Math.round(safetyCapMs / 1000)} s cap after ` +
- `${optionsEvaluated} of ${targetOptions} shooting sequences - shipping the fastest found so far.`, 8000);
+ `${optionsEvaluated} racetrack variant(s) - shipping the best corner skip-k found.`, 8000);
  }
 
  // Use the best (minimum-time) solution found
@@ -13348,7 +13300,7 @@ function computeRoute() {
  let anchor = null;
  for (const prio of sortedPriorities) {
  let blk = groups.get(prio).map(o => ({ ...o }));
- // Do not 2-opt after the 1500-option search: that would resume ILS.
+ // Do not 2-opt after racetrack construction: that would resume ILS.
  if (blk.length > 1 && !nnOnly) blk = directionOptimize(blk);
  anchor = blk[blk.length - 1];
  for (const o of blk) {
@@ -13906,15 +13858,13 @@ function computeDubinsTransitDist(waypoints, startIdx, endIdx) {
 }
 
 // ===== RENDER ROUTE =====
-// Time-gradient color interpolation: green ' cyan ' yellow ' orange ' red
+// Sequence colour: red at the first line, green at the last (contrast on the preplot).
 function timeGradientColor(fraction) {
- // 5-stop gradient: 0=green, 0.25=cyan, 0.5=yellow, 0.75=orange, 1.0=red
  const stops = [
- { t: 0.0, r: 48, g: 209, b: 88 }, // #30d158 green
- { t: 0.25, r: 0, g: 210, b: 255 }, // #00d2ff cyan
- { t: 0.5, r: 255, g: 214, b: 10 }, // #ffd60a yellow
- { t: 0.75, r: 255, g: 149, b: 0 }, // #ff9500 orange
- { t: 1.0, r: 255, g: 69, b: 58 } // #ff453a red
+ { t: 0.0, r: 255, g: 69, b: 58 }, // #ff453a red (start)
+ { t: 0.35, r: 255, g: 149, b: 0 }, // #ff9500 orange
+ { t: 0.65, r: 255, g: 214, b: 10 }, // #ffd60a yellow
+ { t: 1.0, r: 48, g: 209, b: 88 } // #30d158 green (end)
  ];
  const f = Math.max(0, Math.min(1, fraction));
  let lo = stops[0], hi = stops[stops.length - 1];
@@ -13927,6 +13877,26 @@ function timeGradientColor(fraction) {
  const g = Math.round(lo.g + (hi.g - lo.g) * t);
  const b = Math.round(lo.b + (hi.b - lo.b) * t);
  return `rgb(${r},${g},${b})`;
+}
+
+function _routeVisitOrder(waypoints) {
+ const byName = new Map();
+ let n = 0;
+ const route = waypoints || state.route || [];
+ for (let i = 0; i < route.length; i++) {
+  const w = route[i];
+  if (w && w.type === 'lineStart' && w.lineName && !byName.has(w.lineName)) {
+   byName.set(w.lineName, n++);
+  }
+ }
+ return { byName, n };
+}
+
+function visitColorForLine(lineName, visit) {
+ if (!visit || !visit.n) return '#00ff88';
+ const i = visit.byName.get(lineName);
+ if (i == null) return '#8a9bb0';
+ return timeGradientColor(visit.n <= 1 ? 0 : i / (visit.n - 1));
 }
 
 function _addRouteArrow(from, to, color, layer, opacity) {
@@ -14062,6 +14032,7 @@ function renderRoute(waypoints, opts) {
  const highlight = _routeHighlight;
  const overview = _routeViewMode !== 'step' || !highlight;
  const surveyVisible = !!(typeof map !== 'undefined' && map && layerSurveyLines && map.hasLayer(layerSurveyLines));
+ const visit = _routeVisitOrder(waypoints);
 
  const pts = waypoints.map(w => w.pt);
 
@@ -14073,6 +14044,7 @@ function renderRoute(waypoints, opts) {
   const focused = _routeSegFocused(i, highlight);
 
   if (a.type === 'lineStart' && b.type === 'lineEnd' && a.lineName === b.lineName) {
+   const acqColor = visitColorForLine(a.lineName, visit);
    if ((state.obstructions || []).length && findLineObstructionIntersections(a.pt, b.pt).length) {
     state._staleRouteObsHits = (state._staleRouteObsHits || 0) + 1;
     _drawRoutePolyline([a.pt, b.pt], {
@@ -14082,18 +14054,19 @@ function renderRoute(waypoints, opts) {
     _drawRoutePolyline([a.pt, b.pt], {
      color: '#04140a', weight: 6, opacity: 0.85, lineCap: 'round', interactive: false
     });
-    _drawRoutePolyline([a.pt, b.pt], { color: '#30d158', weight: 3.5, opacity: 1, interactive: false });
-    if (layerArrows) _addRouteArrow(a.pt, b.pt, '#30d158', layerArrows);
+    _drawRoutePolyline([a.pt, b.pt], { color: acqColor, weight: 3.5, opacity: 1, interactive: false });
+    if (layerArrows) _addRouteArrow(a.pt, b.pt, acqColor, layerArrows);
    } else if (!surveyVisible) {
-    _drawRoutePolyline([a.pt, b.pt], { color: '#30d158', weight: 1.6, opacity: 0.7, interactive: false });
+    _drawRoutePolyline([a.pt, b.pt], { color: acqColor, weight: 1.6, opacity: 0.7, interactive: false });
    }
-   // else: preplot already shows the line — do not overlay a second rainbow
+   // else: preplot already shows the line, coloured red→green by visit order
   } else if (a.type === 'lineEnd' && b.type === 'runOutEnd' && a.lineName === b.lineName) {
+   const acqColor = visitColorForLine(a.lineName, visit);
    if (focused) {
-    _drawRoutePolyline([a.pt, b.pt], { color: '#30d158', weight: 2.5, opacity: 0.9, dashArray: '8,4', interactive: false });
-    if (layerArrows) _addRouteArrow(a.pt, b.pt, '#30d158', layerArrows, 0.9);
+    _drawRoutePolyline([a.pt, b.pt], { color: acqColor, weight: 2.5, opacity: 0.9, dashArray: '8,4', interactive: false });
+    if (layerArrows) _addRouteArrow(a.pt, b.pt, acqColor, layerArrows, 0.9);
    } else if (!overview) {
-    _drawRoutePolyline([a.pt, b.pt], { color: '#2a6a40', weight: 1.2, opacity: 0.55, dashArray: '8,4', interactive: false });
+    _drawRoutePolyline([a.pt, b.pt], { color: acqColor, weight: 1.2, opacity: 0.55, dashArray: '8,4', interactive: false });
    }
   } else if (a.type === 'runInStart' && b.type === 'lineStart' && a.lineName === b.lineName) {
    if (focused) {
@@ -14146,11 +14119,11 @@ function renderRoute(waypoints, opts) {
  }
 
  L.circleMarker(pts[0], {
-  radius: 7, color: '#fff', fillColor: '#1abc9c', fillOpacity: 1, weight: 2
+  radius: 7, color: '#fff', fillColor: '#ff453a', fillOpacity: 1, weight: 2
  }).bindTooltip('Start', { permanent: false }).addTo(layerAnnotations);
 
  L.circleMarker(pts[pts.length - 1], {
-  radius: 7, color: '#fff', fillColor: '#e74c3c', fillOpacity: 1, weight: 2
+  radius: 7, color: '#fff', fillColor: '#30d158', fillOpacity: 1, weight: 2
  }).bindTooltip('End', { permanent: false }).addTo(layerAnnotations);
 
  if (state.showAnnotations && !overview) {
@@ -14702,8 +14675,8 @@ function showRouteTimeline(route) {
  document.getElementById('main').appendChild(bar);
  }
 
- // Build smooth gradient CSS matching the route line colors (green'cyan'yellow'orange'red)
- const gradientStops = '#30d158 0%, #00d2ff 25%, #ffd60a 50%, #ff9500 75%, #ff453a 100%';
+ // Timeline matches the map: red at start, green at end
+ const gradientStops = '#ff453a 0%, #ff9500 35%, #ffd60a 65%, #30d158 100%';
 
  let markersHtml = '';
  dayMarkers.forEach(m => {
@@ -14782,7 +14755,7 @@ function showPlanningOverlay(show) {
  ov.innerHTML = `<div id="planning-card">
  ${_vesselLoaderHTML()}
  <h3>Planning Route...</h3>
- <p>Scoring ${state.settings.optimizerIterations || 1500} shooting sequences (line order × direction × start). The plan you get is the fastest of those options.</p>
+ <p>Building a skip-k racetrack (k ≈ 2R / line spacing) from a survey corner. 3D finishes each swath as a block.</p>
  </div>`;
  document.getElementById('main').appendChild(ov);
  }
