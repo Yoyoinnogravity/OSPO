@@ -104,10 +104,9 @@ const focus = ctx._routeTransitFocusStyle();
 
 assert(overview, 'overview transit style missing');
 assert(focus, 'focus transit style missing');
-assert(overview.weight <= 1.3, 'overview line-changes must be thin, got weight ' + overview.weight);
+assert(overview.weight >= 2.2, 'overview line-changes must be visible, got weight ' + overview.weight);
 assert(String(overview.color).toLowerCase() !== '#ff9500', 'overview must not use screaming orange #ff9500');
-assert(focus.weight >= 2.2, 'selected leg must be heavier than overview');
-assert(focus.color !== overview.color, 'selected leg colour must differ from overview');
+assert(focus.weight >= 2.2, 'selected leg must stay visible');
 assert(ctx._routeSegFocused(0, null) === false, 'no highlight means nothing focused');
 assert(ctx._routeSegFocused(3, { startWpIdx: 2, endWpIdx: 5 }) === true, 'segment inside highlight');
 assert(ctx._routeSegFocused(5, { startWpIdx: 2, endWpIdx: 5 }) === false, 'end index is exclusive');
@@ -116,13 +115,14 @@ assert(ctx._routeSegFocused(1, { startWpIdx: 2, endWpIdx: 5 }) === false, 'befor
 assert(!src.includes("color: '#ff9500', weight: 2.5, opacity: 0.85"),
   'old heavy orange transit stroke must be gone');
 assert(src.includes("_routeTransitOverviewStyle"), 'overview style helper missing');
+assert(src.includes('function _fitMapToPlannedRoute'), 'plan must fit the map to the vessel route');
 assert(src.includes("mode: 'overview'"), 'plan/show-all must request overview drawing');
 assert(src.includes("mode: 'step'"), 'stepper must request step drawing');
 assert(!/const subset = state\.route\.slice/.test(src),
   'stepper must not slice the route (that hid context and still scribbled on Show All)');
 assert(html.includes('id="route-step-all-btn"'), 'Show All button needs an id');
-assert(/app\.js\?v=17\.11/.test(html), 'app.js cache bump missing');
-assert(/style\.min\.css\?v=3\.32/.test(html), 'css cache bump missing');
+assert(/app\.js\?v=17\.19/.test(html), 'app.js cache bump missing');
+assert(/style\.min\.css\?v=3\.33/.test(html), 'css cache bump missing');
 
 console.log(JSON.stringify({
   ok: true,

@@ -107,9 +107,16 @@ vm.runInContext(`
   else { const _t = showToast; showToast = function(){}; }
 `, ctx);
 
-assert(/app\.js\?v=17\.17/.test(html), 'app.js cache bump 17.17 missing');
+assert(/app\.js\?v=17\.19/.test(html), 'app.js cache bump 17.19 missing');
+assert(/id="val-turn-radius">3\.5km/.test(html), 'toolbar RADIUS default must be 3.5km not 5.1');
+assert(/id="input-turn-radius" value="3500"/.test(html), 'turn-radius input default must be 3500 m');
+assert(!/value="5100"/.test(html), 'HTML must not default min turn radius to 5100');
 assert(src.includes("createPane('routePane')"), 'planned route must have its own map pane');
+assert(src.includes('function _fitMapToPlannedRoute'), 'after a plan the map must fit to the vessel route');
+assert(src.includes('function dubinsMinRadiusFallback'), 'heading-change must not fall back to a straight chord');
+assert(src.includes('colour clock starts at first acquisition'), 'time colour must start at first lineStart t=0');
 assert(src.includes(".addTo(layerRoute)"), 'Start/End markers must sit on the route layer');
+assert(!src.includes('else if (!surveyVisible)'), 'Show All must still paint on-line vessel track');
 assert(src.includes('Load a preplot first, then click Route Planning'), 'empty Plan Route must toast, not silent-return');
 assert(src.includes('if (showStartLineChooser()) return'), 'chooser miss must still executePlanRoute');
 assert(html.includes('1500 sequences, keep the fastest'), 'chooser Auto must score 1500 then keep the fastest');
@@ -324,20 +331,47 @@ assert(sameHead / 81 < 0.25,
   '3D first swath headings must alternate (racetrack), same-heading hops=' + sameHead);
 
 const nameS1 = 'L' + (1000 + t3d.ranks[0]);
-const nameS2 = 'L' + (1000 + t3d.ranks[82]);
+const nameLast = 'L' + (1000 + t3d.ranks[t3d.ranks.length - 1]);
 const col = vm.runInContext(`
   (function() {
     const v = _routeVisitOrder(state._lastRoute);
-    return {
-      a: visitColorForLine(${JSON.stringify(nameS1)}, v),
-      b: visitColorForLine(${JSON.stringify(nameS2)}, v),
-      nLocal: v.localByName ? v.localByName.size : 0
-    };
+    const a = visitColorForLine(${JSON.stringify(nameS1)}, v);
+    const z = visitColorForLine(${JSON.stringify(nameLast)}, v);
+    const t0 = v.t0ByName && v.t0ByName.get(${JSON.stringify(nameS1)});
+    const tZ = v.t0ByName && v.t0ByName.get(${JSON.stringify(nameLast)});
+    return { a, z, t0, tZ, total: v.totalSec };
   })()
 `, ctx);
-assert(col.nLocal === 164, '3D must colour per swath, local n=' + col.nLocal);
-assert(col.a === col.b,
-  'first line of each swath must be the same start colour (equal red→green), got ' + col.a + ' vs ' + col.b);
+assert(col.total > 0 && col.t0 === 0, 'first line must sit at t=0, t0=' + col.t0);
+assert(col.tZ > col.t0, 'last line must be later in time than the first');
+assert(col.a === 'rgb(255,69,58)', 'first line in time must be red, got ' + col.a);
+assert(col.z !== col.a, 'last line in time must not match the start colour');
+
+const turnGeom = vm.runInContext(`
+  (function() {
+    state.settings.turnRadius = 3500;
+    const r = getEffectiveTurnRadius();
+    const lat0 = -20.5, lon0 = 110.2;
+    const mLat = 111320;
+    const mLon = 111320 * Math.cos(lat0 * Math.PI / 180);
+    const L0s = [lat0, lon0];
+    const L0e = [lat0, lon0 + 20000 / mLon];
+    const L1e = [lat0 + 6670 / mLat, lon0 + 20000 / mLon];
+    const brng = bearing(L0s, L0e);
+    const ro = destinationPoint(L0e, brng, 7500);
+    const ri = destinationPoint(L1e, (brng + 180) % 360, 7500);
+    const wps = [
+      { type: 'lineEnd', pt: L0e, lineName: 'A' },
+      { type: 'runOutEnd', pt: ro, lineName: 'A' },
+      { type: 'runInStart', pt: ri, lineName: 'B' },
+      { type: 'lineStart', pt: L1e, lineName: 'B' },
+    ];
+    const arc = computeArcTurn(wps, 1);
+    return { n: arc.length, R: r };
+  })()
+`, ctx);
+assert(turnGeom.R === 3500, 'min R must stay at user 3500 m, got ' + turnGeom.R);
+assert(turnGeom.n > 4, 'line-change must be a Dubins curve, not a 2-pt chord, n=' + turnGeom.n);
 
 const liveLike = makeGrid(164, 667, 44500);
 const tLive = plan(liveLike, { surveyType: '3d', progression: 'interleaved', numSwaths: 2, turnRadius: 3500 });
@@ -360,7 +394,7 @@ assert(src.includes('min="1" max="100"'), 'Line Manager UI 1-100 missing');
 
 console.log(JSON.stringify({
   ok: true,
-  cache: '17.17',
+  cache: '17.19',
   rule: 'skip-k racetrack from a corner; 3D skip-k racetrack per swath',
   kNom,
   nn: { visit: nn.nVisit, mode: nn.stats.mode, ms: nn.ms },

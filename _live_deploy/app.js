@@ -8663,20 +8663,19 @@ function hideSurveyOverlay() {
 }
 
 // ===== SETTINGS APPLY =====
-/** Live min turn radius: prefer the open panel input so Apply is not required mid-plan. */
+/** Live min turn radius: the toolbar / Survey Criteria value. Never let the
+ *  hidden #input-turn-radius HTML default (5100) override the user setting. */
 function getEffectiveTurnRadius() {
- const fromInput = parseFloat(document.getElementById('input-turn-radius')?.value);
- if (isFinite(fromInput) && fromInput >= 100) {
-  if (state.settings.turnRadius !== fromInput) state.settings.turnRadius = fromInput;
-  return fromInput;
- }
  const fromCrit = parseFloat(document.getElementById('crit-radius')?.value);
- if (isFinite(fromCrit) && fromCrit >= 100) {
-  if (state.settings.turnRadius !== fromCrit) state.settings.turnRadius = fromCrit;
-  return fromCrit;
- }
- const r = parseFloat(state.settings.turnRadius);
- return (isFinite(r) && r >= 100) ? r : 3500;
+ const fromState = parseFloat(state.settings && state.settings.turnRadius);
+ const fromInput = parseFloat(document.getElementById('input-turn-radius')?.value);
+ let r;
+ if (isFinite(fromState) && fromState >= 100) r = fromState;
+ else if (isFinite(fromCrit) && fromCrit >= 100) r = fromCrit;
+ else if (isFinite(fromInput) && fromInput >= 100) r = fromInput;
+ else r = 3500;
+ if (state.settings) state.settings.turnRadius = r;
+ return r;
 }
 
 function syncTurnRadiusUi() {
@@ -12051,8 +12050,8 @@ function executePlanRoute() {
  state._optimizerStats = null;
  const route = computeRoute();
  state.route = route;
-      renderRoute(route, { mode: 'overview', highlight: null });
-      renderSurveyLines(); // refresh preplot gaps through exclusions
+ renderSurveyLines(); // refresh preplot gaps through exclusions
+ renderRoute(route, { mode: 'overview', highlight: null, fit: true });
  showRouteStats(route);
  const nDetours = (route || []).filter(w => w.type === 'obsAvoidStart' || w.type === 'transit-detour').length;
  if ((state.obstructions || []).length && nDetours > 0) {
@@ -13910,8 +13909,7 @@ function dubinsShortestPath(x1, y1, th1, x2, y2, th2, R) {
  ].filter(p =>p !== null);
 
  if (paths.length === 0) {
- // Fallback: straight line
- return [[x1, y1], [x2, y2]];
+ return dubinsMinRadiusFallback(x1, y1, th1, x2, y2, th2, R);
  }
 
  // Shortest first, but only accept a candidate whose generated geometry actually
@@ -13925,6 +13923,27 @@ function dubinsShortestPath(x1, y1, th1, x2, y2, th2, R) {
  if (Math.hypot(end[0] - x2, end[1] - y2) <= tol) return pts;
  }
  return dubinsGeneratePoints(x1, y1, th1, paths[0].segments, R, phi);
+}
+
+/** Never chord a heading change: that is a zero-radius turn. Sample two
+ *  min-R arcs (leave + arrive) so the vessel path stays at radius R. */
+function dubinsMinRadiusFallback(x1, y1, th1, x2, y2, th2, R) {
+ const dH = Math.abs(mod2pi(th2) - mod2pi(th1));
+ const headingDelta = dH > Math.PI ? (2 * Math.PI - dH) : dH;
+ if (headingDelta < 0.04) return [[x1, y1], [x2, y2]];
+ const n = 20;
+ const pts = [];
+ const c1 = [x1 - R * Math.sin(th1), y1 + R * Math.cos(th1)];
+ for (let i = 0; i <= n; i++) {
+  const a = th1 - Math.PI / 2 + (i / n) * Math.PI;
+  pts.push([c1[0] + R * Math.cos(a), c1[1] + R * Math.sin(a)]);
+ }
+ const c2 = [x2 - R * Math.sin(th2), y2 + R * Math.cos(th2)];
+ for (let i = 0; i <= n; i++) {
+  const a = th2 + Math.PI / 2 - (i / n) * Math.PI;
+  pts.push([c2[0] + R * Math.cos(a), c2[1] + R * Math.sin(a)]);
+ }
+ return pts;
 }
 
 function mod2pi(angle) {
@@ -14079,7 +14098,7 @@ function computeDubinsTransitDist(waypoints, startIdx, endIdx) {
 }
 
 // ===== RENDER ROUTE =====
-// Sequence colour: red at the first line, green at the last (contrast on the preplot).
+// Sequence colour: placed on time — red at survey start, green at survey end.
 function timeGradientColor(fraction) {
  const stops = [
  { t: 0.0, r: 255, g: 69, b: 58 }, // #ff453a red (start)
@@ -14100,57 +14119,47 @@ function timeGradientColor(fraction) {
  return `rgb(${r},${g},${b})`;
 }
 
+function _routeSegTimeSec(waypoints, i, onlineMs, turnMs) {
+ const a = waypoints[i], b = waypoints[i + 1];
+ if (!a || !b || !a.pt || !b.pt) return 0;
+ const sameLine = a.lineName && b.lineName && a.lineName === b.lineName;
+ const isRunIn = sameLine && a.type === 'runInStart';
+ const isObs = a.type === 'obsAvoidStart' || a.type === 'obsAvoidance' || a.type === 'obsAvoidEnd' ||
+  b.type === 'obsAvoidStart' || b.type === 'obsAvoidance' || b.type === 'obsAvoidEnd';
+ const dist = haversine(a.pt, b.pt);
+ const online = sameLine && !isRunIn && !isObs;
+ return dist / (online ? onlineMs : turnMs);
+}
+
 function _routeVisitOrder(waypoints) {
  const byName = new Map();
+ const t0ByName = new Map();
  let n = 0;
  const route = waypoints || state.route || [];
+ const onlineKn = (state.settings && state.settings.speed) || 4.5;
+ const turnKn = (state.settings && (state.settings.turnSpeed || state.settings.speed)) || 6;
+ const onlineMs = Math.max(0.05, onlineKn * 0.514444);
+ const turnMs = Math.max(0.05, turnKn * 0.514444);
+ let t = 0;
  for (let i = 0; i < route.length; i++) {
   const w = route[i];
   if (w && w.type === 'lineStart' && w.lineName && !byName.has(w.lineName)) {
+   if (n === 0) t = 0; // colour clock starts at first acquisition, not the approach run-in
    byName.set(w.lineName, n++);
+   t0ByName.set(w.lineName, t);
   }
+  if (i < route.length - 1) t += _routeSegTimeSec(route, i, onlineMs, turnMs);
  }
- // 3D: each swath gets its own red→green. Global 0..n made Swath 1 all red
- // and Swath 2 all green ("north red, south green"). Equal contrast per swath.
- const localByName = new Map();
- const nSw = (state.settings && state.settings.numSwaths) || 1;
- const is3d = state.settings && state.settings.surveyType === '3d' && nSw >= 2;
- if (is3d && typeof _computeSwathGroups === 'function') {
-  const groups = _computeSwathGroups(nSw, state.settings.progression || 'interleaved');
-  const swathOf = new Map();
-  for (let g = 0; g < groups.length; g++) {
-   const grp = groups[g] || [];
-   for (let k = 0; k < grp.length; k++) {
-    if (grp[k] && grp[k].name) swathOf.set(grp[k].name, g);
-   }
-  }
-  const per = [];
-  for (let g = 0; g < groups.length; g++) per[g] = [];
-  const ordered = [];
-  byName.forEach((vi, name) => { ordered.push({ name, vi }); });
-  ordered.sort((a, b) => a.vi - b.vi);
-  for (let i = 0; i < ordered.length; i++) {
-   const name = ordered[i].name;
-   const g = swathOf.has(name) ? swathOf.get(name) : 0;
-   if (!per[g]) per[g] = [];
-   per[g].push(name);
-  }
-  for (let g = 0; g < per.length; g++) {
-   const list = per[g];
-   for (let li = 0; li < list.length; li++) {
-    localByName.set(list[li], { i: li, n: list.length });
-   }
-  }
- }
- return { byName, n, localByName };
+ return { byName, n, t0ByName, totalSec: t };
 }
 
 function visitColorForLine(lineName, visit) {
  if (!visit || !visit.n) return '#00ff88';
+ if (visit.t0ByName && visit.totalSec > 0 && visit.t0ByName.has(lineName)) {
+  return timeGradientColor(visit.t0ByName.get(lineName) / visit.totalSec);
+ }
  const i = visit.byName.get(lineName);
  if (i == null) return '#8a9bb0';
- const local = visit.localByName && visit.localByName.get(lineName);
- if (local && local.n > 1) return timeGradientColor(local.i / (local.n - 1));
  return timeGradientColor(visit.n <= 1 ? 0 : i / (visit.n - 1));
 }
 
@@ -14255,8 +14264,28 @@ function _routeSegFocused(i, hl) {
  return i >= a && i < b;
 }
 
+function _ensureRoutePane() {
+ if (typeof map === 'undefined' || !map) return;
+ if (!map.getPane || map.getPane('routePane')) return;
+ map.createPane('routePane');
+ map.getPane('routePane').style.zIndex = 450;
+ map.getPane('routePane').style.pointerEvents = 'none';
+}
+
+function _fitMapToPlannedRoute() {
+ if (typeof map === 'undefined' || !map || !layerRoute) return;
+ if (!map.hasLayer(layerRoute)) map.addLayer(layerRoute);
+ try {
+  const b = layerRoute.getBounds && layerRoute.getBounds();
+  if (b && typeof b.isValid === 'function' && b.isValid()) {
+   map.fitBounds(b.pad(0.15), { animate: false, maxZoom: 12 });
+  }
+ } catch (_) {}
+}
+
 function _drawRoutePolyline(latlngs, style) {
  if (!latlngs || latlngs.length < 2 || !layerRoute) return;
+ _ensureRoutePane();
  if (typeof map !== 'undefined' && map && !map.hasLayer(layerRoute)) map.addLayer(layerRoute);
  L.polyline(latlngs, Object.assign({ pane: 'routePane' }, style)).addTo(layerRoute);
 }
@@ -14278,6 +14307,7 @@ function _drawFocusedTransit(arcPts) {
 function renderRoute(waypoints, opts) {
  opts = opts || {};
  if (!waypoints || !waypoints.length) waypoints = state.route;
+ _ensureRoutePane();
  if (typeof map !== 'undefined' && map && layerRoute && !map.hasLayer(layerRoute)) {
   map.addLayer(layerRoute);
  }
@@ -14293,17 +14323,20 @@ function renderRoute(waypoints, opts) {
  if (opts.highlight !== undefined) _routeHighlight = opts.highlight;
  const highlight = _routeHighlight;
  const overview = _routeViewMode !== 'step' || !highlight;
- const surveyVisible = !!(typeof map !== 'undefined' && map && layerSurveyLines && map.hasLayer(layerSurveyLines));
  const visit = _routeVisitOrder(waypoints);
 
  const pts = waypoints.map(w => w.pt);
+ let startPt = null, endPt = null;
 
- // Survey lines: the preplot already is the on-line track. Overview does not
- // re-paint them (that doubled the grid). Line-changes stay visible as a
- // thin muted vessel path. The selected stepper leg is the only heavy stroke.
+ // Always draw the vessel sail: on-line, run-in/out, and Dubins line-change
+ // turns. Skipping on-line because the preplot exists left Show All blank;
+ // the U-turns sit past run-out, so they must stay painted and the map
+ // must fit to them after a plan.
  for (let i = 0; i < waypoints.length - 1; i++) {
   const a = waypoints[i], b = waypoints[i + 1];
   const focused = _routeSegFocused(i, highlight);
+  if (a.type === 'lineStart' && !startPt) startPt = a.pt;
+  if (b.type === 'lineEnd') endPt = b.pt;
 
   if (a.type === 'lineStart' && b.type === 'lineEnd' && a.lineName === b.lineName) {
    const acqColor = visitColorForLine(a.lineName, visit);
@@ -14318,10 +14351,9 @@ function renderRoute(waypoints, opts) {
     });
     _drawRoutePolyline([a.pt, b.pt], { color: acqColor, weight: 3.5, opacity: 1, interactive: false });
     if (layerArrows) _addRouteArrow(a.pt, b.pt, acqColor, layerArrows);
-   } else if (!surveyVisible) {
-    _drawRoutePolyline([a.pt, b.pt], { color: acqColor, weight: 1.6, opacity: 0.7, interactive: false });
+   } else {
+    _drawRoutePolyline([a.pt, b.pt], { color: acqColor, weight: 2.4, opacity: 0.95, interactive: false });
    }
-   // else: preplot already shows the line, coloured red→green by visit order
   } else if (a.type === 'lineEnd' && b.type === 'runOutEnd' && a.lineName === b.lineName) {
    const acqColor = visitColorForLine(a.lineName, visit);
    if (focused) {
@@ -14382,16 +14414,19 @@ function renderRoute(waypoints, opts) {
   }
  }
 
- if (layerRoute && pts.length) {
-  L.circleMarker(pts[0], {
+ startPt = startPt || (pts.length ? pts[0] : null);
+ endPt = endPt || (pts.length ? pts[pts.length - 1] : null);
+ if (layerRoute && startPt && endPt) {
+  L.circleMarker(startPt, {
    pane: 'routePane',
    radius: 8, color: '#fff', fillColor: '#ff453a', fillOpacity: 1, weight: 2
   }).bindTooltip('Start', { permanent: false }).addTo(layerRoute);
-  L.circleMarker(pts[pts.length - 1], {
+  L.circleMarker(endPt, {
    pane: 'routePane',
    radius: 8, color: '#fff', fillColor: '#30d158', fillOpacity: 1, weight: 2
   }).bindTooltip('End', { permanent: false }).addTo(layerRoute);
  }
+ if (overview && opts.fit !== false) _fitMapToPlannedRoute();
 
  if (state.showAnnotations && !overview) {
   let lineNum = 1;
