@@ -107,7 +107,7 @@ vm.runInContext(`
   else { const _t = showToast; showToast = function(){}; }
 `, ctx);
 
-assert(/app\.js\?v=17\.11/.test(html), 'app.js cache bump 17.11 missing');
+assert(/app\.js\?v=17\.12/.test(html), 'app.js cache bump 17.12 missing');
 assert(html.includes('skip-k racetrack'), 'chooser Auto must describe skip-k racetrack');
 assert(!html.includes('fastest of 1500 options'), 'chooser must not advertise 1500-option TSP');
 assert(html.includes('simple nearest neighbour'), 'auto-nn must stay real NN');
@@ -272,10 +272,52 @@ assert(t3d.stats && t3d.stats.mode === 'swath-blocks',
   '3D mode should be swath-blocks, got ' + (t3d.stats && t3d.stats.mode));
 const zig = t3d.ranks[0] === 0 && t3d.ranks[1] === 82 && t3d.ranks[2] === 1 && t3d.ranks[3] === 83;
 assert(!zig, '3D must not zigzag 0,82,1,83 (line-level swath interleave)');
-assert(t3d.skip.mean < 5,
-  `3D skip mean ${t3d.skip.mean.toFixed(2)} — block-complete is adjacent (~1), zigzag is ~82`);
-assert(t3d.skip.pingPong < 0.15,
-  `3D ping-pong ${t3d.skip.pingPong.toFixed(3)} — block-complete should almost never reverse`);
+const first82 = t3d.ranks.slice(0, 82);
+const swathLo = first82.every((r) => r < 82);
+const swathHi = first82.every((r) => r >= 82);
+assert(swathLo || swathHi,
+  '3D must finish one swath before the other, first8=' + first82.slice(0, 8).join(','));
+assert(!(t3d.ranks[0] === 0 && t3d.ranks[1] === 1 && t3d.ranks[2] === 2),
+  '3D must not crawl adjacent 0,1,2 inside a swath (same-heading sail-back)');
+const inSwath = skipStats(first82);
+assert(Math.abs(inSwath.mode - kNom) <= 2,
+  `3D within-swath skip mode ${inSwath.mode} not near k=${kNom}`);
+assert(inSwath.modeFrac > 0.55,
+  `3D within-swath only ${(inSwath.modeFrac * 100).toFixed(1)}% skip-${inSwath.mode}; racetrack should dominate`);
+
+const headings = vm.runInContext(`
+  (function() {
+    const w = state._lastRoute || [];
+    const lines = state.lines;
+    const out = [];
+    const seen = new Set();
+    for (const x of w) {
+      if (x.type !== 'lineStart' || !x.lineName || seen.has(x.lineName)) continue;
+      seen.add(x.lineName);
+      const L = lines.find(l => l.name === x.lineName);
+      if (!L || !x.pt) continue;
+      const dS = Math.hypot(x.pt[0] - L.start[0], x.pt[1] - L.start[1]);
+      const dE = Math.hypot(x.pt[0] - L.end[0], x.pt[1] - L.end[1]);
+      out.push(dE < dS);
+    }
+    return out;
+  })()
+`, ctx);
+let sameHead = 0;
+for (let i = 1; i < Math.min(headings.length, 82); i++) {
+  if (headings[i] === headings[i - 1]) sameHead++;
+}
+assert(sameHead / 81 < 0.25,
+  '3D first swath headings must alternate (racetrack), same-heading hops=' + sameHead);
+
+const liveLike = makeGrid(164, 667, 44500);
+const tLive = plan(liveLike, { surveyType: '3d', progression: 'interleaved', numSwaths: 2, turnRadius: 3500 });
+assert(tLive.nVisit === 164, '667m 3D must visit all 164');
+const liveFirst = tLive.ranks.slice(0, 82);
+assert(liveFirst.every((r) => r < 82) || liveFirst.every((r) => r >= 82),
+  '667m 3D must stay in one swath for the first 82 visits');
+assert(!(tLive.ranks[0] === 0 && tLive.ranks[1] === 1),
+  '667m 3D must not adjacent-crawl (k ≈ 2R/667 ≈ 10)');
 
 // Line Manager 1-100: high-priority lines acquired first, still a racetrack within the bucket.
 vm.runInContext(`
@@ -289,8 +331,8 @@ assert(src.includes('min="1" max="100"'), 'Line Manager UI 1-100 missing');
 
 console.log(JSON.stringify({
   ok: true,
-  cache: '17.11',
-  rule: 'skip-k racetrack from a corner; 3D block-complete swaths',
+  cache: '17.12',
+  rule: 'skip-k racetrack from a corner; 3D skip-k racetrack per swath',
   kNom,
   nn: { visit: nn.nVisit, mode: nn.stats.mode, ms: nn.ms },
   auto12: { first: auto12.skip.first, mean: +auto12.skip.mean.toFixed(2), mode: auto12.stats.mode },
@@ -309,12 +351,20 @@ console.log(JSON.stringify({
     h: t2d.stats.finalSec != null ? +(t2d.stats.finalSec / 3600).toFixed(2) : null,
   },
   t3d: {
-    first4: t3d.ranks.slice(0, 4),
-    mean: +t3d.skip.mean.toFixed(2),
-    pingPong: +t3d.skip.pingPong.toFixed(3),
+    first8: t3d.ranks.slice(0, 8),
+    inSwathMode: inSwath.mode,
+    inSwathModeFrac: +inSwath.modeFrac.toFixed(3),
+    sameHeadHops: sameHead,
     mode: t3d.stats.mode,
+    skipK: t3d.stats.skipK,
     options: t3d.stats.optionsEvaluated,
     ms: t3d.ms,
+  },
+  tLive667: {
+    first8: tLive.ranks.slice(0, 8),
+    mode: tLive.stats && tLive.stats.mode,
+    skipK: tLive.stats && tLive.stats.skipK,
+    ms: tLive.ms,
   },
 }, null, 2));
 process.exit(0);
