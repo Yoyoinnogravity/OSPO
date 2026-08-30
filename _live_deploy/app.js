@@ -10725,7 +10725,8 @@ function _syncStartPlanSelectForSurveyType() {
 
 function showStartLineChooser() {
  const sel = document.getElementById('start-line-select');
- if (!sel || state.lines.length === 0) return;
+ const box = document.getElementById('start-line-chooser');
+ if (!sel || !box || state.lines.length === 0) return false;
 
  // Populate dropdown with line names
  sel.innerHTML = '';
@@ -10757,6 +10758,7 @@ function showStartLineChooser() {
  if (itEl) itEl.value = state.settings.optimizerIterations || 1500;
 
  document.getElementById('start-line-chooser').style.display = 'flex';
+ return true;
 }
 
 // Persist the chooser'plan strategy + iteration budget into settings.
@@ -12007,15 +12009,14 @@ function lmSolveRoute() {
 }
 
 function planRoute() {
- if (state.lines.length === 0) return;
+ if (state.lines.length === 0) {
+  showToast('Load a preplot first, then click Route Planning.', 4000);
+  return;
+ }
 
  confirmSurveyPlanTypeThen(() => {
-  // Show start line chooser on first plan after loading lines - but only if the
-  // start wasn't already specified in the Survey Criteria dialog (Start Point /
-  // Start Time), in which case that selection is used directly.
   if (!_startLineChooserShown && !state.settings.startConfigured) {
-   showStartLineChooser();
-   return;
+   if (showStartLineChooser()) return;
   }
   executePlanRoute();
  });
@@ -14186,9 +14187,9 @@ let _routeHighlight = null; // { startWpIdx, endWpIdx } or null
 
 function _routeTransitOverviewStyle() {
  return {
-  color: '#8a6230',
-  weight: 0.85,
-  opacity: 0.32,
+  color: '#d4a04a',
+  weight: 1.35,
+  opacity: 0.7,
   lineCap: 'round',
   lineJoin: 'round',
   interactive: false,
@@ -14286,7 +14287,7 @@ function renderRoute(waypoints, opts) {
   } else if (a.type === 'runInStart' && b.type === 'lineStart' && a.lineName === b.lineName) {
    if (focused) {
     _drawFocusedTransit([a.pt, b.pt]);
-   } else if (!overview) {
+   } else {
     _drawRoutePolyline([a.pt, b.pt], _routeTransitOverviewStyle());
    }
   } else if ((a.type === 'obsAvoidStart' || a.type === 'obsAvoidance' || a.type === 'obsAvoidEnd') &&
@@ -14302,9 +14303,9 @@ function renderRoute(waypoints, opts) {
     }
     if (focused) {
      _drawFocusedTransit(obsAvoidPts);
-    } else if (!overview) {
+    } else {
      _drawRoutePolyline(obsAvoidPts, {
-      color: '#b89620', weight: 1.15, opacity: 1, dashArray: '5,5',
+      color: '#b89620', weight: 1.15, opacity: 0.85, dashArray: '5,5',
       lineCap: 'round', interactive: false
      });
     }
@@ -14316,16 +14317,14 @@ function renderRoute(waypoints, opts) {
    a.type === 'transit-detour' || b.type === 'transit-detour') {
    if (focused) {
     _drawFocusedTransit([a.pt, b.pt]);
-   } else if (!overview) {
+   } else {
     _drawRoutePolyline([a.pt, b.pt], {
-     color: '#b89620', weight: 1.15, opacity: 1, dashArray: '5,5',
+     color: '#b89620', weight: 1.15, opacity: 0.85, dashArray: '5,5',
      lineCap: 'round', interactive: false
     });
    }
   } else {
-   // Transit / line turn. Show All must not paint every Dubins loop — that
-   // is the orange hairball. Prev/Next/Simulate draws the focused leg.
-   if (overview && !focused) continue;
+   // Transit / line turn — skip-k U-turns on Show All (not the same-heading hairball)
    const arcPts = computeArcTurn(waypoints, i);
    if (focused) {
     _drawFocusedTransit(arcPts);
@@ -14972,7 +14971,7 @@ function showPlanningOverlay(show) {
  ov.innerHTML = `<div id="planning-card">
  ${_vesselLoaderHTML()}
  <h3>Planning Route...</h3>
- <p>Building a skip-k racetrack (k ≈ 2R / line spacing) from a survey corner. 3D finishes each swath as a block.</p>
+ <p>Scoring up to 1500 shooting sequences, then keeping the fastest. 3D does this per swath.</p>
  </div>`;
  document.getElementById('main').appendChild(ov);
  }

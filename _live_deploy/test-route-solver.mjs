@@ -107,8 +107,9 @@ vm.runInContext(`
   else { const _t = showToast; showToast = function(){}; }
 `, ctx);
 
-assert(/app\.js\?v=17\.14/.test(html), 'app.js cache bump 17.14 missing');
-assert(src.includes('if (overview && !focused) continue'), 'Show All must not paint every Dubins line-change');
+assert(/app\.js\?v=17\.15/.test(html), 'app.js cache bump 17.15 missing');
+assert(src.includes('Load a preplot first, then click Route Planning'), 'empty Plan Route must toast, not silent-return');
+assert(src.includes('if (showStartLineChooser()) return'), 'chooser miss must still executePlanRoute');
 assert(html.includes('1500 sequences, keep the fastest'), 'chooser Auto must score 1500 then keep the fastest');
 assert(html.includes('skip-k racetrack'), 'chooser Auto must describe skip-k racetrack');
 assert(!html.includes('fastest of 1500 options'), 'chooser must not advertise 1500-option TSP');
@@ -341,7 +342,7 @@ assert(src.includes('min="1" max="100"'), 'Line Manager UI 1-100 missing');
 
 console.log(JSON.stringify({
   ok: true,
-  cache: '17.14',
+  cache: '17.15',
   rule: 'skip-k racetrack from a corner; 3D skip-k racetrack per swath',
   kNom,
   nn: { visit: nn.nVisit, mode: nn.stats.mode, ms: nn.ms },
