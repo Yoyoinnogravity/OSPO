@@ -137,6 +137,30 @@ assert(!/id="layer-toggle-labels"\s+checked/.test(html), 'Layers menu labels che
 assert(html.includes('LABELS OFF / ON under the preplot summary') || html.includes('toggleLabels()'), 'map A button still present');
 assert(/app\.js\?v=16\.89/.test(html), 'app.js cache bump missing');
 
+const els = {};
+const kids = [];
+document.getElementById = (id) => els[id] || null;
+document.createElement = (tag) => {
+  const el = elStub(tag);
+  Object.defineProperty(el, 'id', {
+    configurable: true,
+    get() { return this._id || ''; },
+    set(v) { this._id = v; if (v) els[v] = this; },
+  });
+  return el;
+};
+const stack = elStub('survey-summary-stack');
+stack.appendChild = (child) => { kids.push(child); if (child.id) els[child.id] = child; return child; };
+
+const overlay = ctx._ensureMapDisplayToggle(stack);
+assert(overlay, 'map-display overlay must be created under the preplot summary');
+assert(overlay.innerHTML.includes('LABELS OFF'), 'overlay must show LABELS OFF');
+assert(overlay.innerHTML.includes('LABELS ON'), 'overlay must show LABELS ON');
+assert(/id="labels-tab-off"[^>]*\bactive/.test(overlay.innerHTML), 'OFF tab must be active after load');
+assert(!/id="labels-tab-on"[^>]*\bactive/.test(overlay.innerHTML), 'ON tab must not be active after load');
+assert(overlay.innerHTML.includes('MAP LABELS'), 'overlay title MAP LABELS missing');
+assert(kids.length >= 1, 'overlay must be appended under the summary stack');
+
 console.log(JSON.stringify({
   ok: true,
   defaultOff: true,
