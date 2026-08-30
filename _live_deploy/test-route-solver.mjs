@@ -107,7 +107,7 @@ vm.runInContext(`
   else { const _t = showToast; showToast = function(){}; }
 `, ctx);
 
-assert(/app\.js\?v=17\.19/.test(html), 'app.js cache bump 17.19 missing');
+assert(/app\.js\?v=17\.20/.test(html), 'app.js cache bump 17.20 missing');
 assert(/id="val-turn-radius">3\.5km/.test(html), 'toolbar RADIUS default must be 3.5km not 5.1');
 assert(/id="input-turn-radius" value="3500"/.test(html), 'turn-radius input default must be 3500 m');
 assert(!/value="5100"/.test(html), 'HTML must not default min turn radius to 5100');
@@ -120,6 +120,11 @@ assert(!src.includes('else if (!surveyVisible)'), 'Show All must still paint on-
 assert(src.includes('Load a preplot first, then click Route Planning'), 'empty Plan Route must toast, not silent-return');
 assert(src.includes('if (showStartLineChooser()) return'), 'chooser miss must still executePlanRoute');
 assert(html.includes('1500 sequences, keep the fastest'), 'chooser Auto must score 1500 then keep the fastest');
+assert(html.includes('Skip-k racetrack. Keep the fastest. Then stop.'), 'chooser must lock the 1500 cap, not a 20000 slider');
+assert(!html.includes('id="start-iterations"'), 'sequence budget must not be a free-entry 20000 field');
+assert(src.includes('const OSPO_SEQUENCE_CAP = 1500'), '1500 sequence cap constant missing');
+assert(src.includes('function getSequenceBudget'), 'planner must clamp to the 1500 cap');
+assert(!src.includes('Math.min(iters, 20000)'), 'planner must not accept a 20000-option search');
 assert(html.includes('skip-k racetrack'), 'chooser Auto must describe skip-k racetrack');
 assert(!html.includes('fastest of 1500 options'), 'chooser must not advertise 1500-option TSP');
 assert(html.includes('simple nearest neighbour'), 'auto-nn must stay real NN');
@@ -394,7 +399,7 @@ assert(src.includes('min="1" max="100"'), 'Line Manager UI 1-100 missing');
 
 console.log(JSON.stringify({
   ok: true,
-  cache: '17.19',
+  cache: '17.20',
   rule: 'skip-k racetrack from a corner; 3D skip-k racetrack per swath',
   kNom,
   nn: { visit: nn.nVisit, mode: nn.stats.mode, ms: nn.ms },

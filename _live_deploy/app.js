@@ -363,6 +363,15 @@ function _dlgRestoreSize(dlg) {
  dlg.style.right = ''; dlg.style.bottom = '';
 }
 
+// Product cap: score at most 1500 skip-k shooting sequences, keep the fastest, stop.
+const OSPO_SEQUENCE_CAP = 1500;
+function getSequenceBudget() {
+ const n = parseInt(state.settings && state.settings.optimizerIterations, 10);
+ const use = (isFinite(n) && n > 0) ? Math.min(n, OSPO_SEQUENCE_CAP) : OSPO_SEQUENCE_CAP;
+ if (state.settings) state.settings.optimizerIterations = use;
+ return use;
+}
+
 // ===== STATE =====
 const state = {
  lines: [], // { id, name, start: [lat,lon], end: [lat,lon] }
@@ -389,7 +398,7 @@ const state = {
  numSources: 2, // number of sources
  spIntervalPerSource: 50, // SP interval per source in metres
  modeOfShooting: 'flip-flop', // mode of shooting (user text input)
- optimizerIterations: 1500, // shooting sequences to score; the client gets the minimum-time plan only
+ optimizerIterations: 1500, // capped at OSPO_SEQUENCE_CAP; client gets the fastest plan only
  startTime: null,
  startPoint: null, // [lat, lon] or null (use first line start)
  weatherDowntime: 15, // % technical downtime
@@ -10758,8 +10767,7 @@ function showStartLineChooser() {
   planSel.value = (state.settings.surveyType === '3d') ? 'interleaved' : 'auto';
  }
  }
- const itEl = document.getElementById('start-iterations');
- if (itEl) itEl.value = state.settings.optimizerIterations || 1500;
+ state.settings.optimizerIterations = getSequenceBudget();
 
  document.getElementById('start-line-chooser').style.display = 'flex';
  return true;
@@ -10789,11 +10797,7 @@ function _applyChooserPlanSettings() {
    }
   }
  }
- const itEl = document.getElementById('start-iterations');
- const iters = parseInt(itEl && itEl.value, 10);
- if (isFinite(iters) && iters > 0) {
- state.settings.optimizerIterations = Math.min(iters, 20000);
- }
+ state.settings.optimizerIterations = OSPO_SEQUENCE_CAP;
 }
 
 function setStartDirection(reversed) {
@@ -12457,7 +12461,7 @@ function _orderSkipStd(ord, spatial) {
  *  164-line orange hairball (50/50 on-line vs line-change). */
 function planSwathBlockRacetracks(lines, swaths, transitTimeSec, opts) {
  opts = opts || {};
- const targetOptions = Math.max(1, opts.targetOptions || 1500);
+ const targetOptions = Math.max(1, Math.min(opts.targetOptions || getSequenceBudget(), OSPO_SEQUENCE_CAP));
  const R = getEffectiveTurnRadius();
  const startIdx = opts.startIdx;
  const startRev = !!opts.startRev;
@@ -12856,7 +12860,7 @@ function computeRoute() {
  const model3d = buildTransitTimeModel(lines);
  const opt3dStart = Date.now();
  const opt = planSwathBlockRacetracks(lines, swaths, model3d.transitTimeSec, {
-  targetOptions: Math.max(1, state.settings.optimizerIterations || 1500),
+  targetOptions: getSequenceBudget(),
   startIdx: startFilteredIdx,
   startRev: startReversed,
   userStartLocked: !!startLineObj,
@@ -13110,7 +13114,7 @@ function computeRoute() {
  // survey ends, both first headings). Not a 1500-option TSP bake-off, and
  // not ILS. A wall-clock safety cap only aborts if scoring hangs.
  const optimizerStart = Date.now();
- const targetOptions = Math.max(1, state.settings.optimizerIterations || 1500);
+ const targetOptions = getSequenceBudget();
  const safetyCapMs = 60000;
  function timeUp() { return (Date.now() - optimizerStart) > safetyCapMs; }
 
@@ -14604,7 +14608,7 @@ function showRouteStats(waypoints) {
  const hh2 = Math.floor(totH);
  const mm2 = Math.round((totH - hh2) * 60);
  optEl.style.color = '#30d158';
- optEl.textContent = `Fastest of ${nOpt} options: ${hh2}h ${mm2}m`;
+ optEl.textContent = `Fastest of ${nOpt} / ${OSPO_SEQUENCE_CAP} sequences: ${hh2}h ${mm2}m`;
  } else {
  optEl.textContent = '';
  }
@@ -15057,7 +15061,7 @@ function showPlanningOverlay(show) {
  ov.innerHTML = `<div id="planning-card">
  ${_vesselLoaderHTML()}
  <h3>Planning Route...</h3>
- <p>Scoring up to 1500 shooting sequences, then keeping the fastest. 3D does this per swath.</p>
+ <p>Skip-k racetrack: scoring 1500 sequences, keep the fastest, then stop. 3D does this per swath.</p>
  </div>`;
  document.getElementById('main').appendChild(ov);
  }
