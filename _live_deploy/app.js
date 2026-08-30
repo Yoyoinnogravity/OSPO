@@ -12083,7 +12083,13 @@ function executePlanRoute() {
  showToast(`Fastest of ${os.optionsEvaluated || 0} shooting sequences (skip-k racetrack, k=${k}): ${h} h total`, 8000);
  } else if (os && os.mode === 'swath-blocks') {
  const h = os.finalSec != null ? (os.finalSec / 3600).toFixed(1) : '?';
- showToast(`Fastest of ${os.optionsEvaluated || 0} shooting sequences (3D skip-k per swath, k=${os.skipK != null ? os.skipK : '?'}): ${h} h total`, 8000);
+ const k = os.skipK != null ? os.skipK : '?';
+ const nOpt = os.optionsEvaluated || 0;
+ if (os.collapsedToGrid) {
+  showToast(`Fastest of ${nOpt} sequences (skip-k racetrack k=${k} on the full grid; 3D swaths stay as map bands): ${h} h total`, 8000);
+ } else {
+  showToast(`Fastest of ${nOpt} shooting sequences (3D skip-k per swath, k=${k}): ${h} h total`, 8000);
+ }
  } else if (os && (os.optionsEvaluated > 0 || os.mode === 'fastest-of-n')) {
  const nOpt = os.optionsEvaluated || os.iterations || 0;
  const h = os.finalSec != null ? (os.finalSec / 3600).toFixed(1) : '?';
@@ -12232,6 +12238,27 @@ function _medianLineSpacingM(lines, spatial) {
 
 function _racetrackSkipK(spacingM, R) {
  return Math.max(1, Math.round((2 * Math.max(R || 1, 1)) / Math.max(spacingM || 1, 1)));
+}
+
+/** A swath that is not wider than skip-k (k ≈ 2R/spacing) cannot hold a
+ *  U-turn of radius R. Racetrack inside it becomes adjacent-line loops —
+ *  3.5 km circles on a 67 m grid, the gold hairball. */
+function _swathsHoldSkipK(swaths, lines, R) {
+ if (!swaths || !swaths.length || !lines || !lines.length) return true;
+ const spacingM = _medianLineSpacingM(lines);
+ const kNom = _racetrackSkipK(spacingM, R);
+ for (let g = 0; g < swaths.length; g++) {
+  if (swaths[g] && swaths[g].length && swaths[g].length <= kNom) return false;
+ }
+ return true;
+}
+
+function _oneShootingSwath(swaths) {
+ const all = [];
+ for (let g = 0; g < (swaths || []).length; g++) {
+  if (swaths[g] && swaths[g].length) all.push.apply(all, swaths[g]);
+ }
+ return all.length ? [all] : [];
 }
 
 /** Residue-class racetrack over spatial ranks 0..n-1 with alternating headings.
@@ -12467,6 +12494,12 @@ function planSwathBlockRacetracks(lines, swaths, transitTimeSec, opts) {
  const startRev = !!opts.startRev;
  const userStartLocked = !!opts.userStartLocked;
  const forceStartSwath = opts.forceStartSwath;
+ let shootSwaths = swaths;
+ let collapsedToGrid = false;
+ if (!_swathsHoldSkipK(shootSwaths, lines, R) && shootSwaths.length > 1) {
+  shootSwaths = _oneShootingSwath(shootSwaths);
+  collapsedToGrid = true;
+ }
  let evaluated = 0;
  let best = null;
  const seen = new Set();
@@ -12496,7 +12529,7 @@ function planSwathBlockRacetracks(lines, swaths, transitTimeSec, opts) {
  }
 
  function variantsFor(g) {
-  const idxs = swaths[g];
+  const idxs = shootSwaths[g];
   const out = [];
   if (!idxs || !idxs.length) return out;
   const subset = idxs.map(i => lines[i]);
@@ -12535,9 +12568,9 @@ function planSwathBlockRacetracks(lines, swaths, transitTimeSec, opts) {
   return out;
  }
 
- const nSw = swaths.length;
+ const nSw = shootSwaths.length;
  const active = [];
- for (let g = 0; g < nSw; g++) if (swaths[g] && swaths[g].length) active.push(g);
+ for (let g = 0; g < nSw; g++) if (shootSwaths[g] && shootSwaths[g].length) active.push(g);
  const byG = {};
  for (let i = 0; i < active.length; i++) byG[active[i]] = variantsFor(active[i]);
 
@@ -12595,7 +12628,10 @@ function planSwathBlockRacetracks(lines, swaths, transitTimeSec, opts) {
   }
  }
 
- if (best) best.optionsEvaluated = evaluated;
+ if (best) {
+  best.optionsEvaluated = evaluated;
+  best.collapsedToGrid = collapsedToGrid;
+ }
  return best;
 }
 
@@ -12887,6 +12923,7 @@ function computeRoute() {
    solver: 'swath-blocks',
    constructor: 'racetrack',
    skipK: opt.skipK,
+   collapsedToGrid: !!opt.collapsedToGrid,
    optionsEvaluated: nOpt,
    optionsTarget: nOpt,
    finalSec: opt.costSec,

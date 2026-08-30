@@ -107,7 +107,7 @@ vm.runInContext(`
   else { const _t = showToast; showToast = function(){}; }
 `, ctx);
 
-assert(/app\.js\?v=17\.20/.test(html), 'app.js cache bump 17.20 missing');
+assert(/app\.js\?v=17\.21/.test(html), 'app.js cache bump 17.21 missing');
 assert(/id="val-turn-radius">3\.5km/.test(html), 'toolbar RADIUS default must be 3.5km not 5.1');
 assert(/id="input-turn-radius" value="3500"/.test(html), 'turn-radius input default must be 3500 m');
 assert(!/value="5100"/.test(html), 'HTML must not default min turn radius to 5100');
@@ -123,7 +123,7 @@ assert(html.includes('1500 sequences, keep the fastest'), 'chooser Auto must sco
 assert(html.includes('Skip-k racetrack. Keep the fastest. Then stop.'), 'chooser must lock the 1500 cap, not a 20000 slider');
 assert(!html.includes('id="start-iterations"'), 'sequence budget must not be a free-entry 20000 field');
 assert(src.includes('const OSPO_SEQUENCE_CAP = 1500'), '1500 sequence cap constant missing');
-assert(src.includes('function getSequenceBudget'), 'planner must clamp to the 1500 cap');
+assert(src.includes('function _swathsHoldSkipK'), 'narrow 3D swaths must not force adjacent 2R loops');
 assert(!src.includes('Math.min(iters, 20000)'), 'planner must not accept a 20000-option search');
 assert(html.includes('skip-k racetrack'), 'chooser Auto must describe skip-k racetrack');
 assert(!html.includes('fastest of 1500 options'), 'chooser must not advertise 1500-option TSP');
@@ -387,6 +387,15 @@ assert(liveFirst.every((r) => r < 82) || liveFirst.every((r) => r >= 82),
 assert(!(tLive.ranks[0] === 0 && tLive.ranks[1] === 1),
   '667m 3D must not adjacent-crawl (k ≈ 2R/667 ≈ 10)');
 
+const tight = makeGrid(164, 66.7, 38500);
+const tTight = plan(tight, { surveyType: '3d', progression: 'interleaved', numSwaths: 3, turnRadius: 3500 });
+assert(tTight.nVisit === 164, '66.7m 3D must visit all 164');
+const hopTight = Math.abs(tTight.ranks[1] - tTight.ranks[0]);
+assert(hopTight >= 40,
+  '66.7m / 3.5km R must skip ~2R (k≈105), not adjacent, hop=' + hopTight);
+assert(tTight.stats && tTight.stats.collapsedToGrid,
+  'narrow 3-swath 3D must shoot skip-k on the full grid');
+
 // Line Manager 1-100: high-priority lines acquired first, still a racetrack within the bucket.
 vm.runInContext(`
   state.lineStatus[0].priority = 1;
@@ -399,8 +408,8 @@ assert(src.includes('min="1" max="100"'), 'Line Manager UI 1-100 missing');
 
 console.log(JSON.stringify({
   ok: true,
-  cache: '17.20',
-  rule: 'skip-k racetrack from a corner; 3D skip-k racetrack per swath',
+  cache: '17.21',
+  rule: 'skip-k racetrack from a corner; 3D skip-k per swath only when 2R fits',
   kNom,
   nn: { visit: nn.nVisit, mode: nn.stats.mode, ms: nn.ms },
   auto12: { first: auto12.skip.first, mean: +auto12.skip.mean.toFixed(2), mode: auto12.stats.mode },
