@@ -115,7 +115,7 @@
 <link rel="dns-prefetch" href="https://cesium.com">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script>if(!/Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)&&window.innerWidth>768){document.write('<link rel="stylesheet" href="https://cesium.com/downloads/cesiumjs/releases/1.119/Build/Cesium/Widgets/widgets.css"/>')}</script>
-<link rel="stylesheet" href="style.min.css?v=3.30"/>
+<link rel="stylesheet" href="style.min.css?v=3.31"/>
 </head>
 <body>
  <!-- SEO landing content for crawlers when JavaScript is unavailable -->
@@ -502,7 +502,7 @@
  </svg>
  </button>
  <button class="map-ctrl-btn" onclick="toggleAnnotations()" title="Arrows">&#8679;</button>
- <button class="map-ctrl-btn" onclick="toggleLabels()" title="Labels">A</button>
+ <button class="map-ctrl-btn" onclick="toggleLabels()" title="Labels — also LABELS OFF / ON under the preplot summary">A</button>
  </div>
  </div>
  <!-- Weather: Sea temp (NOAA) / Wind / Waves; 6h cache -->
@@ -1359,7 +1359,7 @@
  </div>
  <div class="panel-row" style="justify-content:space-between; margin-bottom:12px;">
  <label>Line Labels (No. &amp; SP)</label>
- <input type="checkbox" id="layer-toggle-labels" checked onchange="toggleSurveyLayer('labels')" style="flex:none; width:20px; height:20px; cursor:pointer;" />
+ <input type="checkbox" id="layer-toggle-labels" onchange="toggleSurveyLayer('labels')" style="flex:none; width:20px; height:20px; cursor:pointer;" />
  </div>
  <div class="panel-row" style="justify-content:space-between; margin-bottom:12px;">
  <label>Planned Route</label>
@@ -2166,7 +2166,7 @@
  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
  <script src="https://unpkg.com/shpjs@latest/dist/shp.min.js"></script>
  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
- <script src="app.js?v=16.88"></script>
+ <script src="app.js?v=16.89"></script>
  <script src="ray_tracing_module.js?v=16.53"></script>
  <script src="wmm_declination.js?v=16.49"></script>
  <script src="magnetic_isogones.js?v=16.49"></script>

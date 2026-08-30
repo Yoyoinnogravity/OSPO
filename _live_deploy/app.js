@@ -424,7 +424,7 @@ const state = {
  activeTab: 'plan',
  showAnnotations: false,
  sstMapDay: 'default', // GIBS SST tile day: 'default' or YYYY-MM-DD
- showLabels: true,
+ showLabels: false, // line / SP labels start OFF; each preplot load resets to off
  coordFormat: 'utm', // 'utm' or 'latlon'
  currentUser: 'Guest'
 };
@@ -731,7 +731,8 @@ function initLeafletMap() {
  // Layer groups
  layerSurveyLines = L.layerGroup().addTo(map);
  layerRoute = L.layerGroup().addTo(map);
- layerLabels = L.layerGroup().addTo(map);
+ layerLabels = L.layerGroup();
+ if (state.showLabels) layerLabels.addTo(map);
  layerAnnotations = L.layerGroup(); // default off; user toggles via Annotations button
  layerArrows = L.layerGroup().addTo(map);
  layerObstructions = L.layerGroup().addTo(map);
@@ -3505,6 +3506,7 @@ function _ppgEditCommit() {
  }
  // Renumber IDs
  (_ppgEditLines || []).forEach((l, i) => { l.id = i; });
+ if (typeof resetMapLabelsForNewPreplot === 'function') resetMapLabelsForNewPreplot();
  if (_ppgEditLines && _ppgEditLines.length) setLines(_ppgEditLines);
  else setLines([]);
  state.obnNodes = (_ppgEditNodes || []).map((n, i) => ({
@@ -4338,6 +4340,8 @@ function beginPreplotLoad(items) {
  state.rawRows = rows;
  // Clear previous geometry until UTM + criteria confirm this file
  state.lines = [];
+ // Each preplot file load starts map/line labels OFF (user can turn them on).
+ if (typeof resetMapLabelsForNewPreplot === 'function') resetMapLabelsForNewPreplot();
  const detected = detectUtmZone(rows);
  const label = items.length === 1 ? items[0].name : (items.length + ' files');
 
@@ -4370,6 +4374,7 @@ function beginPreplotLoad(items) {
 
 /** Parse one/many texts with known UTM. P1 or named X/Y CSV auto-loads; otherwise skip. */
 function finishPreplotLoad(items, zone, hemi, label) {
+ if (typeof resetMapLabelsForNewPreplot === 'function') resetMapLabelsForNewPreplot();
  const allLines = [];
  const failed = [];
  const skipped = [];
@@ -4453,6 +4458,7 @@ function loadCSVManual(event) {
  if (resultIsAutoLoad(auto)) {
   const plaus = assessPreplotPlausibility(auto.lines);
   if (plaus.ok || auto.format === 'p190' || auto.format === 'p111' || auto.skipColumnMap) {
+   if (typeof resetMapLabelsForNewPreplot === 'function') resetMapLabelsForNewPreplot();
    setLines(auto.lines);
    showToast('Imported ' + auto.lines.length + ' lines | UTM ' + zone + hemi, 4000);
    return;
@@ -7937,11 +7943,10 @@ function setLines(lines) {
  showLineManager();
  }
 
- // Line & SP labels are ON by default - let the user know (once per session)
- // that they can hide them via the Layers menu if the map gets cluttered.
- if (!window._labelsWarnShown) {
- window._labelsWarnShown = true;
- setTimeout(() =>showToast('Line numbers & SP labels are shown by default - turn them off anytime in the LAYERS menu.', 6000), 4200);
+ // Line & SP labels start OFF on each file load. Point at the OFF/ON tab once.
+ if (!window._labelsHintShown) {
+ window._labelsHintShown = true;
+ setTimeout(() =>showToast('Line labels start OFF — use LABELS OFF / ON under the preplot summary to show them.', 6000), 4200);
  }
 }
 
@@ -8164,6 +8169,52 @@ function _syncMapDisplayToggles() {
   var dst = document.getElementById('map-toggle-' + names[i]);
   if (src && dst) dst.checked = !!src.checked;
  }
+ _syncLabelOnOffTabs();
+}
+
+function _syncLabelOnOffTabs() {
+ var on = !!state.showLabels;
+ var offBtn = document.getElementById('labels-tab-off');
+ var onBtn = document.getElementById('labels-tab-on');
+ if (offBtn) {
+  offBtn.classList.toggle('active', !on);
+  offBtn.setAttribute('aria-pressed', on ? 'false' : 'true');
+ }
+ if (onBtn) {
+  onBtn.classList.toggle('active', on);
+  onBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+ }
+ var layerCb = document.getElementById('layer-toggle-labels');
+ if (layerCb && layerCb.checked !== on) layerCb.checked = on;
+ var mapCb = document.getElementById('map-toggle-labels');
+ if (mapCb && mapCb.checked !== on) mapCb.checked = on;
+}
+
+/** Apply line/SP label visibility. skipRender: set state only (setLines will draw). */
+function setMapLabelsVisible(show, opts) {
+ opts = opts || {};
+ show = !!show;
+ var changed = state.showLabels !== show;
+ state.showLabels = show;
+ // Intentionally not restored from localStorage: each preplot file load starts OFF.
+ try { localStorage.setItem('candooka_show_labels', show ? '1' : '0'); } catch (_) {}
+ _syncLabelOnOffTabs();
+ if (map && layerLabels) {
+  if (show) {
+   if (!map.hasLayer(layerLabels)) map.addLayer(layerLabels);
+  } else if (map.hasLayer(layerLabels)) {
+   map.removeLayer(layerLabels);
+  }
+ }
+ if (!opts.skipRender && changed && typeof renderSurveyLines === 'function' &&
+     ((state.lines && state.lines.length) || (state._allLines && state._allLines.length))) {
+  renderSurveyLines();
+ }
+}
+
+/** Each new preplot file (and first visit) starts labels OFF. Does not persist ON across loads. */
+function resetMapLabelsForNewPreplot() {
+ setMapLabelsVisible(false, { skipRender: true });
 }
 
 function toggleMapDisplayLayer(layerName) {
@@ -8179,19 +8230,23 @@ function _ensureMapDisplayToggle(stack) {
   _syncMapDisplayToggles();
   return panel;
  }
+ var labelsOn = !!state.showLabels;
  panel = document.createElement('div');
  panel.id = 'map-display-overlay';
  panel.style.cssText = 'pointer-events:auto;cursor:default;background:rgba(8,8,16,0.88);border:1px solid #1a1a2e;border-radius:6px;padding:8px 14px;' +
   'color:#e0e0e4;font-size:11px;line-height:1.6;box-shadow:0 4px 20px rgba(0,0,0,0.6);backdrop-filter:blur(6px);user-select:none;';
  panel.innerHTML =
-  '<div style="font-size:10px;color:#00d2ff;font-weight:700;letter-spacing:0.6px;margin-bottom:4px;">MAP LABELS</div>' +
-  '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:#e0e0e4;">' +
-  '<input type="checkbox" id="map-toggle-labels" checked onchange="toggleMapDisplayLayer(\'labels\')" style="width:14px;height:14px;accent-color:#00d2ff;cursor:pointer;flex:none;" />' +
-  'Line labels (No. &amp; SP)</label>' +
-  '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:#e0e0e4;">' +
+  '<div style="font-size:10px;color:#00d2ff;font-weight:700;letter-spacing:0.6px;margin-bottom:6px;">MAP LABELS</div>' +
+  '<div class="label-onoff-tabs" role="group" aria-label="Line labels off or on">' +
+  '<button type="button" id="labels-tab-off" class="label-onoff-tab' + (labelsOn ? '' : ' active') + '" aria-pressed="' + (labelsOn ? 'false' : 'true') + '" onclick="setMapLabelsVisible(false)">LABELS OFF</button>' +
+  '<button type="button" id="labels-tab-on" class="label-onoff-tab' + (labelsOn ? ' active' : '') + '" aria-pressed="' + (labelsOn ? 'true' : 'false') + '" onclick="setMapLabelsVisible(true)">LABELS ON</button>' +
+  '</div>' +
+  '<input type="checkbox" id="map-toggle-labels" ' + (labelsOn ? 'checked ' : '') + 'onchange="toggleMapDisplayLayer(\'labels\')" style="display:none;" />' +
+  '<div style="font-size:10px;color:#c0c8d4;margin-top:6px;">Line numbers &amp; shot points</div>' +
+  '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:#e0e0e4;margin-top:8px;">' +
   '<input type="checkbox" id="map-toggle-annotations" checked onchange="toggleMapDisplayLayer(\'annotations\')" style="width:14px;height:14px;accent-color:#00d2ff;cursor:pointer;flex:none;" />' +
   'Annotations &amp; arrows</label>' +
-  '<div style="font-size:9px;color:#8a9bb0;margin-top:4px;">Turn off when zoomed out — labels do not scale</div>';
+  '<div style="font-size:9px;color:#8a9bb0;margin-top:4px;">Labels start off when a preplot is loaded. Turn ON here when you need them — they do not scale.</div>';
  stack.appendChild(panel);
  _syncMapDisplayToggles();
  return panel;
@@ -14435,14 +14490,7 @@ function toggleAnnotations() {
 }
 
 function toggleLabels() {
- state.showLabels = !state.showLabels;
- renderSurveyLines();
- if (state.showLabels) layerLabels.addTo(map);
- else map.removeLayer(layerLabels);
- // Keep the Layers-menu checkbox and on-map control in sync
- const cb = document.getElementById('layer-toggle-labels');
- if (cb) cb.checked = state.showLabels;
- if (typeof _syncMapDisplayToggles === 'function') _syncMapDisplayToggles();
+ setMapLabelsVisible(!state.showLabels);
 }
 
 // ===== TAB: PLAN ROUTE button =====
@@ -20278,16 +20326,12 @@ function toggleSurveyLayer(layerName, opts) {
  if (!map) return;
  
  const el = document.getElementById(`layer-toggle-${layerName}`);
- const show = el ? el.checked : true;
+ const show = el ? el.checked : (layerName === 'labels' ? !!state.showLabels : true);
  
  if (layerName === 'lines') {
  if (show) map.addLayer(layerSurveyLines); else map.removeLayer(layerSurveyLines);
  } else if (layerName === 'labels') {
- // Line number & SP annotations. Re-render to (re)build the label markers,
- // then add/remove the label layer group from the map.
- state.showLabels = show;
- renderSurveyLines();
- if (show) map.addLayer(layerLabels); else map.removeLayer(layerLabels);
+ setMapLabelsVisible(show);
  } else if (layerName === 'route') {
  if (show) map.addLayer(layerRoute); else map.removeLayer(layerRoute);
  } else if (layerName === 'annotations') {

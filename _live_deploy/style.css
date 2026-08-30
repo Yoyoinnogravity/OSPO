@@ -1240,3 +1240,40 @@ body {
 .user-layer-label::before {
   display: none !important;
 }
+
+/* Preplot summary: obvious LABELS OFF / ON tabs */
+#map-display-overlay .label-onoff-tabs {
+  display: flex;
+  width: 100%;
+  border: 1px solid #1e3a4a;
+  border-radius: 4px;
+  overflow: hidden;
+  pointer-events: auto;
+}
+#map-display-overlay .label-onoff-tab {
+  flex: 1;
+  padding: 8px 10px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.55px;
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  background: #0a0a12;
+  color: #8a9bb0;
+  text-transform: uppercase;
+  outline: none;
+}
+#map-display-overlay .label-onoff-tab:hover {
+  color: #e0e0e4;
+  background: #14141e;
+}
+#map-display-overlay #labels-tab-off.active {
+  background: #1a1a24;
+  color: #e8edf4;
+  box-shadow: inset 0 0 0 1px #3a3a4e;
+}
+#map-display-overlay #labels-tab-on.active {
+  background: #00d2ff;
+  color: #041018;
+}
