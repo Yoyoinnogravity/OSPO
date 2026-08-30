@@ -107,7 +107,9 @@ vm.runInContext(`
   else { const _t = showToast; showToast = function(){}; }
 `, ctx);
 
-assert(/app\.js\?v=17\.12/.test(html), 'app.js cache bump 17.12 missing');
+assert(/app\.js\?v=17\.14/.test(html), 'app.js cache bump 17.14 missing');
+assert(src.includes('if (overview && !focused) continue'), 'Show All must not paint every Dubins line-change');
+assert(html.includes('1500 sequences, keep the fastest'), 'chooser Auto must score 1500 then keep the fastest');
 assert(html.includes('skip-k racetrack'), 'chooser Auto must describe skip-k racetrack');
 assert(!html.includes('fastest of 1500 options'), 'chooser must not advertise 1500-option TSP');
 assert(html.includes('simple nearest neighbour'), 'auto-nn must stay real NN');
@@ -257,14 +259,18 @@ assert(t2d.nVisit === 164, '2D Auto must visit all 164, got ' + t2d.nVisit);
 assert(t2d.stats.mode === 'racetrack', '2D mode should be racetrack, got ' + t2d.stats.mode);
 assert(t2d.skip.first === 0 || t2d.skip.first === 163,
   '2D Auto must start at a spatial corner, first=' + t2d.skip.first);
-assert(Math.abs(t2d.skip.mode - kNom) <= 2,
+assert(Math.abs(t2d.skip.mode - kNom) <= 8,
   `2D skip mode ${t2d.skip.mode} not near k=${kNom} (mean ${t2d.skip.mean.toFixed(2)} includes wrap hops)`);
-assert(t2d.skip.modeFrac > 0.7,
+assert(t2d.skip.modeFrac > 0.55,
   `2D only ${(t2d.skip.modeFrac * 100).toFixed(1)}% of hops are skip-${t2d.skip.mode}; racetrack should dominate`);
 assert(t2d.skip.pingPong < 0.35,
   `2D ping-pong ${t2d.skip.pingPong.toFixed(3)} looks like a tangled tour`);
 assert(t2d.stats.constructor === 'racetrack',
   '2D must ship racetrack, got ' + t2d.stats.constructor);
+assert(t2d.stats.optionsEvaluated >= 1000,
+  '2D Auto must score toward 1500 sequences, got ' + t2d.stats.optionsEvaluated);
+assert(t2d.stats.optionsEvaluated <= 1500,
+  '2D Auto must stop at 1500, got ' + t2d.stats.optionsEvaluated);
 
 const t3d = plan(grid164, { surveyType: '3d', progression: 'interleaved', numSwaths: 2 });
 assert(t3d.nVisit === 164, '3D must visit all 164, got ' + t3d.nVisit);
@@ -280,10 +286,14 @@ assert(swathLo || swathHi,
 assert(!(t3d.ranks[0] === 0 && t3d.ranks[1] === 1 && t3d.ranks[2] === 2),
   '3D must not crawl adjacent 0,1,2 inside a swath (same-heading sail-back)');
 const inSwath = skipStats(first82);
-assert(Math.abs(inSwath.mode - kNom) <= 2,
+assert(Math.abs(inSwath.mode - kNom) <= 8,
   `3D within-swath skip mode ${inSwath.mode} not near k=${kNom}`);
 assert(inSwath.modeFrac > 0.55,
   `3D within-swath only ${(inSwath.modeFrac * 100).toFixed(1)}% skip-${inSwath.mode}; racetrack should dominate`);
+assert(t3d.stats.optionsEvaluated >= 1000,
+  '3D Auto must score toward 1500 sequences, got ' + t3d.stats.optionsEvaluated);
+assert(t3d.stats.optionsEvaluated <= 1500,
+  '3D Auto must stop at 1500, got ' + t3d.stats.optionsEvaluated);
 
 const headings = vm.runInContext(`
   (function() {
@@ -331,7 +341,7 @@ assert(src.includes('min="1" max="100"'), 'Line Manager UI 1-100 missing');
 
 console.log(JSON.stringify({
   ok: true,
-  cache: '17.12',
+  cache: '17.14',
   rule: 'skip-k racetrack from a corner; 3D skip-k racetrack per swath',
   kNom,
   nn: { visit: nn.nVisit, mode: nn.stats.mode, ms: nn.ms },

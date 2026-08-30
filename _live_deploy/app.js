@@ -5043,7 +5043,7 @@ function askSurveyCriteria({ zone, hemi }, callback) {
  <div class="panel-row" style="margin-bottom:10px;">
  <label style="width:140px; color:#ffffff;">Progression</label>
  <select id="crit-progression-2d" style="flex:1;padding:5px 8px;border-radius:4px;border:1px solid #222222;background:#111111;color:#ffffff;font-size:13px;outline:none;cursor:pointer;">
- <option value="auto" ${(state.settings.progression || 'auto') === 'auto' ? 'selected' : ''}>Auto (skip-k racetrack, k ≈ 2R / spacing)</option>
+ <option value="auto" ${(state.settings.progression || 'auto') === 'auto' ? 'selected' : ''}>Auto (skip-k racetrack, 1500 sequences, keep the fastest)</option>
  <option value="west-east" ${state.settings.progression === 'west-east' ? 'selected' : ''}>West ' East</option>
  <option value="east-west" ${state.settings.progression === 'east-west' ? 'selected' : ''}>East ' West</option>
  <option value="south-north" ${state.settings.progression === 'south-north' ? 'selected' : ''}>South ' North</option>
@@ -12071,10 +12071,10 @@ function executePlanRoute() {
  } else if (os && os.mode === 'racetrack') {
  const h = os.finalSec != null ? (os.finalSec / 3600).toFixed(1) : '?';
  const k = os.skipK != null ? os.skipK : '?';
- showToast(`Skip-k racetrack (k=${k}, corner start): ${h} h total (on-line + Dubins line-changes)`, 8000);
+ showToast(`Fastest of ${os.optionsEvaluated || 0} shooting sequences (skip-k racetrack, k=${k}): ${h} h total`, 8000);
  } else if (os && os.mode === 'swath-blocks') {
  const h = os.finalSec != null ? (os.finalSec / 3600).toFixed(1) : '?';
- showToast(`3D block-complete swaths: ${h} h (adjacent within each swath, no line-level zigzag)`, 8000);
+ showToast(`Fastest of ${os.optionsEvaluated || 0} shooting sequences (3D skip-k per swath, k=${os.skipK != null ? os.skipK : '?'}): ${h} h total`, 8000);
  } else if (os && (os.optionsEvaluated > 0 || os.mode === 'fastest-of-n')) {
  const nOpt = os.optionsEvaluated || os.iterations || 0;
  const h = os.finalSec != null ? (os.finalSec / 3600).toFixed(1) : '?';
@@ -12464,6 +12464,7 @@ function planSwathBlockRacetracks(lines, swaths, transitTimeSec, opts) {
 
  function consider(seq, skipK) {
   if (!seq || !seq.length) return;
+  if (evaluated >= targetOptions) return;
   const fp = _seqFingerprint(seq);
   if (seen.has(fp)) return;
   seen.add(fp);
@@ -12493,11 +12494,13 @@ function planSwathBlockRacetracks(lines, swaths, transitTimeSec, opts) {
   const spacingM = _medianLineSpacingM(subset);
   const kNom = Math.max(1, Math.min(_racetrackSkipK(spacingM, R), subset.length));
   const ks = [];
-  for (let d = 0; d <= 2; d++) {
-   const list = d === 0 ? [kNom] : [kNom - d, kNom + d];
-   for (const k of list) {
-    if (k >= 1 && k <= subset.length && ks.indexOf(k) < 0) ks.push(k);
-   }
+  for (const k of _kAroundNom(kNom, subset.length)) {
+   ks.push(k);
+   // 4 corners per k; 2-swath cartesian × 2 orders ≈ 32 k². Grow k until
+   // that reaches the 1500-sequence budget (SurvOPT-style: score N, stop).
+   const nVar = ks.length * 4;
+   if (nVar * nVar * 2 >= (opts.targetOptions || 1500)) break;
+   if (ks.length >= subset.length) break;
   }
   const startLocal = (userStartLocked && startIdx >= 0) ? idxs.indexOf(startIdx) : -1;
   for (const k of ks) {
@@ -13398,15 +13401,8 @@ function computeRoute() {
   const sol = applyFixed(buildNNSolution(startIdx, startReversed));
   considerSol(sol, 'nn');
  } else {
-  // k window around 2R/spacing only — not every k from 1..n.
-  const kUse = Math.max(1, Math.min(kNom, n));
-  const kWindow = [];
-  for (let d = 0; d <= 2; d++) {
-   const ks = d === 0 ? [kUse] : [kUse - d, kUse + d];
-   for (const k of ks) {
-    if (k >= 1 && k <= n && kWindow.indexOf(k) < 0) kWindow.push(k);
-   }
-  }
+  // Score unique skip-k racetracks until N (default 1500), then stop.
+  // k expands around 2R/spacing. Corners only — not NN/TSP (that hairball).
   const cornerPairs = [
    { startAtHigh: false, firstReversed: false },
    { startAtHigh: false, firstReversed: true },
@@ -13415,7 +13411,7 @@ function computeRoute() {
   ];
   const parallel = _linesFormParallelSweep(lines);
   if (userStartLocked) {
-   for (const k of kWindow) {
+   for (const k of _kAroundNom(kNom, n)) {
     if (optionsEvaluated >= targetOptions || timeUp()) break;
     for (const preferDir of [null, 1, -1]) {
      if (optionsEvaluated >= targetOptions || timeUp()) break;
@@ -13425,13 +13421,25 @@ function computeRoute() {
     }
    }
   } else {
-   for (const k of kWindow) {
+   kFill:
+   for (const k of _kAroundNom(kNom, n)) {
     if (optionsEvaluated >= targetOptions || timeUp()) break;
     for (const corner of cornerPairs) {
-     if (optionsEvaluated >= targetOptions || timeUp()) break;
+     if (optionsEvaluated >= targetOptions || timeUp()) break kFill;
      const rt = buildRacetrackOrder(lines, k, { spatial, ...corner });
      considerSol(rt, 'racetrack');
      maybeInfill(rt, 'racetrack');
+    }
+    const lo = spatial.order[0], hi = spatial.order[spatial.order.length - 1];
+    for (const sIdx of [lo, hi]) {
+     for (const rev of [false, true]) {
+      for (const preferDir of [1, -1]) {
+       if (optionsEvaluated >= targetOptions || timeUp()) break kFill;
+       const rt = buildRacetrackOrderFrom(lines, k, sIdx, rev, spatial, preferDir);
+       considerSol(rt, 'racetrack');
+       maybeInfill(rt, 'racetrack');
+      }
+     }
     }
    }
    // Irregular (non-parallel) spreads: also score corner NN. Never on a
@@ -14278,7 +14286,7 @@ function renderRoute(waypoints, opts) {
   } else if (a.type === 'runInStart' && b.type === 'lineStart' && a.lineName === b.lineName) {
    if (focused) {
     _drawFocusedTransit([a.pt, b.pt]);
-   } else {
+   } else if (!overview) {
     _drawRoutePolyline([a.pt, b.pt], _routeTransitOverviewStyle());
    }
   } else if ((a.type === 'obsAvoidStart' || a.type === 'obsAvoidance' || a.type === 'obsAvoidEnd') &&
@@ -14294,7 +14302,7 @@ function renderRoute(waypoints, opts) {
     }
     if (focused) {
      _drawFocusedTransit(obsAvoidPts);
-    } else {
+    } else if (!overview) {
      _drawRoutePolyline(obsAvoidPts, {
       color: '#b89620', weight: 1.15, opacity: 1, dashArray: '5,5',
       lineCap: 'round', interactive: false
@@ -14308,14 +14316,16 @@ function renderRoute(waypoints, opts) {
    a.type === 'transit-detour' || b.type === 'transit-detour') {
    if (focused) {
     _drawFocusedTransit([a.pt, b.pt]);
-   } else {
+   } else if (!overview) {
     _drawRoutePolyline([a.pt, b.pt], {
      color: '#b89620', weight: 1.15, opacity: 1, dashArray: '5,5',
      lineCap: 'round', interactive: false
     });
    }
   } else {
-   // Transit / line turn — true Dubins geometry, quiet in overview
+   // Transit / line turn. Show All must not paint every Dubins loop — that
+   // is the orange hairball. Prev/Next/Simulate draws the focused leg.
+   if (overview && !focused) continue;
    const arcPts = computeArcTurn(waypoints, i);
    if (focused) {
     _drawFocusedTransit(arcPts);
