@@ -12322,7 +12322,7 @@ function _orderSkipStd(ord, spatial) {
 // swaths: arrays of line indices in per-swath acquisition order.
 // revOf: acquisition direction (reversed flag) per line index.
 // Returns { seq: [lineIdx...], costSec } or null.
-function optimizeSwathInterleave(swaths, revOf, transitTimeSec, forceStartSwath) {
+function optimizeSwathInterleave(swaths, revOf, transitTimeSec, forceStartSwath, opts) {
  const numSw = swaths.length;
  const lens = swaths.map(s => s.length);
  const total = lens.reduce((a, b) => a + b, 0);
@@ -12337,24 +12337,60 @@ function optimizeSwathInterleave(swaths, revOf, transitTimeSec, forceStartSwath)
   if (v === undefined) { v = transitTimeSec(a, revOf[a], b, revOf[b]); memo.set(mk, v); }
   return v;
  };
- function expand(order) {
+ function expandPick(swOrder, pick) {
   const seq = [];
-  for (const g of order) seq.push(...swaths[g]);
+  for (const g of swOrder) seq.push(...(pick[g] || swaths[g]));
   if (seq.length !== total) return null;
   let cost = 0;
   for (let i = 0; i < seq.length - 1; i++) cost += T(seq[i], seq[i + 1]);
   return { seq, costSec: cost };
  }
+ const palettes = swaths.map((sw) => {
+  const pal = [sw.slice(), sw.slice().reverse()];
+  for (let k = 1; k <= sw.length && pal.length < 40; k++) {
+   pal.push(_racetrackRanks(sw.length, k, false, false).map(e => sw[e.rank]));
+   pal.push(_racetrackRanks(sw.length, k, true, true).map(e => sw[e.rank]));
+  }
+  return pal;
+ });
+ const target = (opts && opts.targetOptions) || 1500;
+ const timeUp = (opts && opts.timeUp) || function () { return false; };
+ let best = null, evaluated = 0;
+ const seen = new Set();
+ const consider = (cand) => {
+  if (!cand || evaluated >= target || timeUp()) return;
+  const key = cand.seq.join(',');
+  if (seen.has(key)) return;
+  seen.add(key);
+  evaluated++;
+  if (!best || cand.costSec < best.costSec - 0.5) best = cand;
+ };
  let order = active.slice();
  if (forceStartSwath >= 0 && order.includes(forceStartSwath)) {
   order = [forceStartSwath].concat(order.filter(g => g !== forceStartSwath));
  }
- let best = expand(order);
- const flipped = (forceStartSwath >= 0)
-  ? expand([order[0]].concat(order.slice(1).reverse()))
-  : expand(order.slice().reverse());
- if (flipped && (!best || flipped.costSec < best.costSec - 0.5)) best = flipped;
- if (best) best.optionsEvaluated = 2;
+ const swOrders = [order, order.slice().reverse()];
+ for (const swOrder of swOrders) {
+  const minPal = Math.min.apply(null, swOrder.map(g => palettes[g].length));
+  for (let p = 0; p < minPal; p++) {
+   consider(expandPick(swOrder, palettes.map(pal => pal[Math.min(p, pal.length - 1)])));
+  }
+ }
+ if (active.length === 2) {
+  const a = palettes[active[0]], b = palettes[active[1]];
+  for (let i = 0; i < a.length && evaluated < target; i++) {
+   for (let j = 0; j < b.length && evaluated < target; j++) {
+    const seq1 = a[i].concat(b[j]);
+    const seq2 = b[j].concat(a[i]);
+    let c1 = 0, c2 = 0;
+    for (let k = 0; k < seq1.length - 1; k++) c1 += T(seq1[k], seq1[k + 1]);
+    for (let k = 0; k < seq2.length - 1; k++) c2 += T(seq2[k], seq2[k + 1]);
+    consider({ seq: seq1, costSec: c1 });
+    consider({ seq: seq2, costSec: c2 });
+   }
+  }
+ }
+ if (best) best.optionsEvaluated = evaluated;
  return best;
 }
 

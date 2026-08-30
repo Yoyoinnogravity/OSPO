@@ -107,7 +107,7 @@ vm.runInContext(`
   else { const _t = showToast; showToast = function(){}; }
 `, ctx);
 
-assert(/app\.js\?v=17\.00/.test(html), 'app.js cache bump 17.00 missing');
+assert(/app\.js\?v=17\.01/.test(html), 'app.js cache bump 17.01 missing');
 assert(html.includes('fastest of 1500 options'), 'chooser Auto is not fastest-of-1500');
 assert(html.includes('simple nearest neighbour'), 'auto-nn must stay real NN');
 assert(src.includes('showLabels: false'), 'labels must default off');
@@ -220,7 +220,7 @@ assert((t3d.stats.optionsEvaluated || 0) <= 1500, '3D must stop at 1500 options'
 
 console.log(JSON.stringify({
   ok: true,
-  cache: '17.00',
+  cache: '17.01',
   rule: 'score N shooting sequences (default 1500), ship the fastest, stop',
   cap40: { options: capped.stats.optionsEvaluated, ms: capped.ms, h: +(capped.stats.finalSec / 3600).toFixed(2) },
   grid24: {

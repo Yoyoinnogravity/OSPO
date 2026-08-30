@@ -135,7 +135,7 @@ assert(/showLabels:\s*false/.test(src), 'state.showLabels default must be false'
 assert(/id="layer-toggle-labels"[^>]*onchange/.test(html), 'Layers menu still has labels checkbox');
 assert(!/id="layer-toggle-labels"\s+checked/.test(html), 'Layers menu labels checkbox must not start checked');
 assert(html.includes('LABELS OFF / ON under the preplot summary') || html.includes('toggleLabels()'), 'map A button still present');
-assert(/app\.js\?v=17\.00/.test(html), 'app.js cache bump missing');
+assert(/app\.js\?v=17\.01/.test(html), 'app.js cache bump missing');
 
 const els = {};
 const kids = [];
