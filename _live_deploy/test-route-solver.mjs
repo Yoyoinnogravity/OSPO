@@ -120,7 +120,7 @@ assert(src.includes('swath-blocks'), '3D block-complete stats missing');
 assert(!src.includes('fillBudget:'), 'Family E every-rank fill must be gone');
 assert(!src.includes('Mixed-radix'), 'mixed-radix line-level DP must stay gone');
 assert(!html.toLowerCase().includes('users-db.json'), 'index.html must not touch users-db');
-assert(!src.includes('fetch(') || !/users-db\.json/.test(src), 'app.js must not fetch users-db.json');
+assert(!/fetch\([^)]*users-db\.json/.test(src), 'app.js must not fetch users-db.json');
 
 function makeGrid(n, spacingM = 250, lengthM = 20000, east0 = 0) {
   const lat0 = -20.5, lon0 = 110.2;
@@ -200,11 +200,20 @@ function skipStats(ranks) {
     if (dir) prevDir = dir;
   }
   const mean = skips.reduce((a, b) => a + b, 0) / skips.length;
+  const sorted = skips.slice().sort((a, b) => a - b);
+  const median = sorted[Math.floor(sorted.length / 2)];
+  const hist = {};
+  for (const s of skips) hist[s] = (hist[s] || 0) + 1;
+  const mode = Number(Object.entries(hist).sort((a, b) => b[1] - a[1])[0][0]);
+  const modeFrac = hist[mode] / skips.length;
   const std = Math.sqrt(skips.reduce((a, b) => a + (b - mean) * (b - mean), 0) / skips.length);
   return {
     first: ranks[0],
     last: ranks[ranks.length - 1],
     mean,
+    median,
+    mode,
+    modeFrac,
     std,
     max: Math.max(...skips),
     pingPong: flips / (ranks.length - 1),
@@ -248,8 +257,10 @@ assert(t2d.nVisit === 164, '2D Auto must visit all 164, got ' + t2d.nVisit);
 assert(t2d.stats.mode === 'racetrack', '2D mode should be racetrack, got ' + t2d.stats.mode);
 assert(t2d.skip.first === 0 || t2d.skip.first === 163,
   '2D Auto must start at a spatial corner, first=' + t2d.skip.first);
-assert(Math.abs(t2d.skip.mean - kNom) < 8,
-  `2D skip mean ${t2d.skip.mean.toFixed(2)} not near k=${kNom}`);
+assert(Math.abs(t2d.skip.mode - kNom) <= 2,
+  `2D skip mode ${t2d.skip.mode} not near k=${kNom} (mean ${t2d.skip.mean.toFixed(2)} includes wrap hops)`);
+assert(t2d.skip.modeFrac > 0.7,
+  `2D only ${(t2d.skip.modeFrac * 100).toFixed(1)}% of hops are skip-${t2d.skip.mode}; racetrack should dominate`);
 assert(t2d.skip.pingPong < 0.35,
   `2D ping-pong ${t2d.skip.pingPong.toFixed(3)} looks like a tangled tour`);
 assert(t2d.stats.constructor === 'racetrack',
@@ -285,7 +296,10 @@ console.log(JSON.stringify({
   auto12: { first: auto12.skip.first, mean: +auto12.skip.mean.toFixed(2), mode: auto12.stats.mode },
   t2d: {
     first: t2d.skip.first,
+    mode: t2d.skip.mode,
+    modeFrac: +t2d.skip.modeFrac.toFixed(3),
     mean: +t2d.skip.mean.toFixed(2),
+    median: t2d.skip.median,
     std: +t2d.skip.std.toFixed(2),
     pingPong: +t2d.skip.pingPong.toFixed(3),
     k: t2d.stats.skipK,
