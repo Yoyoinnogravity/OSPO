@@ -8200,13 +8200,14 @@ function renderSwathOverlays() {
 }
 
 function _syncMapDisplayToggles() {
- var names = ['labels', 'annotations'];
+ var names = ['labels', 'annotations', 'swaths'];
  for (var i = 0; i < names.length; i++) {
   var src = document.getElementById('layer-toggle-' + names[i]);
   var dst = document.getElementById('map-toggle-' + names[i]);
   if (src && dst) dst.checked = !!src.checked;
  }
  _syncLabelOnOffTabs();
+ _syncSwathOnOffTabs();
 }
 
 function _syncLabelOnOffTabs() {
@@ -8261,9 +8262,92 @@ function toggleMapDisplayLayer(layerName) {
  if (typeof toggleSurveyLayer === 'function') toggleSurveyLayer(layerName, { silent: true });
 }
 
+function setMapSwathsVisible(show) {
+ show = !!show;
+ state.showSwaths = show;
+ try { localStorage.setItem('candooka_show_swaths', show ? '1' : '0'); } catch (_) {}
+ _syncSwathOnOffTabs();
+ if (map && layerSwaths) {
+  if (show) {
+   if (!map.hasLayer(layerSwaths)) map.addLayer(layerSwaths);
+  } else if (map.hasLayer(layerSwaths)) {
+   map.removeLayer(layerSwaths);
+  }
+ }
+ if (typeof renderSwathOverlays === 'function') renderSwathOverlays();
+}
+
+function setMapSwathCount(n) {
+ n = parseInt(n, 10);
+ if (!isFinite(n)) return;
+ n = Math.max(2, Math.min(10, n));
+ state.settings.numSwaths = n;
+ const nsEl = document.getElementById('crit-num-swaths');
+ if (nsEl) {
+  nsEl.value = String(n);
+  nsEl.dataset.userEdited = '1';
+ }
+ const mapEl = document.getElementById('map-num-swaths');
+ if (mapEl && String(mapEl.value) !== String(n)) mapEl.value = String(n);
+ if (typeof updateSwathDirectionUI === 'function') updateSwathDirectionUI();
+ if (state.showSwaths !== false && map && layerSwaths && !map.hasLayer(layerSwaths)) {
+  map.addLayer(layerSwaths);
+ }
+ if (typeof renderSwathOverlays === 'function') renderSwathOverlays();
+}
+
+function nudgeMapSwathCount(delta) {
+ setMapSwathCount((state.settings.numSwaths || 2) + (delta || 0));
+}
+
+function _syncSwathOnOffTabs() {
+ var on = state.showSwaths !== false;
+ var offBtn = document.getElementById('swaths-tab-off');
+ var onBtn = document.getElementById('swaths-tab-on');
+ if (offBtn) {
+  offBtn.classList.toggle('active', !on);
+  offBtn.setAttribute('aria-pressed', on ? 'false' : 'true');
+ }
+ if (onBtn) {
+  onBtn.classList.toggle('active', on);
+  onBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+ }
+ var layerCb = document.getElementById('layer-toggle-swaths');
+ if (layerCb && layerCb.checked !== on) layerCb.checked = on;
+ var mapEl = document.getElementById('map-num-swaths');
+ var n = state.settings.numSwaths || 2;
+ if (mapEl && String(mapEl.value) !== String(n)) mapEl.value = String(n);
+}
+
+function _mapSwathsBlockHtml() {
+ var on = state.showSwaths !== false;
+ var n = state.settings.numSwaths || 2;
+ var btn = 'flex:none;width:26px;height:26px;border-radius:4px;border:1px solid #2a2a3a;background:#111119;color:#e2e8f0;font-size:16px;font-weight:700;cursor:pointer;line-height:1;';
+ return '' +
+  '<div id="map-swaths-block" style="margin-top:10px;padding-top:8px;border-top:1px solid #1a1a2e;">' +
+  '<div style="font-size:10px;color:#00d2ff;font-weight:700;letter-spacing:0.6px;margin-bottom:6px;">3D SWATHS</div>' +
+  '<div class="label-onoff-tabs" role="group" aria-label="3D swaths off or on">' +
+  '<button type="button" id="swaths-tab-off" class="label-onoff-tab' + (on ? '' : ' active') + '" aria-pressed="' + (on ? 'false' : 'true') + '" onclick="setMapSwathsVisible(false)">SWATHS OFF</button>' +
+  '<button type="button" id="swaths-tab-on" class="label-onoff-tab' + (on ? ' active' : '') + '" aria-pressed="' + (on ? 'true' : 'false') + '" onclick="setMapSwathsVisible(true)">SWATHS ON</button>' +
+  '</div>' +
+  '<div style="display:flex;align-items:center;gap:8px;margin-top:8px;">' +
+  '<span style="color:#c0c8d4;font-size:11px;font-weight:700;flex:1;">Number of swaths</span>' +
+  '<button type="button" onclick="nudgeMapSwathCount(-1)" title="Fewer swaths" style="' + btn + '">\u2212</button>' +
+  '<input id="map-num-swaths" type="number" min="2" max="10" step="1" value="' + n + '" onchange="setMapSwathCount(this.value)" style="width:44px;height:26px;text-align:center;background:#0a0a12;border:1px solid #2a2a3a;color:#e2e8f0;border-radius:4px;font-size:12px;font-weight:700;outline:none;" />' +
+  '<button type="button" onclick="nudgeMapSwathCount(1)" title="More swaths" style="' + btn + '">+</button>' +
+  '</div>' +
+  '<div style="font-size:9px;color:#8a9bb0;margin-top:4px;">2\u201310. Bands draw on the preplot for 3D.</div>' +
+  '</div>';
+}
+
 function _ensureMapDisplayToggle(stack) {
  var panel = document.getElementById('map-display-overlay');
  if (panel) {
+  if (!document.getElementById('map-num-swaths')) {
+   var wrap = document.createElement('div');
+   wrap.innerHTML = _mapSwathsBlockHtml();
+   while (wrap.firstChild) panel.appendChild(wrap.firstChild);
+  }
   _syncMapDisplayToggles();
   return panel;
  }
@@ -8280,6 +8364,7 @@ function _ensureMapDisplayToggle(stack) {
   '</div>' +
   '<input type="checkbox" id="map-toggle-labels" ' + (labelsOn ? 'checked ' : '') + 'onchange="toggleMapDisplayLayer(\'labels\')" style="display:none;" />' +
   '<div style="font-size:10px;color:#c0c8d4;margin-top:6px;">Line numbers &amp; shot points</div>' +
+  _mapSwathsBlockHtml() +
   '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:#e0e0e4;margin-top:8px;">' +
   '<input type="checkbox" id="map-toggle-annotations" checked onchange="toggleMapDisplayLayer(\'annotations\')" style="width:14px;height:14px;accent-color:#00d2ff;cursor:pointer;flex:none;" />' +
   'Annotations &amp; arrows</label>' +
@@ -20616,18 +20701,19 @@ function toggleSurveyLayer(layerName, opts) {
  if (show) map.addLayer(layerRoute); else map.removeLayer(layerRoute);
  } else if (layerName === 'annotations') {
  // Note: line number & SP labels have their own dedicated toggle ('labels').
+ // 3D swaths have their own toggle ('swaths') on the main map.
  // User-defined start point/line marker is part of annotations.
  if (show) {
  map.addLayer(layerAnnotations);
  if (layerArrows) map.addLayer(layerArrows);
- if (layerSwaths) map.addLayer(layerSwaths);
  if (layerStartPoint) map.addLayer(layerStartPoint);
  } else {
  map.removeLayer(layerAnnotations);
  if (layerArrows) map.removeLayer(layerArrows);
- if (layerSwaths) map.removeLayer(layerSwaths);
  if (layerStartPoint) map.removeLayer(layerStartPoint);
  }
+ } else if (layerName === 'swaths') {
+ setMapSwathsVisible(show);
  } else if (layerName === 'obstructions') {
  if (show) map.addLayer(layerObstructions); else map.removeLayer(layerObstructions);
  }

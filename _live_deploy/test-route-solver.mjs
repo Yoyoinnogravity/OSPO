@@ -107,7 +107,7 @@ vm.runInContext(`
   else { const _t = showToast; showToast = function(){}; }
 `, ctx);
 
-assert(/app\.js\?v=17\.10/.test(html), 'app.js cache bump 17.10 missing');
+assert(/app\.js\?v=17\.11/.test(html), 'app.js cache bump 17.11 missing');
 assert(html.includes('skip-k racetrack'), 'chooser Auto must describe skip-k racetrack');
 assert(!html.includes('fastest of 1500 options'), 'chooser must not advertise 1500-option TSP');
 assert(html.includes('simple nearest neighbour'), 'auto-nn must stay real NN');

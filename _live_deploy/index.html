@@ -1369,6 +1369,10 @@
  <label>Annotations, Arrows &amp; Start Point</label>
  <input type="checkbox" id="layer-toggle-annotations" checked onchange="toggleSurveyLayer('annotations')" style="flex:none; width:20px; height:20px; cursor:pointer;" />
  </div>
+ <div class="panel-row" style="justify-content:space-between; margin-bottom:12px;">
+ <label>3D Swaths</label>
+ <input type="checkbox" id="layer-toggle-swaths" checked onchange="toggleSurveyLayer('swaths')" style="flex:none; width:20px; height:20px; cursor:pointer;" />
+ </div>
  <div class="panel-row" style="justify-content:space-between; margin-bottom:14px;">
  <label>Obstructions / Hazards</label>
  <input type="checkbox" id="layer-toggle-obstructions" checked onchange="toggleSurveyLayer('obstructions')" style="flex:none; width:20px; height:20px; cursor:pointer;" />
@@ -2166,7 +2170,7 @@
  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
  <script src="https://unpkg.com/shpjs@latest/dist/shp.min.js"></script>
  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
- <script src="app.js?v=17.10"></script>
+ <script src="app.js?v=17.11"></script>
  <script src="ray_tracing_module.js?v=16.53"></script>
  <script src="wmm_declination.js?v=16.49"></script>
  <script src="magnetic_isogones.js?v=16.49"></script>
