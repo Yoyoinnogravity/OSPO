@@ -46,7 +46,7 @@
  "description": "Offshore survey planner and offshore route planning software for marine survey optimization: preplot generation, geophysical survey planning, seismic survey planning software, offshore navigation optimization, survey duration estimation, offshore cost estimation, tide prediction for offshore surveys, geodetic transformation engine and marine GIS planning software.",
  "featureList": [
  "Survey line preplot generator and automated preplot generation for marine surveys",
- "Offshore survey route optimizer with deep-search optimization (1500 iterations)",
+ "Offshore survey route optimizer: fastest of ~1500 shooting sequences",
  "Route planning for seismic vessels and seismic acquisition planning",
  "Offshore look-ahead timing and survey duration estimation",
  "Offshore cost estimation tool and reporting workflows",
@@ -102,7 +102,7 @@
  "@context": "https://schema.org",
  "@type": "FAQPage",
  "mainEntity": [
- { "@type": "Question", "name": "What is the best software for offshore survey route planning?", "acceptedAnswer": { "@type": "Answer", "text": "Candooka OSPO is an offshore survey planner and route optimizer that plans efficient seismic survey routes in complex geometry using deep-search optimization algorithms (1500 iterations per plan), reducing survey duration and vessel downtime." } },
+ { "@type": "Question", "name": "What is the best software for offshore survey route planning?", "acceptedAnswer": { "@type": "Answer", "text": "Candooka OSPO is an offshore survey planner and route optimizer that scores about 1500 feasible shooting sequences (line order, direction and start) and ships the minimum-time plan, reducing survey duration and vessel downtime." } },
  { "@type": "Question", "name": "How do I generate preplots for seismic surveys?", "acceptedAnswer": { "@type": "Answer", "text": "Candooka's preplot generator provides automated preplot generation for marine surveys: define line spacing, azimuth and survey area, then export offshore survey plans to KML, Shapefile or GeoJSON." } },
  { "@type": "Question", "name": "Can I plan offshore surveys with tide predictions?", "acceptedAnswer": { "@type": "Answer", "text": "Yes - Candooka OSPO includes tide prediction for offshore surveys alongside look-ahead timing, survey duration estimation and offshore cost estimation workflows." } },
  { "@type": "Question", "name": "How do I reduce survey duration and vessel downtime?", "acceptedAnswer": { "@type": "Answer", "text": "Candooka's route optimization engine minimizes line-turn transit time with vessel routing algorithms and survey line geometry optimization, cutting survey turnaround time for seismic vessels." } },
@@ -126,7 +126,7 @@
  <p>The Candooka Offshore Survey Planner is an offshore survey planning tool and offshore survey route optimizer
  for seismic survey planning, offshore navigation optimization and marine operations planning. The Candooka Route
  Optimization Engine plans efficient seismic survey routes in complex geometry using deep-search optimization
- algorithms (1500 iterations per plan), vessel routing algorithms and survey line geometry optimization to reduce
+ (fastest of about 1500 shooting sequences), vessel routing algorithms and survey line geometry optimization to reduce
  survey duration and vessel downtime.</p>
  <h2>Survey Line Preplot Generator</h2>
  <p>Automated preplot generation for marine surveys with the Candooka Preplot Generator: generate preplots for
@@ -786,8 +786,8 @@
  <div style="margin-bottom:12px;">
  <label style="font-size:11px; color:#a0aebb; font-weight:600; margin-bottom:4px; display:block;">Plan (acquisition strategy)</label>
  <select id="start-plan-select" style="width:100%; background:#111; border:1px solid #333; color:#e0e8f0; padding:8px 10px; border-radius:5px; font-size:12px; outline:none; cursor:pointer;">
- <option value="auto">Auto - skip-k racetrack (turn-radius U-turns)</option>
- <option value="auto-nn">Auto - racetrack (nominal skip, no extra k search)</option>
+ <option value="auto">Auto - racetrack skip (turn-radius U-turns) + polish</option>
+ <option value="auto-nn">Auto - simple nearest neighbour (quick, no optimization)</option>
  <option value="low-high">Line number Low &rarr; High</option>
  <option value="high-low">Line number High &rarr; Low</option>
  <option value="interleaved">Interleaved swaths (Low &rarr; High)</option>
@@ -799,7 +799,7 @@
  </select>
  </div>
  <div style="margin-bottom:12px;">
- <label style="font-size:11px; color:#a0aebb; font-weight:600; margin-bottom:4px; display:block;">Optimizer Iterations (Auto plan deep search)</label>
+ <label style="font-size:11px; color:#a0aebb; font-weight:600; margin-bottom:4px; display:block;">Options to evaluate (Auto: line order × direction × start)</label>
  <input type="number" id="start-iterations" value="1500" min="100" max="20000" step="100" style="width:100%; background:#111; border:1px solid #333; color:#e0e8f0; padding:8px 10px; border-radius:5px; font-size:12px; outline:none;" />
  </div>
  <div style="margin-bottom:12px;">
@@ -2166,7 +2166,7 @@
  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
  <script src="https://unpkg.com/shpjs@latest/dist/shp.min.js"></script>
  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
- <script src="app.js?v=16.96"></script>
+ <script src="app.js?v=16.99"></script>
  <script src="ray_tracing_module.js?v=16.53"></script>
  <script src="wmm_declination.js?v=16.49"></script>
  <script src="magnetic_isogones.js?v=16.49"></script>

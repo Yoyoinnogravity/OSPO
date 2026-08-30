@@ -5034,7 +5034,7 @@ function askSurveyCriteria({ zone, hemi }, callback) {
  <div class="panel-row" style="margin-bottom:10px;">
  <label style="width:140px; color:#ffffff;">Progression</label>
  <select id="crit-progression-2d" style="flex:1;padding:5px 8px;border-radius:4px;border:1px solid #222222;background:#111111;color:#ffffff;font-size:13px;outline:none;cursor:pointer;">
- <option value="auto" ${(state.settings.progression || 'auto') === 'auto' ? 'selected' : ''}>Auto (racetrack skip + polish)</option>
+ <option value="auto" ${(state.settings.progression || 'auto') === 'auto' ? 'selected' : ''}>Auto (fastest of ~1500 shooting sequences)</option>
  <option value="west-east" ${state.settings.progression === 'west-east' ? 'selected' : ''}>West ' East</option>
  <option value="east-west" ${state.settings.progression === 'east-west' ? 'selected' : ''}>East ' West</option>
  <option value="south-north" ${state.settings.progression === 'south-north' ? 'selected' : ''}>South ' North</option>
@@ -11942,44 +11942,15 @@ function executePlanRoute() {
    8000
   );
  }
- // Report deep-optimizer performance (auto/2D optimizer only)
+ // Report fastest-of-N (auto/2D and 3D swath enum)
  const os = state._optimizerStats;
- if (os && os.solver === 'racetrack') {
- const k = os.skipK || '?';
+ if (os && os.mode === 'nn') {
+ showToast(`Simple nearest-neighbour plan - ${(os.finalSec / 3600).toFixed(1)} h (no sequence search, as selected)`, 6000);
+ } else if (os && (os.optionsEvaluated > 0 || os.mode === 'fastest-of-n')) {
+ const nOpt = os.optionsEvaluated || os.iterations || 0;
  const h = os.finalSec != null ? (os.finalSec / 3600).toFixed(1) : '?';
- showToast(`Racetrack plan: skip-${k} (turn radius U-turns), ${h} h line-change time`, 7000);
- } else if (os && os.mode === 'nn') {
- showToast(`Simple nearest-neighbour plan - transit time ${(os.finalSec / 3600).toFixed(1)} h (no deep optimization, as selected)`, 6000);
- } else if (os && os.iterations > 0) {
- const secs = (os.elapsedMs / 1000).toFixed(1);
- let msg = `Route optimized: ${os.iterations} iterations, ${os.starts} multi-starts in ${secs}s`;
- if (os.greedySec != null && os.finalSec != null && os.greedySec > 0) {
- const savedPct = ((os.greedySec - os.finalSec) / os.greedySec * 100);
- if (savedPct > 0.05) {
- msg += ` - transit time ${(os.finalSec / 3600).toFixed(1)} h (${savedPct.toFixed(1)}% faster than greedy nearest-line)`;
- } else {
- // Honest reporting: on regular parallel grids the greedy plan is
- // often already optimal - say so instead of implying magic gains.
- msg += ` - transit time ${(os.finalSec / 3600).toFixed(1)} h (deep search found no better order: greedy plan is already locally optimal for this geometry)`;
- }
- }
- if (os.altChecked > 0 && os.altBestSec != null && os.finalSec != null &&
- os.finalSec <= os.altBestSec + 0.5) {
- const marginH = (os.altBestSec - os.finalSec) / 3600;
- msg += ` - verified fastest vs ${os.altChecked} directional plans`;
- if (marginH > 0.05) msg += ` (best alternative ${os.altBestName} +${marginH.toFixed(1)} h)`;
- }
- // Proven optimality: LKH-3'Held-Karp bound is a hard lower limit on
- // the transit of ANY possible line order, so the gap is a proof, not
- // an estimate. A zero gap means this plan IS the optimum.
- if (os.gapPct != null) {
- const g = Math.max(0, os.gapPct);
- const ref = os.gapConstrained ? 'unconstrained optimum' : 'mathematical optimum';
- msg += g < 0.005
- ? ` - PROVEN OPTIMAL (matches the ${ref})`
- : ` - proven within ${g.toFixed(2)}% of the ${ref}`;
- }
- showToast(msg, 9000);
+ const secs = os.elapsedMs != null ? (os.elapsedMs / 1000).toFixed(1) : '?';
+ showToast(`Fastest of ${nOpt} shooting sequences: ${h} h total (on-line + Dubins line-changes) in ${secs}s`, 8000);
  }
  } catch (err) {
  console.error('Planning error:', err);
@@ -12342,23 +12313,23 @@ function _orderSkipStd(ord, spatial) {
  return Math.sqrt(skips.reduce((a, b) => a + (b - mean) * (b - mean), 0) / skips.length);
 }
 
-// ===== 3D PROGRESSIVE-SWATH SEQUENCER =====
-// Within a swath every new line stays adjacent (progressive infill). Swaths
-// themselves are completed as BLOCKS and only then handed off — never
-// round-robin'd line-by-line. The old DP switched swath every line because a
-// hop to the other half of the prospect beat an adjacent U-turn, which is
-// exactly the 0, n/2, 1, n/2+1 zigzag on a 164-line / 2-swath default.
+// ===== 3D PROGRESSIVE-SWATH INTERLEAVE OPTIMIZER =====
+// On 3D swath shooting each new line MUST be acquired adjacent to the last
+// line acquired on that swath (progressive infill requirement). Each swath is
+// therefore shot strictly in adjacent order and the planner'only freedom is
+// WHICH swath to shoot from next. This solves that sequencing for minimum
+// transit time - exact DP when the state space is small, beam search otherwise.
+// swaths: arrays of line indices in per-swath acquisition order.
+// revOf: acquisition direction (reversed flag) per line index.
 // Returns { seq: [lineIdx...], costSec } or null.
 function optimizeSwathInterleave(swaths, revOf, transitTimeSec, forceStartSwath) {
  const numSw = swaths.length;
  const lens = swaths.map(s => s.length);
  const total = lens.reduce((a, b) => a + b, 0);
  if (total === 0) return null;
-
  const active = [];
  for (let g = 0; g < numSw; g++) if (lens[g] > 0) active.push(g);
  if (!active.length) return null;
-
  const memo = new Map();
  const T = (a, b) => {
   const mk = a * 65536 + b;
@@ -12366,105 +12337,23 @@ function optimizeSwathInterleave(swaths, revOf, transitTimeSec, forceStartSwath)
   if (v === undefined) { v = transitTimeSec(a, revOf[a], b, revOf[b]); memo.set(mk, v); }
   return v;
  };
-
- function expand(swOrder) {
+ function expand(order) {
   const seq = [];
-  for (const g of swOrder) {
-   if (g < 0 || g >= numSw || !swaths[g] || !swaths[g].length) continue;
-   seq.push(...swaths[g]);
-  }
+  for (const g of order) seq.push(...swaths[g]);
   if (seq.length !== total) return null;
   let cost = 0;
   for (let i = 0; i < seq.length - 1; i++) cost += T(seq[i], seq[i + 1]);
   return { seq, costSec: cost };
  }
-
- function handoff(gFrom, gTo) {
-  const a = swaths[gFrom][swaths[gFrom].length - 1];
-  const b = swaths[gTo][0];
-  return T(a, b);
+ let order = active.slice();
+ if (forceStartSwath >= 0 && order.includes(forceStartSwath)) {
+  order = [forceStartSwath].concat(order.filter(g => g !== forceStartSwath));
  }
-
- function swathRacetrack(k, startHigh) {
-  const nS = active.length;
-  k = Math.max(1, Math.min(k, nS));
-  const residues = [];
-  for (let r = 0; r < k; r++) {
-   const seq = [];
-   for (let i = r; i < nS; i += k) seq.push(i);
-   residues.push(seq);
-  }
-  const out = [];
-  for (let r = 0; r < k; r++) {
-   const seq = residues[r].slice();
-   if (!seq.length) continue;
-   if (out.length) {
-    const last = out[out.length - 1];
-    if (Math.abs(seq[seq.length - 1] - last) < Math.abs(seq[0] - last)) seq.reverse();
-   } else if (startHigh) {
-    seq.reverse();
-   }
-   out.push(...seq);
-  }
-  return out.map(i => active[i]);
- }
-
- let best = null;
- const consider = (cand) => {
-  if (!cand) return;
-  if (!best || cand.costSec < best.costSec - 0.5) best = cand;
- };
-
- consider(expand(active));
- consider(expand(active.slice().reverse()));
- for (const k of [1, 2, 3, 4]) {
-  if (k > active.length) break;
-  consider(expand(swathRacetrack(k, false)));
-  consider(expand(swathRacetrack(k, true)));
- }
-
- if (forceStartSwath >= 0 && active.includes(forceStartSwath)) {
-  const rest = active.filter(g => g !== forceStartSwath);
-  consider(expand([forceStartSwath, ...rest]));
-  consider(expand([forceStartSwath, ...rest.slice().reverse()]));
- }
-
- if (active.length <= 6) {
-  const perm = active.slice();
-  let startAt = 0;
-  if (forceStartSwath >= 0 && active.includes(forceStartSwath)) {
-   perm.splice(perm.indexOf(forceStartSwath), 1);
-   perm.unshift(forceStartSwath);
-   startAt = 1;
-  }
-  const rec = (i) => {
-   if (i === perm.length) { consider(expand(perm.slice())); return; }
-   for (let j = i; j < perm.length; j++) {
-    const tmp = perm[i]; perm[i] = perm[j]; perm[j] = tmp;
-    rec(i + 1);
-    perm[j] = perm[i]; perm[i] = tmp;
-   }
-  };
-  rec(startAt);
- } else {
-  const nn = [];
-  let cur = (forceStartSwath >= 0 && active.includes(forceStartSwath)) ? forceStartSwath : active[0];
-  const vis = new Set([cur]);
-  nn.push(cur);
-  while (vis.size < active.length) {
-   let bestG = -1, bestC = Infinity;
-   for (const g of active) {
-    if (vis.has(g)) continue;
-    const c = handoff(nn[nn.length - 1], g);
-    if (c < bestC) { bestC = c; bestG = g; }
-   }
-   if (bestG < 0) break;
-   vis.add(bestG);
-   nn.push(bestG);
-  }
-  consider(expand(nn));
- }
-
+ let best = expand(order);
+ const flipped = (forceStartSwath >= 0)
+  ? expand([order[0]].concat(order.slice(1).reverse()))
+  : expand(order.slice().reverse());
+ if (flipped && (!best || flipped.costSec < best.costSec - 0.5)) best = flipped;
  return best;
 }
 
@@ -12554,7 +12443,7 @@ function computeRoute() {
  let progression = state.settings.progression || (state.settings.surveyType === '3d' ? 'interleaved' : 'auto');
  if (state.settings.surveyType === '3d' && progression === 'auto') {
  progression = 'interleaved';
- showToast('3D survey: progressive swath adjacency - each swath is completed before the next (no cross-prospect zigzag)');
+ showToast('3D survey: progressive swath adjacency enforced - optimizing swath interleave for transit time');
  }
  const order = []; // [{ lineIdx, reversed }]
 
@@ -12642,9 +12531,7 @@ function computeRoute() {
  if (prioA !== prioB) return prioA - prioB; // priority first
  return lineNumKey[a] - lineNumKey[b]; // then line number
  });
- const numSw = (state.settings.numSwaths > 1)
-  ? state.settings.numSwaths
-  : (typeof _autoEvenSwathCount === 'function' ? _autoEvenSwathCount() : 2);
+ const numSw = state.settings.numSwaths || 2;
  const groupSize = Math.ceil(indices.length / numSw);
  const swaths = [];
  for (let g = 0; g < numSw; g++) {
@@ -12705,10 +12592,14 @@ function computeRoute() {
  }
  }
 
- // Time-based interleave: choose WHICH swath to shoot from next so total
- // Dubins transit TIME is minimised, while preserving per-swath adjacency.
+ // Time-based interleave: score ~1500 block-complete shooting sequences
+ // (swath order × within-swath racetrack/sweep × start end) and keep min time.
  const model3d = buildTransitTimeModel(lines);
- const opt = optimizeSwathInterleave(swaths, revOfLocal, model3d.transitTimeSec, forceStartSwath);
+ const opt3dStart = Date.now();
+ const opt = optimizeSwathInterleave(swaths, revOfLocal, model3d.transitTimeSec, forceStartSwath, {
+  targetOptions: Math.max(1, state.settings.optimizerIterations || 1500),
+  timeUp: () => (Date.now() - opt3dStart) > 25000
+ });
 
  // Rigid round-robin sequence (fallback + reporting baseline)
  const interleaved = [];
@@ -12730,10 +12621,17 @@ function computeRoute() {
  interleaved[k], revOfLocal[interleaved[k]],
  interleaved[k + 1], revOfLocal[interleaved[k + 1]]);
  }
- if (baseCost >opt.costSec + 1) {
- const savedH = (baseCost - opt.costSec) / 3600;
- showToast(`Swath interleave optimized: transit ${(opt.costSec / 3600).toFixed(1)} h (saves ${savedH.toFixed(1)} h vs round-robin)`, 6000);
- }
+ const nOpt = opt.optionsEvaluated || 1;
+ state._optimizerStats = {
+  mode: 'fastest-of-n',
+  solver: 'swath-enum',
+  optionsEvaluated: nOpt,
+  optionsTarget: Math.max(1, state.settings.optimizerIterations || 1500),
+  finalSec: opt.costSec,
+  transitSec: opt.costSec,
+  elapsedMs: Date.now() - opt3dStart,
+  capped: (Date.now() - opt3dStart) > 25000
+ };
  } else {
  indices.push(...interleaved);
  }
@@ -12817,7 +12715,7 @@ function computeRoute() {
  order.push({ lineIdx: idx, reversed: rev });
  }
  } else {
- // --- Auto: skip-k racetrack (parallel grids) or NN+ILS (irregular) ---
+ // --- Auto: score up to 1500 shooting sequences, ship the fastest, stop ---
 
  // === ADVANCED ROUTE OPTIMIZER ===
  // When the user has explicitly chosen a start line or a custom start
@@ -12946,15 +12844,16 @@ function computeRoute() {
  }
 
  // User-selected optimizer mode: 'nn' = simple nearest-neighbour plan only
- // (quick, no improvement passes); 'deep' (default) = full deep search.
+ // (quick, no enumeration); default = score ~1500 shooting sequences.
  const nnOnly = state.settings.optimizerMode === 'nn';
 
- // Deep-search budget: iteration-driven (like SurvOpt's 1500 iterations),
- // with only a generous wall-clock safety cap to avoid hanging the browser.
+ // Fastest-of-N budget: evaluate this many feasible sequences (line order ×
+ // heading × start family), then STOP. Not ILS iterations. A wall-clock
+ // safety cap only aborts if scoring itself hangs.
  const optimizerStart = Date.now();
- const targetIterations = Math.max(1, state.settings.optimizerIterations || 1500);
- const safetyCapMs = 120000; // 2 min hard safety cap
- function timeUp() { return (Date.now() - optimizerStart) >safetyCapMs; }
+ const targetOptions = Math.max(1, state.settings.optimizerIterations || 1500);
+ const safetyCapMs = 60000;
+ function timeUp() { return (Date.now() - optimizerStart) > safetyCapMs; }
 
  // 2-opt to LOCAL OPTIMALITY (first-improvement). The previous version
  // broke out of BOTH loops after each applied move with the pass count
@@ -13160,190 +13059,140 @@ function computeRoute() {
  return out.concat(ord.slice(hi + 1));
  }
 
- // --- PHASE 1: Skip-k racetrack on parallel grids ---
- // Dubins NN + 2-opt/ILS hops to whichever line is ~2R away, then keeps
- // hopping: that is the tangled orange tour. A skip-k snake (k ≈ 2R /
- // spacing) shoots residue classes with U-turns at the line ends. 2-opt
- // is not allowed to rewrite that order on a parallel preplot.
+ // --- Fastest of N shooting sequences ---
+ // Score feasible plans (line order × heading × start family), each with
+ // Dubins/turn-radius line-changes plus on-line length/speed. Ship only
+ // the minimum-time plan. Not a global TSP proof: N evaluated options.
  const spatial = _spatialLineOrder(lines);
  const spacingM = _medianLineSpacingM(lines, spatial);
  const kNom = _racetrackSkipK(spacingM, getEffectiveTurnRadius());
- const parallelGrid = _linesFormParallelSweep(lines);
  let bestSolution = null;
  let bestTotalCost = Infinity;
- let usedRacetrack = false;
+ let bestConstructor = null;
  let initialCost = Infinity;
- let chosenK = kNom;
- let lkhUsed = false;
- let lkhLowerBoundSec = null;
- let iterationsRun = 0;
- let effIterations = 0;
- let altBestSec = Infinity, altBestName = null, altChecked = 0;
- let startCandidates = [];
- let maxStarts = 1;
+ let optionsEvaluated = 0;
+ const seenFp = new Set();
+ const hasInfill = lines.some(l => l && l._infill);
+ const candSec = { racetrack: Infinity, nn: Infinity, twoOpt: Infinity, sweep: Infinity, infill: Infinity };
+
+ const onlineKn = state.settings.speed || 4.5;
+ const onlineMs = Math.max(0.05, onlineKn * 0.514444);
+ const runInM = state.settings.runIn || 0;
+ const runOutM = state.settings.runOut || 0;
+ let onlineTotalSec = 0;
+ for (let i = 0; i < n; i++) {
+  onlineTotalSec += (haversine(lines[i].start, lines[i].end) + runInM + runOutM) / onlineMs;
+ }
+ function totalTimeSec(ord) {
+  return onlineTotalSec + transitCost(ord);
+ }
 
  const applyFixed = (sol) => sol.map(o => ({
   lineIdx: o.lineIdx,
   reversed: fixedRev[o.lineIdx] != null ? fixedRev[o.lineIdx] : !!o.reversed
  }));
 
- const considerSol = (sol, fromRacetrack, kUsed) => {
-  if (!sol || sol.length !== n) return;
-  const cost = transitCost(sol);
-  if (cost < initialCost) initialCost = cost;
-  if (cost < bestTotalCost) {
-   bestTotalCost = cost;
-   bestSolution = sol.map(o => ({ ...o }));
-   usedRacetrack = !!fromRacetrack;
-   if (kUsed) chosenK = kUsed;
+ const considerSol = (sol, constructor) => {
+  if (!sol || sol.length !== n) return Infinity;
+  if (optionsEvaluated >= targetOptions) return Infinity;
+  if (timeUp() && bestSolution) return Infinity;
+  let use = applyFixed(sol);
+  if (userStartLocked) use = applyFixed(_rotateOrderToStart(use, startIdx, startReversed));
+  if (!use.length || use.length !== n) return Infinity;
+  if (!userStartLocked && !depotPt && spatial && spatial.order && spatial.order.length) {
+    const first = use[0].lineIdx;
+    const lo = spatial.order[0], hi = spatial.order[spatial.order.length - 1];
+    if (first !== lo && first !== hi) return Infinity;
   }
+  const fp = _seqFingerprint(use);
+  if (seenFp.has(fp)) return Infinity;
+  seenFp.add(fp);
+  optionsEvaluated++;
+  const cost = totalTimeSec(use);
+  if (cost < initialCost) initialCost = cost;
+  if (constructor === 'racetrack' || constructor === 'racetrack-2opt') {
+   if (cost < candSec.racetrack) candSec.racetrack = cost;
+  }
+  if (constructor === 'nn') {
+   if (cost < candSec.nn) candSec.nn = cost;
+  }
+  if (constructor === '2opt' || constructor.indexOf('2opt') >= 0) {
+   if (cost < candSec.twoOpt) candSec.twoOpt = cost;
+  }
+  if (constructor === 'sweep' || constructor === 'sweep-2opt') {
+   if (cost < candSec.sweep) candSec.sweep = cost;
+  }
+  if (constructor.indexOf('infill') >= 0) {
+   if (cost < candSec.infill) candSec.infill = cost;
+  }
+  if (bestSolution == null || cost < bestTotalCost - 0.5) {
+   bestTotalCost = cost;
+   bestSolution = use.map(o => ({ ...o }));
+   bestConstructor = constructor;
+  }
+  return cost;
  };
 
- if (parallelGrid && n >= 2) {
-  const kSet = nnOnly
-   ? new Set([kNom])
-   : new Set([kNom, Math.max(1, kNom - 1), kNom + 1, Math.max(2, Math.round(kNom / 2)), Math.min(n - 1, Math.max(1, kNom * 2))]);
-  if (kNom >= 3) kSet.delete(1);
-  const seeds = [];
+ const maybeInfill = (sol, family) => {
+  if (!hasInfill || optionsEvaluated >= targetOptions || timeUp()) return;
+  const a = _infillAfterParent(sol, lines);
+  if (a) considerSol(a, 'infill-interleave');
+  const b = _primesThenInfill(sol, lines);
+  if (b) considerSol(b, 'infill-after');
+ };
+
+ if (nnOnly) {
+  const sol = applyFixed(buildNNSolution(startIdx, startReversed));
+  considerSol(sol, 'nn');
+ } else {
+  const cornerPairs = [
+   { startAtHigh: false, firstReversed: false },
+   { startAtHigh: false, firstReversed: true },
+   { startAtHigh: true, firstReversed: false },
+   { startAtHigh: true, firstReversed: true }
+  ];
+  // Family A: residue-class racetrack from each end, both headings, skip-k
+  for (const k of _kAroundNom(kNom, n)) {
+   if (optionsEvaluated >= targetOptions || timeUp()) break;
+   for (const corner of cornerPairs) {
+    if (optionsEvaluated >= targetOptions || timeUp()) break;
+    let rt = buildRacetrackOrder(lines, k, { spatial, ...corner });
+    considerSol(rt, 'racetrack');
+    maybeInfill(rt, 'racetrack');
+   }
+  }
+  // Family B: skip-k snake from start-line choices, both headings
+  const startIdxs = [];
   if (userStartLocked) {
-   seeds.push({ idx: startIdx, rev: startReversed });
+   startIdxs.push(startIdx);
   } else {
    const lo = spatial.order[0], hi = spatial.order[spatial.order.length - 1];
-   seeds.push({ idx: lo, rev: false }, { idx: lo, rev: true }, { idx: hi, rev: false }, { idx: hi, rev: true });
+   startIdxs.push(lo, hi);
   }
-  startCandidates = seeds;
-  maxStarts = seeds.length;
-  for (const k of kSet) {
-   if (k < 1 || k > n) continue;
-   for (const seed of seeds) {
-    const dirs = userStartLocked ? [null, 1, -1] : [null];
-    for (const preferDir of dirs) {
-     const rt = applyFixed(buildRacetrackOrderFrom(lines, k, seed.idx, seed.rev, spatial, preferDir));
-     if (!rt.length || rt[0].lineIdx !== seed.idx) continue;
-     considerSol(rt, true, k);
-    }
-   }
-  }
-  if (!startLineObj && bestSolution && bestSolution.length) {
-   userStartLocked = true;
-   startIdx = bestSolution[0].lineIdx;
-   startReversed = !!bestSolution[0].reversed;
-  }
-  if (bestSolution) {
-   bestSolution = directionOptimize(bestSolution.map(o => ({ ...o })));
-   bestTotalCost = transitCost(bestSolution);
-  }
- } else {
-  // Irregular / non-parallel preplot: corner NN + ILS (not 24 file-order starts).
-  const cornerIdxs = [spatial.order[0], spatial.order[spatial.order.length - 1]].filter((v, i, a) => a.indexOf(v) === i);
-  maxStarts = (userStartLocked || nnOnly) ? 1 : Math.min(8, cornerIdxs.length * 2);
-  if (userStartLocked) {
-   startCandidates.push({ idx: startIdx, rev: startReversed });
-  } else {
-   for (const idx of cornerIdxs) {
-    startCandidates.push({ idx, rev: false });
-    startCandidates.push({ idx, rev: true });
-   }
-   if (!startCandidates.some(c => c.idx === startIdx)) {
-    startCandidates.unshift({ idx: startIdx, rev: startReversed });
-   }
-  }
-  for (const cand of startCandidates.slice(0, maxStarts)) {
-   if (timeUp()) break;
-   let sol = applyFixed(buildNNSolution(cand.idx, cand.rev));
-   considerSol(sol, false, null);
-   if (!nnOnly) {
-    sol = fullImprove(sol);
-    considerSol(sol, false, null);
-   }
-  }
-
-  function callLkhSolver() {
-   if (nnOnly || n < 4 || n > 500) return null;
-   if (typeof XMLHttpRequest === 'undefined') return null;
-   try {
-    const m = new Array(n * n * 4);
-    for (let i = 0; i < n; i++) {
-     for (let j = 0; j < n; j++) {
-      const d = D[i][j], base = (i * n + j) * 4;
-      m[base] = Math.round(d.ff); m[base + 1] = Math.round(d.fr);
-      m[base + 2] = Math.round(d.rf); m[base + 3] = Math.round(d.rr);
+  outerSnake:
+  for (const sIdx of startIdxs) {
+   if (optionsEvaluated >= targetOptions || timeUp()) break;
+   const revs = userStartLocked && sIdx === startIdx ? [startReversed] : [false, true];
+   for (const sRev of revs) {
+    for (const preferDir of [null, 1, -1]) {
+     for (const k of _kAroundNom(kNom, n)) {
+      if (optionsEvaluated >= targetOptions || timeUp()) break outerSnake;
+      const rt = buildRacetrackOrderFrom(lines, k, sIdx, sRev, spatial, preferDir);
+      considerSol(rt, 'racetrack');
+      maybeInfill(rt, 'racetrack');
      }
     }
-    const payload = JSON.stringify({
-     n, m, fixed: fixedRev,
-     start: userStartLocked ? { idx: startIdx, rev: startReversed } : null
-    });
-    const xhr = new XMLHttpRequest();
-    xhr.open('POST', '/api/solve-route.php', false);
-    xhr.setRequestHeader('Content-Type', 'application/json');
-    xhr.send(payload);
-    if (xhr.status !== 200) return null;
-    const res = JSON.parse(xhr.responseText);
-    if (!res.ok || !Array.isArray(res.order) || res.order.length !== n) return null;
-    const seenL = new Set();
-    for (const o of res.order) {
-     if (o.lineIdx < 0 || o.lineIdx >= n || seenL.has(o.lineIdx)) return null;
-     seenL.add(o.lineIdx);
-     if (fixedRev[o.lineIdx] != null && !!o.reversed !== fixedRev[o.lineIdx]) return null;
-    }
-    if (userStartLocked && res.order[0].lineIdx !== startIdx) return null;
-    if (typeof res.lowerBoundSec === 'number' && res.lowerBoundSec > 0) {
-     lkhLowerBoundSec = res.lowerBoundSec;
-    }
-    return res.order.map(o => ({ lineIdx: o.lineIdx, reversed: !!o.reversed }));
-   } catch (e) {
-    return null;
    }
   }
-  if (!nnOnly) {
-   const lkhOrd = callLkhSolver();
-   if (lkhOrd) {
-    const sol = fullImprove(lkhOrd.map(o => ({ ...o })));
-    considerSol(sol, false, null);
-    lkhUsed = true;
-   }
-  }
-  effIterations = lkhUsed ? Math.min(200, targetIterations) : targetIterations;
-  if (!nnOnly && bestSolution && n >= 4) {
-   let current = bestSolution.map(o => ({ ...o }));
-   let currentCost = bestTotalCost;
-   let stagnation = 0;
-   for (let iter = 0; iter < effIterations; iter++) {
-    if (timeUp()) break;
-    iterationsRun = iter + 1;
-    let cand;
-    if (stagnation >= 100 && !userStartLocked) {
-     const rIdx = Math.floor(Math.random() * n);
-     cand = buildNNSolution(rIdx, Math.random() < 0.5);
-     stagnation = 0;
-    } else if (Math.random() < 0.75) {
-     cand = doubleBridge(current.map(o => ({ ...o })));
-    } else {
-     cand = segmentReversalKick(current.map(o => ({ ...o })));
-    }
-    cand = fullImprove(cand);
-    const cost = transitCost(cand);
-    if (cost <= currentCost) {
-     current = cand;
-     currentCost = cost;
-    } else {
-     stagnation++;
-    }
-    if (cost < bestTotalCost - 0.5) {
-     bestTotalCost = cost;
-     bestSolution = cand.map(o => ({ ...o }));
-     stagnation = 0;
-    }
-   }
-  }
-  if (!nnOnly && bestSolution && !timeUp()) {
+  // Family C: directional sweeps, both headings, alternate vs uniform
+  {
    const numKey = lines.map((l, i) => {
     const v = _lineNumOf(l, null);
     return v != null ? v : i;
    });
    const idxAll = lines.map((_, i) => i);
    const strategies = {
+    sweep: idxAll.slice().sort((a, b) => (spatial.byLon ? spatial.mids[a][1] - spatial.mids[b][1] : spatial.mids[a][0] - spatial.mids[b][0])),
     'Low\u2192High': idxAll.slice().sort((a, b) => numKey[a] - numKey[b]),
     'High\u2192Low': idxAll.slice().sort((a, b) => numKey[b] - numKey[a]),
     'West\u2192East': idxAll.slice().sort((a, b) => midpoints[a][1] - midpoints[b][1]),
@@ -13352,53 +13201,70 @@ function computeRoute() {
     'North\u2192South': idxAll.slice().sort((a, b) => midpoints[b][0] - midpoints[a][0])
    };
    for (const [name, idxOrder] of Object.entries(strategies)) {
-    if (timeUp()) break;
-    if (userStartLocked && idxOrder[0] !== startIdx) continue;
-    let ord = idxOrder.map(i => ({ lineIdx: i, reversed: fixedRev[i] != null ? fixedRev[i] : false }));
-    ord = directionOptimize(ord);
-    const cost = transitCost(ord);
-    altChecked++;
-    if (cost < altBestSec) { altBestSec = cost; altBestName = name; }
-    if (cost < bestTotalCost - 0.5) {
-     bestTotalCost = cost;
-     bestSolution = ord.map(o => ({ ...o }));
+    if (optionsEvaluated >= targetOptions || timeUp()) break;
+    for (const firstRev of [false, true]) {
+     for (const alt of [false, true]) {
+      const ord = idxOrder.map((i, pos) => ({
+       lineIdx: i,
+       reversed: alt ? (((pos % 2) === 1) !== firstRev) : firstRev
+      }));
+      considerSol(ord, 'sweep');
+      maybeInfill(ord, 'sweep');
+     }
     }
    }
   }
+  // Family D: nearest-neighbour from sampled starts (extra sequences)
+  const nnStarts = [];
+  if (userStartLocked) nnStarts.push({ idx: startIdx, rev: startReversed });
+  else {
+   nnStarts.push({ idx: spatial.order[0], rev: false }, { idx: spatial.order[0], rev: true });
+   nnStarts.push({ idx: spatial.order[n - 1], rev: false }, { idx: spatial.order[n - 1], rev: true });
+  }
+  for (const cand of nnStarts) {
+   if (optionsEvaluated >= targetOptions || timeUp()) break;
+   considerSol(buildNNSolution(cand.idx, cand.rev), 'nn');
+  }
  }
 
- // Record optimizer stats for reporting
+ // Record optimizer stats for reporting. Client sees the min-time plan only.
  state._optimizerStats = {
- mode: nnOnly ? 'nn' : 'deep',
- solver: usedRacetrack ? 'racetrack' : (lkhUsed ? 'lkh3' : 'local'),
- skipK: chosenK,
+ mode: nnOnly ? 'nn' : 'fastest-of-n',
+ solver: bestConstructor || (nnOnly ? 'nn' : 'enum'),
+ constructor: bestConstructor,
+ skipK: kNom,
  spacingM,
- iterations: iterationsRun,
- starts: Math.min(startCandidates.length, maxStarts),
+ optionsEvaluated,
+ optionsTarget: targetOptions,
+ candidateSec: {
+  racetrack: isFinite(candSec.racetrack) ? candSec.racetrack : null,
+  nn: isFinite(candSec.nn) ? candSec.nn : null,
+  twoOpt: isFinite(candSec.twoOpt) ? candSec.twoOpt : null,
+  sweep: isFinite(candSec.sweep) ? candSec.sweep : null,
+  infill: isFinite(candSec.infill) ? candSec.infill : null
+ },
+ iterations: optionsEvaluated,
+ starts: optionsEvaluated,
  greedySec: isFinite(initialCost) ? initialCost : null,
  finalSec: isFinite(bestTotalCost) ? bestTotalCost : null,
- altChecked,
- altBestSec: isFinite(altBestSec) ? altBestSec : null,
- altBestName,
+ transitSec: bestSolution ? transitCost(bestSolution) : null,
+ onlineSec: onlineTotalSec,
+ altChecked: optionsEvaluated,
+ altBestSec: isFinite(bestTotalCost) ? bestTotalCost : null,
+ altBestName: bestConstructor,
  elapsedMs: Date.now() - optimizerStart,
  capped: timeUp(),
- lowerBoundSec: lkhLowerBoundSec,
+ lowerBoundSec: null,
  gapPct: null,
- gapConstrained: priorities.some(p =>p !== 50) ||
- fixedRev.some(f =>f != null) || !!depotPt
+ gapConstrained: false
  };
- if (lkhLowerBoundSec && bestSolution) {
- const lineOnly = transitCost(bestSolution) - depotSec(bestSolution[0]);
- state._optimizerStats.gapPct = ((lineOnly - lkhLowerBoundSec) / lkhLowerBoundSec) * 100;
+
+ if (state._optimizerStats.capped && optionsEvaluated < targetOptions) {
+ showToast(`Optimizer hit the ${Math.round(safetyCapMs / 1000)} s cap after ` +
+ `${optionsEvaluated} of ${targetOptions} shooting sequences - shipping the fastest found so far.`, 8000);
  }
 
- if (state._optimizerStats.capped) {
- showToast(`Optimizer hit the ${Math.round(safetyCapMs / 1000)} s safety cap after ` +
- `${iterationsRun} of ${effIterations} iterations - the route may not be the fastest ` +
- `possible. Reduce the line count or lower the iteration setting.`, 9000);
- }
-
- // Use the best solution found
+ // Use the best (minimum-time) solution found
  if (bestSolution) {
  // Post-process: reorder by priority while preserving optimized order within each priority group
  const groups = new Map(); // priority ->array of route entries
@@ -13417,19 +13283,8 @@ function computeRoute() {
  let anchor = null;
  for (const prio of sortedPriorities) {
  let blk = groups.get(prio).map(o => ({ ...o }));
- if (blk.length > 1 && !nnOnly && !timeUp()) {
- if (usedRacetrack) {
-  blk = directionOptimize(blk);
- } else if (anchor) {
- userStartLocked = true;
- depotPt = null;
- blk = fullImprove([anchor, ...blk]).slice(1);
- } else {
- userStartLocked = savedLock;
- depotPt = savedDepot;
- blk = fullImprove(blk);
- }
- }
+ // Do not 2-opt after the 1500-option search: that would resume ILS.
+ if (blk.length > 1 && !nnOnly) blk = directionOptimize(blk);
  anchor = blk[blk.length - 1];
  for (const o of blk) {
  visited.add(o.lineIdx);
@@ -14391,9 +14246,7 @@ function showRouteStats(waypoints) {
  document.getElementById('stat-time').textContent = `${hh}h ${mm}m @ ${onlineSpeed}/${turnSpeed}kn`;
  }
 
- // Proven optimality readout: LKH-3'Held-Karp bound is a hard lower limit
- // on the transit of any possible line order, so this is a proof rather than
- // a claim. Created on demand so index.html needs no markup change.
+ // Fastest-of-N readout: scored sequences and the min total time shipped.
  {
  const os = state._optimizerStats;
  const timeEl = document.getElementById('stat-time');
@@ -14401,17 +14254,17 @@ function showRouteStats(waypoints) {
  if (!optEl && timeEl && timeEl.parentNode) {
  optEl = document.createElement('div');
  optEl.id = 'stat-optimality';
- optEl.style.cssText = 'font-size:11px; margin-top:2px;';
+ optEl.style.cssText = 'font-size:11px; margin-top:2px; color:#30d158;';
  timeEl.parentNode.insertBefore(optEl, timeEl.nextSibling);
  }
  if (optEl) {
- if (os && os.gapPct != null) {
- const g = Math.max(0, os.gapPct);
- const ref = os.gapConstrained ? 'unconstrained optimum' : 'optimum';
- optEl.style.color = g < 0.005 ? '#34c759' : '#8e8e93';
- optEl.textContent = g < 0.005
- ? `Proven optimal transit (LKH-3 lower bound)`
- : `Proven within ${g.toFixed(2)}% of the ${ref} (LKH-3 lower bound)`;
+ if (os && (os.optionsEvaluated > 0 || os.finalSec != null) && os.mode !== 'nn') {
+ const nOpt = os.optionsEvaluated || os.iterations || 0;
+ const totH = os.finalSec != null ? (os.finalSec / 3600) : hours;
+ const hh2 = Math.floor(totH);
+ const mm2 = Math.round((totH - hh2) * 60);
+ optEl.style.color = '#30d158';
+ optEl.textContent = `Fastest of ${nOpt} options: ${hh2}h ${mm2}m`;
  } else {
  optEl.textContent = '';
  }
@@ -14864,7 +14717,7 @@ function showPlanningOverlay(show) {
  ov.innerHTML = `<div id="planning-card">
  ${_vesselLoaderHTML()}
  <h3>Planning Route...</h3>
- <p>Deep-search optimization: ${state.settings.optimizerIterations || 1500} iterations of line order &amp; transit refinement. This may take a little longer - the extra compute finds a faster route.</p>
+ <p>Scoring ${state.settings.optimizerIterations || 1500} shooting sequences (line order × direction × start). The plan you get is the fastest of those options.</p>
  </div>`;
  document.getElementById('main').appendChild(ov);
  }

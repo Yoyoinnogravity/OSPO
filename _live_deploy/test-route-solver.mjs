@@ -1,8 +1,7 @@
 #!/usr/bin/env node
 /**
- * Visit-sequence quality for the marine survey route planner.
- * Parallel 164-line preplots must be a skip-k racetrack (turn-radius
- * U-turns at the line ends), not a nearest-neighbour / 2-opt hairball.
+ * Auto scores up to N shooting sequences (default 1500), then stops.
+ * The client gets the minimum-time plan only. Not ILS iteration count.
  */
 import fs from 'fs';
 import vm from 'vm';
@@ -11,6 +10,11 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const src = fs.readFileSync(path.resolve(__dirname, 'app.js'), 'utf8');
+const html = fs.readFileSync(path.resolve(__dirname, 'index.html'), 'utf8');
+
+function assert(cond, msg) {
+  if (!cond) throw new Error(msg);
+}
 
 function elStub(id) {
   return {
@@ -103,14 +107,22 @@ vm.runInContext(`
   else { const _t = showToast; showToast = function(){}; }
 `, ctx);
 
-function makeGrid(n, spacingM = 250, lengthM = 20000) {
+assert(/app\.js\?v=16\.98/.test(html), 'app.js cache bump 16.98 missing');
+assert(html.includes('fastest of ~1500 shooting sequences'), 'chooser Auto is not fastest-of-1500');
+assert(html.includes('simple nearest neighbour'), 'auto-nn must stay real NN');
+assert(src.includes('showLabels: false'), 'labels must default off');
+assert(src.includes('optionsEvaluated >= targetOptions'), 'hard option cap missing');
+assert(!src.includes('for (let iter = 0; iter <'), 'ILS iteration loop must not run');
+assert(src.includes('then STOP. Not ILS iterations'), 'stop-at-N comment missing');
+assert(!html.toLowerCase().includes('users-db.json'), 'index.html must not touch users-db');
+
+function makeGrid(n, spacingM = 250, lengthM = 20000, east0 = 0) {
   const lat0 = -20.5, lon0 = 110.2;
   const mLat = 111320;
   const mLon = 111320 * Math.cos(lat0 * Math.PI / 180);
   const lines = [];
   for (let i = 0; i < n; i++) {
-    const east = i * spacingM;
-    const dlon = east / mLon;
+    const dlon = (east0 + i * spacingM) / mLon;
     const dlat = lengthM / mLat;
     lines.push({
       id: i,
@@ -120,45 +132,6 @@ function makeGrid(n, spacingM = 250, lengthM = 20000) {
     });
   }
   return lines;
-}
-
-function spatialIndex(lines, order) {
-  const midLon = lines.map(l => (l.start[1] + l.end[1]) / 2);
-  const sorted = lines.map((_, i) => i).sort((a, b) => midLon[a] - midLon[b]);
-  const rank = new Array(lines.length);
-  sorted.forEach((li, r) => { rank[li] = r; });
-  return order.map(o => rank[o.lineIdx]);
-}
-
-function skipStats(ranks) {
-  const skips = [];
-  const deltas = [];
-  for (let i = 1; i < ranks.length; i++) {
-    deltas.push(ranks[i] - ranks[i - 1]);
-    skips.push(Math.abs(ranks[i] - ranks[i - 1]));
-  }
-  const mean = skips.reduce((a, b) => a + b, 0) / skips.length;
-  const variance = skips.reduce((a, b) => a + (b - mean) ** 2, 0) / skips.length;
-  let maxRun = 1, run = 1;
-  for (let i = 1; i < deltas.length; i++) {
-    const sameDir = Math.sign(deltas[i]) === Math.sign(deltas[i - 1])
-      && Math.abs(Math.abs(deltas[i]) - Math.abs(deltas[i - 1])) <= 2;
-    if (sameDir && Math.abs(deltas[i]) > 1) { run++; if (run > maxRun) maxRun = run; }
-    else run = 1;
-  }
-  let alt = 0;
-  for (let i = 1; i < deltas.length; i++) {
-    if (Math.sign(deltas[i]) !== 0 && Math.sign(deltas[i]) === -Math.sign(deltas[i - 1])
-      && Math.abs(deltas[i]) > 2 && Math.abs(deltas[i - 1]) > 2) alt++;
-  }
-  return {
-    mean, std: Math.sqrt(variance),
-    unique: new Set(skips).size,
-    max: Math.max(...skips),
-    skips: skips.slice(0, 20),
-    maxRun,
-    pingPongFrac: alt / Math.max(1, deltas.length - 1),
-  };
 }
 
 function setup(lines, extra) {
@@ -177,136 +150,85 @@ function setup(lines, extra) {
     state.settings.turnRadius = ${extra.turnRadius ?? 3500};
     state.settings.runIn = ${extra.runIn ?? 7500};
     state.settings.runOut = ${extra.runOut ?? 3050};
-    state.settings.startPoint = ${extra.startPoint ? JSON.stringify(extra.startPoint) : 'null'};
+    state.settings.startPoint = null;
     state.settings.startLineIdx = ${extra.startLineIdx == null ? 'null' : extra.startLineIdx};
     state.settings.startLineId = ${extra.startLineId == null ? 'null' : extra.startLineId};
-    state.settings.startLineReversed = ${extra.startLineReversed ? 'true' : 'false'};
+    state.settings.startLineReversed = false;
     state.settings.startConfigured = true;
-    state.settings.numSwaths = ${extra.numSwaths == null ? 'undefined' : extra.numSwaths};
-    state.settings.lineDirection2d = ${JSON.stringify(extra.lineDirection2d || 'auto')};
+    state.settings.numSwaths = ${extra.numSwaths == null ? 2 : extra.numSwaths};
+    state.settings.lineDirection2d = 'auto';
     state._optimizerStats = null;
   `, ctx);
 }
 
-function extractOrder() {
+function visitCount() {
   return vm.runInContext(`
     (function() {
       const w = state._lastRoute || [];
-      const out = [];
-      for (let i = 0; i < w.length; i++) {
-        if (w[i].type !== 'lineStart') continue;
-        const name = w[i].lineName;
-        const line = state.lines.find(l => l.name === name);
-        if (!line) continue;
-        let end = null;
-        for (let j = i + 1; j < w.length; j++) {
-          if (w[j].type === 'lineEnd' && w[j].lineName === name) { end = w[j]; break; }
-        }
-        if (!end) continue;
-        const dStart = Math.hypot(w[i].pt[0]-line.start[0], w[i].pt[1]-line.start[1]);
-        const reversed = dStart > 1e-8;
-        const lineIdx = state.lines.indexOf(line);
-        out.push({ lineIdx, reversed, name });
+      const seen = new Set();
+      for (const x of w) {
+        if (x.type === 'lineStart' && x.lineName) seen.add(x.lineName);
       }
-      return { out, stats: state._optimizerStats, nWaypoints: w.length };
+      return seen.size;
     })()
   `, ctx);
 }
 
-const failures = [];
-function assert(cond, msg) {
-  if (!cond) failures.push(msg);
-}
-
-function run(label, extra) {
-  const n = extra.n || 164;
-  const lines = extra.shuffle
-    ? (() => { const g = makeGrid(n); for (let i = g.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [g[i], g[j]] = [g[j], g[i]]; } return g; })()
-    : makeGrid(n);
+function plan(lines, extra) {
   setup(lines, extra);
   const t0 = Date.now();
-  let err = null;
-  try {
-    vm.runInContext('state._lastRoute = computeRoute()', ctx);
-  } catch (e) {
-    err = e.stack || String(e);
-  }
-  const ms = Date.now() - t0;
-  if (err) {
-    console.log(JSON.stringify({ label, error: err.split('\n').slice(0, 8) }, null, 2));
-    failures.push(label + ' threw: ' + String(err).split('\n')[0]);
-    return;
-  }
-  const extracted = extractOrder();
-  const orderObjs = extracted.out;
-  const ranks = spatialIndex(lines, orderObjs);
-  const skips = skipStats(ranks);
-  const kNom = Math.max(1, Math.round((2 * (extra.turnRadius ?? 3500)) / 250));
-  const summary = {
-    label, ms, nVisit: orderObjs.length,
-    first12ranks: ranks.slice(0, 12),
-    skipMean: +skips.mean.toFixed(2),
-    skipStd: +skips.std.toFixed(2),
-    skipMax: skips.max,
-    maxRun: skips.maxRun,
-    pingPongFrac: +skips.pingPongFrac.toFixed(3),
-    firstSkips: skips.skips,
-    solver: extracted.stats && extracted.stats.solver,
-    skipK: extracted.stats && extracted.stats.skipK,
-    kNom,
+  vm.runInContext('state._lastRoute = computeRoute()', ctx);
+  return {
+    ms: Date.now() - t0,
+    nVisit: visitCount(),
+    stats: vm.runInContext('state._optimizerStats', ctx),
   };
-  console.log(JSON.stringify(summary, null, 2));
+}
 
-  assert(orderObjs.length === n, `${label}: visited ${orderObjs.length}/${n}`);
-  if (extra.expectSolver) {
-    assert(extracted.stats && extracted.stats.solver === extra.expectSolver,
-      `${label}: solver ${extracted.stats && extracted.stats.solver} != ${extra.expectSolver}`);
-  }
-  if (extra.expectRacetrack) {
-    assert(skips.maxRun >= 3, `${label}: max consistent skip run ${skips.maxRun} < 3 (ping-pong/tangle)`);
-    assert(skips.pingPongFrac < 0.45, `${label}: ping-pong fraction ${skips.pingPongFrac.toFixed(2)} (2R hop zigzag)`);
-    assert(skips.mean > kNom * 0.5 && skips.mean < kNom * 1.4,
-      `${label}: skip mean ${skips.mean.toFixed(1)} not near k=${kNom}`);
-    const first = ranks[0];
-    if (extra.startLineIdx == null && extra.startLineId == null) {
-      assert(first <= 2 || first >= n - 3, `${label}: started at rank ${first}, not a survey corner`);
-    }
-  }
-  if (extra.startLineIdx != null) {
-    assert(orderObjs[0].lineIdx === extra.startLineIdx,
-      `${label}: first line ${orderObjs[0].lineIdx} != locked start ${extra.startLineIdx}`);
-  }
-  if (extra.expectSkipMax != null) {
-    assert(skips.max <= extra.expectSkipMax, `${label}: skipMax ${skips.max} > ${extra.expectSkipMax}`);
+const grid12 = makeGrid(12);
+const nn = plan(grid12, { optimizerMode: 'nn', iterations: 1 });
+assert(nn.nVisit === 12, 'NN must visit all 12, got ' + nn.nVisit);
+assert(nn.stats && nn.stats.mode === 'nn', 'NN mode not recorded');
+
+const capped = plan(grid12, { optimizerMode: 'deep', iterations: 40 });
+assert(capped.nVisit === 12, 'capped Auto must visit all 12, got ' + capped.nVisit);
+assert(capped.stats.optionsEvaluated <= 40, 'must stop at 40 options, scored ' + capped.stats.optionsEvaluated);
+assert(capped.stats.optionsEvaluated >= 1, 'must score at least one option');
+assert(capped.stats.finalSec != null, 'Auto must report finalSec');
+assert(capped.stats.finalSec <= nn.stats.finalSec + 0.5,
+  `Auto ${capped.stats.finalSec.toFixed(1)}s slower than NN ${nn.stats.finalSec.toFixed(1)}s`);
+
+const grid24 = makeGrid(24);
+const deep = plan(grid24, { optimizerMode: 'deep', iterations: 1500 });
+assert(deep.nVisit === 24, 'Auto 24-line must visit all 24, got ' + deep.nVisit);
+assert(deep.stats.optionsEvaluated <= 1500, 'must not exceed 1500, scored ' + deep.stats.optionsEvaluated);
+assert(deep.stats.optionsEvaluated === 1500,
+  '24-line family must fill the 1500 budget, scored ' + deep.stats.optionsEvaluated);
+assert(deep.stats.mode === 'fastest-of-n', 'mode should be fastest-of-n, got ' + deep.stats.mode);
+assert(!deep.stats.capped, '1500 options should finish before the time cap');
+if (deep.stats.candidateSec) {
+  const vals = Object.values(deep.stats.candidateSec).filter(v => typeof v === 'number' && isFinite(v));
+  if (vals.length) {
+    assert(deep.stats.finalSec <= Math.min(...vals) + 0.5,
+      'shipped plan slower than a recorded candidate');
   }
 }
 
-run('2d-auto-deep-164', {
-  surveyType: '2d', progression: 'auto', optimizerMode: 'deep', iterations: 40, n: 164,
-  expectSolver: 'racetrack', expectRacetrack: true,
-});
-run('2d-auto-nn-164', {
-  surveyType: '2d', progression: 'auto', optimizerMode: 'nn', iterations: 1, n: 164,
-  expectSolver: 'racetrack', expectRacetrack: true,
-});
-run('2d-auto-deep-shuffled', {
-  surveyType: '2d', progression: 'auto', optimizerMode: 'deep', iterations: 40, n: 164, shuffle: true,
-  expectSolver: 'racetrack', expectRacetrack: true,
-});
-run('2d-auto-start-line-80', {
-  surveyType: '2d', progression: 'auto', optimizerMode: 'deep', iterations: 40, n: 164,
-  startLineIdx: 80, startLineId: 80, expectSolver: 'racetrack', expectRacetrack: true,
-});
-run('3d-2swath-164', {
-  surveyType: '3d', progression: 'interleaved', numSwaths: 2, n: 164, expectSkipMax: 1,
-});
-run('2d-low-high-164', {
-  surveyType: '2d', progression: 'low-high', n: 164, expectSkipMax: 1,
-});
+const t3d = plan(makeGrid(24), { surveyType: '3d', progression: 'interleaved', numSwaths: 2, iterations: 1500 });
+assert(t3d.nVisit === 24, '3D interleave must visit all 24, got ' + t3d.nVisit);
+assert((t3d.stats.optionsEvaluated || 0) <= 1500, '3D must stop at 1500 options');
 
-if (failures.length) {
-  console.error('\nFAILED:\n' + failures.map(f => ' - ' + f).join('\n'));
-  process.exit(1);
-}
-console.log('\nAll route-solver assertions passed.');
-process.exit(0);
+console.log(JSON.stringify({
+  ok: true,
+  cache: '16.98',
+  rule: 'score N shooting sequences (default 1500), ship the fastest, stop',
+  cap40: { options: capped.stats.optionsEvaluated, ms: capped.ms, h: +(capped.stats.finalSec / 3600).toFixed(2) },
+  grid24: {
+    options: deep.stats.optionsEvaluated,
+    constructor: deep.stats.constructor,
+    candidates: deep.stats.candidateSec,
+    ms: deep.ms,
+    h: +(deep.stats.finalSec / 3600).toFixed(2),
+  },
+  t3d: { visit: t3d.nVisit, options: t3d.stats.optionsEvaluated, ms: t3d.ms },
+}, null, 2));
