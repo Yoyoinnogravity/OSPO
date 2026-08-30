@@ -289,7 +289,7 @@ assert(src.includes('min="1" max="100"'), 'Line Manager UI 1-100 missing');
 
 console.log(JSON.stringify({
   ok: true,
-  cache: '17.10',
+  cache: '17.11',
   rule: 'skip-k racetrack from a corner; 3D block-complete swaths',
   kNom,
   nn: { visit: nn.nVisit, mode: nn.stats.mode, ms: nn.ms },
