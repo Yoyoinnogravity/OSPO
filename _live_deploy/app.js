@@ -11923,8 +11923,8 @@ function executePlanRoute() {
  state._optimizerStats = null;
  const route = computeRoute();
  state.route = route;
- renderRoute(route);
- renderSurveyLines(); // refresh preplot gaps through exclusions
+      renderRoute(route, { mode: 'overview', highlight: null });
+      renderSurveyLines(); // refresh preplot gaps through exclusions
  showRouteStats(route);
  const nDetours = (route || []).filter(w => w.type === 'obsAvoidStart' || w.type === 'transit-detour').length;
  if ((state.obstructions || []).length && nDetours > 0) {
@@ -13749,118 +13749,184 @@ function _bezierSpline(points, segmentsPerCurve) {
  return result;
 }
 
-function renderRoute(waypoints) {
- layerRoute.clearLayers();
- layerAnnotations.clearLayers();
+// Route drawing. The optimiser produces real large-radius Dubins U-turns
+// (often 3+ km). Painting every one as solid #ff9500 weight 2.5 with an arrow
+// made Show All a scribble over the preplot. Overview uses a thin muted
+// line-change; Prev/Next lights the selected leg.
+let _routeViewMode = 'overview'; // 'overview' | 'step'
+let _routeHighlight = null; // { startWpIdx, endWpIdx } or null
+
+function _routeTransitOverviewStyle() {
+ return {
+  color: '#c4843a',
+  weight: 1.1,
+  opacity: 1,
+  lineCap: 'round',
+  lineJoin: 'round',
+  interactive: false,
+  className: 'ospo-route-lc'
+ };
+}
+
+function _routeTransitFocusStyle() {
+ return {
+  color: '#ffb020',
+  weight: 2.6,
+  opacity: 0.96,
+  lineCap: 'round',
+  lineJoin: 'round',
+  interactive: false
+ };
+}
+
+function _routeSegFocused(i, hl) {
+ if (!hl) return false;
+ const a = hl.startWpIdx != null ? hl.startWpIdx : 0;
+ const b = hl.endWpIdx != null ? hl.endWpIdx : -1;
+ return i >= a && i < b;
+}
+
+function _drawRoutePolyline(latlngs, style) {
+ if (!latlngs || latlngs.length < 2 || !layerRoute) return;
+ L.polyline(latlngs, style).addTo(layerRoute);
+}
+
+function _drawFocusedTransit(arcPts) {
+ if (!arcPts || arcPts.length < 2) return;
+ _drawRoutePolyline(arcPts, {
+  color: '#1a1006', weight: 5, opacity: 0.8,
+  lineCap: 'round', lineJoin: 'round', interactive: false
+ });
+ _drawRoutePolyline(arcPts, _routeTransitFocusStyle());
+ if (layerArrows) {
+  const midIdx = Math.floor(arcPts.length / 2);
+  const endIdx = Math.min(midIdx + 1, arcPts.length - 1);
+  _addRouteArrow(arcPts[midIdx], arcPts[endIdx], '#ffb020', layerArrows, 0.95);
+ }
+}
+
+function renderRoute(waypoints, opts) {
+ opts = opts || {};
+ if (!waypoints || !waypoints.length) waypoints = state.route;
+ if (layerRoute) layerRoute.clearLayers();
+ if (layerAnnotations) layerAnnotations.clearLayers();
  if (layerArrows) layerArrows.clearLayers();
  if (!waypoints || waypoints.length === 0) return;
  state._staleRouteObsHits = 0;
 
- const pts = waypoints.map(w =>w.pt);
+ if (opts.mode) _routeViewMode = opts.mode;
+ if (opts.highlight !== undefined) _routeHighlight = opts.highlight;
+ const highlight = _routeHighlight;
+ const overview = _routeViewMode !== 'step' || !highlight;
+ const surveyVisible = !!(typeof map !== 'undefined' && map && layerSurveyLines && map.hasLayer(layerSurveyLines));
 
- // Compute cumulative distance for time gradient
- const cumDist = [0];
- for (let i = 1; i < waypoints.length; i++) {
- cumDist.push(cumDist[i - 1] + haversine(waypoints[i - 1].pt, waypoints[i].pt));
- }
- const totalDist = cumDist[cumDist.length - 1] || 1;
+ const pts = waypoints.map(w => w.pt);
 
- // Draw each segment with differentiated styles
- // Survey lines: bold coloured | Run-in/out: dotted white | Turns: thin dashed grey
+ // Survey lines: the preplot already is the on-line track. Overview does not
+ // re-paint them (that doubled the grid). Line-changes stay visible as a
+ // thin muted vessel path. The selected stepper leg is the only heavy stroke.
  for (let i = 0; i < waypoints.length - 1; i++) {
- const a = waypoints[i], b = waypoints[i + 1];
- const frac = cumDist[i] / totalDist;
- const col = timeGradientColor(frac);
+  const a = waypoints[i], b = waypoints[i + 1];
+  const focused = _routeSegFocused(i, highlight);
 
- if (a.type === 'lineStart' && b.type === 'lineEnd' && a.lineName === b.lineName) {
- // Survey line segment - bold solid colour. Never paint acquisition through
- // an exclusion (stale route before re-plan, or a missed intersection).
- if ((state.obstructions || []).length && findLineObstructionIntersections(a.pt, b.pt).length) {
-  state._staleRouteObsHits = (state._staleRouteObsHits || 0) + 1;
-  L.polyline([a.pt, b.pt], {
-   color: '#e74c3c', weight: 2, opacity: 0.45, dashArray: '4,6'
-  }).addTo(layerRoute);
- } else {
-  L.polyline([a.pt, b.pt], { color: col, weight: 3.5, opacity: 1.0 }).addTo(layerRoute);
-  _addRouteArrow(a.pt, b.pt, col, layerArrows);
- }
- } else if (a.type === 'lineEnd' && b.type === 'runOutEnd' && a.lineName === b.lineName) {
- // Run-out - same colour as the survey line (part of acquisition)
- L.polyline([a.pt, b.pt], { color: col, weight: 3, opacity: 0.9, dashArray: '8,4' }).addTo(layerRoute);
- _addRouteArrow(a.pt, b.pt, col, layerArrows, 0.9);
- } else if (a.type === 'runInStart' && b.type === 'lineStart' && a.lineName === b.lineName) {
- // Run-in - white dashed (part of line turn)
- L.polyline([a.pt, b.pt], { color: '#ffffff', weight: 2, opacity: 0.7, dashArray: '6,4' }).addTo(layerRoute);
- _addRouteArrow(a.pt, b.pt, '#ffffff', layerArrows, 0.7);
- } else if ((a.type === 'obsAvoidStart' || a.type === 'obsAvoidance' || a.type === 'obsAvoidEnd') &&
- (b.type === 'obsAvoidStart' || b.type === 'obsAvoidance' || b.type === 'obsAvoidEnd' ||
- b.type === 'lineStart') && a.lineName === b.lineName) {
- // Obstruction avoidance - path is already densified with Dubins arcs of radius R
- if (a.type === 'obsAvoidStart') {
- const obsAvoidPts = [a.pt];
- let k = i + 1;
- while (k < waypoints.length) {
- obsAvoidPts.push(waypoints[k].pt);
- if (waypoints[k].type === 'obsAvoidEnd') break;
- k++;
- }
- L.polyline(obsAvoidPts, { color: '#ffd60a', weight: 2.5, opacity: 0.9, dashArray: '6,4' }).addTo(layerRoute);
- if (obsAvoidPts.length >= 2) {
- const midIdx = Math.floor(obsAvoidPts.length / 2);
- const endIdx = Math.min(midIdx + 1, obsAvoidPts.length - 1);
- _addRouteArrow(obsAvoidPts[midIdx], obsAvoidPts[endIdx], '#ffd60a', layerArrows, 0.9);
- }
- }
- // Skip individual segment rendering (handled by block above)
- } else if ((a.type === 'lineEnd' && b.type === 'obsAvoidStart' && a.lineName === b.lineName) ||
- (a.type === 'obsAvoidEnd' && b.type === 'lineStart' && a.lineName === b.lineName)) {
- // Same-line transition into/out of obstruction avoidance - zero-length, skip
- } else if (a.type === 'detour' || b.type === 'detour' ||
- a.type === 'transit-detour' || b.type === 'transit-detour') {
- // Legacy detour / transit detour - dashed yellow
- L.polyline([a.pt, b.pt], { color: '#ffd60a', weight: 2.5, opacity: 0.9, dashArray: '6,4' }).addTo(layerRoute);
- } else {
- // Transit / line turn - Dubins arc respecting min turn radius
- const arcPts = computeArcTurn(waypoints, i);
- L.polyline(arcPts, { color: '#ff9500', weight: 2.5, opacity: 0.85 }).addTo(layerRoute);
- if (arcPts.length >= 2) {
- const midIdx = Math.floor(arcPts.length / 2);
- const endIdx = Math.min(midIdx + 1, arcPts.length - 1);
- _addRouteArrow(arcPts[midIdx], arcPts[endIdx], '#ff9500', layerArrows, 0.85);
- }
- }
+  if (a.type === 'lineStart' && b.type === 'lineEnd' && a.lineName === b.lineName) {
+   if ((state.obstructions || []).length && findLineObstructionIntersections(a.pt, b.pt).length) {
+    state._staleRouteObsHits = (state._staleRouteObsHits || 0) + 1;
+    _drawRoutePolyline([a.pt, b.pt], {
+     color: '#e74c3c', weight: 2, opacity: 0.45, dashArray: '4,6', interactive: false
+    });
+   } else if (focused) {
+    _drawRoutePolyline([a.pt, b.pt], {
+     color: '#04140a', weight: 6, opacity: 0.85, lineCap: 'round', interactive: false
+    });
+    _drawRoutePolyline([a.pt, b.pt], { color: '#30d158', weight: 3.5, opacity: 1, interactive: false });
+    if (layerArrows) _addRouteArrow(a.pt, b.pt, '#30d158', layerArrows);
+   } else if (!surveyVisible) {
+    _drawRoutePolyline([a.pt, b.pt], { color: '#30d158', weight: 1.6, opacity: 0.7, interactive: false });
+   }
+   // else: preplot already shows the line — do not overlay a second rainbow
+  } else if (a.type === 'lineEnd' && b.type === 'runOutEnd' && a.lineName === b.lineName) {
+   if (focused) {
+    _drawRoutePolyline([a.pt, b.pt], { color: '#30d158', weight: 2.5, opacity: 0.9, dashArray: '8,4', interactive: false });
+    if (layerArrows) _addRouteArrow(a.pt, b.pt, '#30d158', layerArrows, 0.9);
+   } else if (!overview) {
+    _drawRoutePolyline([a.pt, b.pt], { color: '#2a6a40', weight: 1.2, opacity: 0.55, dashArray: '8,4', interactive: false });
+   }
+  } else if (a.type === 'runInStart' && b.type === 'lineStart' && a.lineName === b.lineName) {
+   if (focused) {
+    _drawFocusedTransit([a.pt, b.pt]);
+   } else {
+    _drawRoutePolyline([a.pt, b.pt], _routeTransitOverviewStyle());
+   }
+  } else if ((a.type === 'obsAvoidStart' || a.type === 'obsAvoidance' || a.type === 'obsAvoidEnd') &&
+   (b.type === 'obsAvoidStart' || b.type === 'obsAvoidance' || b.type === 'obsAvoidEnd' ||
+    b.type === 'lineStart') && a.lineName === b.lineName) {
+   if (a.type === 'obsAvoidStart') {
+    const obsAvoidPts = [a.pt];
+    let k = i + 1;
+    while (k < waypoints.length) {
+     obsAvoidPts.push(waypoints[k].pt);
+     if (waypoints[k].type === 'obsAvoidEnd') break;
+     k++;
+    }
+    if (focused) {
+     _drawFocusedTransit(obsAvoidPts);
+    } else {
+     _drawRoutePolyline(obsAvoidPts, {
+      color: '#b89620', weight: 1.15, opacity: 1, dashArray: '5,5',
+      lineCap: 'round', interactive: false
+     });
+    }
+   }
+  } else if ((a.type === 'lineEnd' && b.type === 'obsAvoidStart' && a.lineName === b.lineName) ||
+   (a.type === 'obsAvoidEnd' && b.type === 'lineStart' && a.lineName === b.lineName)) {
+   // Same-line transition into/out of obstruction avoidance - zero-length, skip
+  } else if (a.type === 'detour' || b.type === 'detour' ||
+   a.type === 'transit-detour' || b.type === 'transit-detour') {
+   if (focused) {
+    _drawFocusedTransit([a.pt, b.pt]);
+   } else {
+    _drawRoutePolyline([a.pt, b.pt], {
+     color: '#b89620', weight: 1.15, opacity: 1, dashArray: '5,5',
+     lineCap: 'round', interactive: false
+    });
+   }
+  } else {
+   // Transit / line turn — true Dubins geometry, quiet in overview
+   const arcPts = computeArcTurn(waypoints, i);
+   if (focused) {
+    _drawFocusedTransit(arcPts);
+   } else {
+    _drawRoutePolyline(arcPts, _routeTransitOverviewStyle());
+   }
+  }
  }
 
- // Start marker
  L.circleMarker(pts[0], {
- radius: 7, color: '#fff', fillColor: '#1abc9c', fillOpacity: 1, weight: 2
+  radius: 7, color: '#fff', fillColor: '#1abc9c', fillOpacity: 1, weight: 2
  }).bindTooltip('Start', { permanent: false }).addTo(layerAnnotations);
 
- // End marker
  L.circleMarker(pts[pts.length - 1], {
- radius: 7, color: '#fff', fillColor: '#e74c3c', fillOpacity: 1, weight: 2
+  radius: 7, color: '#fff', fillColor: '#e74c3c', fillOpacity: 1, weight: 2
  }).bindTooltip('End', { permanent: false }).addTo(layerAnnotations);
 
- // Line number labels (every lineStart)
- if (state.showAnnotations) {
- let lineNum = 1;
- waypoints.forEach((w, i) => {
- if (w.type === 'lineStart') {
- const frac = cumDist[i] / totalDist;
- const col = timeGradientColor(frac);
- const label = w.lineName || lineNum;
- const icon = L.divIcon({
- className: '',
- html: `<div style="color:#fff;font-size:12px;font-weight:700;background:${col};
+ if (state.showAnnotations && !overview) {
+  let lineNum = 1;
+  waypoints.forEach((w, i) => {
+   if (w.type === 'lineStart' && _routeSegFocused(i, highlight)) {
+    const label = w.lineName || lineNum;
+    const icon = L.divIcon({
+     className: '',
+     html: `<div style="color:#041018;font-size:12px;font-weight:700;background:#30d158;
  padding:3px 7px;border-radius:4px;border:2px solid #fff;
  box-shadow:0 2px 6px rgba(0,0,0,0.7);white-space:nowrap;
  pointer-events:none;line-height:1.2;">${label}</div>`,
- iconAnchor: [12, 12]
- });
- L.marker(w.pt, { icon }).addTo(layerAnnotations);
- lineNum++;
- }
- });
+     iconAnchor: [12, 12]
+    });
+    L.marker(w.pt, { icon }).addTo(layerAnnotations);
+   }
+   if (w.type === 'lineStart') lineNum++;
+  });
  }
 
  if (state._staleRouteObsHits > 0) {
@@ -16344,7 +16410,7 @@ function restorePlanFromData(id) {
   if (typeof fitMapToLines === 'function') fitMapToLines();
   // Prefer restored route; only replan if none was saved
   if (state.route && state.route.length && typeof renderRoute === 'function') {
-   try { renderRoute(); } catch (_) {}
+   try { renderRoute(state.route, { mode: 'overview', highlight: null }); } catch (_) {}
   } else if (state.lines.length > 1 && typeof planRoute === 'function') {
    planRoute();
   }
@@ -22700,10 +22766,11 @@ function showRouteStepper() {
  if (prevLineName && wp.lineName !== prevLineName && lastStepEndIdx >= 0) {
  // There'a transit gap between the previous step'end and this lineStart
  const transitEndIdx = i > 0 ? i - 1 : i;
- if (transitEndIdx >lastStepEndIdx) {
+ if (transitEndIdx > lastStepEndIdx) {
  stepperSteps.push({
  type: 'lineChange',
  label: `${prevLineName} -> ${wp.lineName}`,
+ startWpIdx: lastStepEndIdx,
  endWpIdx: transitEndIdx
  });
  }
@@ -22718,6 +22785,7 @@ function showRouteStepper() {
  type: 'line',
  label: isCont ? `${wp.lineName} (cont.)` : wp.lineName,
  lineNum,
+ startWpIdx: i,
  endWpIdx: endIdx
  });
  lastStepEndIdx = endIdx;
@@ -22736,6 +22804,7 @@ function showRouteStepper() {
  stepperSteps.push({
  type: 'obsAvoidance',
  label: `Obs. Avoidance: ${obsName}`,
+ startWpIdx: i,
  endWpIdx: endIdx
  });
  lastStepEndIdx = endIdx;
@@ -22748,26 +22817,48 @@ function showRouteStepper() {
 
  stepperTotalSteps = stepperSteps.length;
  if (stepperTotalSteps === 0) return;
- stepperCurrentStep = 0;
+ // After a plan, Show All is the map: quiet full route, not "Line 1" while
+ // every turn is still painted.
+ _routeViewMode = 'overview';
+ _routeHighlight = null;
+ stepperCurrentStep = stepperTotalSteps - 1;
  const el = document.getElementById('route-stepper');
  if (el) {
  el.style.display = 'flex';
  updateStepperLabel();
+ _syncRouteStepperUi();
  }
 }
 
 function hideRouteStepper() {
  const el = document.getElementById('route-stepper');
  if (el) el.style.display = 'none';
- renderRoute(state.route);
+ renderRoute(state.route, { mode: 'overview', highlight: null });
+}
+
+function _stepperLineCount() {
+ return stepperSteps.filter(s => s.type === 'line' && !String(s.label).includes('cont.')).length;
+}
+
+function _syncRouteStepperUi() {
+ const allBtn = document.getElementById('route-step-all-btn');
+ if (allBtn) {
+  const on = _routeViewMode === 'overview';
+  allBtn.classList.toggle('active', on);
+  allBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+ }
 }
 
 function updateStepperLabel() {
  const label = document.getElementById('stepper-label');
  if (!label) return;
+ const totalLines = _stepperLineCount();
+ if (_routeViewMode === 'overview') {
+  label.textContent = `All ${totalLines} lines`;
+  return;
+ }
  if (stepperCurrentStep < stepperSteps.length) {
  const step = stepperSteps[stepperCurrentStep];
- const totalLines = stepperSteps.filter(s =>s.type === 'line' && !s.label.includes('cont.')).length;
  if (step.type === 'line') {
  label.textContent = `Line ${step.lineNum || '?'}/${totalLines}: ${step.label}`;
  } else if (step.type === 'obsAvoidance') {
@@ -22779,32 +22870,51 @@ function updateStepperLabel() {
 }
 
 function routeStepNext() {
- if (stepperCurrentStep < stepperTotalSteps - 1) {
- stepperCurrentStep++;
+ if (_routeViewMode === 'overview') {
+  // Leave the quiet overview on the first step so Prev/Next inspect one leg
+  stepperCurrentStep = 0;
+ } else if (stepperCurrentStep < stepperTotalSteps - 1) {
+  stepperCurrentStep++;
+ } else {
+  return;
+ }
+ _routeViewMode = 'step';
  updateStepperLabel();
  renderRouteUpToStep(stepperCurrentStep);
- }
+ _syncRouteStepperUi();
 }
 
 function routeStepPrev() {
- if (stepperCurrentStep > 0) {
- stepperCurrentStep--;
+ if (_routeViewMode === 'overview') {
+  stepperCurrentStep = Math.max(0, stepperTotalSteps - 1);
+ } else if (stepperCurrentStep > 0) {
+  stepperCurrentStep--;
+ } else {
+  return;
+ }
+ _routeViewMode = 'step';
  updateStepperLabel();
  renderRouteUpToStep(stepperCurrentStep);
- }
+ _syncRouteStepperUi();
 }
 
 function routeStepAll() {
- stepperCurrentStep = stepperTotalSteps - 1;
+ _routeViewMode = 'overview';
+ _routeHighlight = null;
+ stepperCurrentStep = Math.max(0, stepperTotalSteps - 1);
  updateStepperLabel();
- renderRoute(state.route);
+ renderRoute(state.route, { mode: 'overview', highlight: null });
+ _syncRouteStepperUi();
 }
 
 function renderRouteUpToStep(stepIdx) {
  if (!state.route || stepIdx >= stepperSteps.length) return;
  const step = stepperSteps[stepIdx];
- const subset = state.route.slice(0, step.endWpIdx + 1);
- renderRoute(subset);
+ const highlight = {
+  startWpIdx: step.startWpIdx != null ? step.startWpIdx : 0,
+  endWpIdx: step.endWpIdx
+ };
+ renderRoute(state.route, { mode: 'step', highlight });
 }
 
 // ===== SITE READY =====

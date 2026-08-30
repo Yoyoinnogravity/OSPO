@@ -115,7 +115,7 @@
 <link rel="dns-prefetch" href="https://cesium.com">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script>if(!/Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)&&window.innerWidth>768){document.write('<link rel="stylesheet" href="https://cesium.com/downloads/cesiumjs/releases/1.119/Build/Cesium/Widgets/widgets.css"/>')}</script>
-<link rel="stylesheet" href="style.min.css?v=3.31"/>
+<link rel="stylesheet" href="style.min.css?v=3.32"/>
 </head>
 <body>
  <!-- SEO landing content for crawlers when JavaScript is unavailable -->
@@ -448,7 +448,7 @@
  <button onclick="routeStepPrev()" style="background:none;border:1px solid #444;color:#fff;border-radius:4px;padding:3px 10px;cursor:pointer;font-size:12px;">< Prev</button>
  <span id="stepper-label" style="color:#fff;font-size:11px;min-width:120px;text-align:center;">Line 1 / 31</span>
  <button onclick="routeStepNext()" style="background:none;border:1px solid #444;color:#fff;border-radius:4px;padding:3px 10px;cursor:pointer;font-size:12px;">Next ></button>
- <button onclick="routeStepAll()" style="background:none;border:1px solid #30d158;color:#30d158;border-radius:4px;padding:3px 10px;cursor:pointer;font-size:11px;font-weight:700;">Show All</button>
+ <button id="route-step-all-btn" onclick="routeStepAll()" aria-pressed="true" style="background:none;border:1px solid #30d158;color:#30d158;border-radius:4px;padding:3px 10px;cursor:pointer;font-size:11px;font-weight:700;">Show All</button>
  <span style="width:1px;height:16px;background:#444;margin:0 4px;"></span>
  <button onclick="startVesselSimulation()" style="background:none;border:1px solid #00d2ff;color:#00d2ff;border-radius:4px;padding:3px 10px;cursor:pointer;font-size:11px;font-weight:700;">>Simulate</button>
  <button onclick="saveScenario()" style="background:none;border:1px solid #ffd60a;color:#ffd60a;border-radius:4px;padding:3px 8px;cursor:pointer;font-size:11px;font-weight:700;">Save</button>
@@ -2166,7 +2166,7 @@
  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
  <script src="https://unpkg.com/shpjs@latest/dist/shp.min.js"></script>
  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
- <script src="app.js?v=16.89"></script>
+ <script src="app.js?v=16.90"></script>
  <script src="ray_tracing_module.js?v=16.53"></script>
  <script src="wmm_declination.js?v=16.49"></script>
  <script src="magnetic_isogones.js?v=16.49"></script>
