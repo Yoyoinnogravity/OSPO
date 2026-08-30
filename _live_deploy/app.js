@@ -389,7 +389,7 @@ const state = {
  numSources: 2, // number of sources
  spIntervalPerSource: 50, // SP interval per source in metres
  modeOfShooting: 'flip-flop', // mode of shooting (user text input)
- optimizerIterations: 1500, // deep-search ILS iterations for the auto route optimizer
+ optimizerIterations: 1500, // shooting sequences to score; the client gets the minimum-time plan only
  startTime: null,
  startPoint: null, // [lat, lon] or null (use first line start)
  weatherDowntime: 15, // % technical downtime
@@ -12266,6 +12266,68 @@ function _rotateOrderToStart(ord, startIdx, startRev) {
  const rot = pos === 0 ? ord.slice() : ord.slice(pos).concat(ord.slice(0, pos));
  if (startRev != null) rot[0] = { lineIdx: rot[0].lineIdx, reversed: !!startRev };
  return rot;
+}
+
+/** Compact identity of a shooting sequence (line order × heading). */
+function _seqFingerprint(ord) {
+ let s = '';
+ for (let i = 0; i < ord.length; i++) s += ord[i].lineIdx + (ord[i].reversed ? 'R' : ',');
+ return s;
+}
+
+function* _kAroundNom(kNom, n) {
+ const seen = new Set();
+ const emit = (k) => {
+  k = k | 0;
+  if (k < 1 || k > n || seen.has(k)) return false;
+  seen.add(k);
+  return true;
+ };
+ if (emit(kNom)) yield kNom;
+ for (let d = 1; d < n; d++) {
+  const lo = kNom - d, hi = kNom + d;
+  if (emit(lo)) yield lo;
+  if (emit(hi)) yield hi;
+ }
+}
+
+/** Shoot each infill immediately after its parent prime line. */
+function _infillAfterParent(ord, lines) {
+ if (!ord || !ord.length) return null;
+ const primes = [];
+ const kids = new Map();
+ let nInfill = 0;
+ for (const o of ord) {
+  const L = lines[o.lineIdx];
+  if (L && L._infill) {
+   nInfill++;
+   const pid = L._parentLineId;
+   if (pid == null) continue;
+   if (!kids.has(pid)) kids.set(pid, []);
+   kids.get(pid).push(o);
+  } else primes.push(o);
+ }
+ if (!nInfill || !primes.length) return null;
+ const used = new Set();
+ const out = [];
+ for (const o of primes) {
+  out.push(o);
+  used.add(o.lineIdx);
+  const id = lines[o.lineIdx] && lines[o.lineIdx].id;
+  const k = id != null ? kids.get(id) : null;
+  if (k) for (const c of k) { out.push(c); used.add(c.lineIdx); }
+ }
+ for (const o of ord) if (!used.has(o.lineIdx)) out.push(o);
+ return out.length === ord.length ? out : null;
+}
+
+/** All primes in the given order, then all infills. */
+function _primesThenInfill(ord, lines) {
+ if (!ord || !ord.length) return null;
+ const a = [], b = [];
+ for (const o of ord) (lines[o.lineIdx] && lines[o.lineIdx]._infill ? b : a).push(o);
+ if (!a.length || !b.length) return null;
+ return a.concat(b);
 }
 
 function _orderSkipStd(ord, spatial) {
