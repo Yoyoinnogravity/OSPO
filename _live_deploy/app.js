@@ -12354,6 +12354,7 @@ function optimizeSwathInterleave(swaths, revOf, transitTimeSec, forceStartSwath)
   ? expand([order[0]].concat(order.slice(1).reverse()))
   : expand(order.slice().reverse());
  if (flipped && (!best || flipped.costSec < best.costSec - 0.5)) best = flipped;
+ if (best) best.optionsEvaluated = 2;
  return best;
 }
 
@@ -13062,7 +13063,7 @@ function computeRoute() {
  // --- Fastest of N shooting sequences ---
  // Score feasible plans (line order × heading × start family), each with
  // Dubins/turn-radius line-changes plus on-line length/speed. Ship only
- // the minimum-time plan. Not a global TSP proof: N evaluated options.
+ // the minimum-time plan, then STOP. Not ILS iterations. Not a global TSP proof.
  const spatial = _spatialLineOrder(lines);
  const spacingM = _medianLineSpacingM(lines, spatial);
  const kNom = _racetrackSkipK(spacingM, getEffectiveTurnRadius());
@@ -13099,11 +13100,6 @@ function computeRoute() {
   let use = applyFixed(sol);
   if (userStartLocked) use = applyFixed(_rotateOrderToStart(use, startIdx, startReversed));
   if (!use.length || use.length !== n) return Infinity;
-  if (!userStartLocked && !depotPt && spatial && spatial.order && spatial.order.length) {
-    const first = use[0].lineIdx;
-    const lo = spatial.order[0], hi = spatial.order[spatial.order.length - 1];
-    if (first !== lo && first !== hi) return Infinity;
-  }
   const fp = _seqFingerprint(use);
   if (seenFp.has(fp)) return Infinity;
   seenFp.add(fp);
@@ -13145,6 +13141,21 @@ function computeRoute() {
   const sol = applyFixed(buildNNSolution(startIdx, startReversed));
   considerSol(sol, 'nn');
  } else {
+  // NN and a short sweep first so the budget always compares those families
+  // against racetrack. Fastest wins; racetrack is not preferred.
+  {
+   const nnStarts = [];
+   if (userStartLocked) nnStarts.push({ idx: startIdx, rev: startReversed });
+   else {
+    nnStarts.push({ idx: startIdx, rev: startReversed }, { idx: startIdx, rev: !startReversed });
+    nnStarts.push({ idx: spatial.order[0], rev: false }, { idx: spatial.order[0], rev: true });
+    nnStarts.push({ idx: spatial.order[n - 1], rev: false }, { idx: spatial.order[n - 1], rev: true });
+   }
+   for (const cand of nnStarts) {
+    if (optionsEvaluated >= targetOptions || timeUp()) break;
+    considerSol(buildNNSolution(cand.idx, cand.rev), 'nn');
+   }
+  }
   const cornerPairs = [
    { startAtHigh: false, firstReversed: false },
    { startAtHigh: false, firstReversed: true },
@@ -13224,6 +13235,24 @@ function computeRoute() {
   for (const cand of nnStarts) {
    if (optionsEvaluated >= targetOptions || timeUp()) break;
    considerSol(buildNNSolution(cand.idx, cand.rev), 'nn');
+  }
+  // Family E: fill remaining budget from every spatial rank until 1500, then stop.
+  fillBudget:
+  for (let r = 0; r < n; r++) {
+   if (optionsEvaluated >= targetOptions || timeUp()) break;
+   const sIdx = spatial.order[r];
+   if (userStartLocked && sIdx !== startIdx) continue;
+   for (const sRev of (userStartLocked ? [startReversed] : [false, true])) {
+    for (const preferDir of [null, 1, -1]) {
+     for (const k of _kAroundNom(kNom, n)) {
+      if (optionsEvaluated >= targetOptions || timeUp()) break fillBudget;
+      considerSol(buildRacetrackOrderFrom(lines, k, sIdx, sRev, spatial, preferDir), 'racetrack');
+     }
+    }
+   }
+  }
+  if (bestSolution && n >= 4 && !timeUp() && optionsEvaluated < targetOptions) {
+   considerSol(twoOptImprove(bestSolution.map(o => ({ ...o }))), '2opt');
   }
  }
 

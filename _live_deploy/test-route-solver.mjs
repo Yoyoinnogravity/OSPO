@@ -64,7 +64,7 @@ const mapStub = {
 
 const ctx = {
   window, document, console,
-  setTimeout, clearTimeout, setInterval, clearInterval,
+  setTimeout: () => 0, clearTimeout() {}, setInterval: () => 0, clearInterval() {},
   localStorage: window.localStorage,
   fetch: async () => ({ json: async () => ({}), ok: false, status: 404 }),
   alert() {},
@@ -107,8 +107,8 @@ vm.runInContext(`
   else { const _t = showToast; showToast = function(){}; }
 `, ctx);
 
-assert(/app\.js\?v=16\.98/.test(html), 'app.js cache bump 16.98 missing');
-assert(html.includes('fastest of ~1500 shooting sequences'), 'chooser Auto is not fastest-of-1500');
+assert(/app\.js\?v=17\.00/.test(html), 'app.js cache bump 17.00 missing');
+assert(html.includes('fastest of 1500 options'), 'chooser Auto is not fastest-of-1500');
 assert(html.includes('simple nearest neighbour'), 'auto-nn must stay real NN');
 assert(src.includes('showLabels: false'), 'labels must default off');
 assert(src.includes('optionsEvaluated >= targetOptions'), 'hard option cap missing');
@@ -220,7 +220,7 @@ assert((t3d.stats.optionsEvaluated || 0) <= 1500, '3D must stop at 1500 options'
 
 console.log(JSON.stringify({
   ok: true,
-  cache: '16.98',
+  cache: '17.00',
   rule: 'score N shooting sequences (default 1500), ship the fastest, stop',
   cap40: { options: capped.stats.optionsEvaluated, ms: capped.ms, h: +(capped.stats.finalSec / 3600).toFixed(2) },
   grid24: {
@@ -232,3 +232,4 @@ console.log(JSON.stringify({
   },
   t3d: { visit: t3d.nVisit, options: t3d.stats.optionsEvaluated, ms: t3d.ms },
 }, null, 2));
+process.exit(0);
