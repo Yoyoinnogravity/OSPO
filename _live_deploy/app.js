@@ -14110,13 +14110,47 @@ function _routeVisitOrder(waypoints) {
    byName.set(w.lineName, n++);
   }
  }
- return { byName, n };
+ // 3D: each swath gets its own red→green. Global 0..n made Swath 1 all red
+ // and Swath 2 all green ("north red, south green"). Equal contrast per swath.
+ const localByName = new Map();
+ const nSw = (state.settings && state.settings.numSwaths) || 1;
+ const is3d = state.settings && state.settings.surveyType === '3d' && nSw >= 2;
+ if (is3d && typeof _computeSwathGroups === 'function') {
+  const groups = _computeSwathGroups(nSw, state.settings.progression || 'interleaved');
+  const swathOf = new Map();
+  for (let g = 0; g < groups.length; g++) {
+   const grp = groups[g] || [];
+   for (let k = 0; k < grp.length; k++) {
+    if (grp[k] && grp[k].name) swathOf.set(grp[k].name, g);
+   }
+  }
+  const per = [];
+  for (let g = 0; g < groups.length; g++) per[g] = [];
+  const ordered = [];
+  byName.forEach((vi, name) => { ordered.push({ name, vi }); });
+  ordered.sort((a, b) => a.vi - b.vi);
+  for (let i = 0; i < ordered.length; i++) {
+   const name = ordered[i].name;
+   const g = swathOf.has(name) ? swathOf.get(name) : 0;
+   if (!per[g]) per[g] = [];
+   per[g].push(name);
+  }
+  for (let g = 0; g < per.length; g++) {
+   const list = per[g];
+   for (let li = 0; li < list.length; li++) {
+    localByName.set(list[li], { i: li, n: list.length });
+   }
+  }
+ }
+ return { byName, n, localByName };
 }
 
 function visitColorForLine(lineName, visit) {
  if (!visit || !visit.n) return '#00ff88';
  const i = visit.byName.get(lineName);
  if (i == null) return '#8a9bb0';
+ const local = visit.localByName && visit.localByName.get(lineName);
+ if (local && local.n > 1) return timeGradientColor(local.i / (local.n - 1));
  return timeGradientColor(visit.n <= 1 ? 0 : i / (visit.n - 1));
 }
 

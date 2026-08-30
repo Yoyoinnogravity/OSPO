@@ -107,7 +107,7 @@ vm.runInContext(`
   else { const _t = showToast; showToast = function(){}; }
 `, ctx);
 
-assert(/app\.js\?v=17\.16/.test(html), 'app.js cache bump 17.16 missing');
+assert(/app\.js\?v=17\.17/.test(html), 'app.js cache bump 17.17 missing');
 assert(src.includes("createPane('routePane')"), 'planned route must have its own map pane');
 assert(src.includes(".addTo(layerRoute)"), 'Start/End markers must sit on the route layer');
 assert(src.includes('Load a preplot first, then click Route Planning'), 'empty Plan Route must toast, not silent-return');
@@ -323,6 +323,22 @@ for (let i = 1; i < Math.min(headings.length, 82); i++) {
 assert(sameHead / 81 < 0.25,
   '3D first swath headings must alternate (racetrack), same-heading hops=' + sameHead);
 
+const nameS1 = 'L' + (1000 + t3d.ranks[0]);
+const nameS2 = 'L' + (1000 + t3d.ranks[82]);
+const col = vm.runInContext(`
+  (function() {
+    const v = _routeVisitOrder(state._lastRoute);
+    return {
+      a: visitColorForLine(${JSON.stringify(nameS1)}, v),
+      b: visitColorForLine(${JSON.stringify(nameS2)}, v),
+      nLocal: v.localByName ? v.localByName.size : 0
+    };
+  })()
+`, ctx);
+assert(col.nLocal === 164, '3D must colour per swath, local n=' + col.nLocal);
+assert(col.a === col.b,
+  'first line of each swath must be the same start colour (equal red→green), got ' + col.a + ' vs ' + col.b);
+
 const liveLike = makeGrid(164, 667, 44500);
 const tLive = plan(liveLike, { surveyType: '3d', progression: 'interleaved', numSwaths: 2, turnRadius: 3500 });
 assert(tLive.nVisit === 164, '667m 3D must visit all 164');
@@ -344,7 +360,7 @@ assert(src.includes('min="1" max="100"'), 'Line Manager UI 1-100 missing');
 
 console.log(JSON.stringify({
   ok: true,
-  cache: '17.16',
+  cache: '17.17',
   rule: 'skip-k racetrack from a corner; 3D skip-k racetrack per swath',
   kNom,
   nn: { visit: nn.nVisit, mode: nn.stats.mode, ms: nn.ms },
