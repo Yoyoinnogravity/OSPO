@@ -5432,7 +5432,8 @@ function askSurveyCriteria({ zone, hemi }, callback) {
  state.settings.swathWidth = swMetres;
  state.settings.swathUnit = swUnit;
  state.settings.swathRawValue = isFinite(swVal) && swVal > 0 ? swVal : 0;
- state.settings.lineSpacing = swMetres;
+ // Swath width is not preplot line spacing. Skip-k and sq km must keep
+ // using adjacent-line separation from the grid, not this value.
  state.settings.progression = progression;
  state.settings.surveyType = surveyType;
  state.settings.numSwaths = numSwaths;
@@ -9227,7 +9228,8 @@ function segmentClearOfAllObstructions(a, b) {
 }
 
 // Preplot line separation (m): average adjacent prime-line midpoint distance.
-// Do NOT use settings.lineSpacing here - that stores swath width.
+// Do NOT use settings.lineSpacing here — it used to be overwritten with
+// swath width; always measure adjacent prime-line separation instead.
 function getPreplotLineSeparationM() {
  const lines = ((state._allLines || state.lines) || []).filter(l => !l._infill);
  if (lines.length >= 2) {
@@ -15162,7 +15164,6 @@ if (savedSwath) {
  const sw = parseFloat(savedSwath);
  if (isFinite(sw) && sw > 0) {
  state.settings.swathWidth = sw;
- state.settings.lineSpacing = sw;
  }
 }
 

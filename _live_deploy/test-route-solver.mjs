@@ -107,7 +107,7 @@ vm.runInContext(`
   else { const _t = showToast; showToast = function(){}; }
 `, ctx);
 
-assert(/app\.js\?v=17\.24/.test(html), 'app.js cache bump 17.24 missing');
+assert(/app\.js\?v=17\.25/.test(html), 'app.js cache bump 17.25 missing');
 assert(/id="val-turn-radius">3\.5km/.test(html), 'toolbar RADIUS default must be 3.5km not 5.1');
 assert(/id="input-turn-radius" value="3500"/.test(html), 'turn-radius input default must be 3500 m');
 assert(!/value="5100"/.test(html), 'HTML must not default min turn radius to 5100');
@@ -124,6 +124,10 @@ assert(html.includes('Skip-k racetrack. Keep the fastest. Then stop.'), 'chooser
 assert(!html.includes('id="start-iterations"'), 'sequence budget must not be a free-entry 20000 field');
 assert(src.includes('const OSPO_SEQUENCE_CAP = 1500'), '1500 sequence cap constant missing');
 assert(src.includes('function _swathsHoldSkipK'), 'narrow 3D swaths must not force adjacent 2R loops');
+assert(!src.includes('state.settings.lineSpacing = swMetres'),
+  'confirming Survey Criteria must not store swath metres as line spacing');
+assert(!src.includes('state.settings.lineSpacing = sw;'),
+  'restored swath width must not overwrite line spacing');
 assert(src.includes('function _sliceAdjacentSwaths'), '3D swaths must be contiguous adjacent lines');
 assert(src.includes('function _swathVisitOrder'), '3D swath visit order helper missing');
 assert(src.includes('constructor: \'adjacent-swaths\''), '3D stats must record adjacent-swaths');
@@ -452,7 +456,7 @@ assert(src.includes('min="1" max="100"'), 'Line Manager UI 1-100 missing');
 
 console.log(JSON.stringify({
   ok: true,
-  cache: '17.24',
+  cache: '17.25',
   rule: '2D skip-k racetrack; 3D adjacent-line swath blocks for every plan',
   kNom,
   nn: { visit: nn.nVisit, mode: nn.stats.mode, ms: nn.ms },
