@@ -107,7 +107,7 @@ vm.runInContext(`
   else { const _t = showToast; showToast = function(){}; }
 `, ctx);
 
-assert(/app\.js\?v=17\.23/.test(html), 'app.js cache bump 17.23 missing');
+assert(/app\.js\?v=17\.24/.test(html), 'app.js cache bump 17.24 missing');
 assert(/id="val-turn-radius">3\.5km/.test(html), 'toolbar RADIUS default must be 3.5km not 5.1');
 assert(/id="input-turn-radius" value="3500"/.test(html), 'turn-radius input default must be 3500 m');
 assert(!/value="5100"/.test(html), 'HTML must not default min turn radius to 5100');
@@ -124,6 +124,9 @@ assert(html.includes('Skip-k racetrack. Keep the fastest. Then stop.'), 'chooser
 assert(!html.includes('id="start-iterations"'), 'sequence budget must not be a free-entry 20000 field');
 assert(src.includes('const OSPO_SEQUENCE_CAP = 1500'), '1500 sequence cap constant missing');
 assert(src.includes('function _swathsHoldSkipK'), 'narrow 3D swaths must not force adjacent 2R loops');
+assert(src.includes('function _sliceAdjacentSwaths'), '3D swaths must be contiguous adjacent lines');
+assert(src.includes('function _swathVisitOrder'), '3D swath visit order helper missing');
+assert(src.includes('constructor: \'adjacent-swaths\''), '3D stats must record adjacent-swaths');
 assert(!src.includes('Math.min(iters, 20000)'), 'planner must not accept a 20000-option search');
 assert(html.includes('skip-k racetrack'), 'chooser Auto must describe skip-k racetrack');
 assert(!html.includes('fastest of 1500 options'), 'chooser must not advertise 1500-option TSP');
@@ -179,6 +182,9 @@ function setup(lines, extra) {
     state.settings.startLineReversed = false;
     state.settings.startConfigured = true;
     state.settings.numSwaths = ${extra.numSwaths == null ? 2 : extra.numSwaths};
+    state.settings.swathUnit = ${JSON.stringify(extra.swathUnit || 'm')};
+    state.settings.swathRawValue = ${extra.swathRawValue ?? 0};
+    state.settings.swathWidth = ${extra.swathWidth ?? 0};
     state.settings.lineDirection2d = 'auto';
     state._optimizerStats = null;
   `, ctx);
@@ -391,6 +397,49 @@ assert(Math.abs(tTight.ranks[1] - tTight.ranks[0]) === 1,
 assert(!(tTight.stats && tTight.stats.collapsedToGrid),
   '3D must not collapse to a 2D skip-k racetrack');
 
+const tSeq = plan(grid164, { surveyType: '3d', progression: 'low-high', numSwaths: 2 });
+assert(tSeq.nVisit === 164, '3D sequential must visit all 164');
+assert(tSeq.stats && tSeq.stats.mode === 'swath-blocks',
+  '3D sequential must use swath-blocks, got ' + (tSeq.stats && tSeq.stats.mode));
+assert(Math.abs(tSeq.ranks[1] - tSeq.ranks[0]) === 1,
+  '3D sequential swath must progress adjacent, hop=' + Math.abs(tSeq.ranks[1] - tSeq.ranks[0]));
+const seqFirst = tSeq.ranks.slice(0, 82);
+assert(seqFirst.every((r) => r < 82) || seqFirst.every((r) => r >= 82),
+  '3D sequential must finish one adjacent-line swath before the next');
+
+const t4 = plan(grid164, { surveyType: '3d', progression: 'interleaved', numSwaths: 4 });
+assert(t4.nVisit === 164, '4-swath 3D must visit all 164');
+assert(Math.abs(t4.ranks[1] - t4.ranks[0]) === 1,
+  '4-swath 3D must progress adjacent in the swath, hop=' + Math.abs(t4.ranks[1] - t4.ranks[0]));
+const gSize4 = Math.ceil(164 / 4);
+const t4first = t4.ranks.slice(0, gSize4);
+assert(t4first.every((r) => r < gSize4),
+  '4-swath interleaved must start in adjacent swath 1, first=' + t4first.slice(0, 6).join(','));
+assert(t4.ranks[gSize4] === gSize4 * 2,
+  '4-swath interleaved must skip the neighbouring swath (0 then 2), next=' + t4.ranks[gSize4]);
+
+const tWE = plan(grid164, { surveyType: '3d', progression: 'west-east', numSwaths: 2 });
+assert(tWE.nVisit === 164, '3D west-east must visit all 164');
+assert(tWE.stats && tWE.stats.mode === 'swath-blocks',
+  '3D compass plan must respect adjacent-line swaths, got ' + (tWE.stats && tWE.stats.mode));
+assert(Math.abs(tWE.ranks[1] - tWE.ranks[0]) === 1,
+  '3D west-east swath must progress adjacent, hop=' + Math.abs(tWE.ranks[1] - tWE.ranks[0]));
+
+const tW = plan(makeGrid(40), {
+  surveyType: '3d',
+  progression: 'interleaved',
+  numSwaths: 2,
+  swathUnit: 'lines',
+  swathRawValue: 8,
+});
+assert(tW.nVisit === 40, '8-line swath width must still visit all 40');
+assert(Math.abs(tW.ranks[1] - tW.ranks[0]) === 1,
+  'width-in-lines swath must be adjacent, hop=' + Math.abs(tW.ranks[1] - tW.ranks[0]));
+assert(tW.ranks.slice(0, 8).join(',') === '0,1,2,3,4,5,6,7',
+  '8-line swath must be the first 8 adjacent lines, got ' + tW.ranks.slice(0, 8).join(','));
+assert(tW.ranks[8] === 16,
+  '8-line interleaved must skip the neighbouring 8-line swath, next=' + tW.ranks[8]);
+
 // Line Manager 1-100: high-priority lines acquired first, still a racetrack within the bucket.
 vm.runInContext(`
   state.lineStatus[0].priority = 1;
@@ -403,8 +452,8 @@ assert(src.includes('min="1" max="100"'), 'Line Manager UI 1-100 missing');
 
 console.log(JSON.stringify({
   ok: true,
-  cache: '17.23',
-  rule: '2D skip-k racetrack; 3D swath blocks with one heading per swath',
+  cache: '17.24',
+  rule: '2D skip-k racetrack; 3D adjacent-line swath blocks for every plan',
   kNom,
   nn: { visit: nn.nVisit, mode: nn.stats.mode, ms: nn.ms },
   auto12: { first: auto12.skip.first, mean: +auto12.skip.mean.toFixed(2), mode: auto12.stats.mode },

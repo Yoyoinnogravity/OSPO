@@ -4619,7 +4619,7 @@ function toggleSurveyTypeOptions() {
  if (hint) {
   if (type === 'obn') hint.textContent = 'OBN: Ocean Bottom Nodes - node patch + source sail lines (no streamer swaths)';
   else if (type === '2d') hint.textContent = '2D: Plans the quickest route';
-  else hint.textContent = '3D: Interleaves swaths for coverage overlap | 2D: Plans the quickest route';
+  else hint.textContent = '3D: each swath is adjacent lines; every plan finishes a swath before the next';
  }
 }
 
@@ -4899,7 +4899,7 @@ function askSurveyCriteria({ zone, hemi }, callback) {
  <div id="survey-type-hint" style="font-size:9px;color:#a0aebb;margin-bottom:10px;margin-left:144px;">
  ${state.settings.surveyType === 'obn'
   ? 'OBN: Ocean Bottom Nodes - node patch + source sail lines (no streamer swaths)'
-  : '3D: Interleaves swaths for coverage overlap &nbsp;|&nbsp; 2D: Plans the quickest route'}
+  : '3D: each swath is adjacent lines; every plan finishes a swath before the next'}
  </div>
  <div class="panel-row" style="margin-bottom:10px;">
  <label style="width:140px; color:#ffffff;">Min Turn Radius (m)</label>
@@ -5008,10 +5008,10 @@ function askSurveyCriteria({ zone, hemi }, callback) {
  <div class="panel-row" style="margin-bottom:10px;">
  <label style="width:140px; color:#ffffff;">Swath Progression</label>
  <select id="crit-progression" style="flex:1;padding:5px 8px;border-radius:4px;border:1px solid #222222;background:#111111;color:#ffffff;font-size:13px;outline:none;cursor:pointer;">
- <option value="interleaved" ${(state.settings.progression || 'interleaved') === 'interleaved' ? 'selected' : ''}>Interleaved (Low -> High)</option>
- <option value="interleaved-reverse" ${state.settings.progression === 'interleaved-reverse' ? 'selected' : ''}>Interleaved (High -> Low)</option>
- <option value="low-high" ${state.settings.progression === 'low-high' ? 'selected' : ''}>Sequential (Low -> High)</option>
- <option value="high-low" ${state.settings.progression === 'high-low' ? 'selected' : ''}>Sequential (High -> Low)</option>
+ <option value="interleaved" ${(state.settings.progression || 'interleaved') === 'interleaved' ? 'selected' : ''}>Interleaved (adjacent lines, skip neighbouring swath)</option>
+ <option value="interleaved-reverse" ${state.settings.progression === 'interleaved-reverse' ? 'selected' : ''}>Interleaved High→Low (adjacent lines)</option>
+ <option value="low-high" ${state.settings.progression === 'low-high' ? 'selected' : ''}>Sequential Low→High (adjacent-line swaths)</option>
+ <option value="high-low" ${state.settings.progression === 'high-low' ? 'selected' : ''}>Sequential High→Low (adjacent-line swaths)</option>
  </select>
  </div>
  <div class="panel-row" style="margin-bottom:10px;">
@@ -8101,33 +8101,145 @@ function renderSurveyLines() {
  updateSurveySummary();
 }
 
+// How many neighbouring sail lines make one 3D swath. Survey Criteria Swath
+// Width in "lines" (or metres ÷ median spacing) wins; otherwise 0 means equal
+// split by Number of Swaths. Never skip-k / every-Nth — a swath is adjacent.
+function _effectiveLinesPerSwath(lines) {
+ const s = state.settings || {};
+ if (s.swathUnit === 'lines' && s.swathRawValue > 0) {
+  return Math.max(1, Math.round(Number(s.swathRawValue)));
+ }
+ if (s.swathWidth > 0 && lines && lines.length >= 2) {
+  const sp = (typeof _medianLineSpacingM === 'function') ? _medianLineSpacingM(lines) : 0;
+  if (sp > 0) return Math.max(1, Math.round(s.swathWidth / sp));
+ }
+ return 0;
+}
+
+// Canonical across-track order so Swath 1 is always the low / west / south
+// adjacent bundle. Visit direction is applied afterwards, not by reversing
+// membership.
+function _sortLineIdxForSwaths(lines, progression, lineNumKey, midpoints) {
+ const indices = lines.map((_, i) => i);
+ const key = (i) => (lineNumKey && lineNumKey[i] != null) ? lineNumKey[i] : i;
+ const mid = (i) => midpoints[i] || [
+  (lines[i].start[0] + lines[i].end[0]) / 2,
+  (lines[i].start[1] + lines[i].end[1]) / 2
+ ];
+ if (progression === 'west-east' || progression === 'east-west') {
+  indices.sort((a, b) => mid(a)[1] - mid(b)[1]);
+ } else if (progression === 'south-north' || progression === 'north-south') {
+  indices.sort((a, b) => mid(a)[0] - mid(b)[0]);
+ } else {
+  indices.sort((a, b) => key(a) - key(b));
+ }
+ return indices;
+}
+
+// Contiguous slices of already-sorted adjacent lines. Never round-robin.
+function _sliceAdjacentSwaths(sortedIdx, lines, opts) {
+ opts = opts || {};
+ if (!sortedIdx || !sortedIdx.length) return [];
+ const per = _effectiveLinesPerSwath(lines);
+ if (per > 0) {
+  const groups = [];
+  for (let i = 0; i < sortedIdx.length; i += per) {
+   const slice = sortedIdx.slice(i, i + per);
+   if (slice.length) groups.push(slice);
+  }
+  return groups;
+ }
+ const nSw = Math.max(1, parseInt(opts.numSwaths != null ? opts.numSwaths : (state.settings && state.settings.numSwaths), 10) || 1);
+ const groupSize = Math.ceil(sortedIdx.length / nSw);
+ const groups = [];
+ for (let g = 0; g < nSw; g++) {
+  const slice = sortedIdx.slice(g * groupSize, (g + 1) * groupSize);
+  if (slice.length) groups.push(slice);
+ }
+ return groups;
+}
+
+// Order in which adjacent-line swaths are acquired. Interleaved skips the
+// neighbouring swath (0,2,4… then 1,3,5…) so coverage overlaps; sequential
+// and compass plans still finish each adjacent bundle before the next.
+function _swathVisitOrder(nSw, progression) {
+ const seq = [];
+ for (let i = 0; i < nSw; i++) seq.push(i);
+ if (nSw < 2) return seq;
+ if (progression === 'interleaved' || progression === 'auto') {
+  return seq.filter(i => i % 2 === 0).concat(seq.filter(i => i % 2 === 1));
+ }
+ if (progression === 'interleaved-reverse') {
+  const even = seq.filter(i => i % 2 === 0).reverse();
+  const odd = seq.filter(i => i % 2 === 1).reverse();
+  return even.concat(odd);
+ }
+ if (progression === 'high-low' || progression === 'east-west' || progression === 'north-south') {
+  return seq.slice().reverse();
+ }
+ return seq;
+}
+
+function _nearestSwathOrder(swaths, lines, startIdx, startPt) {
+ const remaining = [];
+ for (let g = 0; g < swaths.length; g++) if (swaths[g] && swaths[g].length) remaining.push(g);
+ const order = [];
+ if (startIdx >= 0) {
+  for (let i = 0; i < remaining.length; i++) {
+   if (swaths[remaining[i]].indexOf(startIdx) >= 0) {
+    order.push(remaining.splice(i, 1)[0]);
+    break;
+   }
+  }
+ }
+ const endPt = (g) => {
+  const last = swaths[g][swaths[g].length - 1];
+  const L = lines[last];
+  return L ? L.end : startPt;
+ };
+ const minD = (g, pt) => {
+  if (!pt) return 0;
+  let best = Infinity;
+  for (let k = 0; k < swaths[g].length; k++) {
+   const L = lines[swaths[g][k]];
+   if (!L) continue;
+   const ds = haversine(pt, L.start), de = haversine(pt, L.end);
+   if (ds < best) best = ds;
+   if (de < best) best = de;
+  }
+  return best;
+ };
+ let cur = startPt;
+ if (order.length) cur = endPt(order[0]);
+ while (remaining.length) {
+  let bestI = 0, bestD = Infinity;
+  for (let i = 0; i < remaining.length; i++) {
+   const d = minD(remaining[i], cur);
+   if (d < bestD) { bestD = d; bestI = i; }
+  }
+  const g = remaining.splice(bestI, 1)[0];
+  order.push(g);
+  cur = endPt(g);
+ }
+ return order;
+}
+
 // Group prime lines into swaths exactly as the route solver does, so on-map
 // swath labels match the per-swath acquisition-direction settings. Returns an
 // array of groups (index g === "Swath g+1"), each an array of line objects.
+// Each group is a contiguous run of adjacent sail lines — never skip-k.
 function _computeSwathGroups(numSwaths, progression) {
  const _pool = (state._allLines && state._allLines.length) ? state._allLines : state.lines;
  const prime = _pool.filter(l => !l._infill);
- if (prime.length < 1 || numSwaths < 1) return [];
- const keyOf = (l, i) => _lineNumOf(l, i); // unsigned parse - never -1234 from "INFILL-1234"
-
- const mid = l => [(l.start[0] + l.end[0]) / 2, (l.start[1] + l.end[1]) / 2];
- const idx = prime.map((l, i) =>i);
- // Line-number progressions band by ASCENDING line number so Swath 1 always
- // covers the lowest line numbers (for intuition). Compass progressions band
- // along their spatial sort order.
- if (progression === 'west-east') idx.sort((a, b) =>mid(prime[a])[1] - mid(prime[b])[1]);
- else if (progression === 'east-west') idx.sort((a, b) =>mid(prime[b])[1] - mid(prime[a])[1]);
- else if (progression === 'south-north') idx.sort((a, b) =>mid(prime[a])[0] - mid(prime[b])[0]);
- else if (progression === 'north-south') idx.sort((a, b) =>mid(prime[b])[0] - mid(prime[a])[0]);
- else idx.sort((a, b) =>keyOf(prime[a], a) - keyOf(prime[b], b)); // low-high / high-low / interleaved(-reverse) / auto
-
- const groupSize = Math.ceil(idx.length / numSwaths);
- const groups = [];
- for (let g = 0; g < numSwaths; g++) {
- const slice = idx.slice(g * groupSize, (g + 1) * groupSize).map(i =>prime[i]);
- if (slice.length) groups.push(slice);
- }
- return groups;
+ if (prime.length < 1) return [];
+ const lineNumKey = prime.map((l, i) => {
+  const num = _lineNumOf(l, null);
+  return num != null ? num : i;
+ });
+ const midpoints = prime.map(l => [(l.start[0] + l.end[0]) / 2, (l.start[1] + l.end[1]) / 2]);
+ const sorted = _sortLineIdxForSwaths(prime, progression, lineNumKey, midpoints);
+ const slices = _sliceAdjacentSwaths(sorted, prime, { numSwaths: numSwaths || 1 });
+ return slices.map(idxs => idxs.map(i => prime[i]));
 }
 
 const _SWATH_BAND_COLORS = ['#22d3ee', '#fbbf24', '#f472b6', '#a78bfa', '#34d399', '#fb7185', '#38bdf8', '#facc15', '#c084fc', '#4ade80'];
@@ -8160,7 +8272,6 @@ function renderSwathOverlays() {
  const s = state.settings;
  if ((s.surveyType || '3d') !== '3d') return;
  const numSwaths = s.numSwaths || 1;
- if (numSwaths < 2) return;
  const progression = s.progression || 'interleaved';
  const groups = _computeSwathGroups(numSwaths, progression);
  if (groups.length < 1) return;
@@ -8296,6 +8407,10 @@ function setMapSwathCount(n) {
  if (!isFinite(n)) return;
  n = Math.max(2, Math.min(10, n));
  state.settings.numSwaths = n;
+ // Spinner chooses N equal adjacent bands; clear a lines/metres width so
+ // grouping does not stay locked to a previous Swath Width.
+ state.settings.swathRawValue = 0;
+ state.settings.swathWidth = 0;
  const nsEl = document.getElementById('crit-num-swaths');
  if (nsEl) {
   nsEl.value = String(n);
@@ -10698,7 +10813,7 @@ function applyConfirmedSurveyPlanType(type) {
   ? 'Route plan locked to OBN - source sail lines (no streamer swaths)'
   : is2d
   ? 'Route plan locked to 2D - any direction (no swath interleave)'
-  : 'Route plan locked to 3D - swath / progressive adjacency', 4000);
+  : 'Route plan locked to 3D - adjacent-line swaths', 4000);
 }
 
  /** Show/hide start-plan options that only apply to 3D swath surveys. */
@@ -12088,7 +12203,7 @@ function executePlanRoute() {
  if (os.collapsedToGrid) {
   showToast(`Fastest of ${nOpt} sequences (skip-k racetrack k=${k} on the full grid; 3D swaths stay as map bands): ${h} h total`, 8000);
  } else {
-  showToast(`Fastest of ${nOpt} shooting sequences (3D swath blocks, one direction per swath): ${h} h total`, 8000);
+  showToast(`3D plan: ${nOpt} adjacent-line swath sequence(s), one direction per swath: ${h} h total`, 8000);
  }
  } else if (os && (os.optionsEvaluated > 0 || os.mode === 'fastest-of-n')) {
  const nOpt = os.optionsEvaluated || os.iterations || 0;
@@ -12489,10 +12604,16 @@ function planSwathBlockRacetracks(lines, swaths, transitTimeSec, opts) {
 
  const active = [];
  for (let g = 0; g < swaths.length; g++) if (swaths[g] && swaths[g].length) active.push(g);
- let orderG = active.slice();
- if (forceStartSwath >= 0 && active.indexOf(forceStartSwath) >= 0) {
-  const i = active.indexOf(forceStartSwath);
-  orderG = active.slice(i).concat(active.slice(0, i));
+ let orderG;
+ if (opts.swathOrder && opts.swathOrder.length) {
+  orderG = opts.swathOrder.filter(g => active.indexOf(g) >= 0);
+  for (let i = 0; i < active.length; i++) if (orderG.indexOf(active[i]) < 0) orderG.push(active[i]);
+ } else {
+  orderG = active.slice();
+ }
+ if (forceStartSwath >= 0 && orderG.indexOf(forceStartSwath) >= 0) {
+  const i = orderG.indexOf(forceStartSwath);
+  orderG = orderG.slice(i).concat(orderG.slice(0, i));
  }
 
  const seq = [];
@@ -12654,8 +12775,8 @@ function computeRoute() {
  (l.start[1] + l.end[1]) / 2
  ]);
 
- // 3D: skip-k racetrack inside each swath, then the next swath. The free
- // Auto TSP is 2D-only. 3D Auto is remapped to interleaved (block-complete).
+ // 3D: adjacent-line swath blocks for every plan. Skip-k Auto is 2D-only.
+ // 3D Auto is remapped to interleaved swath order (still adjacent within).
  let progression = state.settings.progression || (state.settings.surveyType === '3d' ? 'interleaved' : 'auto');
  if (state.settings.surveyType === '3d' && progression === 'auto') {
  progression = 'interleaved';
@@ -12739,35 +12860,27 @@ function computeRoute() {
  return lineNumKey[b] - lineNumKey[a]; // then descending line number
  });
  } else if (progression === 'interleaved' || progression === 'interleaved-reverse') {
- // Band lines into N swaths by ASCENDING line number (Swath 1 = lowest
- // lines), then shoot each swath as a block (adjacent within). Line-level
- // round-robin (0, n/2, 1, n/2+1) is the 164-line orange hairball.
- indices.sort((a, b) => {
- const prioA = priorities[a], prioB = priorities[b];
- if (prioA !== prioB) return prioA - prioB; // priority first
- return lineNumKey[a] - lineNumKey[b]; // then line number
- });
- const numSw = state.settings.numSwaths || 2;
- const groupSize = Math.ceil(indices.length / numSw);
- const swaths = [];
- for (let g = 0; g < numSw; g++) {
- swaths.push(indices.slice(g * groupSize, (g + 1) * groupSize));
+ // Adjacent line-number order only. Priority must not pull distant lines
+ // into the same swath. Shooting is the 3D block below.
+ indices.sort((a, b) => lineNumKey[a] - lineNumKey[b]);
  }
 
- // Banding only: Swath 1 = lowest line numbers. Visit order inside a
- // swath is progressive adjacent. Every line uses that swath's set
- // Low→High or High→Low heading — never opposite directions on a swath.
+ // 3D: every plan (interleaved, sequential, compass, Auto) finishes adjacent-
+ // line swaths as blocks. Skip-k racetrack is 2D only.
+ if (state.settings.surveyType === '3d' && !swathRacetrackFilled) {
+ const bandIdx = _sortLineIdxForSwaths(lines, progression, lineNumKey, midpoints);
+ const swaths = _sliceAdjacentSwaths(bandIdx, lines, { numSwaths: state.settings.numSwaths || 2 });
  if (progression === 'interleaved-reverse') swaths.forEach(s => s.reverse());
 
  let forceStartSwath = -1;
  const startFilteredIdx = startLineObj ? _startIdxIn(lines) : -1;
  if (startFilteredIdx >= 0) {
-  for (let g = 0; g < numSw; g++) {
+  for (let g = 0; g < swaths.length; g++) {
    if (swaths[g].indexOf(startFilteredIdx) >= 0) { forceStartSwath = g; break; }
   }
  } else if (state.settings.startPoint) {
   let bestD = Infinity, bestG = -1;
-  for (let g = 0; g < numSw; g++) {
+  for (let g = 0; g < swaths.length; g++) {
    if (!swaths[g].length) continue;
    const a = swaths[g][0], b = swaths[g][swaths[g].length - 1];
    const corners = [lines[a].start, lines[a].end, lines[b].start, lines[b].end];
@@ -12779,6 +12892,12 @@ function computeRoute() {
   forceStartSwath = bestG;
  }
 
+ let swathOrder = _swathVisitOrder(swaths.length, progression);
+ if (state.settings.optimizerMode === 'nn') {
+  swathOrder = _nearestSwathOrder(swaths, lines, startFilteredIdx,
+   state.settings.startPoint || null);
+ }
+
  const swDirsPlan = (state.settings.swathDirections || []);
  const model3d = buildTransitTimeModel(lines);
  const opt3dStart = Date.now();
@@ -12788,16 +12907,13 @@ function computeRoute() {
   startRev: startReversed,
   userStartLocked: !!startLineObj,
   forceStartSwath,
+  swathOrder,
   swathDirs: swaths.map((_, g) => swDirsPlan[g] || defaultSwathDirection(g))
  });
 
- const blockSeq = [];
- for (let g = 0; g < numSw; g++) {
-  for (let k = 0; k < swaths[g].length; k++) blockSeq.push(swaths[g][k]);
- }
-
+ const nBlock = swaths.reduce((a, s) => a + (s ? s.length : 0), 0);
  indices.length = 0;
- if (opt && opt.seq && opt.seq.length === blockSeq.length) {
+ if (opt && opt.seq && opt.seq.length === nBlock) {
   for (let i = 0; i < opt.seq.length; i++) {
    visited.add(opt.seq[i].lineIdx);
    order.push({ lineIdx: opt.seq[i].lineIdx, reversed: !!opt.seq[i].reversed });
@@ -12809,9 +12925,10 @@ function computeRoute() {
   state._optimizerStats = {
    mode: 'swath-blocks',
    solver: 'swath-blocks',
-   constructor: 'racetrack',
+   constructor: 'adjacent-swaths',
    skipK: opt.skipK,
-   collapsedToGrid: !!opt.collapsedToGrid,
+   collapsedToGrid: false,
+   nSwaths: swaths.length,
    optionsEvaluated: nOpt,
    optionsTarget: nOpt,
    finalSec: opt.costSec,
@@ -12820,7 +12937,7 @@ function computeRoute() {
    capped: false
   };
  } else {
-  indices.push.apply(indices, blockSeq);
+  for (let g = 0; g < swaths.length; g++) indices.push.apply(indices, swaths[g]);
  }
  }
 
