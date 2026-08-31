@@ -12476,103 +12476,49 @@ function _orderSkipStd(ord, spatial) {
  return Math.sqrt(skips.reduce((a, b) => a + (b - mean) * (b - mean), 0) / skips.length);
 }
 
-// ===== 3D PROGRESSIVE-SWATH BLOCKS =====
-// Finish each swath as a block. Every line in a swath uses that swath's
-// set direction (Low→High or High→Low). No opposite headings on a swath.
-// Skip-k racetrack (alternate headings) is 2D only.
+// ===== 3D SWATH SHOOTING (as defined in Survey Criteria) =====
+// Number of swaths, swath progression, and per-swath Low→High / High→Low
+// are set in stone. Finish each swath as a block, progressive adjacent,
+// one heading for every line in that swath. Skip-k reverse is 2D only.
 function planSwathBlockRacetracks(lines, swaths, transitTimeSec, opts) {
  opts = opts || {};
- const targetOptions = Math.max(1, Math.min(opts.targetOptions || getSequenceBudget(), OSPO_SEQUENCE_CAP));
  const startIdx = opts.startIdx;
  const userStartLocked = !!opts.userStartLocked;
  const forceStartSwath = opts.forceStartSwath;
  const swathDirs = opts.swathDirs || [];
- let evaluated = 0;
- let best = null;
- const seen = new Set();
-
- function consider(seq) {
-  if (!seq || !seq.length) return;
-  if (evaluated >= targetOptions) return;
-  const fp = _seqFingerprint(seq);
-  if (seen.has(fp)) return;
-  seen.add(fp);
-  evaluated++;
-  let cost = 0;
-  for (let i = 0; i < seq.length - 1; i++) {
-   cost += transitTimeSec(seq[i].lineIdx, seq[i].reversed, seq[i + 1].lineIdx, seq[i + 1].reversed);
-  }
-  if (!best || cost < best.costSec - 0.5) {
-   best = {
-    seq: seq.map(o => ({ lineIdx: o.lineIdx, reversed: !!o.reversed })),
-    costSec: cost,
-    skipK: null,
-    collapsedToGrid: false
-   };
-  }
- }
-
- function pinDir(g) {
-  return (swathDirs[g] || 'low-high') === 'high-low';
- }
-
- function variantsFor(g) {
-  const idxs = swaths[g];
-  const out = [];
-  if (!idxs || !idxs.length) return out;
-  const rev = pinDir(g);
-  function pack(list) {
-   return list.map(lineIdx => ({ lineIdx, reversed: rev }));
-  }
-  const lock = userStartLocked && startIdx >= 0 && idxs.indexOf(startIdx) >= 0;
-  if (lock) {
-   const pos = idxs.indexOf(startIdx);
-   out.push({ ord: pack(idxs.slice(pos).concat(idxs.slice(0, pos))) });
-   const back = idxs.slice(0, pos + 1).reverse().concat(idxs.slice(pos + 1).reverse());
-   out.push({ ord: pack(back) });
-  } else {
-   out.push({ ord: pack(idxs) });
-   out.push({ ord: pack(idxs.slice().reverse()) });
-  }
-  return out;
- }
 
  const active = [];
  for (let g = 0; g < swaths.length; g++) if (swaths[g] && swaths[g].length) active.push(g);
- const byG = {};
- for (let i = 0; i < active.length; i++) byG[active[i]] = variantsFor(active[i]);
-
- function walkRemaining(remaining, acc) {
-  if (evaluated >= targetOptions) return;
-  if (!remaining.length) {
-   consider(acc);
-   return;
-  }
-  for (let i = 0; i < remaining.length; i++) {
-   if (evaluated >= targetOptions) return;
-   const g = remaining[i];
-   const rest = remaining.slice(0, i).concat(remaining.slice(i + 1));
-   const vars = byG[g] || [];
-   for (let v = 0; v < vars.length; v++) {
-    if (evaluated >= targetOptions) return;
-    walkRemaining(rest, acc.concat(vars[v].ord));
-   }
-  }
- }
-
+ let orderG = active.slice();
  if (forceStartSwath >= 0 && active.indexOf(forceStartSwath) >= 0) {
-  const firstVars = byG[forceStartSwath] || [];
-  const rest = active.filter(g => g !== forceStartSwath);
-  for (let v = 0; v < firstVars.length; v++) {
-   if (evaluated >= targetOptions) break;
-   walkRemaining(rest, firstVars[v].ord);
-  }
- } else {
-  walkRemaining(active, []);
+  const i = active.indexOf(forceStartSwath);
+  orderG = active.slice(i).concat(active.slice(0, i));
  }
 
- if (best) best.optionsEvaluated = evaluated;
- return best;
+ const seq = [];
+ for (let n = 0; n < orderG.length; n++) {
+  const g = orderG[n];
+  const idxs = swaths[g].slice();
+  const rev = (swathDirs[g] || 'low-high') === 'high-low';
+  let list = idxs;
+  if (userStartLocked && startIdx >= 0 && idxs.indexOf(startIdx) >= 0) {
+   const pos = idxs.indexOf(startIdx);
+   list = idxs.slice(pos).concat(idxs.slice(0, pos));
+  }
+  for (let k = 0; k < list.length; k++) seq.push({ lineIdx: list[k], reversed: rev });
+ }
+
+ let cost = 0;
+ for (let i = 0; i < seq.length - 1; i++) {
+  cost += transitTimeSec(seq[i].lineIdx, seq[i].reversed, seq[i + 1].lineIdx, seq[i + 1].reversed);
+ }
+ return {
+  seq: seq.map(o => ({ lineIdx: o.lineIdx, reversed: !!o.reversed })),
+  costSec: cost,
+  skipK: null,
+  collapsedToGrid: false,
+  optionsEvaluated: 1
+ };
 }
 
 function optimizeSwathInterleave(swaths, revOf, transitTimeSec, forceStartSwath) {
