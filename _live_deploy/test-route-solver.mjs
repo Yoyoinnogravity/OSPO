@@ -107,7 +107,7 @@ vm.runInContext(`
   else { const _t = showToast; showToast = function(){}; }
 `, ctx);
 
-assert(/app\.js\?v=17\.23/.test(html), 'app.js cache bump 17.23 missing');
+assert(/app\.js\?v=17\.27/.test(html), 'app.js cache bump 17.27 missing');
 assert(/id="val-turn-radius">3\.5km/.test(html), 'toolbar RADIUS default must be 3.5km not 5.1');
 assert(/id="input-turn-radius" value="3500"/.test(html), 'turn-radius input default must be 3500 m');
 assert(!/value="5100"/.test(html), 'HTML must not default min turn radius to 5100');
@@ -124,8 +124,21 @@ assert(html.includes('Skip-k racetrack. Keep the fastest. Then stop.'), 'chooser
 assert(!html.includes('id="start-iterations"'), 'sequence budget must not be a free-entry 20000 field');
 assert(src.includes('const OSPO_SEQUENCE_CAP = 1500'), '1500 sequence cap constant missing');
 assert(src.includes('function _swathsHoldSkipK'), 'narrow 3D swaths must not force adjacent 2R loops');
+assert(!src.includes('state.settings.lineSpacing = swMetres'),
+  'confirming Survey Criteria must not store swath metres as line spacing');
+assert(!src.includes('state.settings.lineSpacing = sw;'),
+  'restored swath width must not overwrite line spacing');
+assert(src.includes('function _sliceAdjacentSwaths'), '3D swaths must be contiguous adjacent lines');
+assert(src.includes('function _swathVisitOrder'), '3D swath visit order helper missing');
+assert(src.includes('function insertMonopassStadiums'), 'same-heading 3D line-changes need stadium returns');
+assert(src.includes('every line in a swath uses that swath'), '3D heading lock comment missing');
+assert(!src.includes('function _swathRtCandidates'), '3D must not score skip-k racetracks inside a swath');
+assert(src.includes('constructor: \'adjacent-swaths\''), '3D stats must record adjacent-swaths');
 assert(!src.includes('Math.min(iters, 20000)'), 'planner must not accept a 20000-option search');
 assert(html.includes('skip-k racetrack'), 'chooser Auto must describe skip-k racetrack');
+assert(html.includes('Acquire per swath'), 'chooser must offer acquire-per-swath plans');
+assert(src.includes("progression = 'low-high'"), '3D Auto must acquire per swath in band order');
+assert(src.includes('acquire each adjacent-line swath as a block'), '3D plan type must say acquire per swath');
 assert(!html.includes('fastest of 1500 options'), 'chooser must not advertise 1500-option TSP');
 assert(html.includes('simple nearest neighbour'), 'auto-nn must stay real NN');
 assert(src.includes('showLabels: false'), 'labels must default off');
@@ -179,7 +192,11 @@ function setup(lines, extra) {
     state.settings.startLineReversed = false;
     state.settings.startConfigured = true;
     state.settings.numSwaths = ${extra.numSwaths == null ? 2 : extra.numSwaths};
+    state.settings.swathUnit = ${JSON.stringify(extra.swathUnit || 'm')};
+    state.settings.swathRawValue = ${extra.swathRawValue ?? 0};
+    state.settings.swathWidth = ${extra.swathWidth ?? 0};
     state.settings.lineDirection2d = 'auto';
+    state.settings.swathDirections = ${JSON.stringify(extra.swathDirections || [])};
     state._optimizerStats = null;
   `, ctx);
 }
@@ -286,6 +303,9 @@ assert(t2d.stats.optionsEvaluated >= 1000,
   '2D Auto must score toward 1500 sequences, got ' + t2d.stats.optionsEvaluated);
 assert(t2d.stats.optionsEvaluated <= 1500,
   '2D Auto must stop at 1500, got ' + t2d.stats.optionsEvaluated);
+const stad2d = vm.runInContext(
+  `(state._lastRoute || []).filter(w => w.type === 'monopassTurn').length`, ctx);
+assert(stad2d === 0, '2D skip-k must not insert monopass stadiums, n=' + stad2d);
 
 const t3d = plan(grid164, { surveyType: '3d', progression: 'interleaved', numSwaths: 2 });
 assert(t3d.nVisit === 164, '3D must visit all 164, got ' + t3d.nVisit);
@@ -330,6 +350,55 @@ for (let i = 1; i < Math.min(headings.length, 82); i++) {
 }
 assert(sameHead / 81 > 0.9,
   '3D first swath must be one heading, same-heading hops=' + sameHead);
+
+const stadiumN = vm.runInContext(`
+  (state._lastRoute || []).filter(w => w.type === 'monopassTurn' || w.type === 'monopassReturn').length
+`, ctx);
+assert(stadiumN >= 80,
+  '3D same-heading line-changes must insert stadium returns, n=' + stadiumN);
+const stadGeom = vm.runInContext(`
+  (function() {
+    const w = state._lastRoute || [];
+    const R = getEffectiveTurnRadius();
+    let i = -1;
+    for (let k = 0; k < w.length; k++) if (w[k].type === 'monopassTurn') { i = k; break; }
+    if (i < 1 || i + 2 >= w.length) return { ok: false };
+    const a = w[i - 1], turn = w[i], ret = w[i + 1], b = w[i + 2];
+    const exitHdg = (i >= 2) ? bearing(w[i - 2].pt, a.pt) : bearing(a.pt, turn.pt);
+    const retHdg = bearing(turn.pt, ret.pt);
+    let dh = Math.abs(retHdg - ((exitHdg + 180) % 360));
+    if (dh > 180) dh = 360 - dh;
+    return {
+      ok: true,
+      d1: haversine(a.pt, turn.pt),
+      d2: haversine(ret.pt, b.pt),
+      R,
+      dh,
+      retKm: haversine(turn.pt, ret.pt) / 1000
+    };
+  })()
+`, ctx);
+assert(stadGeom.ok, 'stadium waypoint pair missing after first line');
+assert(Math.abs(stadGeom.d1 - 2 * stadGeom.R) < 80,
+  'stadium offset from run-out should be 2R, d=' + stadGeom.d1);
+assert(Math.abs(stadGeom.d2 - 2 * stadGeom.R) < 80,
+  'stadium offset onto run-in should be 2R, d=' + stadGeom.d2);
+assert(stadGeom.dh < 15, 'stadium return must be opposite the shot heading, dh=' + stadGeom.dh);
+assert(stadGeom.retKm > 15, 'stadium return must sail the line back, km=' + stadGeom.retKm);
+const stadArc = vm.runInContext(`
+  (function() {
+    const w = state._lastRoute || [];
+    const i = w.findIndex(x => x.type === 'monopassTurn');
+    if (i < 0 || i + 1 >= w.length) return { ok: false };
+    const arc = computeArcTurn(w, i);
+    let d = 0;
+    for (let k = 1; k < arc.length; k++) d += haversine(arc[k - 1], arc[k]);
+    const chord = haversine(w[i].pt, w[i + 1].pt);
+    return { ok: true, ratio: d / Math.max(chord, 1) };
+  })()
+`, ctx);
+assert(stadArc.ok && stadArc.ratio < 1.08,
+  'stadium return must draw as a parallel sail-back, ratio=' + (stadArc && stadArc.ratio));
 
 const nameS1 = 'L' + (1000 + t3d.ranks[0]);
 const nameLast = 'L' + (1000 + t3d.ranks[t3d.ranks.length - 1]);
@@ -391,6 +460,62 @@ assert(Math.abs(tTight.ranks[1] - tTight.ranks[0]) === 1,
 assert(!(tTight.stats && tTight.stats.collapsedToGrid),
   '3D must not collapse to a 2D skip-k racetrack');
 
+const tSeq = plan(grid164, { surveyType: '3d', progression: 'low-high', numSwaths: 2 });
+assert(tSeq.nVisit === 164, '3D sequential must visit all 164');
+assert(tSeq.stats && tSeq.stats.mode === 'swath-blocks',
+  '3D sequential must use swath-blocks, got ' + (tSeq.stats && tSeq.stats.mode));
+assert(Math.abs(tSeq.ranks[1] - tSeq.ranks[0]) === 1,
+  '3D sequential swath must progress adjacent, hop=' + Math.abs(tSeq.ranks[1] - tSeq.ranks[0]));
+const seqFirst = tSeq.ranks.slice(0, 82);
+assert(seqFirst.every((r) => r < 82) || seqFirst.every((r) => r >= 82),
+  '3D sequential must finish one adjacent-line swath before the next');
+
+const gSize4 = Math.ceil(164 / 4);
+const tPer = plan(grid164, { surveyType: '3d', progression: 'auto', numSwaths: 4 });
+assert(tPer.nVisit === 164, '3D Auto per-swath must visit all 164');
+assert(tPer.stats && tPer.stats.mode === 'swath-blocks',
+  '3D Auto must use swath-blocks, got ' + (tPer.stats && tPer.stats.mode));
+assert(Math.abs(tPer.ranks[1] - tPer.ranks[0]) === 1,
+  '3D Auto swath must progress adjacent, hop=' + Math.abs(tPer.ranks[1] - tPer.ranks[0]));
+const perFirst = tPer.ranks.slice(0, gSize4);
+assert(perFirst.every((r) => r < gSize4),
+  '3D Auto must start in swath 1, first=' + perFirst.slice(0, 6).join(','));
+assert(tPer.ranks[gSize4] === gSize4 || tPer.ranks[gSize4] === gSize4 * 2 - 1,
+  '3D Auto must acquire the next neighbouring swath (0 then 1), next=' + tPer.ranks[gSize4]);
+
+const t4 = plan(grid164, { surveyType: '3d', progression: 'interleaved', numSwaths: 4 });
+assert(t4.nVisit === 164, '4-swath 3D must visit all 164');
+assert(Math.abs(t4.ranks[1] - t4.ranks[0]) === 1,
+  '4-swath 3D must progress adjacent in the swath, hop=' + Math.abs(t4.ranks[1] - t4.ranks[0]));
+const t4first = t4.ranks.slice(0, gSize4);
+assert(t4first.every((r) => r < gSize4),
+  '4-swath interleaved must start in adjacent swath 1, first=' + t4first.slice(0, 6).join(','));
+assert(t4.ranks[gSize4] === gSize4 * 2 || t4.ranks[gSize4] === gSize4 * 3 - 1,
+  '4-swath interleaved must skip the neighbouring swath (0 then 2), next=' + t4.ranks[gSize4]);
+
+const tWE = plan(grid164, { surveyType: '3d', progression: 'west-east', numSwaths: 2 });
+assert(tWE.nVisit === 164, '3D west-east must visit all 164');
+assert(tWE.stats && tWE.stats.mode === 'swath-blocks',
+  '3D compass plan must respect adjacent-line swaths, got ' + (tWE.stats && tWE.stats.mode));
+assert(Math.abs(tWE.ranks[1] - tWE.ranks[0]) === 1,
+  '3D west-east swath must progress adjacent, hop=' + Math.abs(tWE.ranks[1] - tWE.ranks[0]));
+
+const tW = plan(makeGrid(40), {
+  surveyType: '3d',
+  progression: 'interleaved',
+  numSwaths: 2,
+  swathUnit: 'lines',
+  swathRawValue: 8,
+});
+assert(tW.nVisit === 40, '8-line swath width must still visit all 40');
+assert(Math.abs(tW.ranks[1] - tW.ranks[0]) === 1,
+  'width-in-lines swath must be adjacent, hop=' + Math.abs(tW.ranks[1] - tW.ranks[0]));
+assert(tW.ranks.slice(0, 8).join(',') === '0,1,2,3,4,5,6,7' ||
+  tW.ranks.slice(0, 8).join(',') === '7,6,5,4,3,2,1,0',
+  '8-line swath must be the first 8 adjacent lines, got ' + tW.ranks.slice(0, 8).join(','));
+assert(tW.ranks[8] === 16 || tW.ranks[8] === 23,
+  '8-line interleaved must skip the neighbouring 8-line swath, next=' + tW.ranks[8]);
+
 // Line Manager 1-100: high-priority lines acquired first, still a racetrack within the bucket.
 vm.runInContext(`
   state.lineStatus[0].priority = 1;
@@ -403,8 +528,8 @@ assert(src.includes('min="1" max="100"'), 'Line Manager UI 1-100 missing');
 
 console.log(JSON.stringify({
   ok: true,
-  cache: '17.23',
-  rule: '2D skip-k racetrack; 3D swath blocks with one heading per swath',
+  cache: '17.27',
+  rule: '2D skip-k; 3D acquire per swath (adjacent monopass, stadium returns)',
   kNom,
   nn: { visit: nn.nVisit, mode: nn.stats.mode, ms: nn.ms },
   auto12: { first: auto12.skip.first, mean: +auto12.skip.mean.toFixed(2), mode: auto12.stats.mode },
