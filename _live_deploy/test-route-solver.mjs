@@ -107,7 +107,7 @@ vm.runInContext(`
   else { const _t = showToast; showToast = function(){}; }
 `, ctx);
 
-assert(/app\.js\?v=17\.25/.test(html), 'app.js cache bump 17.25 missing');
+assert(/app\.js\?v=17\.26/.test(html), 'app.js cache bump 17.26 missing');
 assert(/id="val-turn-radius">3\.5km/.test(html), 'toolbar RADIUS default must be 3.5km not 5.1');
 assert(/id="input-turn-radius" value="3500"/.test(html), 'turn-radius input default must be 3500 m');
 assert(!/value="5100"/.test(html), 'HTML must not default min turn radius to 5100');
@@ -130,6 +130,9 @@ assert(!src.includes('state.settings.lineSpacing = sw;'),
   'restored swath width must not overwrite line spacing');
 assert(src.includes('function _sliceAdjacentSwaths'), '3D swaths must be contiguous adjacent lines');
 assert(src.includes('function _swathVisitOrder'), '3D swath visit order helper missing');
+assert(src.includes('function insertMonopassStadiums'), 'same-heading 3D line-changes need stadium returns');
+assert(src.includes('every line in a swath uses that swath'), '3D heading lock comment missing');
+assert(!src.includes('function _swathRtCandidates'), '3D must not score skip-k racetracks inside a swath');
 assert(src.includes('constructor: \'adjacent-swaths\''), '3D stats must record adjacent-swaths');
 assert(!src.includes('Math.min(iters, 20000)'), 'planner must not accept a 20000-option search');
 assert(html.includes('skip-k racetrack'), 'chooser Auto must describe skip-k racetrack');
@@ -190,6 +193,7 @@ function setup(lines, extra) {
     state.settings.swathRawValue = ${extra.swathRawValue ?? 0};
     state.settings.swathWidth = ${extra.swathWidth ?? 0};
     state.settings.lineDirection2d = 'auto';
+    state.settings.swathDirections = ${JSON.stringify(extra.swathDirections || [])};
     state._optimizerStats = null;
   `, ctx);
 }
@@ -341,6 +345,12 @@ for (let i = 1; i < Math.min(headings.length, 82); i++) {
 assert(sameHead / 81 > 0.9,
   '3D first swath must be one heading, same-heading hops=' + sameHead);
 
+const stadiumN = vm.runInContext(`
+  (state._lastRoute || []).filter(w => w.type === 'monopassTurn' || w.type === 'monopassReturn').length
+`, ctx);
+assert(stadiumN >= 80,
+  '3D same-heading line-changes must insert stadium returns, n=' + stadiumN);
+
 const nameS1 = 'L' + (1000 + t3d.ranks[0]);
 const nameLast = 'L' + (1000 + t3d.ranks[t3d.ranks.length - 1]);
 const col = vm.runInContext(`
@@ -419,7 +429,7 @@ const gSize4 = Math.ceil(164 / 4);
 const t4first = t4.ranks.slice(0, gSize4);
 assert(t4first.every((r) => r < gSize4),
   '4-swath interleaved must start in adjacent swath 1, first=' + t4first.slice(0, 6).join(','));
-assert(t4.ranks[gSize4] === gSize4 * 2,
+assert(t4.ranks[gSize4] === gSize4 * 2 || t4.ranks[gSize4] === gSize4 * 3 - 1,
   '4-swath interleaved must skip the neighbouring swath (0 then 2), next=' + t4.ranks[gSize4]);
 
 const tWE = plan(grid164, { surveyType: '3d', progression: 'west-east', numSwaths: 2 });
@@ -439,9 +449,10 @@ const tW = plan(makeGrid(40), {
 assert(tW.nVisit === 40, '8-line swath width must still visit all 40');
 assert(Math.abs(tW.ranks[1] - tW.ranks[0]) === 1,
   'width-in-lines swath must be adjacent, hop=' + Math.abs(tW.ranks[1] - tW.ranks[0]));
-assert(tW.ranks.slice(0, 8).join(',') === '0,1,2,3,4,5,6,7',
+assert(tW.ranks.slice(0, 8).join(',') === '0,1,2,3,4,5,6,7' ||
+  tW.ranks.slice(0, 8).join(',') === '7,6,5,4,3,2,1,0',
   '8-line swath must be the first 8 adjacent lines, got ' + tW.ranks.slice(0, 8).join(','));
-assert(tW.ranks[8] === 16,
+assert(tW.ranks[8] === 16 || tW.ranks[8] === 23,
   '8-line interleaved must skip the neighbouring 8-line swath, next=' + tW.ranks[8]);
 
 // Line Manager 1-100: high-priority lines acquired first, still a racetrack within the bucket.
@@ -456,8 +467,8 @@ assert(src.includes('min="1" max="100"'), 'Line Manager UI 1-100 missing');
 
 console.log(JSON.stringify({
   ok: true,
-  cache: '17.25',
-  rule: '2D skip-k racetrack; 3D adjacent-line swath blocks for every plan',
+  cache: '17.26',
+  rule: '2D skip-k racetrack; 3D adjacent-line monopass swath blocks, stadium returns',
   kNom,
   nn: { visit: nn.nVisit, mode: nn.stats.mode, ms: nn.ms },
   auto12: { first: auto12.skip.first, mean: +auto12.skip.mean.toFixed(2), mode: auto12.stats.mode },

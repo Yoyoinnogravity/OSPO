@@ -12312,6 +12312,16 @@ function buildTransitTimeModel(lines) {
  function transitTimeSec(aIdx, aRev, bIdx, bRev) {
  const A = aRev ? cfg[aIdx].rev : cfg[aIdx].fwd;
  const B = bRev ? cfg[bIdx].rev : cfg[bIdx].fwd;
+ let dth = A.th - B.th;
+ dth = Math.atan2(Math.sin(dth), Math.cos(dth));
+ const dx = B.entry[0] - A.exit[0];
+ const dy = B.entry[1] - A.exit[1];
+ const chord = Math.sqrt(dx * dx + dy * dy);
+ // Same heading + a long sail-back is a stadium (two 180s + parallel return),
+ // not the short Dubins chord that scribbles across the preplot.
+ if (Math.abs(dth) < 25 * Math.PI / 180 && chord > 4 * R) {
+  return (chord + 2 * Math.PI * R) / turnSpeedMs;
+ }
  const distM = dubinsPathLengthM(A.exit[0], A.exit[1], A.th, B.entry[0], B.entry[1], B.th, R);
  return distM / turnSpeedMs;
  }
@@ -12593,16 +12603,34 @@ function _orderSkipStd(ord, spatial) {
  return Math.sqrt(skips.reduce((a, b) => a + (b - mean) * (b - mean), 0) / skips.length);
 }
 
+function _seqTransitCost(seq, transitTimeSec) {
+ let c = 0;
+ for (let i = 0; i < seq.length - 1; i++) {
+  c += transitTimeSec(seq[i].lineIdx, seq[i].reversed, seq[i + 1].lineIdx, seq[i + 1].reversed);
+ }
+ return c;
+}
+
+function _monopassSwathSeq(idxs, reversed, visitFlip) {
+ const order = visitFlip ? idxs.slice().reverse() : idxs.slice();
+ return order.map(idx => ({ lineIdx: idx, reversed: !!reversed }));
+}
+
 // ===== 3D SWATH SHOOTING (as defined in Survey Criteria) =====
-// Number of swaths, swath progression, and per-swath Low→High / High→Low
-// are set in stone. Finish each swath as a block, progressive adjacent,
-// one heading for every line in that swath. Skip-k reverse is 2D only.
+// Constraints, set in stone:
+//  - a swath is a contiguous band of neighbouring sail lines
+//  - finish each swath as a block before the next
+//  - every line in a swath uses that swath's Low→High / High→Low heading
+// Fastest legal plan under those constraints: adjacent sequential inside
+// the swath (skip-k needs opposite headings). Remaining search is which
+// swath edge to start — heading never flips. Skip-k racetrack is 2D only.
 function planSwathBlockRacetracks(lines, swaths, transitTimeSec, opts) {
  opts = opts || {};
  const startIdx = opts.startIdx;
  const userStartLocked = !!opts.userStartLocked;
  const forceStartSwath = opts.forceStartSwath;
  const swathDirs = opts.swathDirs || [];
+ const target = Math.max(1, opts.targetOptions || (typeof getSequenceBudget === 'function' ? getSequenceBudget() : 1500));
 
  const active = [];
  for (let g = 0; g < swaths.length; g++) if (swaths[g] && swaths[g].length) active.push(g);
@@ -12618,29 +12646,83 @@ function planSwathBlockRacetracks(lines, swaths, transitTimeSec, opts) {
   orderG = orderG.slice(i).concat(orderG.slice(0, i));
  }
 
- const seq = [];
+ const lists = [];
  for (let n = 0; n < orderG.length; n++) {
   const g = orderG[n];
   const idxs = swaths[g].slice();
   const rev = (swathDirs[g] || 'low-high') === 'high-low';
-  let list = idxs;
-  if (userStartLocked && startIdx >= 0 && idxs.indexOf(startIdx) >= 0) {
-   const pos = idxs.indexOf(startIdx);
-   list = idxs.slice(pos).concat(idxs.slice(0, pos));
+  const lockedHere = userStartLocked && startIdx >= 0 && idxs.indexOf(startIdx) >= 0;
+  const flips = [];
+  if (lockedHere) {
+   if (idxs[0] === startIdx) flips.push(false);
+   else if (idxs[idxs.length - 1] === startIdx) flips.push(true);
+   else {
+    const pos = idxs.indexOf(startIdx);
+    flips.push(pos > (idxs.length - 1 - pos));
+   }
+  } else {
+   flips.push(false, true);
   }
-  for (let k = 0; k < list.length; k++) seq.push({ lineIdx: list[k], reversed: rev });
+  const cands = [];
+  const seen = new Set();
+  for (let f = 0; f < flips.length; f++) {
+   const seq = _monopassSwathSeq(idxs, rev, flips[f]);
+   const fp = _seqFingerprint(seq);
+   if (seen.has(fp)) continue;
+   seen.add(fp);
+   cands.push({ seq, cost: _seqTransitCost(seq, transitTimeSec) });
+  }
+  if (!cands.length) {
+   const seq = _monopassSwathSeq(idxs, rev, false);
+   cands.push({ seq, cost: _seqTransitCost(seq, transitTimeSec) });
+  }
+  lists.push(cands);
  }
 
- let cost = 0;
- for (let i = 0; i < seq.length - 1; i++) {
-  cost += transitTimeSec(seq[i].lineIdx, seq[i].reversed, seq[i + 1].lineIdx, seq[i + 1].reversed);
+ let best = null;
+ let nOpt = 0;
+ const rec = (gi, prefix, costSoFar) => {
+  if (nOpt >= target) return;
+  if (gi === lists.length) {
+   nOpt++;
+   if (!best || costSoFar < best.costSec - 0.5) {
+    best = { seq: prefix.slice(), costSec: costSoFar };
+   }
+   return;
+  }
+  const cands = lists[gi];
+  for (let i = 0; i < cands.length; i++) {
+   if (nOpt >= target) return;
+   const cand = cands[i];
+   let extra = cand.cost;
+   if (prefix.length && cand.seq.length) {
+    const a = prefix[prefix.length - 1];
+    const b = cand.seq[0];
+    extra += transitTimeSec(a.lineIdx, a.reversed, b.lineIdx, b.reversed);
+   }
+   rec(gi + 1, prefix.concat(cand.seq), costSoFar + extra);
+  }
+ };
+ rec(0, [], 0);
+
+ if (!best || !best.seq.length) {
+  const seq = [];
+  for (let n = 0; n < orderG.length; n++) {
+   const g = orderG[n];
+   const idxs = swaths[g] || [];
+   const rev = (swathDirs[g] || 'low-high') === 'high-low';
+   for (let k = 0; k < idxs.length; k++) seq.push({ lineIdx: idxs[k], reversed: rev });
+  }
+  best = { seq, costSec: _seqTransitCost(seq, transitTimeSec) };
+  nOpt = Math.max(1, nOpt);
  }
+
  return {
-  seq: seq.map(o => ({ lineIdx: o.lineIdx, reversed: !!o.reversed })),
-  costSec: cost,
+  seq: best.seq.map(o => ({ lineIdx: o.lineIdx, reversed: !!o.reversed })),
+  costSec: best.costSec,
   skipK: null,
   collapsedToGrid: false,
-  optionsEvaluated: 1
+  optionsEvaluated: Math.max(1, nOpt)
  };
 }
 
@@ -12868,7 +12950,7 @@ function computeRoute() {
  }
 
  // 3D: every plan (interleaved, sequential, compass, Auto) finishes adjacent-
- // line swaths as blocks. Skip-k racetrack is 2D only.
+ // line swaths as blocks, one heading per swath. Skip-k racetrack is 2D only.
  if (state.settings.surveyType === '3d' && !swathRacetrackFilled) {
  const bandIdx = _sortLineIdxForSwaths(lines, progression, lineNumKey, midpoints);
  const swaths = _sliceAdjacentSwaths(bandIdx, lines, { numSwaths: state.settings.numSwaths || 2 });
@@ -13614,7 +13696,7 @@ function computeRoute() {
  // transit time - silently ignoring priorities. Stable regroup here:
  // preserves the planner'order within each priority group, and a
  // user-locked start line / start point stays first.
- if (order.length > 1 && priorities.some(p =>p !== 50)) {
+ if (order.length > 1 && !swathRacetrackFilled && priorities.some(p =>p !== 50)) {
  const before = order.map(o =>o.lineIdx).join(',');
  const firstEntry = order[0];
  const regrouped = order.slice().sort((a, b) =>priorities[a.lineIdx] - priorities[b.lineIdx]);
@@ -13697,7 +13779,7 @@ function computeRoute() {
  }
 
  // Build waypoints from order, with obstruction avoidance
- const waypoints = [];
+ let waypoints = [];
  const { runIn, runOut } = state.settings;
  state.skippedRanges = [];
 
@@ -13831,6 +13913,8 @@ function computeRoute() {
  }
  });
 
+ waypoints = insertMonopassStadiums(waypoints);
+
  // Post-process: route transit segments around obstructions too.
  // Transit must avoid exclusion zones on BOTH the straight chord AND the
  // Dubins turn that renderRoute draws (large R loops often clip a hazard
@@ -13894,6 +13978,49 @@ function computeRoute() {
 // subject to a minimum turn radius R. Path consists of arcs and straights.
 // No Bezier approximation - actual circular arcs computed geometrically.
 
+function _hdgDeltaDeg(a, b) {
+ let d = Math.abs(a - b) % 360;
+ if (d > 180) d = 360 - d;
+ return d;
+}
+
+// Same-heading 3D line-change: 180 at run-out, parallel return at 2R outside
+// the remaining lines, 180 onto the next run-in. Without these waypoints
+// Dubins draws a diagonal CSC across the preplot.
+function insertMonopassStadiums(waypoints) {
+ if (!waypoints || waypoints.length < 4) return waypoints;
+ const R = (typeof getEffectiveTurnRadius === 'function') ? getEffectiveTurnRadius() : 3500;
+ if (!(R > 0)) return waypoints;
+ const out = [];
+ for (let i = 0; i < waypoints.length; i++) {
+  out.push(waypoints[i]);
+  if (i >= waypoints.length - 1) continue;
+  const a = waypoints[i], b = waypoints[i + 1];
+  const aIsExit = a.type === 'runOutEnd' || a.type === 'lineEnd';
+  const bIsEntry = b.type === 'runInStart' || b.type === 'lineStart';
+  if (!aIsExit || !bIsEntry) continue;
+  if (a.lineName && b.lineName && a.lineName === b.lineName) continue;
+  const hdgExit = (i > 0) ? bearing(waypoints[i - 1].pt, a.pt) : bearing(a.pt, b.pt);
+  let hdgEntry = bearing(a.pt, b.pt);
+  if (i + 2 < waypoints.length) hdgEntry = bearing(b.pt, waypoints[i + 2].pt);
+  if (_hdgDeltaDeg(hdgExit, hdgEntry) > 30) continue;
+  const midLat = (a.pt[0] + b.pt[0]) / 2;
+  const mLat = 111320;
+  const mLon = 111320 * Math.cos(midLat * Math.PI / 180);
+  const dx = (b.pt[1] - a.pt[1]) * mLon;
+  const dy = (b.pt[0] - a.pt[0]) * mLat;
+  const th = (90 - hdgExit) * Math.PI / 180;
+  const along = dx * Math.cos(th) + dy * Math.sin(th);
+  if (Math.abs(along) < 4 * R) continue;
+  const portLat = dx * (-Math.sin(th)) + dy * Math.cos(th);
+  const offsetBrng = (portLat > 0 ? (hdgExit + 90) : (hdgExit + 270)) % 360;
+  const retHdg = (hdgExit + 180) % 360;
+  out.push({ type: 'monopassTurn', pt: destinationPoint(a.pt, offsetBrng, 2 * R), lineName: '', hdg: retHdg });
+  out.push({ type: 'monopassReturn', pt: destinationPoint(b.pt, offsetBrng, 2 * R), lineName: '', hdg: retHdg });
+ }
+ return out;
+}
+
 function computeArcTurn(waypoints, i) {
  const a = waypoints[i], b = waypoints[i + 1];
  const dist = haversine(a.pt, b.pt);
@@ -13902,11 +14029,13 @@ function computeArcTurn(waypoints, i) {
  // Use configured turn radius - vessel cannot turn tighter than this
  const R = getEffectiveTurnRadius(); // metres
 
- // Determine headings (in degrees, clockwise from north)
- let hdg1 = bearing(a.pt, b.pt); // fallback
- if (i > 0) hdg1 = bearing(waypoints[i - 1].pt, a.pt);
- let hdg2 = bearing(a.pt, b.pt); // fallback
- if (i + 2 < waypoints.length) hdg2 = bearing(b.pt, waypoints[i + 2].pt);
+ // Determine headings (in degrees, clockwise from north). Explicit waypoint
+ // headings win so stadium returns stay parallel instead of inheriting the
+ // 2R offset chord.
+ let hdg1 = (a.hdg != null && isFinite(a.hdg)) ? a.hdg : bearing(a.pt, b.pt);
+ if (!(a.hdg != null && isFinite(a.hdg)) && i > 0) hdg1 = bearing(waypoints[i - 1].pt, a.pt);
+ let hdg2 = (b.hdg != null && isFinite(b.hdg)) ? b.hdg : bearing(a.pt, b.pt);
+ if (!(b.hdg != null && isFinite(b.hdg)) && i + 2 < waypoints.length) hdg2 = bearing(b.pt, waypoints[i + 2].pt);
 
  // Convert to local XY (metres) centered on midpoint
  const midLat = (a.pt[0] + b.pt[0]) / 2;
