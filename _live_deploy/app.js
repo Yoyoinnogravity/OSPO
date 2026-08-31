@@ -5008,6 +5008,7 @@ function askSurveyCriteria({ zone, hemi }, callback) {
  <div class="panel-row" style="margin-bottom:10px;">
  <label style="width:140px; color:#ffffff;">Swath Progression</label>
  <select id="crit-progression" style="flex:1;padding:5px 8px;border-radius:4px;border:1px solid #222222;background:#111111;color:#ffffff;font-size:13px;outline:none;cursor:pointer;">
+ <option value="auto" ${(state.settings.progression || 'low-high') === 'auto' ? 'selected' : ''}>Auto — fastest per-swath tour</option>
  <option value="low-high" ${(state.settings.progression || 'low-high') === 'low-high' ? 'selected' : ''}>Acquire per swath (Low → High)</option>
  <option value="high-low" ${state.settings.progression === 'high-low' ? 'selected' : ''}>Acquire per swath (High → Low)</option>
  <option value="interleaved" ${state.settings.progression === 'interleaved' ? 'selected' : ''}>Interleaved (skip neighbouring swath)</option>
@@ -10801,8 +10802,11 @@ function applyConfirmedSurveyPlanType(type) {
    state.settings.optimizerMode = state.settings.optimizerMode || 'deep';
   }
  } else {
-  if (prog === 'auto' || prog === 'auto-nn') {
-   prog = 'low-high';
+  // 3D Auto stays Auto: still swath shooting (adjacent blocks, locked heading),
+  // but the solver is free to pick the fastest swath-block order.
+  if (prog === 'auto-nn') {
+   prog = 'auto';
+   state.settings.optimizerMode = 'nn';
   }
  }
  state.settings.progression = prog;
@@ -10842,7 +10846,7 @@ function _syncStartPlanSelectForSurveyType() {
  if (autoOpt) {
   autoOpt.textContent = noSwath
    ? 'Auto - skip-k racetrack (1500 sequences, keep the fastest)'
-   : 'Auto - acquire per swath (adjacent lines, finish each swath)';
+   : 'Auto - acquire per swath (fastest legal block tour)';
  }
  const swathOnly = new Set(['interleaved', 'interleaved-reverse']);
  Array.from(planSel.options).forEach(opt => {
@@ -10919,7 +10923,7 @@ function _applyChooserPlanSettings() {
    state.settings.progression = val;
    if (val === 'auto') {
     state.settings.optimizerMode = 'deep';
-    if ((state.settings.surveyType || '3d') === '3d') state.settings.progression = 'low-high';
+    // 3D Auto stays 'auto': computeRoute runs per-swath shooting (never 2D skip-k).
    }
    // Choosing interleaved implies 3D swath planning
    if (val === 'interleaved' || val === 'interleaved-reverse') {
@@ -12219,7 +12223,7 @@ function executePlanRoute() {
  if (os.collapsedToGrid) {
   showToast(`Fastest of ${nOpt} sequences (skip-k racetrack k=${k} on the full grid; 3D swaths stay as map bands): ${h} h total`, 8000);
  } else {
-  showToast(`3D plan: ${nOpt} adjacent-line swath sequence(s), one direction per swath: ${h} h total`, 8000);
+  showToast(`3D swath shooting: fastest of ${nOpt} legal block tour(s), one heading per swath: ${h} h total`, 8000);
  }
  } else if (os && (os.optionsEvaluated > 0 || os.mode === 'fastest-of-n')) {
  const nOpt = os.optionsEvaluated || os.iterations || 0;
@@ -12635,9 +12639,35 @@ function _monopassSwathSeq(idxs, reversed, visitFlip) {
 //  - a swath is a contiguous band of neighbouring sail lines
 //  - finish each swath as a block before the next
 //  - every line in a swath uses that swath's Low→High / High→Low heading
-// Fastest legal plan under those constraints: adjacent sequential inside
-// the swath (skip-k needs opposite headings). Remaining search is which
-// swath edge to start — heading never flips. Skip-k racetrack is 2D only.
+// Fastest legal plan: adjacent sequential inside the swath (skip-k needs
+// opposite headings). Auto searches every swath-block order + start edge
+// (exact DP, nSwaths <= 10). Explicit Low→High / interleaved keep their
+// visit order and only search start edges. Skip-k racetrack is 2D only.
+function _swathOrientations(idxs, headingRev, startIdx, userStartLocked) {
+ const flips = [];
+ const lockedHere = userStartLocked && startIdx >= 0 && idxs.indexOf(startIdx) >= 0;
+ if (lockedHere) {
+  if (idxs[0] === startIdx) flips.push(false);
+  else if (idxs[idxs.length - 1] === startIdx) flips.push(true);
+  else flips.push(idxs.indexOf(startIdx) > (idxs.length - 1 - idxs.indexOf(startIdx)));
+ } else {
+  flips.push(false, true);
+ }
+ const cands = [];
+ const seen = new Set();
+ for (let f = 0; f < flips.length; f++) {
+  // Heading is the swath's Survey Criteria direction on every line.
+  // Never mix Low→High and High→Low inside one swath.
+  const seq = _monopassSwathSeq(idxs, headingRev, flips[f]);
+  const fp = _seqFingerprint(seq);
+  if (seen.has(fp)) continue;
+  seen.add(fp);
+  cands.push(seq);
+ }
+ if (!cands.length) cands.push(_monopassSwathSeq(idxs, headingRev, false));
+ return cands;
+}
+
 function planSwathBlockRacetracks(lines, swaths, transitTimeSec, opts) {
  opts = opts || {};
  const startIdx = opts.startIdx;
@@ -12645,6 +12675,8 @@ function planSwathBlockRacetracks(lines, swaths, transitTimeSec, opts) {
  const forceStartSwath = opts.forceStartSwath;
  const swathDirs = opts.swathDirs || [];
  const target = Math.max(1, opts.targetOptions || (typeof getSequenceBudget === 'function' ? getSequenceBudget() : 1500));
+ const depotSec = typeof opts.depotSec === 'function' ? opts.depotSec : () => 0;
+ const searchSwathOrder = !!opts.searchSwathOrder;
 
  const active = [];
  for (let g = 0; g < swaths.length; g++) if (swaths[g] && swaths[g].length) active.push(g);
@@ -12655,69 +12687,139 @@ function planSwathBlockRacetracks(lines, swaths, transitTimeSec, opts) {
  } else {
   orderG = active.slice();
  }
- if (forceStartSwath >= 0 && orderG.indexOf(forceStartSwath) >= 0) {
+ if (!searchSwathOrder && forceStartSwath >= 0 && orderG.indexOf(forceStartSwath) >= 0) {
   const i = orderG.indexOf(forceStartSwath);
   orderG = orderG.slice(i).concat(orderG.slice(0, i));
  }
 
- const lists = [];
- for (let n = 0; n < orderG.length; n++) {
-  const g = orderG[n];
+ const orientsOf = (g) => {
   const idxs = swaths[g].slice();
-  const rev = (swathDirs[g] || 'low-high') === 'high-low';
-  const lockedHere = userStartLocked && startIdx >= 0 && idxs.indexOf(startIdx) >= 0;
-  const flips = [];
-  if (lockedHere) {
-   if (idxs[0] === startIdx) flips.push(false);
-   else if (idxs[idxs.length - 1] === startIdx) flips.push(true);
-   else {
-    const pos = idxs.indexOf(startIdx);
-    flips.push(pos > (idxs.length - 1 - pos));
+  const headingRev = (swathDirs[g] || 'low-high') === 'high-low';
+  const seqs = _swathOrientations(idxs, headingRev, startIdx, userStartLocked);
+  return seqs.map(seq => ({
+   seq,
+   cost: _seqTransitCost(seq, transitTimeSec),
+   first: seq[0],
+   last: seq[seq.length - 1]
+  }));
+ };
+
+ const joinCost = (a, b) => {
+  if (!a || !b) return 0;
+  return transitTimeSec(a.lineIdx, a.reversed, b.lineIdx, b.reversed);
+ };
+
+ const considerChain = (candsPerSwath) => {
+  let best = null;
+  let nOpt = 0;
+  const rec = (gi, prefix, costSoFar) => {
+   if (nOpt >= target) return;
+   if (gi === candsPerSwath.length) {
+    nOpt++;
+    if (!best || costSoFar < best.costSec - 0.5) {
+     best = { seq: prefix.slice(), costSec: costSoFar };
+    }
+    return;
    }
-  } else {
-   flips.push(false, true);
-  }
-  const cands = [];
-  const seen = new Set();
-  for (let f = 0; f < flips.length; f++) {
-   const seq = _monopassSwathSeq(idxs, rev, flips[f]);
-   const fp = _seqFingerprint(seq);
-   if (seen.has(fp)) continue;
-   seen.add(fp);
-   cands.push({ seq, cost: _seqTransitCost(seq, transitTimeSec) });
-  }
-  if (!cands.length) {
-   const seq = _monopassSwathSeq(idxs, rev, false);
-   cands.push({ seq, cost: _seqTransitCost(seq, transitTimeSec) });
-  }
-  lists.push(cands);
- }
+   const cands = candsPerSwath[gi];
+   for (let i = 0; i < cands.length; i++) {
+    if (nOpt >= target) return;
+    const cand = cands[i];
+    let extra = cand.cost;
+    if (!prefix.length) extra += depotSec(cand.first.lineIdx, cand.first.reversed);
+    else extra += joinCost(prefix[prefix.length - 1], cand.first);
+    rec(gi + 1, prefix.concat(cand.seq), costSoFar + extra);
+   }
+  };
+  rec(0, [], 0);
+  return { best, nOpt };
+ };
 
  let best = null;
  let nOpt = 0;
- const rec = (gi, prefix, costSoFar) => {
-  if (nOpt >= target) return;
-  if (gi === lists.length) {
-   nOpt++;
-   if (!best || costSoFar < best.costSec - 0.5) {
-    best = { seq: prefix.slice(), costSec: costSoFar };
+ let solver = 'swath-blocks';
+
+ if (!searchSwathOrder || active.length <= 1) {
+  const lists = orderG.map(g => orientsOf(g));
+  const chain = considerChain(lists);
+  best = chain.best;
+  nOpt = chain.nOpt;
+  solver = 'swath-blocks';
+ } else {
+  // Exact DP over swath blocks. nSwaths is 2–10; 2^n · n · orients is tiny.
+  // This is the fastest legal 3D tour under the per-swath / locked-heading rules,
+  // not a 1500-option sample.
+  const n = active.length;
+  const orients = active.map(g => orientsOf(g));
+  const nOri = orients.map(o => o.length);
+  const INF = 1e18;
+  const size = 1 << n;
+  const dp = new Array(size);
+  const parent = new Array(size);
+  for (let m = 0; m < size; m++) {
+   dp[m] = new Array(n);
+   parent[m] = new Array(n);
+   for (let g = 0; g < n; g++) {
+    dp[m][g] = new Array(nOri[g]).fill(INF);
+    parent[m][g] = new Array(nOri[g]).fill(null);
    }
-   return;
   }
-  const cands = lists[gi];
-  for (let i = 0; i < cands.length; i++) {
-   if (nOpt >= target) return;
-   const cand = cands[i];
-   let extra = cand.cost;
-   if (prefix.length && cand.seq.length) {
-    const a = prefix[prefix.length - 1];
-    const b = cand.seq[0];
-    extra += transitTimeSec(a.lineIdx, a.reversed, b.lineIdx, b.reversed);
+  for (let g = 0; g < n; g++) {
+   if (forceStartSwath >= 0 && active[g] !== forceStartSwath) continue;
+   if (userStartLocked && startIdx >= 0 && swaths[active[g]].indexOf(startIdx) < 0) continue;
+   for (let o = 0; o < orients[g].length; o++) {
+    const cand = orients[g][o];
+    dp[1 << g][g][o] = cand.cost + depotSec(cand.first.lineIdx, cand.first.reversed);
+    nOpt++;
    }
-   rec(gi + 1, prefix.concat(cand.seq), costSoFar + extra);
   }
- };
- rec(0, [], 0);
+  for (let mask = 0; mask < size; mask++) {
+   for (let g = 0; g < n; g++) {
+    if (!(mask & (1 << g))) continue;
+    for (let o = 0; o < orients[g].length; o++) {
+     const cur = dp[mask][g][o];
+     if (cur >= INF / 2) continue;
+     const last = orients[g][o].last;
+     for (let h = 0; h < n; h++) {
+      if (mask & (1 << h)) continue;
+      const nmask = mask | (1 << h);
+      for (let p = 0; p < orients[h].length; p++) {
+       const cand = orients[h][p];
+       const tot = cur + cand.cost + joinCost(last, cand.first);
+       nOpt++;
+       if (tot < dp[nmask][h][p] - 0.5) {
+        dp[nmask][h][p] = tot;
+        parent[nmask][h][p] = [mask, g, o];
+       }
+      }
+     }
+    }
+   }
+  }
+  const full = size - 1;
+  let bestC = INF, bg = 0, bo = 0;
+  for (let g = 0; g < n; g++) {
+   for (let o = 0; o < orients[g].length; o++) {
+    if (dp[full][g][o] < bestC) { bestC = dp[full][g][o]; bg = g; bo = o; }
+   }
+  }
+  if (bestC < INF / 2) {
+   const parts = [];
+   let mask = full, g = bg, o = bo;
+   while (mask) {
+    parts.push(orients[g][o].seq);
+    const p = parent[mask][g][o];
+    if (!p) break;
+    mask = p[0]; g = p[1]; o = p[2];
+   }
+   parts.reverse();
+   const seq = [];
+   for (let i = 0; i < parts.length; i++) seq.push.apply(seq, parts[i]);
+   best = { seq, costSec: bestC };
+  }
+  solver = 'swath-dp';
+  nOpt = Math.min(target, Math.max(1, nOpt));
+ }
 
  if (!best || !best.seq.length) {
   const seq = [];
@@ -12727,7 +12829,8 @@ function planSwathBlockRacetracks(lines, swaths, transitTimeSec, opts) {
    const rev = (swathDirs[g] || 'low-high') === 'high-low';
    for (let k = 0; k < idxs.length; k++) seq.push({ lineIdx: idxs[k], reversed: rev });
   }
-  best = { seq, costSec: _seqTransitCost(seq, transitTimeSec) };
+  const cost = _seqTransitCost(seq, transitTimeSec) + (seq.length ? depotSec(seq[0].lineIdx, seq[0].reversed) : 0);
+  best = { seq, costSec: cost };
   nOpt = Math.max(1, nOpt);
  }
 
@@ -12736,7 +12839,8 @@ function planSwathBlockRacetracks(lines, swaths, transitTimeSec, opts) {
   costSec: best.costSec,
   skipK: null,
   collapsedToGrid: false,
-  optionsEvaluated: Math.max(1, nOpt)
+  solver,
+  optionsEvaluated: Math.max(1, Math.min(target, nOpt))
  };
 }
 
@@ -12874,9 +12978,12 @@ function computeRoute() {
  ]);
 
  // 3D: adjacent-line swath blocks for every plan. Skip-k Auto is 2D-only.
- // 3D Auto acquires per swath in band order (finish each swath, then the next).
+ // 3D Auto is still swath shooting: finish each neighbouring-line swath as a
+ // block, one Survey Criteria heading per swath, stadium line-changes.
  let progression = state.settings.progression || (state.settings.surveyType === '3d' ? 'low-high' : 'auto');
- if (state.settings.surveyType === '3d' && (progression === 'auto' || progression === 'auto-nn')) {
+ const is3dAuto = state.settings.surveyType === '3d' &&
+  (progression === 'auto' || progression === 'auto-nn');
+ if (is3dAuto) {
  progression = 'low-high';
  }
  const order = []; // [{ lineIdx, reversed }]
@@ -12976,7 +13083,7 @@ function computeRoute() {
   for (let g = 0; g < swaths.length; g++) {
    if (swaths[g].indexOf(startFilteredIdx) >= 0) { forceStartSwath = g; break; }
   }
- } else if (state.settings.startPoint) {
+ } else if (state.settings.startPoint && !is3dAuto) {
   let bestD = Infinity, bestG = -1;
   for (let g = 0; g < swaths.length; g++) {
    if (!swaths[g].length) continue;
@@ -12998,14 +13105,22 @@ function computeRoute() {
 
  const swDirsPlan = (state.settings.swathDirections || []);
  const model3d = buildTransitTimeModel(lines);
+ const depotPt3d = (!startLineObj && state.settings.startPoint) ? state.settings.startPoint : null;
+ const depotSec3d = (lineIdx, reversed) => {
+  if (!depotPt3d || !lines[lineIdx]) return 0;
+  const L = lines[lineIdx];
+  const entry = reversed ? L.end : L.start;
+  return haversine(depotPt3d, entry) / model3d.turnSpeedMs;
+ };
  const opt3dStart = Date.now();
  const opt = planSwathBlockRacetracks(lines, swaths, model3d.transitTimeSec, {
   targetOptions: getSequenceBudget(),
   startIdx: startFilteredIdx,
-  startRev: startReversed,
   userStartLocked: !!startLineObj,
   forceStartSwath,
   swathOrder,
+  searchSwathOrder: is3dAuto && state.settings.optimizerMode !== 'nn',
+  depotSec: depotSec3d,
   swathDirs: swaths.map((_, g) => swDirsPlan[g] || defaultSwathDirection(g))
  });
 
@@ -13022,7 +13137,7 @@ function computeRoute() {
   const nOpt = opt.optionsEvaluated || 1;
   state._optimizerStats = {
    mode: 'swath-blocks',
-   solver: 'swath-blocks',
+   solver: opt.solver || 'swath-blocks',
    constructor: 'adjacent-swaths',
    skipK: opt.skipK,
    collapsedToGrid: false,
@@ -15247,7 +15362,7 @@ function showPlanningOverlay(show) {
  ov.innerHTML = `<div id="planning-card">
  ${_vesselLoaderHTML()}
  <h3>Planning Route...</h3>
- <p>Skip-k racetrack: scoring 1500 sequences, keep the fastest, then stop. 3D shoots each swath in one set direction.</p>
+ <p>2D: 1500 skip-k sequences, keep the fastest. 3D: swath shooting — adjacent lines, one heading per swath, stadium returns.</p>
  </div>`;
  document.getElementById('main').appendChild(ov);
  }
