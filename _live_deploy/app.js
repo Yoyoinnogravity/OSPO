@@ -12088,7 +12088,7 @@ function executePlanRoute() {
  if (os.collapsedToGrid) {
   showToast(`Fastest of ${nOpt} sequences (skip-k racetrack k=${k} on the full grid; 3D swaths stay as map bands): ${h} h total`, 8000);
  } else {
-  showToast(`Fastest of ${nOpt} shooting sequences (3D skip-k per swath, k=${k}): ${h} h total`, 8000);
+  showToast(`Fastest of ${nOpt} shooting sequences (3D swath blocks, one direction per swath): ${h} h total`, 8000);
  }
  } else if (os && (os.optionsEvaluated > 0 || os.mode === 'fastest-of-n')) {
  const nOpt = os.optionsEvaluated || os.iterations || 0;
@@ -12476,35 +12476,22 @@ function _orderSkipStd(ord, spatial) {
  return Math.sqrt(skips.reduce((a, b) => a + (b - mean) * (b - mean), 0) / skips.length);
 }
 
-// ===== 3D PROGRESSIVE-SWATH INTERLEAVE OPTIMIZER =====
-// On 3D swath shooting each new line MUST be acquired adjacent to the last
-// line acquired on that swath (progressive infill). Interleaving swaths at
-// LINE level (0, n/2, 1, n/2+1) is what drew the 164-line orange hairball:
-// every hop crosses the prospect. Finish each swath as a BLOCK, then move
-// to the next swath. Freedom: swath visit order, and Low→High vs High→Low
-// within a swath (still adjacent). Skip-k inside a 3D swath is forbidden.
-/** 3D: skip-k racetrack inside each swath (alternate headings), then the next
- *  swath. Adjacent same-heading is a sail-back after every line — that is the
- *  164-line orange hairball (50/50 on-line vs line-change). */
+// ===== 3D PROGRESSIVE-SWATH BLOCKS =====
+// Finish each swath as a block. Every line in a swath uses that swath's
+// set direction (Low→High or High→Low). No opposite headings on a swath.
+// Skip-k racetrack (alternate headings) is 2D only.
 function planSwathBlockRacetracks(lines, swaths, transitTimeSec, opts) {
  opts = opts || {};
  const targetOptions = Math.max(1, Math.min(opts.targetOptions || getSequenceBudget(), OSPO_SEQUENCE_CAP));
- const R = getEffectiveTurnRadius();
  const startIdx = opts.startIdx;
- const startRev = !!opts.startRev;
  const userStartLocked = !!opts.userStartLocked;
  const forceStartSwath = opts.forceStartSwath;
- let shootSwaths = swaths;
- let collapsedToGrid = false;
- if (!_swathsHoldSkipK(shootSwaths, lines, R) && shootSwaths.length > 1) {
-  shootSwaths = _oneShootingSwath(shootSwaths);
-  collapsedToGrid = true;
- }
+ const swathDirs = opts.swathDirs || [];
  let evaluated = 0;
  let best = null;
  const seen = new Set();
 
- function consider(seq, skipK) {
+ function consider(seq) {
   if (!seq || !seq.length) return;
   if (evaluated >= targetOptions) return;
   const fp = _seqFingerprint(seq);
@@ -12519,119 +12506,72 @@ function planSwathBlockRacetracks(lines, swaths, transitTimeSec, opts) {
    best = {
     seq: seq.map(o => ({ lineIdx: o.lineIdx, reversed: !!o.reversed })),
     costSec: cost,
-    skipK: skipK || null
+    skipK: null,
+    collapsedToGrid: false
    };
   }
  }
 
- function mapSubset(idxs, localOrd) {
-  return localOrd.map(o => ({ lineIdx: idxs[o.lineIdx], reversed: !!o.reversed }));
+ function pinDir(g) {
+  return (swathDirs[g] || 'low-high') === 'high-low';
  }
 
  function variantsFor(g) {
-  const idxs = shootSwaths[g];
+  const idxs = swaths[g];
   const out = [];
   if (!idxs || !idxs.length) return out;
-  const subset = idxs.map(i => lines[i]);
-  const spacingM = _medianLineSpacingM(subset);
-  const kNom = Math.max(1, Math.min(_racetrackSkipK(spacingM, R), subset.length));
-  const ks = [];
-  for (const k of _kAroundNom(kNom, subset.length)) {
-   ks.push(k);
-   // 4 corners per k; 2-swath cartesian × 2 orders ≈ 32 k². Grow k until
-   // that reaches the 1500-sequence budget (SurvOPT-style: score N, stop).
-   const nVar = ks.length * 4;
-   if (nVar * nVar * 2 >= (opts.targetOptions || 1500)) break;
-   if (ks.length >= subset.length) break;
+  const rev = pinDir(g);
+  function pack(list) {
+   return list.map(lineIdx => ({ lineIdx, reversed: rev }));
   }
-  const startLocal = (userStartLocked && startIdx >= 0) ? idxs.indexOf(startIdx) : -1;
-  for (const k of ks) {
-   if (startLocal >= 0) {
-    const spatial = _spatialLineOrder(subset);
-    for (const preferDir of [null, 1, -1]) {
-     out.push({
-      k,
-      ord: mapSubset(idxs, buildRacetrackOrderFrom(subset, k, startLocal, startRev, spatial, preferDir))
-     });
-    }
-   } else {
-    for (const startAtHigh of [false, true]) {
-     for (const firstReversed of [false, true]) {
-      out.push({
-       k,
-       ord: mapSubset(idxs, buildRacetrackOrder(subset, k, { startAtHigh, firstReversed }))
-      });
-     }
-    }
-   }
+  const lock = userStartLocked && startIdx >= 0 && idxs.indexOf(startIdx) >= 0;
+  if (lock) {
+   const pos = idxs.indexOf(startIdx);
+   out.push({ ord: pack(idxs.slice(pos).concat(idxs.slice(0, pos))) });
+   const back = idxs.slice(0, pos + 1).reverse().concat(idxs.slice(pos + 1).reverse());
+   out.push({ ord: pack(back) });
+  } else {
+   out.push({ ord: pack(idxs) });
+   out.push({ ord: pack(idxs.slice().reverse()) });
   }
   return out;
  }
 
- const nSw = shootSwaths.length;
  const active = [];
- for (let g = 0; g < nSw; g++) if (shootSwaths[g] && shootSwaths[g].length) active.push(g);
+ for (let g = 0; g < swaths.length; g++) if (swaths[g] && swaths[g].length) active.push(g);
  const byG = {};
  for (let i = 0; i < active.length; i++) byG[active[i]] = variantsFor(active[i]);
 
- const swOrders = [];
- if (forceStartSwath >= 0 && active.indexOf(forceStartSwath) >= 0) {
-  const rest = active.filter(g => g !== forceStartSwath);
-  swOrders.push([forceStartSwath].concat(rest));
-  swOrders.push([forceStartSwath].concat(rest.slice().reverse()));
- } else {
-  swOrders.push(active.slice());
-  swOrders.push(active.slice().reverse());
- }
-
- const nActive = active.length;
- if (nActive <= 2) {
-  for (const so of swOrders) {
-   if (evaluated >= targetOptions) break;
-   const lists = so.map(g => byG[g] || []);
-   function walk(i, acc, kLast) {
+ function walkRemaining(remaining, acc) {
+  if (evaluated >= targetOptions) return;
+  if (!remaining.length) {
+   consider(acc);
+   return;
+  }
+  for (let i = 0; i < remaining.length; i++) {
+   if (evaluated >= targetOptions) return;
+   const g = remaining[i];
+   const rest = remaining.slice(0, i).concat(remaining.slice(i + 1));
+   const vars = byG[g] || [];
+   for (let v = 0; v < vars.length; v++) {
     if (evaluated >= targetOptions) return;
-    if (i >= lists.length) { consider(acc, kLast); return; }
-    for (let v = 0; v < lists[i].length; v++) {
-     if (evaluated >= targetOptions) return;
-     walk(i + 1, acc.concat(lists[i][v].ord), lists[i][v].k);
-    }
+    walkRemaining(rest, acc.concat(vars[v].ord));
    }
-   walk(0, [], null);
-  }
- } else {
-  const bestG = {};
-  for (const g of active) {
-   let b = null;
-   const list = byG[g] || [];
-   for (let v = 0; v < list.length; v++) {
-    const ord = list[v].ord;
-    let c = 0;
-    for (let i = 0; i < ord.length - 1; i++) {
-     c += transitTimeSec(ord[i].lineIdx, ord[i].reversed, ord[i + 1].lineIdx, ord[i + 1].reversed);
-    }
-    evaluated++;
-    if (!b || c < b.cost - 0.5) b = { ord, k: list[v].k, cost: c };
-   }
-   bestG[g] = b;
-  }
-  for (const so of swOrders) {
-   const seq = [];
-   let k0 = null;
-   for (const g of so) {
-    if (bestG[g]) {
-     seq.push.apply(seq, bestG[g].ord);
-     if (k0 == null) k0 = bestG[g].k;
-    }
-   }
-   consider(seq, k0);
   }
  }
 
- if (best) {
-  best.optionsEvaluated = evaluated;
-  best.collapsedToGrid = collapsedToGrid;
+ if (forceStartSwath >= 0 && active.indexOf(forceStartSwath) >= 0) {
+  const firstVars = byG[forceStartSwath] || [];
+  const rest = active.filter(g => g !== forceStartSwath);
+  for (let v = 0; v < firstVars.length; v++) {
+   if (evaluated >= targetOptions) break;
+   walkRemaining(rest, firstVars[v].ord);
+  }
+ } else {
+  walkRemaining(active, []);
  }
+
+ if (best) best.optionsEvaluated = evaluated;
  return best;
 }
 
@@ -12869,8 +12809,8 @@ function computeRoute() {
  }
 
  // Banding only: Swath 1 = lowest line numbers. Visit order inside a
- // swath is skip-k racetrack (alternate headings). Adjacent same-heading
- // was a sail-back after every line — the orange hairball.
+ // swath is progressive adjacent. Every line uses that swath's set
+ // Low→High or High→Low heading — never opposite directions on a swath.
  if (progression === 'interleaved-reverse') swaths.forEach(s => s.reverse());
 
  let forceStartSwath = -1;
@@ -12893,6 +12833,7 @@ function computeRoute() {
   forceStartSwath = bestG;
  }
 
+ const swDirsPlan = (state.settings.swathDirections || []);
  const model3d = buildTransitTimeModel(lines);
  const opt3dStart = Date.now();
  const opt = planSwathBlockRacetracks(lines, swaths, model3d.transitTimeSec, {
@@ -12900,7 +12841,8 @@ function computeRoute() {
   startIdx: startFilteredIdx,
   startRev: startReversed,
   userStartLocked: !!startLineObj,
-  forceStartSwath
+  forceStartSwath,
+  swathDirs: swaths.map((_, g) => swDirsPlan[g] || defaultSwathDirection(g))
  });
 
  const blockSeq = [];
@@ -12996,9 +12938,8 @@ function computeRoute() {
  firstDirLocked = true;
  }
 
- // Build the order. Skip when 3D already filled `order` with skip-k
- // racetrack headings — pinning every line to the swath Low/High SP
- // heading is the sail-back hairball.
+ // Build the order. Skip when 3D already filled `order` with per-swath
+ // headings. Do not re-pin here (that would shuffle a finished block).
  if (!swathRacetrackFilled) {
  for (let k = 0; k < indices.length; k++) {
  const idx = indices[k];
@@ -15098,7 +15039,7 @@ function showPlanningOverlay(show) {
  ov.innerHTML = `<div id="planning-card">
  ${_vesselLoaderHTML()}
  <h3>Planning Route...</h3>
- <p>Skip-k racetrack: scoring 1500 sequences, keep the fastest, then stop. 3D does this per swath.</p>
+ <p>Skip-k racetrack: scoring 1500 sequences, keep the fastest, then stop. 3D shoots each swath in one set direction.</p>
  </div>`;
  document.getElementById('main').appendChild(ov);
  }

@@ -107,7 +107,7 @@ vm.runInContext(`
   else { const _t = showToast; showToast = function(){}; }
 `, ctx);
 
-assert(/app\.js\?v=17\.21/.test(html), 'app.js cache bump 17.21 missing');
+assert(/app\.js\?v=17\.22/.test(html), 'app.js cache bump 17.22 missing');
 assert(/id="val-turn-radius">3\.5km/.test(html), 'toolbar RADIUS default must be 3.5km not 5.1');
 assert(/id="input-turn-radius" value="3500"/.test(html), 'turn-radius input default must be 3500 m');
 assert(!/value="5100"/.test(html), 'HTML must not default min turn radius to 5100');
@@ -291,24 +291,20 @@ const t3d = plan(grid164, { surveyType: '3d', progression: 'interleaved', numSwa
 assert(t3d.nVisit === 164, '3D must visit all 164, got ' + t3d.nVisit);
 assert(t3d.stats && t3d.stats.mode === 'swath-blocks',
   '3D mode should be swath-blocks, got ' + (t3d.stats && t3d.stats.mode));
-const zig = t3d.ranks[0] === 0 && t3d.ranks[1] === 82 && t3d.ranks[2] === 1 && t3d.ranks[3] === 83;
-assert(!zig, '3D must not zigzag 0,82,1,83 (line-level swath interleave)');
+assert(!(t3d.ranks[0] === 0 && t3d.ranks[1] === 82 && t3d.ranks[2] === 1 && t3d.ranks[3] === 83),
+  '3D must not zigzag 0,82,1,83 (line-level swath interleave)');
 const first82 = t3d.ranks.slice(0, 82);
 const swathLo = first82.every((r) => r < 82);
 const swathHi = first82.every((r) => r >= 82);
 assert(swathLo || swathHi,
   '3D must finish one swath before the other, first8=' + first82.slice(0, 8).join(','));
-assert(!(t3d.ranks[0] === 0 && t3d.ranks[1] === 1 && t3d.ranks[2] === 2),
-  '3D must not crawl adjacent 0,1,2 inside a swath (same-heading sail-back)');
-const inSwath = skipStats(first82);
-assert(Math.abs(inSwath.mode - kNom) <= 8,
-  `3D within-swath skip mode ${inSwath.mode} not near k=${kNom}`);
-assert(inSwath.modeFrac > 0.55,
-  `3D within-swath only ${(inSwath.modeFrac * 100).toFixed(1)}% skip-${inSwath.mode}; racetrack should dominate`);
-assert(t3d.stats.optionsEvaluated >= 1000,
-  '3D Auto must score toward 1500 sequences, got ' + t3d.stats.optionsEvaluated);
+const hop3 = Math.abs(t3d.ranks[1] - t3d.ranks[0]);
+assert(hop3 === 1,
+  '3D within a swath must progress adjacent (fixed heading), hop=' + hop3);
+assert(t3d.stats.optionsEvaluated >= 1,
+  '3D must score at least one sequence, got ' + t3d.stats.optionsEvaluated);
 assert(t3d.stats.optionsEvaluated <= 1500,
-  '3D Auto must stop at 1500, got ' + t3d.stats.optionsEvaluated);
+  '3D must stop at 1500, got ' + t3d.stats.optionsEvaluated);
 
 const headings = vm.runInContext(`
   (function() {
@@ -332,8 +328,8 @@ let sameHead = 0;
 for (let i = 1; i < Math.min(headings.length, 82); i++) {
   if (headings[i] === headings[i - 1]) sameHead++;
 }
-assert(sameHead / 81 < 0.25,
-  '3D first swath headings must alternate (racetrack), same-heading hops=' + sameHead);
+assert(sameHead / 81 > 0.9,
+  '3D first swath must be one heading, same-heading hops=' + sameHead);
 
 const nameS1 = 'L' + (1000 + t3d.ranks[0]);
 const nameLast = 'L' + (1000 + t3d.ranks[t3d.ranks.length - 1]);
@@ -384,17 +380,16 @@ assert(tLive.nVisit === 164, '667m 3D must visit all 164');
 const liveFirst = tLive.ranks.slice(0, 82);
 assert(liveFirst.every((r) => r < 82) || liveFirst.every((r) => r >= 82),
   '667m 3D must stay in one swath for the first 82 visits');
-assert(!(tLive.ranks[0] === 0 && tLive.ranks[1] === 1),
-  '667m 3D must not adjacent-crawl (k ≈ 2R/667 ≈ 10)');
+assert(Math.abs(tLive.ranks[1] - tLive.ranks[0]) === 1,
+  '667m 3D must progress adjacent in the swath, hop=' + Math.abs(tLive.ranks[1] - tLive.ranks[0]));
 
 const tight = makeGrid(164, 66.7, 38500);
 const tTight = plan(tight, { surveyType: '3d', progression: 'interleaved', numSwaths: 3, turnRadius: 3500 });
 assert(tTight.nVisit === 164, '66.7m 3D must visit all 164');
-const hopTight = Math.abs(tTight.ranks[1] - tTight.ranks[0]);
-assert(hopTight >= 40,
-  '66.7m / 3.5km R must skip ~2R (k≈105), not adjacent, hop=' + hopTight);
-assert(tTight.stats && tTight.stats.collapsedToGrid,
-  'narrow 3-swath 3D must shoot skip-k on the full grid');
+assert(Math.abs(tTight.ranks[1] - tTight.ranks[0]) === 1,
+  '66.7m 3D must keep one heading and progress adjacent, hop=' + Math.abs(tTight.ranks[1] - tTight.ranks[0]));
+assert(!(tTight.stats && tTight.stats.collapsedToGrid),
+  '3D must not collapse to a 2D skip-k racetrack');
 
 // Line Manager 1-100: high-priority lines acquired first, still a racetrack within the bucket.
 vm.runInContext(`
@@ -408,8 +403,8 @@ assert(src.includes('min="1" max="100"'), 'Line Manager UI 1-100 missing');
 
 console.log(JSON.stringify({
   ok: true,
-  cache: '17.21',
-  rule: 'skip-k racetrack from a corner; 3D skip-k per swath only when 2R fits',
+  cache: '17.22',
+  rule: '2D skip-k racetrack; 3D swath blocks with one heading per swath',
   kNom,
   nn: { visit: nn.nVisit, mode: nn.stats.mode, ms: nn.ms },
   auto12: { first: auto12.skip.first, mean: +auto12.skip.mean.toFixed(2), mode: auto12.stats.mode },
@@ -429,11 +424,9 @@ console.log(JSON.stringify({
   },
   t3d: {
     first8: t3d.ranks.slice(0, 8),
-    inSwathMode: inSwath.mode,
-    inSwathModeFrac: +inSwath.modeFrac.toFixed(3),
+    hop: Math.abs(t3d.ranks[1] - t3d.ranks[0]),
     sameHeadHops: sameHead,
     mode: t3d.stats.mode,
-    skipK: t3d.stats.skipK,
     options: t3d.stats.optionsEvaluated,
     ms: t3d.ms,
   },
