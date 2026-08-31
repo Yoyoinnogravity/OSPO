@@ -300,6 +300,9 @@ assert(t2d.stats.optionsEvaluated >= 1000,
   '2D Auto must score toward 1500 sequences, got ' + t2d.stats.optionsEvaluated);
 assert(t2d.stats.optionsEvaluated <= 1500,
   '2D Auto must stop at 1500, got ' + t2d.stats.optionsEvaluated);
+const stad2d = vm.runInContext(
+  `(state._lastRoute || []).filter(w => w.type === 'monopassTurn').length`, ctx);
+assert(stad2d === 0, '2D skip-k must not insert monopass stadiums, n=' + stad2d);
 
 const t3d = plan(grid164, { surveyType: '3d', progression: 'interleaved', numSwaths: 2 });
 assert(t3d.nVisit === 164, '3D must visit all 164, got ' + t3d.nVisit);
@@ -350,6 +353,49 @@ const stadiumN = vm.runInContext(`
 `, ctx);
 assert(stadiumN >= 80,
   '3D same-heading line-changes must insert stadium returns, n=' + stadiumN);
+const stadGeom = vm.runInContext(`
+  (function() {
+    const w = state._lastRoute || [];
+    const R = getEffectiveTurnRadius();
+    let i = -1;
+    for (let k = 0; k < w.length; k++) if (w[k].type === 'monopassTurn') { i = k; break; }
+    if (i < 1 || i + 2 >= w.length) return { ok: false };
+    const a = w[i - 1], turn = w[i], ret = w[i + 1], b = w[i + 2];
+    const exitHdg = (i >= 2) ? bearing(w[i - 2].pt, a.pt) : bearing(a.pt, turn.pt);
+    const retHdg = bearing(turn.pt, ret.pt);
+    let dh = Math.abs(retHdg - ((exitHdg + 180) % 360));
+    if (dh > 180) dh = 360 - dh;
+    return {
+      ok: true,
+      d1: haversine(a.pt, turn.pt),
+      d2: haversine(ret.pt, b.pt),
+      R,
+      dh,
+      retKm: haversine(turn.pt, ret.pt) / 1000
+    };
+  })()
+`, ctx);
+assert(stadGeom.ok, 'stadium waypoint pair missing after first line');
+assert(Math.abs(stadGeom.d1 - 2 * stadGeom.R) < 80,
+  'stadium offset from run-out should be 2R, d=' + stadGeom.d1);
+assert(Math.abs(stadGeom.d2 - 2 * stadGeom.R) < 80,
+  'stadium offset onto run-in should be 2R, d=' + stadGeom.d2);
+assert(stadGeom.dh < 15, 'stadium return must be opposite the shot heading, dh=' + stadGeom.dh);
+assert(stadGeom.retKm > 15, 'stadium return must sail the line back, km=' + stadGeom.retKm);
+const stadArc = vm.runInContext(`
+  (function() {
+    const w = state._lastRoute || [];
+    const i = w.findIndex(x => x.type === 'monopassTurn');
+    if (i < 0 || i + 1 >= w.length) return { ok: false };
+    const arc = computeArcTurn(w, i);
+    let d = 0;
+    for (let k = 1; k < arc.length; k++) d += haversine(arc[k - 1], arc[k]);
+    const chord = haversine(w[i].pt, w[i + 1].pt);
+    return { ok: true, ratio: d / Math.max(chord, 1) };
+  })()
+`, ctx);
+assert(stadArc.ok && stadArc.ratio < 1.08,
+  'stadium return must draw as a parallel sail-back, ratio=' + (stadArc && stadArc.ratio));
 
 const nameS1 = 'L' + (1000 + t3d.ranks[0]);
 const nameLast = 'L' + (1000 + t3d.ranks[t3d.ranks.length - 1]);

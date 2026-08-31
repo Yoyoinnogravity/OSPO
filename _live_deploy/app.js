@@ -12866,6 +12866,7 @@ function computeRoute() {
  progression = 'interleaved';
  }
  const order = []; // [{ lineIdx, reversed }]
+ let swathRacetrackFilled = false;
 
  // Get priority for each line from lineStatus, on the 1-100 scale where 1 is
  // acquired FIRST, 100 LAST and 50 = Neutral (default / legacy unset).
@@ -12881,7 +12882,6 @@ function computeRoute() {
  // Build sorted index list
  const indices = lines.map((_, i) =>i);
  let interleaveOptimized = false; // set when the 3D interleave optimizer placed the start itself
- let swathRacetrackFilled = false;
 
  // Acquisition direction (SP direction) for each line, derived from its
  // swath'Low'High / High'Low setting. 'low-high' = acquire low SP -> high SP
