@@ -4791,7 +4791,7 @@ function askSurveyCriteria({ zone, hemi }, callback) {
  state.settings.swathUnit = saved.swathUnit || state.settings.swathUnit || 'm';
  state.settings.numSwaths = saved.numSwaths || state.settings.numSwaths || 2;
  state.settings.surveyType = saved.surveyType || state.settings.surveyType || '3d';
- state.settings.progression = saved.progression || state.settings.progression || (state.settings.surveyType === '3d' ? 'interleaved' : 'auto');
+ state.settings.progression = saved.progression || state.settings.progression || (state.settings.surveyType === '3d' ? 'low-high' : 'auto');
  state.settings.progression2d = saved.progression2d || state.settings.progression2d || 'auto';
  state.settings.swathDirections = saved.swathDirections || state.settings.swathDirections || [];
  state.settings.utmZone = saved.utmZone || state.settings.utmZone || 31;
@@ -5008,10 +5008,10 @@ function askSurveyCriteria({ zone, hemi }, callback) {
  <div class="panel-row" style="margin-bottom:10px;">
  <label style="width:140px; color:#ffffff;">Swath Progression</label>
  <select id="crit-progression" style="flex:1;padding:5px 8px;border-radius:4px;border:1px solid #222222;background:#111111;color:#ffffff;font-size:13px;outline:none;cursor:pointer;">
- <option value="interleaved" ${(state.settings.progression || 'interleaved') === 'interleaved' ? 'selected' : ''}>Interleaved (adjacent lines, skip neighbouring swath)</option>
- <option value="interleaved-reverse" ${state.settings.progression === 'interleaved-reverse' ? 'selected' : ''}>Interleaved High→Low (adjacent lines)</option>
- <option value="low-high" ${state.settings.progression === 'low-high' ? 'selected' : ''}>Sequential Low→High (adjacent-line swaths)</option>
- <option value="high-low" ${state.settings.progression === 'high-low' ? 'selected' : ''}>Sequential High→Low (adjacent-line swaths)</option>
+ <option value="low-high" ${(state.settings.progression || 'low-high') === 'low-high' ? 'selected' : ''}>Acquire per swath (Low → High)</option>
+ <option value="high-low" ${state.settings.progression === 'high-low' ? 'selected' : ''}>Acquire per swath (High → Low)</option>
+ <option value="interleaved" ${state.settings.progression === 'interleaved' ? 'selected' : ''}>Interleaved (skip neighbouring swath)</option>
+ <option value="interleaved-reverse" ${state.settings.progression === 'interleaved-reverse' ? 'selected' : ''}>Interleaved High→Low (skip neighbouring swath)</option>
  </select>
  </div>
  <div class="panel-row" style="margin-bottom:10px;">
@@ -8160,14 +8160,14 @@ function _sliceAdjacentSwaths(sortedIdx, lines, opts) {
  return groups;
 }
 
-// Order in which adjacent-line swaths are acquired. Interleaved skips the
-// neighbouring swath (0,2,4… then 1,3,5…) so coverage overlaps; sequential
-// and compass plans still finish each adjacent bundle before the next.
+// Order in which adjacent-line swaths are acquired. Default / Auto / sequential
+// acquire per swath in band order (0,1,2…). Interleaved is opt-in and skips
+// the neighbouring swath (0,2,4… then 1,3,5…).
 function _swathVisitOrder(nSw, progression) {
  const seq = [];
  for (let i = 0; i < nSw; i++) seq.push(i);
  if (nSw < 2) return seq;
- if (progression === 'interleaved' || progression === 'auto') {
+ if (progression === 'interleaved') {
   return seq.filter(i => i % 2 === 0).concat(seq.filter(i => i % 2 === 1));
  }
  if (progression === 'interleaved-reverse') {
@@ -8273,7 +8273,7 @@ function renderSwathOverlays() {
  const s = state.settings;
  if ((s.surveyType || '3d') !== '3d') return;
  const numSwaths = s.numSwaths || 1;
- const progression = s.progression || 'interleaved';
+ const progression = s.progression || 'low-high';
  const groups = _computeSwathGroups(numSwaths, progression);
  if (groups.length < 1) return;
  const swathDirections = s.swathDirections || [];
@@ -10740,7 +10740,7 @@ function confirmSurveyPlanTypeThen(continueFn) {
  <input type="radio" name="survey-plan-type" value="3d"${current === '3d' ? ' checked' : ''} style="margin-top:3px;accent-color:#fbbf24;" />
  <span>
  <span style="display:block;color:#e2e8f0;font-size:13px;font-weight:700;">3D</span>
- <span style="display:block;color:#94a3b8;font-size:10px;line-height:1.35;margin-top:2px;">Multi-streamer swath plan - progressive / interleaved coverage.</span>
+ <span style="display:block;color:#94a3b8;font-size:10px;line-height:1.35;margin-top:2px;">Multi-streamer swath plan - acquire each adjacent-line swath as a block, then the next.</span>
  </span>
  </label>
  <label style="display:flex;gap:10px;align-items:flex-start;padding:12px 14px;margin-bottom:16px;border-radius:8px;border:1px solid ${current === 'obn' ? '#f59e0b' : '#1e293b'};background:${current === 'obn' ? 'rgba(66,32,6,0.4)' : '#111'};cursor:pointer;">
@@ -10793,7 +10793,7 @@ function applyConfirmedSurveyPlanType(type) {
  const is2d = type === '2d';
  const isObn = type === 'obn';
  state.settings.surveyType = isObn ? 'obn' : (is2d ? '2d' : '3d');
- let prog = state.settings.progression || ((is2d || isObn) ? 'auto' : 'interleaved');
+ let prog = state.settings.progression || ((is2d || isObn) ? 'auto' : 'low-high');
  if (is2d || isObn) {
   // Swath-interleave strategies are 3D-only - force a 2D/OBN-safe progression.
   if (prog === 'interleaved' || prog === 'interleaved-reverse') {
@@ -10802,6 +10802,7 @@ function applyConfirmedSurveyPlanType(type) {
   }
  } else {
   if (prog === 'auto' || prog === 'auto-nn') {
+   prog = 'low-high';
   }
  }
  state.settings.progression = prog;
@@ -10815,7 +10816,7 @@ function applyConfirmedSurveyPlanType(type) {
   ? 'Route plan locked to OBN - source sail lines (no streamer swaths)'
   : is2d
   ? 'Route plan locked to 2D - any direction (no swath interleave)'
-  : 'Route plan locked to 3D - adjacent-line swaths', 4000);
+  : 'Route plan locked to 3D - acquire per swath', 4000);
 }
 
  /** Show/hide start-plan options that only apply to 3D swath surveys. */
@@ -10831,12 +10832,18 @@ function _syncStartPlanSelectForSurveyType() {
    ? 'Plan type: OBN - source sail lines'
    : is2d
    ? 'Plan type: 2D - any direction'
-   : 'Plan type: 3D - swath plan';
+   : 'Plan type: 3D - acquire per swath';
   banner.style.borderColor = isObn ? '#92400e' : is2d ? '#155e75' : '#92400e';
   banner.style.color = isObn ? '#fbbf24' : is2d ? '#67e8f9' : '#fbbf24';
   banner.style.background = isObn ? 'rgba(66,32,6,0.4)' : is2d ? 'rgba(8,47,73,0.45)' : 'rgba(66,32,6,0.35)';
  }
  if (!planSel) return;
+ const autoOpt = Array.from(planSel.options).find(o => o.value === 'auto');
+ if (autoOpt) {
+  autoOpt.textContent = noSwath
+   ? 'Auto - skip-k racetrack (1500 sequences, keep the fastest)'
+   : 'Auto - acquire per swath (adjacent lines, finish each swath)';
+ }
  const swathOnly = new Set(['interleaved', 'interleaved-reverse']);
  Array.from(planSel.options).forEach(opt => {
   if (swathOnly.has(opt.value)) {
@@ -10850,6 +10857,10 @@ function _syncStartPlanSelectForSurveyType() {
  // If current value is a hidden 3D swath option while in 2D, snap to auto
  if (is2d && swathOnly.has(planSel.value)) {
   planSel.value = 'auto';
+ }
+ const budgetNote = document.getElementById('start-plan-budget-note');
+ if (budgetNote) {
+  budgetNote.style.display = noSwath ? '' : 'none';
  }
 }
 
@@ -10876,12 +10887,12 @@ function showStartLineChooser() {
  const planSel = document.getElementById('start-plan-select');
  if (planSel) {
  const prog = state.settings.progression ||
- (state.settings.surveyType === '3d' ? 'interleaved' : 'auto');
+ (state.settings.surveyType === '3d' ? 'low-high' : 'auto');
  const desired = (prog === 'auto' && state.settings.optimizerMode === 'nn') ? 'auto-nn' : prog;
  if ([...planSel.options].some(o => o.value === desired && !o.disabled && !o.hidden)) {
   planSel.value = desired;
  } else {
-  planSel.value = (state.settings.surveyType === '3d') ? 'interleaved' : 'auto';
+  planSel.value = (state.settings.surveyType === '3d') ? 'low-high' : 'auto';
  }
  }
  state.settings.optimizerIterations = getSequenceBudget();
@@ -10906,7 +10917,10 @@ function _applyChooserPlanSettings() {
    state.settings.optimizerMode = 'nn';
   } else {
    state.settings.progression = val;
-   if (val === 'auto') state.settings.optimizerMode = 'deep';
+   if (val === 'auto') {
+    state.settings.optimizerMode = 'deep';
+    if ((state.settings.surveyType || '3d') === '3d') state.settings.progression = 'low-high';
+   }
    // Choosing interleaved implies 3D swath planning
    if (val === 'interleaved' || val === 'interleaved-reverse') {
     state.settings.surveyType = '3d';
@@ -12860,10 +12874,10 @@ function computeRoute() {
  ]);
 
  // 3D: adjacent-line swath blocks for every plan. Skip-k Auto is 2D-only.
- // 3D Auto is remapped to interleaved swath order (still adjacent within).
- let progression = state.settings.progression || (state.settings.surveyType === '3d' ? 'interleaved' : 'auto');
- if (state.settings.surveyType === '3d' && progression === 'auto') {
- progression = 'interleaved';
+ // 3D Auto acquires per swath in band order (finish each swath, then the next).
+ let progression = state.settings.progression || (state.settings.surveyType === '3d' ? 'low-high' : 'auto');
+ if (state.settings.surveyType === '3d' && (progression === 'auto' || progression === 'auto-nn')) {
+ progression = 'low-high';
  }
  const order = []; // [{ lineIdx, reversed }]
  let swathRacetrackFilled = false;

@@ -107,7 +107,7 @@ vm.runInContext(`
   else { const _t = showToast; showToast = function(){}; }
 `, ctx);
 
-assert(/app\.js\?v=17\.26/.test(html), 'app.js cache bump 17.26 missing');
+assert(/app\.js\?v=17\.27/.test(html), 'app.js cache bump 17.27 missing');
 assert(/id="val-turn-radius">3\.5km/.test(html), 'toolbar RADIUS default must be 3.5km not 5.1');
 assert(/id="input-turn-radius" value="3500"/.test(html), 'turn-radius input default must be 3500 m');
 assert(!/value="5100"/.test(html), 'HTML must not default min turn radius to 5100');
@@ -136,6 +136,9 @@ assert(!src.includes('function _swathRtCandidates'), '3D must not score skip-k r
 assert(src.includes('constructor: \'adjacent-swaths\''), '3D stats must record adjacent-swaths');
 assert(!src.includes('Math.min(iters, 20000)'), 'planner must not accept a 20000-option search');
 assert(html.includes('skip-k racetrack'), 'chooser Auto must describe skip-k racetrack');
+assert(html.includes('Acquire per swath'), 'chooser must offer acquire-per-swath plans');
+assert(src.includes("progression = 'low-high'"), '3D Auto must acquire per swath in band order');
+assert(src.includes('acquire each adjacent-line swath as a block'), '3D plan type must say acquire per swath');
 assert(!html.includes('fastest of 1500 options'), 'chooser must not advertise 1500-option TSP');
 assert(html.includes('simple nearest neighbour'), 'auto-nn must stay real NN');
 assert(src.includes('showLabels: false'), 'labels must default off');
@@ -467,11 +470,23 @@ const seqFirst = tSeq.ranks.slice(0, 82);
 assert(seqFirst.every((r) => r < 82) || seqFirst.every((r) => r >= 82),
   '3D sequential must finish one adjacent-line swath before the next');
 
+const gSize4 = Math.ceil(164 / 4);
+const tPer = plan(grid164, { surveyType: '3d', progression: 'auto', numSwaths: 4 });
+assert(tPer.nVisit === 164, '3D Auto per-swath must visit all 164');
+assert(tPer.stats && tPer.stats.mode === 'swath-blocks',
+  '3D Auto must use swath-blocks, got ' + (tPer.stats && tPer.stats.mode));
+assert(Math.abs(tPer.ranks[1] - tPer.ranks[0]) === 1,
+  '3D Auto swath must progress adjacent, hop=' + Math.abs(tPer.ranks[1] - tPer.ranks[0]));
+const perFirst = tPer.ranks.slice(0, gSize4);
+assert(perFirst.every((r) => r < gSize4),
+  '3D Auto must start in swath 1, first=' + perFirst.slice(0, 6).join(','));
+assert(tPer.ranks[gSize4] === gSize4 || tPer.ranks[gSize4] === gSize4 * 2 - 1,
+  '3D Auto must acquire the next neighbouring swath (0 then 1), next=' + tPer.ranks[gSize4]);
+
 const t4 = plan(grid164, { surveyType: '3d', progression: 'interleaved', numSwaths: 4 });
 assert(t4.nVisit === 164, '4-swath 3D must visit all 164');
 assert(Math.abs(t4.ranks[1] - t4.ranks[0]) === 1,
   '4-swath 3D must progress adjacent in the swath, hop=' + Math.abs(t4.ranks[1] - t4.ranks[0]));
-const gSize4 = Math.ceil(164 / 4);
 const t4first = t4.ranks.slice(0, gSize4);
 assert(t4first.every((r) => r < gSize4),
   '4-swath interleaved must start in adjacent swath 1, first=' + t4first.slice(0, 6).join(','));
@@ -513,8 +528,8 @@ assert(src.includes('min="1" max="100"'), 'Line Manager UI 1-100 missing');
 
 console.log(JSON.stringify({
   ok: true,
-  cache: '17.26',
-  rule: '2D skip-k racetrack; 3D adjacent-line monopass swath blocks, stadium returns',
+  cache: '17.27',
+  rule: '2D skip-k; 3D acquire per swath (adjacent monopass, stadium returns)',
   kNom,
   nn: { visit: nn.nVisit, mode: nn.stats.mode, ms: nn.ms },
   auto12: { first: auto12.skip.first, mean: +auto12.skip.mean.toFixed(2), mode: auto12.stats.mode },
