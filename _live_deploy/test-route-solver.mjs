@@ -132,10 +132,12 @@ assert(src.includes('showLabels: false'), 'labels must default off');
 assert(src.includes('lmSetPriority'), 'Line Manager priority setter missing');
 assert(src.includes('Math.max(1, Math.min(100, priorityNum))'), 'Line Manager 1-100 clamp missing');
 assert(src.includes('function _prioNorm'), 'priority normalizer missing');
-assert(src.includes('Band by line number only'),
+assert(src.includes('must NOT steal a line out of its neighbour band'),
   '3D interleaved must band swaths by line number, not Line Manager Priority');
 assert(!src.includes('Line priorities override swath interleave order'),
   '3D must not let Priority shred swath blocks');
+assert(!/interleaved-reverse'\) \{[\s\S]{0,450}if \(prioA !== prioB\) return prioA - prioB/.test(src),
+  '3D interleaved banding must not sort Priority before line number');
 assert(src.includes('first !== lo && first !== hi'), 'corner-start guard missing');
 assert(src.includes('swath-blocks'), '3D block-complete stats missing');
 assert(!src.includes('fillBudget:'), 'Family E every-rank fill must be gone');
