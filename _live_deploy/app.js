@@ -393,6 +393,11 @@ const state = {
  numStreamers: 6, // number of streamers
  streamerSeparation: 100, // metres between streamers
  swathWidth: 0, // metres (0 = auto-detect from line spacing)
+ numSwaths: 2,
+ swathCountUserSet: false, // true once the user picks a swath count; Auto must not clobber it
+ swathDirections: [],
+ swathUnit: 'm',
+ swathRawValue: 0,
  channelsPerStreamer: 480, // number of channels per streamer
  channelSpacing: 12.5, // channel spacing in metres
  numSources: 2, // number of sources
@@ -4708,10 +4713,60 @@ function _persistSwathDefaults(dirs) {
  if (blob) {
  const parsed = JSON.parse(blob) || {};
  parsed.swathDirections = dirs;
+ if (state.settings.numSwaths) parsed.numSwaths = state.settings.numSwaths;
  localStorage.setItem(userKey('survey_defaults'), JSON.stringify(parsed));
  }
  }
  } catch (e) {}
+}
+
+// Persist the user's swath election (count, whether they chose it, directions,
+// on/off) so a reload, login, or Survey Criteria Auto pass cannot throw it away.
+function _persistSwathElection() {
+ try {
+ const n = parseInt(state.settings.numSwaths, 10);
+ if (isFinite(n) && n >= 1) localStorage.setItem(userKey('default_num_swaths'), String(n));
+ localStorage.setItem(userKey('default_swath_count_user'), state.settings.swathCountUserSet ? '1' : '0');
+ if (Array.isArray(state.settings.swathDirections) && state.settings.swathDirections.length) {
+  _persistSwathDefaults(state.settings.swathDirections);
+ }
+ localStorage.setItem('candooka_show_swaths', state.showSwaths === false ? '0' : '1');
+ // Number of Swaths is the election; drop a leftover width so reload cannot
+ // regroup into Auto-derived bands.
+ if (state.settings.swathCountUserSet) {
+  try { localStorage.removeItem(userKey('default_swath')); } catch (_) {}
+ }
+ } catch (_) {}
+}
+
+function _restoreSwathElection() {
+ try {
+  const n = parseInt(localStorage.getItem(userKey('default_num_swaths')), 10);
+  if (isFinite(n) && n >= 2) state.settings.numSwaths = Math.max(2, Math.min(10, n));
+  const elected = localStorage.getItem(userKey('default_swath_count_user'));
+  if (elected === '1') state.settings.swathCountUserSet = true;
+  else if (elected === '0') state.settings.swathCountUserSet = false;
+  const dirs = localStorage.getItem(userKey('default_swath_directions'));
+  if (dirs) {
+   try {
+    const parsed = JSON.parse(dirs);
+    if (Array.isArray(parsed) && parsed.length) state.settings.swathDirections = parsed;
+   } catch (_) {}
+  }
+  const show = localStorage.getItem('candooka_show_swaths');
+  if (show === '0') state.showSwaths = false;
+  else if (show === '1') state.showSwaths = true;
+ } catch (_) {}
+ try {
+  if (typeof _syncSwathOnOffTabs === 'function') _syncSwathOnOffTabs();
+  if (typeof map !== 'undefined' && map && typeof layerSwaths !== 'undefined' && layerSwaths) {
+   if (state.showSwaths === false) {
+    if (map.hasLayer && map.hasLayer(layerSwaths)) map.removeLayer(layerSwaths);
+   } else if (map.hasLayer && !map.hasLayer(layerSwaths)) {
+    map.addLayer(layerSwaths);
+   }
+  }
+ } catch (_) {}
 }
 
 // Auto number of swaths (even, in pairs) derived from the survey when the Swath
@@ -4734,8 +4789,9 @@ function _refreshAutoSwathCount() {
  const swEl = document.getElementById('crit-swath');
  const nsEl = document.getElementById('crit-num-swaths');
  if (!swEl || !nsEl) return;
+ if (state.settings.swathCountUserSet || nsEl.dataset.userEdited === '1') return;
  const widthAuto = !(parseFloat(swEl.value) > 0);
- if (widthAuto && nsEl.dataset.userEdited !== '1') {
+ if (widthAuto) {
  nsEl.value = _autoEvenSwathCount();
  updateSwathDirectionUI();
  }
@@ -4763,6 +4819,16 @@ function updateSwathDirectionUI() {
  `;
  container.appendChild(div);
  }
+ container.querySelectorAll('.swath-dir-select').forEach(select => {
+  select.addEventListener('change', () => {
+   const dirs = [];
+   container.querySelectorAll('.swath-dir-select').forEach(s => {
+    dirs[parseInt(s.dataset.swath, 10)] = s.value;
+   });
+   state.settings.swathDirections = dirs;
+   _persistSwathElection();
+  });
+ });
 }
 
 // ===== CRITICAL SURVEY CRITERIA PROMPT =====
@@ -4780,11 +4846,15 @@ function askSurveyCriteria({ zone, hemi }, callback) {
  state.settings.runOut = state.settings.runOut ?? saved.runOut;
  state.settings.swathRawValue = saved.swathValue || state.settings.swathRawValue || 0;
  state.settings.swathUnit = saved.swathUnit || state.settings.swathUnit || 'm';
- state.settings.numSwaths = saved.numSwaths || state.settings.numSwaths || 2;
+ if (!state.settings.swathCountUserSet) {
+  state.settings.numSwaths = saved.numSwaths || state.settings.numSwaths || 2;
+ }
+ if (!(state.settings.swathDirections && state.settings.swathDirections.length)) {
+  state.settings.swathDirections = saved.swathDirections || [];
+ }
  state.settings.surveyType = saved.surveyType || state.settings.surveyType || '3d';
  state.settings.progression = saved.progression || state.settings.progression || (state.settings.surveyType === '3d' ? 'low-high' : 'auto');
  state.settings.progression2d = saved.progression2d || state.settings.progression2d || 'auto';
- state.settings.swathDirections = saved.swathDirections || state.settings.swathDirections || [];
  state.settings.utmZone = saved.utmZone || state.settings.utmZone || 31;
  state.settings.utmHemi = saved.utmHemi || state.settings.utmHemi || 'N';
  state.settings.numStreamers = Number(saved.numStreamers) || state.settings.numStreamers;
@@ -5356,9 +5426,13 @@ function askSurveyCriteria({ zone, hemi }, callback) {
  document.getElementById('crit-swath').addEventListener(ev, _refreshAutoSwathCount);
  document.getElementById('crit-swath-unit').addEventListener(ev, _refreshAutoSwathCount);
  });
- // Initialise: if the survey opened with Swath Width on Auto, fill the derived
- // even count now (only when the user has not previously fixed a count).
- if (state.settings.numSwaths == null) _refreshAutoSwathCount();
+ // Keep a user-elected swath count. Auto-fill only when they have not chosen N.
+ if (state.settings.swathCountUserSet) {
+  numSwathsEl.dataset.userEdited = '1';
+  numSwathsEl.value = String(state.settings.numSwaths || 2);
+ } else {
+  _refreshAutoSwathCount();
+ }
 
  document.getElementById('crit-submit-btn').onclick = () => {
  const z = parseInt(document.getElementById('crit-utm-zone').value);
@@ -5430,6 +5504,11 @@ function askSurveyCriteria({ zone, hemi }, callback) {
  state.settings.surveyType = surveyType;
  state.settings.numSwaths = numSwaths;
  state.settings.swathDirections = swathDirections;
+ const nsElConfirm = document.getElementById('crit-num-swaths');
+ if (nsElConfirm && nsElConfirm.dataset.userEdited === '1') {
+  state.settings.swathCountUserSet = true;
+ }
+ _persistSwathElection();
  if (surveyType === 'obn') {
   state.settings.obnNodeDx = parseFloat(document.getElementById('crit-obn-dx')?.value) || 400;
   state.settings.obnNodeDy = parseFloat(document.getElementById('crit-obn-dy')?.value) || 400;
@@ -5845,6 +5924,7 @@ function askSurveyCriteria({ zone, hemi }, callback) {
  swathValue: getFloat('crit-swath', 0),
  swathUnit: getVal('crit-swath-unit', 'm'),
  numSwaths: getInt('crit-num-swaths', 2),
+ swathCountUserSet: !!(state.settings.swathCountUserSet || (document.getElementById('crit-num-swaths') || {}).dataset.userEdited === '1'),
  surveyType: getVal('crit-survey-type', '3d'),
  progression: getVal('crit-progression', 'auto'),
  progression2d: getVal('crit-progression-2d', 'auto'),
@@ -5943,6 +6023,8 @@ function askSurveyCriteria({ zone, hemi }, callback) {
  localStorage.setItem(userKey('survey_defaults'), JSON.stringify(defaults));
  // Also save individual settings for startup loading
  localStorage.setItem(userKey('default_swath_directions'), JSON.stringify(defaults.swathDirections || []));
+ localStorage.setItem(userKey('default_num_swaths'), String(defaults.numSwaths || 2));
+ localStorage.setItem(userKey('default_swath_count_user'), defaults.swathCountUserSet ? '1' : '0');
  localStorage.setItem(userKey('default_prime_cost_mode'), defaults.primeCostMode || 'dayrate');
  localStorage.setItem(userKey('default_infill_cost_mode'), defaults.infillCostMode || 'dayrate');
  showToast('Current settings saved as defaults for all future sessions.');
@@ -5975,6 +6057,11 @@ function askSurveyCriteria({ zone, hemi }, callback) {
  if (defaults.swathValue != null) document.getElementById('crit-swath').value = defaults.swathValue;
  if (defaults.swathUnit) document.getElementById('crit-swath-unit').value = defaults.swathUnit;
  if (defaults.numSwaths) document.getElementById('crit-num-swaths').value = defaults.numSwaths;
+ if (defaults.swathCountUserSet) {
+  state.settings.swathCountUserSet = true;
+  const ns = document.getElementById('crit-num-swaths');
+  if (ns) ns.dataset.userEdited = '1';
+ }
  if (defaults.surveyType) {
  document.getElementById('crit-survey-type').value = defaults.surveyType;
  toggleSurveyTypeOptions();
@@ -8099,6 +8186,9 @@ function renderSurveyLines() {
 // split by Number of Swaths. Never skip-k / every-Nth — a swath is adjacent.
 function _effectiveLinesPerSwath(lines) {
  const s = state.settings || {};
+ // User picked Number of Swaths (map spinner or typed in Criteria). That
+ // election wins: equal adjacent bands, not a leftover width from Auto.
+ if (s.swathCountUserSet) return 0;
  if (s.swathUnit === 'lines' && s.swathRawValue > 0) {
   return Math.max(1, Math.round(Number(s.swathRawValue)));
  }
@@ -8384,6 +8474,7 @@ function setMapSwathsVisible(show) {
  show = !!show;
  state.showSwaths = show;
  try { localStorage.setItem('candooka_show_swaths', show ? '1' : '0'); } catch (_) {}
+ try { _persistSwathElection(); } catch (_) {}
  _syncSwathOnOffTabs();
  if (map && layerSwaths) {
   if (show) {
@@ -8400,10 +8491,12 @@ function setMapSwathCount(n) {
  if (!isFinite(n)) return;
  n = Math.max(2, Math.min(10, n));
  state.settings.numSwaths = n;
+ state.settings.swathCountUserSet = true;
  // Spinner chooses N equal adjacent bands; clear a lines/metres width so
  // grouping does not stay locked to a previous Swath Width.
  state.settings.swathRawValue = 0;
  state.settings.swathWidth = 0;
+ _persistSwathElection();
  const nsEl = document.getElementById('crit-num-swaths');
  if (nsEl) {
   nsEl.value = String(n);
@@ -15407,21 +15500,26 @@ if (savedSP) {
  }
 }
 
-// Restore saved swath width
-const savedSwath = localStorage.getItem(userKey('default_swath'));
-if (savedSwath) {
- const sw = parseFloat(savedSwath);
- if (isFinite(sw) && sw > 0) {
- state.settings.swathWidth = sw;
+// Restore the user's swath election first (count, directions, on/off). A
+// leftover saved width must not regroup bands after they picked N.
+_restoreSwathElection();
+if (!state.settings.swathCountUserSet) {
+ const savedSwath = localStorage.getItem(userKey('default_swath'));
+ if (savedSwath) {
+  const sw = parseFloat(savedSwath);
+  if (isFinite(sw) && sw > 0) {
+   state.settings.swathWidth = sw;
+  }
  }
 }
-
-// Restore saved swath directions
-const savedSwathDirections = localStorage.getItem(userKey('default_swath_directions'));
-if (savedSwathDirections) {
- try {
- state.settings.swathDirections = JSON.parse(savedSwathDirections);
- } catch(e) {}
+if (!(state.settings.swathDirections && state.settings.swathDirections.length)) {
+ const savedSwathDirections = localStorage.getItem(userKey('default_swath_directions'));
+ if (savedSwathDirections) {
+  try {
+   const parsed = JSON.parse(savedSwathDirections);
+   if (Array.isArray(parsed) && parsed.length) state.settings.swathDirections = parsed;
+  } catch(e) {}
+ }
 }
 
 // Restore saved prime cost basis
@@ -17726,6 +17824,7 @@ function enterWorkspace(mode) {
  const app = document.getElementById('app');
  if (app) app.style.visibility = 'visible';
  showToast('Maps & GIS — survey planning workspace', 2500);
+ _restoreSwathElection();
  const layer = readSavedBaseLayer();
  try {
   if (typeof map !== 'undefined' && map) switchBaseMap(layer);
@@ -21192,6 +21291,11 @@ function _applyCriteriaSwathSettings() {
  // Remember these directions as this user'default for the next round.
  _persistSwathDefaults(swathDirections);
  }
+ const nsEl = document.getElementById('crit-num-swaths');
+ if (nsEl && nsEl.dataset.userEdited === '1') {
+  state.settings.swathCountUserSet = true;
+ }
+ try { _persistSwathElection(); } catch (_) {}
 }
 
 // Carry any user-added infill lines (from the current line list) over to a

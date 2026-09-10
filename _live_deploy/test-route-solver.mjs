@@ -47,7 +47,12 @@ const window = {
   innerWidth: 1400,
   innerHeight: 900,
   devicePixelRatio: 1,
-  localStorage: { _s: {}, getItem() { return null; }, setItem() {}, removeItem() {} },
+  localStorage: {
+    _s: {},
+    getItem(k) { return Object.prototype.hasOwnProperty.call(this._s, k) ? this._s[k] : null; },
+    setItem(k, v) { this._s[k] = String(v); },
+    removeItem(k) { delete this._s[k]; },
+  },
 };
 
 const mapStub = {
@@ -107,7 +112,7 @@ vm.runInContext(`
   else { const _t = showToast; showToast = function(){}; }
 `, ctx);
 
-assert(/app\.js\?v=17\.30/.test(html), 'app.js cache bump 17.30 missing');
+assert(/app\.js\?v=17\.31/.test(html), 'app.js cache bump 17.31 missing');
 assert(/id="val-turn-radius">3\.5km/.test(html), 'toolbar RADIUS default must be 3.5km not 5.1');
 assert(/id="input-turn-radius" value="3500"/.test(html), 'turn-radius input default must be 3500 m');
 assert(!/value="5100"/.test(html), 'HTML must not default min turn radius to 5100');
@@ -549,9 +554,57 @@ const tPrio = plan(makeGrid(12), { surveyType: '2d', progression: 'auto' });
 assert(tPrio.nVisit === 12, 'priority Auto must visit all 12');
 assert(src.includes('min="1" max="100"'), 'Line Manager UI 1-100 missing');
 
+// User-elected swath count must survive leftover Swath Width (map spinner / Criteria).
+setup(makeGrid(12), {
+  surveyType: '3d',
+  progression: 'low-high',
+  numSwaths: 4,
+  swathWidth: 50000,
+});
+vm.runInContext('state.settings.swathCountUserSet = true;', ctx);
+const nUser = vm.runInContext(`
+  (function() {
+    const lines = state.lines;
+    const idx = lines.map((_, i) => i);
+    return _sliceAdjacentSwaths(idx, lines, { numSwaths: 4 }).length;
+  })()
+`, ctx);
+assert(nUser === 4, 'user-elected 4 swaths must not be replaced by leftover width, got ' + nUser);
+assert(src.includes('function _persistSwathElection'), 'swath election must persist');
+assert(src.includes('function _restoreSwathElection'), 'swath election must restore after login');
+assert(src.includes('swathCountUserSet'), 'swathCountUserSet flag missing');
+
+vm.runInContext(`
+  state.settings.numSwaths = 6;
+  state.settings.swathCountUserSet = true;
+  state.settings.swathDirections = ['high-low','low-high','high-low','low-high','high-low','low-high'];
+  state.showSwaths = false;
+  _persistSwathElection();
+  state.settings.numSwaths = 2;
+  state.settings.swathCountUserSet = false;
+  state.settings.swathDirections = [];
+  state.showSwaths = true;
+  _restoreSwathElection();
+`, ctx);
+assert(vm.runInContext('state.settings.numSwaths', ctx) === 6, 'persisted swath count must restore');
+assert(vm.runInContext('state.settings.swathCountUserSet', ctx) === true, 'user-elected flag must restore');
+assert(vm.runInContext('state.settings.swathDirections[0]', ctx) === 'high-low', 'swath directions must restore');
+assert(vm.runInContext('state.showSwaths', ctx) === false, 'swaths off/on must restore');
+vm.runInContext(`
+  const nsEl = { value: '6', dataset: {} };
+  const swEl = { value: '' };
+  const _gid = document.getElementById;
+  document.getElementById = (id) => id === 'crit-num-swaths' ? nsEl : id === 'crit-swath' ? swEl : _gid(id);
+  _refreshAutoSwathCount();
+  document.getElementById = _gid;
+  globalThis.__autoNs = nsEl.value;
+`, ctx);
+assert(vm.runInContext('globalThis.__autoNs', ctx) === '6',
+  'Auto must not overwrite a user-elected swath count, got ' + vm.runInContext('globalThis.__autoNs', ctx));
+
 console.log(JSON.stringify({
   ok: true,
-  cache: '17.30',
+  cache: '17.31',
   rule: '2D skip-k; 3D swath shooting (adjacent monopass, locked heading, stadium returns)',
   kNom,
   nn: { visit: nn.nVisit, mode: nn.stats.mode, ms: nn.ms },
