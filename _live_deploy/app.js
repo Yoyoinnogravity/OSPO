@@ -722,18 +722,14 @@ function initLeafletMap() {
  wheelDebounceTime: 25
  });
 
- currentBaseLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
- attribution: 'Tiles &copy; Esri',
- maxZoom: 19,
- crossOrigin: true
- }).addTo(map);
+ // GEBCO first — never flash Esri satellite "Map data not yet available" tiles
+ // over open ocean while the saved/pending basemap is applied.
+ currentBaseLayer = createGebcoOceanLayer().addTo(map);
 
- // Apply pending base layer choice (from chooser before map init)
- const pending = window._pendingBaseLayer || localStorage.getItem('candooka_baseLayer');
- if (pending) {
- switchBaseMap(pending);
+ // Apply pending / saved base layer (defaults to GEBCO ocean, not satellite)
+ const pending = window._pendingBaseLayer || readSavedBaseLayer();
  window._pendingBaseLayer = null;
- }
+ switchBaseMap(pending);
 
  // Scale bar
  L.control.scale({ position: 'bottomleft', metric: true, imperial: true, maxWidth: 200 }).addTo(map);
@@ -17735,13 +17731,14 @@ function enterWorkspace(mode) {
  const app = document.getElementById('app');
  if (app) app.style.visibility = 'visible';
  showToast('Maps & GIS — survey planning workspace', 2500);
- const saved = localStorage.getItem('candooka_baseLayer');
- if (!saved) {
-  if (isGuestUser(window.currentUser, state.currentUser)) {
-   try { switchBaseMap('satellite'); } catch (_) {}
-  } else {
-   setTimeout(showBaseLayerChooser, 200);
-  }
+ const layer = readSavedBaseLayer();
+ try {
+  if (typeof map !== 'undefined' && map) switchBaseMap(layer);
+  else window._pendingBaseLayer = layer;
+ } catch (_) {}
+ const hadPref = !!localStorage.getItem('candooka_baseLayer_chosen');
+ if (!hadPref && !isGuestUser(window.currentUser, state.currentUser)) {
+  setTimeout(showBaseLayerChooser, 200);
  }
 }
 
@@ -17755,8 +17752,8 @@ function getSignInWorkspacePreference() { return 'planning'; }
 function initSignInWorkspaceUi() { /* no-op */ }
 
 function showBaseLayerChooser() {
- // Default to satellite (Esri) if no saved preference
- const saved = localStorage.getItem('candooka_baseLayer') || 'satellite';
+ // Default to GEBCO ocean, never Esri satellite (blank over open water)
+ const saved = readSavedBaseLayer();
  switchBaseMap(saved);
  const radio = document.querySelector(`input[name="layers-basemap"][value="${saved}"]`);
  if (radio) radio.checked = true;
@@ -17765,6 +17762,7 @@ function showBaseLayerChooser() {
 }
 
 function selectBaseLayer(baseName) {
+ try { localStorage.setItem('candooka_baseLayer_chosen', '1'); } catch (_) {}
  localStorage.setItem('candooka_baseLayer', baseName);
  // Update radio button in layers panel
  const radio = document.querySelector(`input[name="layers-basemap"][value="${baseName}"]`);
@@ -17784,6 +17782,47 @@ function selectBaseLayer(baseName) {
 // opaque overview sheet at world zooms, which would hide the global bathymetry;
 // they only add real charted detail from about z7 anyway.
 const CHART_MIN_ZOOM = 7;
+
+// Esri World Imagery (and Esri Ocean) return grey/blue "Map data not yet available"
+// tiles over open water at survey zoom. GEBCO 2024 shaded relief from NOAA NCEI
+// is a real seafloor map worldwide. Native tiles thin out around z10 in the open
+// ocean; Leaflet upscales those instead of showing blank placeholders.
+const DEFAULT_BASEMAP = 'ocean';
+const BASELAYER_PREF_VERSION = '2';
+const GEBCO_NCEI_TILES = 'https://tiles.arcgis.com/tiles/C8EMgrsFcRFL6LrL/arcgis/rest/services/GEBCO_basemap_NCEI/MapServer/tile/{z}/{y}/{x}';
+const GEBCO_NCEI_TILE_URL = 'https://tiles.arcgis.com/tiles/C8EMgrsFcRFL6LrL/arcgis/rest/services/GEBCO_basemap_NCEI/MapServer/tile';
+const GEBCO_NCEI_NATIVE_ZOOM = 10;
+
+function createGebcoOceanLayer() {
+ return L.tileLayer(GEBCO_NCEI_TILES, {
+  attribution: 'GEBCO Compilation Group; NOAA NCEI',
+  maxNativeZoom: GEBCO_NCEI_NATIVE_ZOOM,
+  maxZoom: 22,
+  crossOrigin: true
+ });
+}
+
+function readSavedBaseLayer() {
+ try {
+  const ver = localStorage.getItem('candooka_baseLayer_v');
+  const saved = localStorage.getItem('candooka_baseLayer');
+  if (ver !== BASELAYER_PREF_VERSION) {
+   // v1 defaulted to satellite. Promote that old implicit default to GEBCO.
+   // Any other saved choice (dark, nautical, osm, …) is kept.
+   if (!saved || saved === 'satellite') {
+    localStorage.setItem('candooka_baseLayer', DEFAULT_BASEMAP);
+   }
+   localStorage.setItem('candooka_baseLayer_v', BASELAYER_PREF_VERSION);
+   if (saved && !localStorage.getItem('candooka_baseLayer_chosen')) {
+    // Returning user: apply the new default silently, do not re-open the chooser
+    localStorage.setItem('candooka_baseLayer_chosen', '1');
+   }
+  }
+  return localStorage.getItem('candooka_baseLayer') || DEFAULT_BASEMAP;
+ } catch (_) {
+  return DEFAULT_BASEMAP;
+ }
+}
 
 function switchBaseMap(baseName) {
  // Basemaps belong to the 2D Leaflet map, which only exists once the user
@@ -17812,6 +17851,8 @@ function switchBaseMap(baseName) {
  }
  hideShipmapOverlay();
 
+ if (!baseName) baseName = DEFAULT_BASEMAP;
+
  // Remove current base layer
  if (currentBaseLayer) {
  map.removeLayer(currentBaseLayer);
@@ -17819,6 +17860,19 @@ function switchBaseMap(baseName) {
  }
  // SST legend only stays if the SST overlay checkbox is still on.
  if (baseName !== 'sst' && !mapLayers.sst) showSstLegend(false);
+
+ // GEBCO 2024 shaded relief — the product default. Real bathymetry and land
+ // cover worldwide; does not emit Esri's "Map data not yet available" tiles.
+ if (baseName === 'ocean') {
+ currentBaseLayer = createGebcoOceanLayer();
+ currentBaseLayer.addTo(map);
+ currentBaseLayer.bringToBack();
+ localStorage.setItem('candooka_baseLayer', baseName);
+ document.querySelectorAll('input[name="basemap"], input[name="layers-basemap"]').forEach(r => {
+ r.checked = (r.value === baseName);
+ });
+ return;
+ }
 
  // Nautical chart, built in coverage order so the best available product wins
  // in any given sea: worldwide bathymetry, then finer European soundings, then
@@ -17911,7 +17965,6 @@ function switchBaseMap(baseName) {
  light: { url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', attr: '(c) CartoDB', native: 19 },
  voyager: { url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', attr: '(c) CartoDB', native: 19 },
  topo: { url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', attr: '(c) OpenTopoMap', native: 17 },
- ocean: { url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Base/MapServer/tile/{z}/{y}/{x}', attr: 'Esri Ocean', native: 16 },
  'esri-street': { url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', attr: 'Esri World Street Map', native: 19 },
  'esri-topo': { url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', attr: 'Esri World Topo Map', native: 19 },
  'esri-gray': { url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}', attr: 'Esri Light Gray Canvas', native: 16 },
@@ -17919,10 +17972,16 @@ function switchBaseMap(baseName) {
  'esri-relief': { url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Shaded_Relief/MapServer/tile/{z}/{y}/{x}', attr: 'Esri World Shaded Relief', native: 13 }
  };
 
- const cfg = baseMaps[baseName] || baseMaps.satellite;
- // maxNativeZoom + higher maxZoom lets tiles upscale instead of vanishing
- // when zooming past a provider'native tile depth (e.g. Ocean at z>16).
- currentBaseLayer = L.tileLayer(cfg.url, { attribution: cfg.attr, maxNativeZoom: cfg.native, maxZoom: 22, crossOrigin: true });
+ const cfg = baseMaps[baseName];
+ if (!cfg) {
+  // Unknown / retired name → GEBCO ocean, never satellite placeholders
+  currentBaseLayer = createGebcoOceanLayer();
+  baseName = DEFAULT_BASEMAP;
+ } else {
+  // maxNativeZoom + higher maxZoom lets tiles upscale instead of vanishing
+  // when zooming past a provider's native tile depth.
+  currentBaseLayer = L.tileLayer(cfg.url, { attribution: cfg.attr, maxNativeZoom: cfg.native, maxZoom: 22, crossOrigin: true });
+ }
  currentBaseLayer.addTo(map);
  currentBaseLayer.bringToBack();
 
@@ -22586,7 +22645,7 @@ async function _doGenerateReport() {
  // live Leaflet map), so no fitBounds/settle delay on the live map is needed.
  let mapDataUrl = '';
  let mapHasScaleBar = false;
- // Deterministic renderer: composite satellite tiles + overlays onto a centred
+ // Deterministic renderer: composite GEBCO bathymetry tiles + overlays onto a centred
  // canvas. Robust against the html2canvas failures that previously produced an
  // off-centre or base-map-only image.
  try {
@@ -22738,7 +22797,7 @@ async function _doGenerateReport() {
  const inCanvas = document.createElement('canvas'); inCanvas.width = inW; inCanvas.height = inH;
  const ic = inCanvas.getContext('2d');
  ic.fillStyle = '#dce8f4'; ic.fillRect(0, 0, inW, inH);
- // Use Esri World_Topo_Map (reliable CORS support, same provider as main map)
+ // Use GEBCO shaded relief (reliable CORS, same default as the live map)
  // Esri tile URL format: tile/{z}/{y}/{x}
  const tilePromises = [];
  let loadedCount = 0;
@@ -22754,7 +22813,7 @@ async function _doGenerateReport() {
  img.crossOrigin = 'anonymous';
  img.onload = () => { try { ic.drawImage(img, px, py, 256, 256); loadedCount++; } catch(e){} resolve(); };
  img.onerror = () =>resolve();
- img.src = `https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/${regionZoom}/${ty}/${tx}`;
+ img.src = `${GEBCO_NCEI_TILE_URL}/${regionZoom}/${ty}/${tx}`;
  }));
  }
  }
@@ -23220,7 +23279,7 @@ ${schedRows}
  }
 }
 
-// Robust, deterministic report map renderer. Fetches satellite tiles for the
+// Robust, deterministic report map renderer. Fetches GEBCO bathymetry tiles for the
 // survey bounds (Web Mercator) and composites survey lines, planned route and
 // obstructions onto a fixed-size, centred canvas. Returns a PNG data URL.
 // This replaces html2canvas of the live Leaflet map, which intermittently
@@ -23266,21 +23325,30 @@ async function _renderReportMainMap(opts) {
  const toX = lon =>lon2mx(lon) * worldPx - originPxX;
  const toY = lat =>lat2my(lat) * worldPx - originPxY;
 
- // Fetch and composite the satellite tiles covering the canvas.
- const tileMinX = Math.floor(originPxX / 256), tileMaxX = Math.floor((originPxX + W) / 256);
- const tileMinY = Math.floor(originPxY / 256), tileMaxY = Math.floor((originPxY + H) / 256);
+ // Fetch and composite GEBCO bathymetry tiles covering the canvas.
+ // Native tiles stop around z10 over open ocean; upscale those rather than
+ // requesting Esri imagery that paints "Map data not yet available".
+ const nativeZ = Math.min(zoom, GEBCO_NCEI_NATIVE_ZOOM);
+ const tileScale = Math.pow(2, zoom - nativeZ);
+ const nativeN = Math.pow(2, nativeZ);
+ const nativeOriginX = originPxX / tileScale;
+ const nativeOriginY = originPxY / tileScale;
+ const nativeW = W / tileScale;
+ const nativeH = H / tileScale;
+ const tileMinX = Math.floor(nativeOriginX / 256), tileMaxX = Math.floor((nativeOriginX + nativeW) / 256);
+ const tileMinY = Math.floor(nativeOriginY / 256), tileMaxY = Math.floor((nativeOriginY + nativeH) / 256);
  const tilePromises = [];
  for (let tx = tileMinX; tx <= tileMaxX; tx++) {
  for (let ty = tileMinY; ty <= tileMaxY; ty++) {
- if (ty < 0 || ty >= nTiles) continue;
- const wrapX = ((tx % nTiles) + nTiles) % nTiles;
- const dx = tx * 256 - originPxX, dy = ty * 256 - originPxY;
+ if (ty < 0 || ty >= nativeN) continue;
+ const wrapX = ((tx % nativeN) + nativeN) % nativeN;
+ const dx = tx * 256 * tileScale - originPxX, dy = ty * 256 * tileScale - originPxY;
  tilePromises.push(new Promise(res => {
  const img = new Image();
  img.crossOrigin = 'anonymous';
- img.onload = () => { try { ctx.drawImage(img, dx, dy, 256, 256); } catch (e) {} res(); };
+ img.onload = () => { try { ctx.drawImage(img, dx, dy, 256 * tileScale, 256 * tileScale); } catch (e) {} res(); };
  img.onerror = () =>res();
- img.src = `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${zoom}/${ty}/${wrapX}`;
+ img.src = `${GEBCO_NCEI_TILE_URL}/${nativeZ}/${ty}/${wrapX}`;
  }));
  }
  }

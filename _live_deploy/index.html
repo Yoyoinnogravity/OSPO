@@ -153,16 +153,16 @@
  <div id="baselayer-chooser" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(6,6,12,0.92); z-index:9998; align-items:center; justify-content:center;">
  <div style="background:#0e0e16; border:1px solid #1a1a24; border-radius:8px; padding:28px 32px; width:100%; max-width:400px; box-shadow:0 16px 64px rgba(0,0,0,0.7); text-align:center;">
  <div style="font-size:14px; font-weight:700; color:#e0e8f0; margin-bottom:6px;">Choose Default Base Map</div>
- <div style="font-size:11px; color:#8a9bb0; margin-bottom:20px;">Select your preferred map background. You can change this anytime in the Layers panel.</div>
+ <div style="font-size:11px; color:#8a9bb0; margin-bottom:20px;">GEBCO bathymetry is the default — satellite imagery is blank over open water. You can change this anytime in Layers.</div>
  <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:20px;">
- <button onclick="selectBaseLayer('satellite')" style="padding:14px 10px; border-radius:6px; border:2px solid #333; background:#1a1a2e; color:#e0e8f0; cursor:pointer; font-size:12px; font-weight:600; transition:all 0.15s;">Satellite</button>
- <button onclick="selectBaseLayer('ocean')" style="padding:14px 10px; border-radius:6px; border:2px solid #333; background:#1a1a2e; color:#e0e8f0; cursor:pointer; font-size:12px; font-weight:600; transition:all 0.15s;">Ocean</button>
+ <button onclick="selectBaseLayer('ocean')" style="padding:14px 10px; border-radius:6px; border:2px solid #00d2ff; background:#1a1a2e; color:#e0e8f0; cursor:pointer; font-size:12px; font-weight:600; transition:all 0.15s;">Ocean / GEBCO</button>
+ <button onclick="selectBaseLayer('nautical')" style="padding:14px 10px; border-radius:6px; border:2px solid #333; background:#1a1a2e; color:#e0e8f0; cursor:pointer; font-size:12px; font-weight:600;">Nautical Chart</button>
  <button onclick="selectBaseLayer('dark')" style="padding:14px 10px; border-radius:6px; border:2px solid #333; background:#1a1a2e; color:#e0e8f0; cursor:pointer; font-size:12px; font-weight:600; transition:all 0.15s;">Dark</button>
  <button onclick="selectBaseLayer('osm')" style="padding:14px 10px; border-radius:6px; border:2px solid #333; background:#1a1a2e; color:#e0e8f0; cursor:pointer; font-size:12px; font-weight:600; transition:all 0.15s;">Street Map</button>
- <button onclick="selectBaseLayer('nautical')" style="padding:14px 10px; border-radius:6px; border:2px solid #333; background:#1a1a2e; color:#e0e8f0; cursor:pointer; font-size:12px; font-weight:600;">Nautical Chart</button>
- <button onclick="selectBaseLayer('topo')" style="padding:14px 10px; border-radius:6px; border:2px solid #333; background:#1a1a2e; color:#e0e8f0; cursor:pointer; font-size:12px; font-weight:600; transition:all 0.15s; grid-column: span 2;">Topographic</button>
+ <button onclick="selectBaseLayer('satellite')" style="padding:14px 10px; border-radius:6px; border:2px solid #333; background:#1a1a2e; color:#e0e8f0; cursor:pointer; font-size:12px; font-weight:600; transition:all 0.15s;">Satellite</button>
+ <button onclick="selectBaseLayer('topo')" style="padding:14px 10px; border-radius:6px; border:2px solid #333; background:#1a1a2e; color:#e0e8f0; cursor:pointer; font-size:12px; font-weight:600; transition:all 0.15s;">Topographic</button>
  </div>
- <button onclick="selectBaseLayer('satellite')" style="padding:8px 20px; border-radius:4px; border:none; background:#333; color:#8a9bb0; cursor:pointer; font-size:11px;">Skip (use Satellite)</button>
+ <button onclick="selectBaseLayer('ocean')" style="padding:8px 20px; border-radius:4px; border:none; background:#333; color:#8a9bb0; cursor:pointer; font-size:11px;">Skip (use Ocean / GEBCO)</button>
  </div>
  </div>
  <!-- Full-Screen Sign-In Overlay -->
@@ -1382,7 +1382,10 @@
  <div style="font-size:10px; color:#a0aebb; margin-bottom:8px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px;">Base Map</div>
  <div style="display:flex; flex-direction:column; gap:5px;">
  <label style="display:flex; align-items:center; gap:8px; font-size:11px; color:#ccc; cursor:pointer;">
- <input type="radio" name="layers-basemap" value="satellite" onchange="switchBaseMap('satellite')" onclick="switchBaseMap('satellite')" checked style="accent-color:#00d2ff;"/>Satellite Imagery (Esri)
+ <input type="radio" name="layers-basemap" value="ocean" onchange="switchBaseMap('ocean')" onclick="switchBaseMap('ocean')" checked style="accent-color:#00d2ff;"/>Ocean / GEBCO bathymetry (default)
+ </label>
+ <label style="display:flex; align-items:center; gap:8px; font-size:11px; color:#ccc; cursor:pointer;">
+ <input type="radio" name="layers-basemap" value="nautical" onchange="switchBaseMap('nautical')" onclick="switchBaseMap('nautical')" style="accent-color:#00d2ff;"/>Nautical Chart (BA-style GEBCO bathy chart + ENC where published + seamarks)
  </label>
  <label style="display:flex; align-items:center; gap:8px; font-size:11px; color:#ccc; cursor:pointer;">
  <input type="radio" name="layers-basemap" value="osm" onchange="switchBaseMap('osm')" onclick="switchBaseMap('osm')" style="accent-color:#00d2ff;"/>OpenStreetMap
@@ -1393,8 +1396,8 @@
  <label style="display:flex; align-items:center; gap:8px; font-size:11px; color:#ccc; cursor:pointer;">
  <input type="radio" name="layers-basemap" value="topo" onchange="switchBaseMap('topo')" onclick="switchBaseMap('topo')" style="accent-color:#00d2ff;"/>Topographic (OpenTopoMap)
  </label>
- <label style="display:flex; align-items:center; gap:8px; font-size:11px; color:#ccc; cursor:pointer;">
- <input type="radio" name="layers-basemap" value="ocean" onchange="switchBaseMap('ocean')" onclick="switchBaseMap('ocean')" style="accent-color:#00d2ff;"/>Ocean Basemap (Esri)
+ <label title="Esri satellite is often blank over open water at survey zoom" style="display:flex; align-items:center; gap:8px; font-size:11px; color:#ccc; cursor:pointer;">
+ <input type="radio" name="layers-basemap" value="satellite" onchange="switchBaseMap('satellite')" onclick="switchBaseMap('satellite')" style="accent-color:#00d2ff;"/>Satellite Imagery (Esri)
  </label>
  <label style="display:flex; align-items:center; gap:8px; font-size:11px; color:#ccc; cursor:pointer;">
  <input type="radio" name="layers-basemap" value="light" onchange="switchBaseMap('light')" onclick="switchBaseMap('light')" style="accent-color:#00d2ff;"/>Light (CartoDB)
@@ -1419,9 +1422,6 @@
  </label>
  <label style="display:flex; align-items:center; gap:8px; font-size:11px; color:#ccc; cursor:pointer;">
  <input type="radio" name="layers-basemap" value="esri-relief" onchange="switchBaseMap('esri-relief')" onclick="switchBaseMap('esri-relief')" style="accent-color:#00d2ff;"/>Shaded Relief (Esri)
- </label>
- <label style="display:flex; align-items:center; gap:8px; font-size:11px; color:#ccc; cursor:pointer;">
- <input type="radio" name="layers-basemap" value="nautical" onchange="switchBaseMap('nautical')" onclick="switchBaseMap('nautical')" style="accent-color:#00d2ff;"/>Nautical Chart (BA-style GEBCO bathy chart + ENC where published + seamarks)
  </label>
  <label style="display:flex; align-items:center; gap:8px; font-size:11px; color:#ccc; cursor:pointer;">
  <input type="radio" name="layers-basemap" value="shipping" onchange="switchBaseMap('shipping')" onclick="switchBaseMap('shipping')" style="accent-color:#00d2ff;"/>Global Shipping Density (World Bank/IMF AIS)
@@ -2170,7 +2170,7 @@
  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
  <script src="https://unpkg.com/shpjs@latest/dist/shp.min.js"></script>
  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
- <script src="app.js?v=17.28"></script>
+ <script src="app.js?v=17.29"></script>
  <script src="ray_tracing_module.js?v=16.53"></script>
  <script src="wmm_declination.js?v=16.49"></script>
  <script src="magnetic_isogones.js?v=16.49"></script>
