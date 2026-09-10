@@ -393,6 +393,11 @@ const state = {
  numStreamers: 6, // number of streamers
  streamerSeparation: 100, // metres between streamers
  swathWidth: 0, // metres (0 = auto-detect from line spacing)
+ numSwaths: 2,
+ swathCountUserSet: false, // true once the user picks a swath count; Auto must not clobber it
+ swathDirections: [],
+ swathUnit: 'm',
+ swathRawValue: 0,
  channelsPerStreamer: 480, // number of channels per streamer
  channelSpacing: 12.5, // channel spacing in metres
  numSources: 2, // number of sources
@@ -491,6 +496,11 @@ function warnMobilePhoneThen(onContinue) {
  showMobileNotDesignedDialog(onContinue);
 }
 
+// Default 2D/3D view: Canada (both coasts + Arctic). Marine planning, not a
+// world-equator splash. GEBCO tiles are the same great map as the 2D default.
+const DEFAULT_MAP_CENTER = [56.0, -96.0];
+const DEFAULT_MAP_ZOOM = 3.8;
+
 // ===== CESIUM 3D GLOBE =====
 var cesiumViewer = null;
 var globeActive = isWebGLSupported() && !isMobileDevice() && (typeof Cesium !== 'undefined');
@@ -513,15 +523,25 @@ try {
  terrainProvider: new Cesium.EllipsoidTerrainProvider()
  });
 
- // Asynchronously load the local earth satellite texture
- Cesium.SingleTileImageryProvider.fromUrl('earth.jpg').then(provider => {
- if (cesiumViewer) {
- cesiumViewer.imageryLayers.removeAll();
- cesiumViewer.imageryLayers.addImageryProvider(provider);
+ // GEBCO 2024 shaded relief — same default as the 2D map. earth.jpg is a
+ // last-resort fallback if the tile service is blocked.
+ try {
+  cesiumViewer.imageryLayers.removeAll();
+  cesiumViewer.imageryLayers.addImageryProvider(new Cesium.UrlTemplateImageryProvider({
+   url: 'https://tiles.arcgis.com/tiles/C8EMgrsFcRFL6LrL/arcgis/rest/services/GEBCO_basemap_NCEI/MapServer/tile/{z}/{y}/{x}',
+   maximumLevel: 10,
+   credit: 'GEBCO Compilation Group; NOAA NCEI'
+  }));
+ } catch (imgErr) {
+  Cesium.SingleTileImageryProvider.fromUrl('earth.jpg').then(provider => {
+   if (cesiumViewer) {
+    cesiumViewer.imageryLayers.removeAll();
+    cesiumViewer.imageryLayers.addImageryProvider(provider);
+   }
+  }).catch(err => {
+   console.warn('Failed to load globe imagery:', err);
+  });
  }
- }).catch(err => {
- console.warn('Failed to load local earth texture:', err);
- });
 
  // Slow auto-rotation
  cesiumViewer.clock.onTick.addEventListener(() => {
@@ -530,30 +550,10 @@ try {
  }
  });
 
- // Center camera on user'location if available, otherwise fallback
- if (navigator.geolocation) {
- navigator.geolocation.getCurrentPosition(
- (pos) => {
- const lat = pos.coords.latitude;
- const lon = pos.coords.longitude;
- if (cesiumViewer && globeActive) {
- cesiumViewer.camera.setView({
- destination: Cesium.Cartesian3.fromDegrees(lon, lat, 12000000)
- });
- }
- },
- () => {
+ // Open on Canada so the first view after login matches the 2D GEBCO map
  if (cesiumViewer) {
  cesiumViewer.camera.setView({
- destination: Cesium.Cartesian3.fromDegrees(10, 20, 15000000)
- });
- }
- },
- { timeout: 5000 }
- );
- } else {
- cesiumViewer.camera.setView({
- destination: Cesium.Cartesian3.fromDegrees(10, 20, 15000000)
+  destination: Cesium.Cartesian3.fromDegrees(DEFAULT_MAP_CENTER[1], DEFAULT_MAP_CENTER[0], 8200000)
  });
  }
 
@@ -710,8 +710,8 @@ function initLeafletMap() {
 
  document.getElementById('map').style.display = 'block';
  map = L.map('map', {
- center: [20, 0],
- zoom: 3,
+ center: DEFAULT_MAP_CENTER,
+ zoom: DEFAULT_MAP_ZOOM,
  zoomControl: false,
  attributionControl: true,
  // Fine-grained zoom: fractional zoom levels in 0.1 steps, quarter-level
@@ -722,18 +722,14 @@ function initLeafletMap() {
  wheelDebounceTime: 25
  });
 
- currentBaseLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
- attribution: 'Tiles &copy; Esri',
- maxZoom: 19,
- crossOrigin: true
- }).addTo(map);
+ // GEBCO first — never flash Esri satellite "Map data not yet available" tiles
+ // over open ocean while the saved/pending basemap is applied.
+ currentBaseLayer = createGebcoOceanLayer().addTo(map);
 
- // Apply pending base layer choice (from chooser before map init)
- const pending = window._pendingBaseLayer || localStorage.getItem('candooka_baseLayer');
- if (pending) {
- switchBaseMap(pending);
+ // Apply pending / saved base layer (defaults to GEBCO ocean, not satellite)
+ const pending = window._pendingBaseLayer || readSavedBaseLayer();
  window._pendingBaseLayer = null;
- }
+ switchBaseMap(pending);
 
  // Scale bar
  L.control.scale({ position: 'bottomleft', metric: true, imperial: true, maxWidth: 200 }).addTo(map);
@@ -4717,10 +4713,107 @@ function _persistSwathDefaults(dirs) {
  if (blob) {
  const parsed = JSON.parse(blob) || {};
  parsed.swathDirections = dirs;
+ if (state.settings.numSwaths) parsed.numSwaths = state.settings.numSwaths;
  localStorage.setItem(userKey('survey_defaults'), JSON.stringify(parsed));
  }
  }
  } catch (e) {}
+}
+
+// Persist the user's swath election (count, whether they chose it, directions,
+// on/off) so a reload, login, or Survey Criteria Auto pass cannot throw it away.
+function _swathElectionPayload() {
+ const n = parseInt(state.settings.numSwaths, 10);
+ return {
+  numSwaths: (isFinite(n) && n >= 1) ? Math.max(1, Math.min(10, n)) : 2,
+  userSet: !!state.settings.swathCountUserSet,
+  directions: Array.isArray(state.settings.swathDirections) ? state.settings.swathDirections : [],
+  show: state.showSwaths !== false
+ };
+}
+
+function _applySwathElectionPayload(p) {
+ if (!p || typeof p !== 'object') return;
+ const n = parseInt(p.numSwaths, 10);
+ if (isFinite(n) && n >= 2) state.settings.numSwaths = Math.max(2, Math.min(10, n));
+ if (p.userSet === true || p.userSet === '1') state.settings.swathCountUserSet = true;
+ else if (p.userSet === false || p.userSet === '0') state.settings.swathCountUserSet = false;
+ if (Array.isArray(p.directions) && p.directions.length) state.settings.swathDirections = p.directions;
+ if (p.show === false || p.show === '0') state.showSwaths = false;
+ else if (p.show === true || p.show === '1') state.showSwaths = true;
+}
+
+function _swathUserPrefix() {
+ return userKey('default_num_swaths').replace(/default_num_swaths$/, '');
+}
+
+function _writeSwathElectionKey(prefix, payload) {
+ localStorage.setItem(prefix + 'default_num_swaths', String(payload.numSwaths));
+ localStorage.setItem(prefix + 'default_swath_count_user', payload.userSet ? '1' : '0');
+ if (payload.directions && payload.directions.length) {
+  localStorage.setItem(prefix + 'default_swath_directions', JSON.stringify(payload.directions));
+ }
+}
+
+function _readSwathElectionFromPrefix(prefix) {
+ const n = parseInt(localStorage.getItem(prefix + 'default_num_swaths'), 10);
+ const elected = localStorage.getItem(prefix + 'default_swath_count_user');
+ if (!isFinite(n) && elected !== '1' && elected !== '0') return null;
+ let directions = [];
+ try {
+  const raw = localStorage.getItem(prefix + 'default_swath_directions');
+  const parsed = raw ? JSON.parse(raw) : [];
+  if (Array.isArray(parsed)) directions = parsed;
+ } catch (_) {}
+ return {
+  numSwaths: isFinite(n) ? n : undefined,
+  userSet: elected === '1' ? true : elected === '0' ? false : undefined,
+  directions,
+  show: undefined
+ };
+}
+
+function _persistSwathElection() {
+ try {
+ const payload = _swathElectionPayload();
+ localStorage.setItem('candooka_swath_election', JSON.stringify(payload));
+ _writeSwathElectionKey(_swathUserPrefix(), payload);
+ // Page-load restore runs before login (currentUser is still "Guest").
+ _writeSwathElectionKey('candooka_Guest_', payload);
+ if (payload.directions.length) _persistSwathDefaults(payload.directions);
+ localStorage.setItem('candooka_show_swaths', payload.show ? '1' : '0');
+ if (payload.userSet) {
+  try { localStorage.removeItem(userKey('default_swath')); } catch (_) {}
+ }
+ } catch (_) {}
+}
+
+function _restoreSwathElection() {
+ try {
+  let payload = null;
+  try {
+   payload = JSON.parse(localStorage.getItem('candooka_swath_election') || 'null');
+  } catch (_) { payload = null; }
+  const fromUser = _readSwathElectionFromPrefix(_swathUserPrefix());
+  const fromGuest = _readSwathElectionFromPrefix('candooka_Guest_');
+  // Prefer a user-elected record (logged-in keys, Guest keys, then the
+  // device blob) so Auto never wins over a count the user already picked.
+  const elected = [fromUser, fromGuest, payload].find(p => p && (p.userSet === true || p.userSet === '1'));
+  _applySwathElectionPayload(elected || fromUser || fromGuest || payload);
+  const show = localStorage.getItem('candooka_show_swaths');
+  if (show === '0') state.showSwaths = false;
+  else if (show === '1') state.showSwaths = true;
+ } catch (_) {}
+ try {
+  if (typeof _syncSwathOnOffTabs === 'function') _syncSwathOnOffTabs();
+  if (typeof map !== 'undefined' && map && typeof layerSwaths !== 'undefined' && layerSwaths) {
+   if (state.showSwaths === false) {
+    if (map.hasLayer && map.hasLayer(layerSwaths)) map.removeLayer(layerSwaths);
+   } else if (map.hasLayer && !map.hasLayer(layerSwaths)) {
+    map.addLayer(layerSwaths);
+   }
+  }
+ } catch (_) {}
 }
 
 // Auto number of swaths (even, in pairs) derived from the survey when the Swath
@@ -4743,8 +4836,9 @@ function _refreshAutoSwathCount() {
  const swEl = document.getElementById('crit-swath');
  const nsEl = document.getElementById('crit-num-swaths');
  if (!swEl || !nsEl) return;
+ if (state.settings.swathCountUserSet || nsEl.dataset.userEdited === '1') return;
  const widthAuto = !(parseFloat(swEl.value) > 0);
- if (widthAuto && nsEl.dataset.userEdited !== '1') {
+ if (widthAuto) {
  nsEl.value = _autoEvenSwathCount();
  updateSwathDirectionUI();
  }
@@ -4772,6 +4866,16 @@ function updateSwathDirectionUI() {
  `;
  container.appendChild(div);
  }
+ container.querySelectorAll('.swath-dir-select').forEach(select => {
+  select.addEventListener('change', () => {
+   const dirs = [];
+   container.querySelectorAll('.swath-dir-select').forEach(s => {
+    dirs[parseInt(s.dataset.swath, 10)] = s.value;
+   });
+   state.settings.swathDirections = dirs;
+   _persistSwathElection();
+  });
+ });
 }
 
 // ===== CRITICAL SURVEY CRITERIA PROMPT =====
@@ -4789,11 +4893,15 @@ function askSurveyCriteria({ zone, hemi }, callback) {
  state.settings.runOut = state.settings.runOut ?? saved.runOut;
  state.settings.swathRawValue = saved.swathValue || state.settings.swathRawValue || 0;
  state.settings.swathUnit = saved.swathUnit || state.settings.swathUnit || 'm';
- state.settings.numSwaths = saved.numSwaths || state.settings.numSwaths || 2;
+ if (!state.settings.swathCountUserSet) {
+  state.settings.numSwaths = saved.numSwaths || state.settings.numSwaths || 2;
+ }
+ if (!(state.settings.swathDirections && state.settings.swathDirections.length)) {
+  state.settings.swathDirections = saved.swathDirections || [];
+ }
  state.settings.surveyType = saved.surveyType || state.settings.surveyType || '3d';
  state.settings.progression = saved.progression || state.settings.progression || (state.settings.surveyType === '3d' ? 'low-high' : 'auto');
  state.settings.progression2d = saved.progression2d || state.settings.progression2d || 'auto';
- state.settings.swathDirections = saved.swathDirections || state.settings.swathDirections || [];
  state.settings.utmZone = saved.utmZone || state.settings.utmZone || 31;
  state.settings.utmHemi = saved.utmHemi || state.settings.utmHemi || 'N';
  state.settings.numStreamers = Number(saved.numStreamers) || state.settings.numStreamers;
@@ -5365,9 +5473,13 @@ function askSurveyCriteria({ zone, hemi }, callback) {
  document.getElementById('crit-swath').addEventListener(ev, _refreshAutoSwathCount);
  document.getElementById('crit-swath-unit').addEventListener(ev, _refreshAutoSwathCount);
  });
- // Initialise: if the survey opened with Swath Width on Auto, fill the derived
- // even count now (only when the user has not previously fixed a count).
- if (state.settings.numSwaths == null) _refreshAutoSwathCount();
+ // Keep a user-elected swath count. Auto-fill only when they have not chosen N.
+ if (state.settings.swathCountUserSet) {
+  numSwathsEl.dataset.userEdited = '1';
+  numSwathsEl.value = String(state.settings.numSwaths || 2);
+ } else {
+  _refreshAutoSwathCount();
+ }
 
  document.getElementById('crit-submit-btn').onclick = () => {
  const z = parseInt(document.getElementById('crit-utm-zone').value);
@@ -5439,6 +5551,11 @@ function askSurveyCriteria({ zone, hemi }, callback) {
  state.settings.surveyType = surveyType;
  state.settings.numSwaths = numSwaths;
  state.settings.swathDirections = swathDirections;
+ const nsElConfirm = document.getElementById('crit-num-swaths');
+ if (nsElConfirm && nsElConfirm.dataset.userEdited === '1') {
+  state.settings.swathCountUserSet = true;
+ }
+ _persistSwathElection();
  if (surveyType === 'obn') {
   state.settings.obnNodeDx = parseFloat(document.getElementById('crit-obn-dx')?.value) || 400;
   state.settings.obnNodeDy = parseFloat(document.getElementById('crit-obn-dy')?.value) || 400;
@@ -5854,6 +5971,7 @@ function askSurveyCriteria({ zone, hemi }, callback) {
  swathValue: getFloat('crit-swath', 0),
  swathUnit: getVal('crit-swath-unit', 'm'),
  numSwaths: getInt('crit-num-swaths', 2),
+ swathCountUserSet: !!(state.settings.swathCountUserSet || (document.getElementById('crit-num-swaths') || {}).dataset.userEdited === '1'),
  surveyType: getVal('crit-survey-type', '3d'),
  progression: getVal('crit-progression', 'auto'),
  progression2d: getVal('crit-progression-2d', 'auto'),
@@ -5952,6 +6070,8 @@ function askSurveyCriteria({ zone, hemi }, callback) {
  localStorage.setItem(userKey('survey_defaults'), JSON.stringify(defaults));
  // Also save individual settings for startup loading
  localStorage.setItem(userKey('default_swath_directions'), JSON.stringify(defaults.swathDirections || []));
+ localStorage.setItem(userKey('default_num_swaths'), String(defaults.numSwaths || 2));
+ localStorage.setItem(userKey('default_swath_count_user'), defaults.swathCountUserSet ? '1' : '0');
  localStorage.setItem(userKey('default_prime_cost_mode'), defaults.primeCostMode || 'dayrate');
  localStorage.setItem(userKey('default_infill_cost_mode'), defaults.infillCostMode || 'dayrate');
  showToast('Current settings saved as defaults for all future sessions.');
@@ -5984,6 +6104,11 @@ function askSurveyCriteria({ zone, hemi }, callback) {
  if (defaults.swathValue != null) document.getElementById('crit-swath').value = defaults.swathValue;
  if (defaults.swathUnit) document.getElementById('crit-swath-unit').value = defaults.swathUnit;
  if (defaults.numSwaths) document.getElementById('crit-num-swaths').value = defaults.numSwaths;
+ if (defaults.swathCountUserSet) {
+  state.settings.swathCountUserSet = true;
+  const ns = document.getElementById('crit-num-swaths');
+  if (ns) ns.dataset.userEdited = '1';
+ }
  if (defaults.surveyType) {
  document.getElementById('crit-survey-type').value = defaults.surveyType;
  toggleSurveyTypeOptions();
@@ -8108,6 +8233,9 @@ function renderSurveyLines() {
 // split by Number of Swaths. Never skip-k / every-Nth — a swath is adjacent.
 function _effectiveLinesPerSwath(lines) {
  const s = state.settings || {};
+ // User picked Number of Swaths (map spinner or typed in Criteria). That
+ // election wins: equal adjacent bands, not a leftover width from Auto.
+ if (s.swathCountUserSet) return 0;
  if (s.swathUnit === 'lines' && s.swathRawValue > 0) {
   return Math.max(1, Math.round(Number(s.swathRawValue)));
  }
@@ -8393,6 +8521,7 @@ function setMapSwathsVisible(show) {
  show = !!show;
  state.showSwaths = show;
  try { localStorage.setItem('candooka_show_swaths', show ? '1' : '0'); } catch (_) {}
+ try { _persistSwathElection(); } catch (_) {}
  _syncSwathOnOffTabs();
  if (map && layerSwaths) {
   if (show) {
@@ -8409,10 +8538,12 @@ function setMapSwathCount(n) {
  if (!isFinite(n)) return;
  n = Math.max(2, Math.min(10, n));
  state.settings.numSwaths = n;
+ state.settings.swathCountUserSet = true;
  // Spinner chooses N equal adjacent bands; clear a lines/metres width so
  // grouping does not stay locked to a previous Swath Width.
  state.settings.swathRawValue = 0;
  state.settings.swathWidth = 0;
+ _persistSwathElection();
  const nsEl = document.getElementById('crit-num-swaths');
  if (nsEl) {
   nsEl.value = String(n);
@@ -8464,7 +8595,7 @@ function _mapSwathsBlockHtml() {
   '<div style="display:flex;align-items:center;gap:8px;margin-top:8px;">' +
   '<span style="color:#c0c8d4;font-size:11px;font-weight:700;flex:1;">Number of swaths</span>' +
   '<button type="button" onclick="nudgeMapSwathCount(-1)" title="Fewer swaths" style="' + btn + '">\u2212</button>' +
-  '<input id="map-num-swaths" type="number" min="2" max="10" step="1" value="' + n + '" onchange="setMapSwathCount(this.value)" style="width:44px;height:26px;text-align:center;background:#0a0a12;border:1px solid #2a2a3a;color:#e2e8f0;border-radius:4px;font-size:12px;font-weight:700;outline:none;" />' +
+  '<input id="map-num-swaths" type="number" min="2" max="10" step="1" value="' + n + '" onchange="setMapSwathCount(this.value)" oninput="setMapSwathCount(this.value)" style="width:44px;height:26px;text-align:center;background:#0a0a12;border:1px solid #2a2a3a;color:#e2e8f0;border-radius:4px;font-size:12px;font-weight:700;outline:none;" />' +
   '<button type="button" onclick="nudgeMapSwathCount(1)" title="More swaths" style="' + btn + '">+</button>' +
   '</div>' +
   '<div style="font-size:9px;color:#8a9bb0;margin-top:4px;">2\u201310. Bands draw on the preplot for 3D.</div>' +
@@ -15416,21 +15547,26 @@ if (savedSP) {
  }
 }
 
-// Restore saved swath width
-const savedSwath = localStorage.getItem(userKey('default_swath'));
-if (savedSwath) {
- const sw = parseFloat(savedSwath);
- if (isFinite(sw) && sw > 0) {
- state.settings.swathWidth = sw;
+// Restore the user's swath election first (count, directions, on/off). A
+// leftover saved width must not regroup bands after they picked N.
+_restoreSwathElection();
+if (!state.settings.swathCountUserSet) {
+ const savedSwath = localStorage.getItem(userKey('default_swath'));
+ if (savedSwath) {
+  const sw = parseFloat(savedSwath);
+  if (isFinite(sw) && sw > 0) {
+   state.settings.swathWidth = sw;
+  }
  }
 }
-
-// Restore saved swath directions
-const savedSwathDirections = localStorage.getItem(userKey('default_swath_directions'));
-if (savedSwathDirections) {
- try {
- state.settings.swathDirections = JSON.parse(savedSwathDirections);
- } catch(e) {}
+if (!(state.settings.swathDirections && state.settings.swathDirections.length)) {
+ const savedSwathDirections = localStorage.getItem(userKey('default_swath_directions'));
+ if (savedSwathDirections) {
+  try {
+   const parsed = JSON.parse(savedSwathDirections);
+   if (Array.isArray(parsed) && parsed.length) state.settings.swathDirections = parsed;
+  } catch(e) {}
+ }
 }
 
 // Restore saved prime cost basis
@@ -17735,14 +17871,17 @@ function enterWorkspace(mode) {
  const app = document.getElementById('app');
  if (app) app.style.visibility = 'visible';
  showToast('Maps & GIS — survey planning workspace', 2500);
- const saved = localStorage.getItem('candooka_baseLayer');
- if (!saved) {
-  if (isGuestUser(window.currentUser, state.currentUser)) {
-   try { switchBaseMap('satellite'); } catch (_) {}
-  } else {
-   setTimeout(showBaseLayerChooser, 200);
-  }
+ _restoreSwathElection();
+ const layer = readSavedBaseLayer();
+ try {
+  if (typeof map !== 'undefined' && map) switchBaseMap(layer);
+  else window._pendingBaseLayer = layer;
+ } catch (_) {}
+ const hadPref = !!localStorage.getItem('candooka_baseLayer_chosen');
+ if (!hadPref && !isGuestUser(window.currentUser, state.currentUser)) {
+  setTimeout(showBaseLayerChooser, 200);
  }
+ setTimeout(openDefaultPlanningMap, 50);
 }
 
 function showWorkspaceChooser() {
@@ -17754,9 +17893,34 @@ function selectSignInWorkspace() { /* no-op: maps only */ }
 function getSignInWorkspacePreference() { return 'planning'; }
 function initSignInWorkspaceUi() { /* no-op */ }
 
+// After sign-in, show the GEBCO map on Canada immediately — do not leave the
+// user on the 3D splash. Keep Cesium alive so 3D still works. If a preplot is
+// already loaded, leave the view on the survey.
+function openDefaultPlanningMap() {
+ if (state.lines && state.lines.length) return;
+ const globeEl = document.getElementById('cesium-globe');
+ const mapEl = document.getElementById('map');
+ const btn = document.getElementById('ctrl-mode-toggle');
+ if (globeActive) {
+  globeActive = false;
+  if (globeEl) globeEl.style.display = 'none';
+ }
+ if (mapEl) mapEl.style.display = 'block';
+ if (btn) {
+  btn.textContent = '3D';
+  btn.style.background = '#e67e22';
+ }
+ if (!map) {
+  if (typeof initLeafletMap === 'function') initLeafletMap();
+ } else {
+  try { map.invalidateSize(); } catch (_) {}
+  map.setView(DEFAULT_MAP_CENTER, DEFAULT_MAP_ZOOM);
+ }
+}
+
 function showBaseLayerChooser() {
- // Default to satellite (Esri) if no saved preference
- const saved = localStorage.getItem('candooka_baseLayer') || 'satellite';
+ // Default to GEBCO ocean, never Esri satellite (blank over open water)
+ const saved = readSavedBaseLayer();
  switchBaseMap(saved);
  const radio = document.querySelector(`input[name="layers-basemap"][value="${saved}"]`);
  if (radio) radio.checked = true;
@@ -17765,6 +17929,7 @@ function showBaseLayerChooser() {
 }
 
 function selectBaseLayer(baseName) {
+ try { localStorage.setItem('candooka_baseLayer_chosen', '1'); } catch (_) {}
  localStorage.setItem('candooka_baseLayer', baseName);
  // Update radio button in layers panel
  const radio = document.querySelector(`input[name="layers-basemap"][value="${baseName}"]`);
@@ -17784,6 +17949,47 @@ function selectBaseLayer(baseName) {
 // opaque overview sheet at world zooms, which would hide the global bathymetry;
 // they only add real charted detail from about z7 anyway.
 const CHART_MIN_ZOOM = 7;
+
+// Esri World Imagery (and Esri Ocean) return grey/blue "Map data not yet available"
+// tiles over open water at survey zoom. GEBCO 2024 shaded relief from NOAA NCEI
+// is a real seafloor map worldwide. Native tiles thin out around z10 in the open
+// ocean; Leaflet upscales those instead of showing blank placeholders.
+const DEFAULT_BASEMAP = 'ocean';
+const BASELAYER_PREF_VERSION = '2';
+const GEBCO_NCEI_TILES = 'https://tiles.arcgis.com/tiles/C8EMgrsFcRFL6LrL/arcgis/rest/services/GEBCO_basemap_NCEI/MapServer/tile/{z}/{y}/{x}';
+const GEBCO_NCEI_TILE_URL = 'https://tiles.arcgis.com/tiles/C8EMgrsFcRFL6LrL/arcgis/rest/services/GEBCO_basemap_NCEI/MapServer/tile';
+const GEBCO_NCEI_NATIVE_ZOOM = 10;
+
+function createGebcoOceanLayer() {
+ return L.tileLayer(GEBCO_NCEI_TILES, {
+  attribution: 'GEBCO Compilation Group; NOAA NCEI',
+  maxNativeZoom: GEBCO_NCEI_NATIVE_ZOOM,
+  maxZoom: 22,
+  crossOrigin: true
+ });
+}
+
+function readSavedBaseLayer() {
+ try {
+  const ver = localStorage.getItem('candooka_baseLayer_v');
+  const saved = localStorage.getItem('candooka_baseLayer');
+  if (ver !== BASELAYER_PREF_VERSION) {
+   // v1 defaulted to satellite. Promote that old implicit default to GEBCO.
+   // Any other saved choice (dark, nautical, osm, …) is kept.
+   if (!saved || saved === 'satellite') {
+    localStorage.setItem('candooka_baseLayer', DEFAULT_BASEMAP);
+   }
+   localStorage.setItem('candooka_baseLayer_v', BASELAYER_PREF_VERSION);
+   if (saved && !localStorage.getItem('candooka_baseLayer_chosen')) {
+    // Returning user: apply the new default silently, do not re-open the chooser
+    localStorage.setItem('candooka_baseLayer_chosen', '1');
+   }
+  }
+  return localStorage.getItem('candooka_baseLayer') || DEFAULT_BASEMAP;
+ } catch (_) {
+  return DEFAULT_BASEMAP;
+ }
+}
 
 function switchBaseMap(baseName) {
  // Basemaps belong to the 2D Leaflet map, which only exists once the user
@@ -17812,6 +18018,8 @@ function switchBaseMap(baseName) {
  }
  hideShipmapOverlay();
 
+ if (!baseName) baseName = DEFAULT_BASEMAP;
+
  // Remove current base layer
  if (currentBaseLayer) {
  map.removeLayer(currentBaseLayer);
@@ -17819,6 +18027,19 @@ function switchBaseMap(baseName) {
  }
  // SST legend only stays if the SST overlay checkbox is still on.
  if (baseName !== 'sst' && !mapLayers.sst) showSstLegend(false);
+
+ // GEBCO 2024 shaded relief — the product default. Real bathymetry and land
+ // cover worldwide; does not emit Esri's "Map data not yet available" tiles.
+ if (baseName === 'ocean') {
+ currentBaseLayer = createGebcoOceanLayer();
+ currentBaseLayer.addTo(map);
+ currentBaseLayer.bringToBack();
+ localStorage.setItem('candooka_baseLayer', baseName);
+ document.querySelectorAll('input[name="basemap"], input[name="layers-basemap"]').forEach(r => {
+ r.checked = (r.value === baseName);
+ });
+ return;
+ }
 
  // Nautical chart, built in coverage order so the best available product wins
  // in any given sea: worldwide bathymetry, then finer European soundings, then
@@ -17846,6 +18067,12 @@ function switchBaseMap(baseName) {
  layers: '0,1,2,3,4,5,6,7,8,9,10,11,12', format: 'image/png', transparent: true, version: '1.3.0',
  attribution: 'NOAA ENC', minZoom: CHART_MIN_ZOOM, maxZoom: 22
  });
+ // Canadian Hydrographic Service ENC (S-57) — Atlantic, Pacific, Arctic, Great
+ // Lakes. Same MCS stack as NOAA; not for navigation.
+ const canadaEnc = L.tileLayer.wms('https://egisp.dfo-mpo.gc.ca/arcgis/rest/services/chs/ENC_MaritimeChartService/MapServer/exts/MaritimeChartService/WMSServer', {
+ layers: '0,1,2,3,4,5,6,7,8,9,10,11,12', format: 'image/png', transparent: true, version: '1.3.0',
+ attribution: 'CHS ENC (not for navigation)', minZoom: CHART_MIN_ZOOM, maxZoom: 22
+ });
  // Kartverket'official raster charts, open under CC-BY 4.0 - Norwegian
  // waters including Svalbard and the Barents Sea.
  const norwayCharts = L.tileLayer.wms('https://wms.geonorge.no/skwms1/wms.sjokartraster2', {
@@ -17855,7 +18082,7 @@ function switchBaseMap(baseName) {
  const seamarks = L.tileLayer('https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png', {
  attribution: '(c) OpenSeaMap contributors', maxNativeZoom: 18, maxZoom: 22, opacity: 0.95
  });
- currentBaseLayer = L.layerGroup([bathyChart, noaaEnc, norwayCharts, seamarks]);
+ currentBaseLayer = L.layerGroup([bathyChart, noaaEnc, canadaEnc, norwayCharts, seamarks]);
  currentBaseLayer.addTo(map);
  localStorage.setItem('candooka_baseLayer', baseName);
  document.querySelectorAll('input[name="basemap"], input[name="layers-basemap"]').forEach(r => {
@@ -17911,7 +18138,6 @@ function switchBaseMap(baseName) {
  light: { url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', attr: '(c) CartoDB', native: 19 },
  voyager: { url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', attr: '(c) CartoDB', native: 19 },
  topo: { url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', attr: '(c) OpenTopoMap', native: 17 },
- ocean: { url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Base/MapServer/tile/{z}/{y}/{x}', attr: 'Esri Ocean', native: 16 },
  'esri-street': { url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', attr: 'Esri World Street Map', native: 19 },
  'esri-topo': { url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', attr: 'Esri World Topo Map', native: 19 },
  'esri-gray': { url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}', attr: 'Esri Light Gray Canvas', native: 16 },
@@ -17919,10 +18145,16 @@ function switchBaseMap(baseName) {
  'esri-relief': { url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Shaded_Relief/MapServer/tile/{z}/{y}/{x}', attr: 'Esri World Shaded Relief', native: 13 }
  };
 
- const cfg = baseMaps[baseName] || baseMaps.satellite;
- // maxNativeZoom + higher maxZoom lets tiles upscale instead of vanishing
- // when zooming past a provider'native tile depth (e.g. Ocean at z>16).
- currentBaseLayer = L.tileLayer(cfg.url, { attribution: cfg.attr, maxNativeZoom: cfg.native, maxZoom: 22, crossOrigin: true });
+ const cfg = baseMaps[baseName];
+ if (!cfg) {
+  // Unknown / retired name → GEBCO ocean, never satellite placeholders
+  currentBaseLayer = createGebcoOceanLayer();
+  baseName = DEFAULT_BASEMAP;
+ } else {
+  // maxNativeZoom + higher maxZoom lets tiles upscale instead of vanishing
+  // when zooming past a provider's native tile depth.
+  currentBaseLayer = L.tileLayer(cfg.url, { attribution: cfg.attr, maxNativeZoom: cfg.native, maxZoom: 22, crossOrigin: true });
+ }
  currentBaseLayer.addTo(map);
  currentBaseLayer.bringToBack();
 
@@ -21106,6 +21338,11 @@ function _applyCriteriaSwathSettings() {
  // Remember these directions as this user'default for the next round.
  _persistSwathDefaults(swathDirections);
  }
+ const nsEl = document.getElementById('crit-num-swaths');
+ if (nsEl && nsEl.dataset.userEdited === '1') {
+  state.settings.swathCountUserSet = true;
+ }
+ try { _persistSwathElection(); } catch (_) {}
 }
 
 // Carry any user-added infill lines (from the current line list) over to a
@@ -22586,7 +22823,7 @@ async function _doGenerateReport() {
  // live Leaflet map), so no fitBounds/settle delay on the live map is needed.
  let mapDataUrl = '';
  let mapHasScaleBar = false;
- // Deterministic renderer: composite satellite tiles + overlays onto a centred
+ // Deterministic renderer: composite GEBCO bathymetry tiles + overlays onto a centred
  // canvas. Robust against the html2canvas failures that previously produced an
  // off-centre or base-map-only image.
  try {
@@ -22738,7 +22975,7 @@ async function _doGenerateReport() {
  const inCanvas = document.createElement('canvas'); inCanvas.width = inW; inCanvas.height = inH;
  const ic = inCanvas.getContext('2d');
  ic.fillStyle = '#dce8f4'; ic.fillRect(0, 0, inW, inH);
- // Use Esri World_Topo_Map (reliable CORS support, same provider as main map)
+ // Use GEBCO shaded relief (reliable CORS, same default as the live map)
  // Esri tile URL format: tile/{z}/{y}/{x}
  const tilePromises = [];
  let loadedCount = 0;
@@ -22754,7 +22991,7 @@ async function _doGenerateReport() {
  img.crossOrigin = 'anonymous';
  img.onload = () => { try { ic.drawImage(img, px, py, 256, 256); loadedCount++; } catch(e){} resolve(); };
  img.onerror = () =>resolve();
- img.src = `https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/${regionZoom}/${ty}/${tx}`;
+ img.src = `${GEBCO_NCEI_TILE_URL}/${regionZoom}/${ty}/${tx}`;
  }));
  }
  }
@@ -23220,7 +23457,7 @@ ${schedRows}
  }
 }
 
-// Robust, deterministic report map renderer. Fetches satellite tiles for the
+// Robust, deterministic report map renderer. Fetches GEBCO bathymetry tiles for the
 // survey bounds (Web Mercator) and composites survey lines, planned route and
 // obstructions onto a fixed-size, centred canvas. Returns a PNG data URL.
 // This replaces html2canvas of the live Leaflet map, which intermittently
@@ -23266,21 +23503,30 @@ async function _renderReportMainMap(opts) {
  const toX = lon =>lon2mx(lon) * worldPx - originPxX;
  const toY = lat =>lat2my(lat) * worldPx - originPxY;
 
- // Fetch and composite the satellite tiles covering the canvas.
- const tileMinX = Math.floor(originPxX / 256), tileMaxX = Math.floor((originPxX + W) / 256);
- const tileMinY = Math.floor(originPxY / 256), tileMaxY = Math.floor((originPxY + H) / 256);
+ // Fetch and composite GEBCO bathymetry tiles covering the canvas.
+ // Native tiles stop around z10 over open ocean; upscale those rather than
+ // requesting Esri imagery that paints "Map data not yet available".
+ const nativeZ = Math.min(zoom, GEBCO_NCEI_NATIVE_ZOOM);
+ const tileScale = Math.pow(2, zoom - nativeZ);
+ const nativeN = Math.pow(2, nativeZ);
+ const nativeOriginX = originPxX / tileScale;
+ const nativeOriginY = originPxY / tileScale;
+ const nativeW = W / tileScale;
+ const nativeH = H / tileScale;
+ const tileMinX = Math.floor(nativeOriginX / 256), tileMaxX = Math.floor((nativeOriginX + nativeW) / 256);
+ const tileMinY = Math.floor(nativeOriginY / 256), tileMaxY = Math.floor((nativeOriginY + nativeH) / 256);
  const tilePromises = [];
  for (let tx = tileMinX; tx <= tileMaxX; tx++) {
  for (let ty = tileMinY; ty <= tileMaxY; ty++) {
- if (ty < 0 || ty >= nTiles) continue;
- const wrapX = ((tx % nTiles) + nTiles) % nTiles;
- const dx = tx * 256 - originPxX, dy = ty * 256 - originPxY;
+ if (ty < 0 || ty >= nativeN) continue;
+ const wrapX = ((tx % nativeN) + nativeN) % nativeN;
+ const dx = tx * 256 * tileScale - originPxX, dy = ty * 256 * tileScale - originPxY;
  tilePromises.push(new Promise(res => {
  const img = new Image();
  img.crossOrigin = 'anonymous';
- img.onload = () => { try { ctx.drawImage(img, dx, dy, 256, 256); } catch (e) {} res(); };
+ img.onload = () => { try { ctx.drawImage(img, dx, dy, 256 * tileScale, 256 * tileScale); } catch (e) {} res(); };
  img.onerror = () =>res();
- img.src = `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${zoom}/${ty}/${wrapX}`;
+ img.src = `${GEBCO_NCEI_TILE_URL}/${nativeZ}/${ty}/${wrapX}`;
  }));
  }
  }
