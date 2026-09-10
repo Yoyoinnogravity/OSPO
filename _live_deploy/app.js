@@ -491,6 +491,11 @@ function warnMobilePhoneThen(onContinue) {
  showMobileNotDesignedDialog(onContinue);
 }
 
+// Default 2D/3D view: Canada (both coasts + Arctic). Marine planning, not a
+// world-equator splash. GEBCO tiles are the same great map as the 2D default.
+const DEFAULT_MAP_CENTER = [56.0, -96.0];
+const DEFAULT_MAP_ZOOM = 3.8;
+
 // ===== CESIUM 3D GLOBE =====
 var cesiumViewer = null;
 var globeActive = isWebGLSupported() && !isMobileDevice() && (typeof Cesium !== 'undefined');
@@ -513,15 +518,25 @@ try {
  terrainProvider: new Cesium.EllipsoidTerrainProvider()
  });
 
- // Asynchronously load the local earth satellite texture
- Cesium.SingleTileImageryProvider.fromUrl('earth.jpg').then(provider => {
- if (cesiumViewer) {
- cesiumViewer.imageryLayers.removeAll();
- cesiumViewer.imageryLayers.addImageryProvider(provider);
+ // GEBCO 2024 shaded relief — same default as the 2D map. earth.jpg is a
+ // last-resort fallback if the tile service is blocked.
+ try {
+  cesiumViewer.imageryLayers.removeAll();
+  cesiumViewer.imageryLayers.addImageryProvider(new Cesium.UrlTemplateImageryProvider({
+   url: 'https://tiles.arcgis.com/tiles/C8EMgrsFcRFL6LrL/arcgis/rest/services/GEBCO_basemap_NCEI/MapServer/tile/{z}/{y}/{x}',
+   maximumLevel: 10,
+   credit: 'GEBCO Compilation Group; NOAA NCEI'
+  }));
+ } catch (imgErr) {
+  Cesium.SingleTileImageryProvider.fromUrl('earth.jpg').then(provider => {
+   if (cesiumViewer) {
+    cesiumViewer.imageryLayers.removeAll();
+    cesiumViewer.imageryLayers.addImageryProvider(provider);
+   }
+  }).catch(err => {
+   console.warn('Failed to load globe imagery:', err);
+  });
  }
- }).catch(err => {
- console.warn('Failed to load local earth texture:', err);
- });
 
  // Slow auto-rotation
  cesiumViewer.clock.onTick.addEventListener(() => {
@@ -530,30 +545,10 @@ try {
  }
  });
 
- // Center camera on user'location if available, otherwise fallback
- if (navigator.geolocation) {
- navigator.geolocation.getCurrentPosition(
- (pos) => {
- const lat = pos.coords.latitude;
- const lon = pos.coords.longitude;
- if (cesiumViewer && globeActive) {
- cesiumViewer.camera.setView({
- destination: Cesium.Cartesian3.fromDegrees(lon, lat, 12000000)
- });
- }
- },
- () => {
+ // Open on Canada so the first view after login matches the 2D GEBCO map
  if (cesiumViewer) {
  cesiumViewer.camera.setView({
- destination: Cesium.Cartesian3.fromDegrees(10, 20, 15000000)
- });
- }
- },
- { timeout: 5000 }
- );
- } else {
- cesiumViewer.camera.setView({
- destination: Cesium.Cartesian3.fromDegrees(10, 20, 15000000)
+  destination: Cesium.Cartesian3.fromDegrees(DEFAULT_MAP_CENTER[1], DEFAULT_MAP_CENTER[0], 8200000)
  });
  }
 
@@ -710,8 +705,8 @@ function initLeafletMap() {
 
  document.getElementById('map').style.display = 'block';
  map = L.map('map', {
- center: [20, 0],
- zoom: 3,
+ center: DEFAULT_MAP_CENTER,
+ zoom: DEFAULT_MAP_ZOOM,
  zoomControl: false,
  attributionControl: true,
  // Fine-grained zoom: fractional zoom levels in 0.1 steps, quarter-level
@@ -17740,6 +17735,7 @@ function enterWorkspace(mode) {
  if (!hadPref && !isGuestUser(window.currentUser, state.currentUser)) {
   setTimeout(showBaseLayerChooser, 200);
  }
+ setTimeout(openDefaultPlanningMap, 50);
 }
 
 function showWorkspaceChooser() {
@@ -17750,6 +17746,31 @@ function showWorkspaceChooser() {
 function selectSignInWorkspace() { /* no-op: maps only */ }
 function getSignInWorkspacePreference() { return 'planning'; }
 function initSignInWorkspaceUi() { /* no-op */ }
+
+// After sign-in, show the GEBCO map on Canada immediately — do not leave the
+// user on the 3D splash. Keep Cesium alive so 3D still works. If a preplot is
+// already loaded, leave the view on the survey.
+function openDefaultPlanningMap() {
+ if (state.lines && state.lines.length) return;
+ const globeEl = document.getElementById('cesium-globe');
+ const mapEl = document.getElementById('map');
+ const btn = document.getElementById('ctrl-mode-toggle');
+ if (globeActive) {
+  globeActive = false;
+  if (globeEl) globeEl.style.display = 'none';
+ }
+ if (mapEl) mapEl.style.display = 'block';
+ if (btn) {
+  btn.textContent = '3D';
+  btn.style.background = '#e67e22';
+ }
+ if (!map) {
+  if (typeof initLeafletMap === 'function') initLeafletMap();
+ } else {
+  try { map.invalidateSize(); } catch (_) {}
+  map.setView(DEFAULT_MAP_CENTER, DEFAULT_MAP_ZOOM);
+ }
+}
 
 function showBaseLayerChooser() {
  // Default to GEBCO ocean, never Esri satellite (blank over open water)
@@ -17900,6 +17921,12 @@ function switchBaseMap(baseName) {
  layers: '0,1,2,3,4,5,6,7,8,9,10,11,12', format: 'image/png', transparent: true, version: '1.3.0',
  attribution: 'NOAA ENC', minZoom: CHART_MIN_ZOOM, maxZoom: 22
  });
+ // Canadian Hydrographic Service ENC (S-57) — Atlantic, Pacific, Arctic, Great
+ // Lakes. Same MCS stack as NOAA; not for navigation.
+ const canadaEnc = L.tileLayer.wms('https://egisp.dfo-mpo.gc.ca/arcgis/rest/services/chs/ENC_MaritimeChartService/MapServer/exts/MaritimeChartService/WMSServer', {
+ layers: '0,1,2,3,4,5,6,7,8,9,10,11,12', format: 'image/png', transparent: true, version: '1.3.0',
+ attribution: 'CHS ENC (not for navigation)', minZoom: CHART_MIN_ZOOM, maxZoom: 22
+ });
  // Kartverket'official raster charts, open under CC-BY 4.0 - Norwegian
  // waters including Svalbard and the Barents Sea.
  const norwayCharts = L.tileLayer.wms('https://wms.geonorge.no/skwms1/wms.sjokartraster2', {
@@ -17909,7 +17936,7 @@ function switchBaseMap(baseName) {
  const seamarks = L.tileLayer('https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png', {
  attribution: '(c) OpenSeaMap contributors', maxNativeZoom: 18, maxZoom: 22, opacity: 0.95
  });
- currentBaseLayer = L.layerGroup([bathyChart, noaaEnc, norwayCharts, seamarks]);
+ currentBaseLayer = L.layerGroup([bathyChart, noaaEnc, canadaEnc, norwayCharts, seamarks]);
  currentBaseLayer.addTo(map);
  localStorage.setItem('candooka_baseLayer', baseName);
  document.querySelectorAll('input[name="basemap"], input[name="layers-basemap"]').forEach(r => {

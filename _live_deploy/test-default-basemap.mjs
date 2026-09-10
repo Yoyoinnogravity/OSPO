@@ -15,7 +15,7 @@ function assert(cond, msg) {
   }
 }
 
-assert(/app\.js\?v=17\.29/.test(html), 'app.js cache bump 17.29 missing');
+assert(/app\.js\?v=17\.30/.test(html), 'app.js cache bump 17.30 missing');
 assert(/const DEFAULT_BASEMAP = 'ocean'/.test(src), 'DEFAULT_BASEMAP must be ocean');
 assert(/GEBCO_basemap_NCEI/.test(src), 'GEBCO NCEI tile service missing');
 assert(/function createGebcoOceanLayer/.test(src), 'createGebcoOceanLayer helper missing');
@@ -28,6 +28,10 @@ assert(/selectBaseLayer\('ocean'\)/.test(html), 'chooser must offer Ocean / GEBC
 assert(/value="ocean"[^>]*checked/.test(html), 'Layers radio default must be ocean');
 assert(!/value="satellite"[^>]*checked/.test(html), 'Layers radio must not default to satellite');
 assert(/Ocean \/ GEBCO bathymetry \(default\)/.test(html), 'Layers label must name GEBCO as default');
+assert(/const DEFAULT_MAP_CENTER = \[56\.0, -96\.0\]/.test(src), 'initial view must be Canada');
+assert(/function openDefaultPlanningMap/.test(src), 'login must open the 2D GEBCO map immediately');
+assert(/ENC_MaritimeChartService/.test(src), 'nautical stack must include CHS Canada ENC');
+assert(/UrlTemplateImageryProvider/.test(src), '3D globe must use GEBCO tiles, not only earth.jpg');
 assert(/saved === 'satellite'/.test(src), 'old satellite preference must migrate to ocean');
 assert(/GEBCO_NCEI_TILE_URL/.test(src), 'report renderer must use GEBCO tiles');
 assert(!src.includes("img.src = `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${zoom}"),
@@ -72,6 +76,6 @@ console.log(JSON.stringify({
   ok: true,
   defaultBasemap: 'ocean',
   provider: 'GEBCO NCEI',
-  cache: '17.29',
+  cache: '17.30',
 }, null, 2));
 process.exit(0);
