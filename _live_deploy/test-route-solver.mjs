@@ -112,7 +112,7 @@ vm.runInContext(`
   else { const _t = showToast; showToast = function(){}; }
 `, ctx);
 
-assert(/app\.js\?v=17\.31/.test(html), 'app.js cache bump 17.31 missing');
+assert(/app\.js\?v=17\.32/.test(html), 'app.js cache bump 17.32 missing');
 assert(/id="val-turn-radius">3\.5km/.test(html), 'toolbar RADIUS default must be 3.5km not 5.1');
 assert(/id="input-turn-radius" value="3500"/.test(html), 'turn-radius input default must be 3500 m');
 assert(!/value="5100"/.test(html), 'HTML must not default min turn radius to 5100');
@@ -590,6 +590,17 @@ assert(vm.runInContext('state.settings.numSwaths', ctx) === 6, 'persisted swath 
 assert(vm.runInContext('state.settings.swathCountUserSet', ctx) === true, 'user-elected flag must restore');
 assert(vm.runInContext('state.settings.swathDirections[0]', ctx) === 'high-low', 'swath directions must restore');
 assert(vm.runInContext('state.showSwaths', ctx) === false, 'swaths off/on must restore');
+assert(vm.runInContext('localStorage.getItem("candooka_swath_election")', ctx).indexOf('"numSwaths":6') >= 0,
+  'device blob must store the elected count');
+vm.runInContext(`
+  state.currentUser = 'guest@candooka.world';
+  state.settings.numSwaths = 2;
+  state.settings.swathCountUserSet = false;
+  state.showSwaths = true;
+  _restoreSwathElection();
+`, ctx);
+assert(vm.runInContext('state.settings.numSwaths', ctx) === 6, 'election must survive login user-key change');
+assert(vm.runInContext('state.settings.swathCountUserSet', ctx) === true, 'user-elected flag must survive login');
 vm.runInContext(`
   const nsEl = { value: '6', dataset: {} };
   const swEl = { value: '' };
@@ -604,7 +615,7 @@ assert(vm.runInContext('globalThis.__autoNs', ctx) === '6',
 
 console.log(JSON.stringify({
   ok: true,
-  cache: '17.31',
+  cache: '17.32',
   rule: '2D skip-k; 3D swath shooting (adjacent monopass, locked heading, stadium returns)',
   kNom,
   nn: { visit: nn.nVisit, mode: nn.stats.mode, ms: nn.ms },

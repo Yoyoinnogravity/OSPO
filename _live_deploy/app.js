@@ -4722,18 +4722,67 @@ function _persistSwathDefaults(dirs) {
 
 // Persist the user's swath election (count, whether they chose it, directions,
 // on/off) so a reload, login, or Survey Criteria Auto pass cannot throw it away.
+function _swathElectionPayload() {
+ const n = parseInt(state.settings.numSwaths, 10);
+ return {
+  numSwaths: (isFinite(n) && n >= 1) ? Math.max(1, Math.min(10, n)) : 2,
+  userSet: !!state.settings.swathCountUserSet,
+  directions: Array.isArray(state.settings.swathDirections) ? state.settings.swathDirections : [],
+  show: state.showSwaths !== false
+ };
+}
+
+function _applySwathElectionPayload(p) {
+ if (!p || typeof p !== 'object') return;
+ const n = parseInt(p.numSwaths, 10);
+ if (isFinite(n) && n >= 2) state.settings.numSwaths = Math.max(2, Math.min(10, n));
+ if (p.userSet === true || p.userSet === '1') state.settings.swathCountUserSet = true;
+ else if (p.userSet === false || p.userSet === '0') state.settings.swathCountUserSet = false;
+ if (Array.isArray(p.directions) && p.directions.length) state.settings.swathDirections = p.directions;
+ if (p.show === false || p.show === '0') state.showSwaths = false;
+ else if (p.show === true || p.show === '1') state.showSwaths = true;
+}
+
+function _swathUserPrefix() {
+ return userKey('default_num_swaths').replace(/default_num_swaths$/, '');
+}
+
+function _writeSwathElectionKey(prefix, payload) {
+ localStorage.setItem(prefix + 'default_num_swaths', String(payload.numSwaths));
+ localStorage.setItem(prefix + 'default_swath_count_user', payload.userSet ? '1' : '0');
+ if (payload.directions && payload.directions.length) {
+  localStorage.setItem(prefix + 'default_swath_directions', JSON.stringify(payload.directions));
+ }
+}
+
+function _readSwathElectionFromPrefix(prefix) {
+ const n = parseInt(localStorage.getItem(prefix + 'default_num_swaths'), 10);
+ const elected = localStorage.getItem(prefix + 'default_swath_count_user');
+ if (!isFinite(n) && elected !== '1' && elected !== '0') return null;
+ let directions = [];
+ try {
+  const raw = localStorage.getItem(prefix + 'default_swath_directions');
+  const parsed = raw ? JSON.parse(raw) : [];
+  if (Array.isArray(parsed)) directions = parsed;
+ } catch (_) {}
+ return {
+  numSwaths: isFinite(n) ? n : undefined,
+  userSet: elected === '1' ? true : elected === '0' ? false : undefined,
+  directions,
+  show: undefined
+ };
+}
+
 function _persistSwathElection() {
  try {
- const n = parseInt(state.settings.numSwaths, 10);
- if (isFinite(n) && n >= 1) localStorage.setItem(userKey('default_num_swaths'), String(n));
- localStorage.setItem(userKey('default_swath_count_user'), state.settings.swathCountUserSet ? '1' : '0');
- if (Array.isArray(state.settings.swathDirections) && state.settings.swathDirections.length) {
-  _persistSwathDefaults(state.settings.swathDirections);
- }
- localStorage.setItem('candooka_show_swaths', state.showSwaths === false ? '0' : '1');
- // Number of Swaths is the election; drop a leftover width so reload cannot
- // regroup into Auto-derived bands.
- if (state.settings.swathCountUserSet) {
+ const payload = _swathElectionPayload();
+ localStorage.setItem('candooka_swath_election', JSON.stringify(payload));
+ _writeSwathElectionKey(_swathUserPrefix(), payload);
+ // Page-load restore runs before login (currentUser is still "Guest").
+ _writeSwathElectionKey('candooka_Guest_', payload);
+ if (payload.directions.length) _persistSwathDefaults(payload.directions);
+ localStorage.setItem('candooka_show_swaths', payload.show ? '1' : '0');
+ if (payload.userSet) {
   try { localStorage.removeItem(userKey('default_swath')); } catch (_) {}
  }
  } catch (_) {}
@@ -4741,18 +4790,16 @@ function _persistSwathElection() {
 
 function _restoreSwathElection() {
  try {
-  const n = parseInt(localStorage.getItem(userKey('default_num_swaths')), 10);
-  if (isFinite(n) && n >= 2) state.settings.numSwaths = Math.max(2, Math.min(10, n));
-  const elected = localStorage.getItem(userKey('default_swath_count_user'));
-  if (elected === '1') state.settings.swathCountUserSet = true;
-  else if (elected === '0') state.settings.swathCountUserSet = false;
-  const dirs = localStorage.getItem(userKey('default_swath_directions'));
-  if (dirs) {
-   try {
-    const parsed = JSON.parse(dirs);
-    if (Array.isArray(parsed) && parsed.length) state.settings.swathDirections = parsed;
-   } catch (_) {}
-  }
+  let payload = null;
+  try {
+   payload = JSON.parse(localStorage.getItem('candooka_swath_election') || 'null');
+  } catch (_) { payload = null; }
+  const fromUser = _readSwathElectionFromPrefix(_swathUserPrefix());
+  const fromGuest = _readSwathElectionFromPrefix('candooka_Guest_');
+  // Prefer a user-elected record (logged-in keys, Guest keys, then the
+  // device blob) so Auto never wins over a count the user already picked.
+  const elected = [fromUser, fromGuest, payload].find(p => p && (p.userSet === true || p.userSet === '1'));
+  _applySwathElectionPayload(elected || fromUser || fromGuest || payload);
   const show = localStorage.getItem('candooka_show_swaths');
   if (show === '0') state.showSwaths = false;
   else if (show === '1') state.showSwaths = true;
@@ -8548,7 +8595,7 @@ function _mapSwathsBlockHtml() {
   '<div style="display:flex;align-items:center;gap:8px;margin-top:8px;">' +
   '<span style="color:#c0c8d4;font-size:11px;font-weight:700;flex:1;">Number of swaths</span>' +
   '<button type="button" onclick="nudgeMapSwathCount(-1)" title="Fewer swaths" style="' + btn + '">\u2212</button>' +
-  '<input id="map-num-swaths" type="number" min="2" max="10" step="1" value="' + n + '" onchange="setMapSwathCount(this.value)" style="width:44px;height:26px;text-align:center;background:#0a0a12;border:1px solid #2a2a3a;color:#e2e8f0;border-radius:4px;font-size:12px;font-weight:700;outline:none;" />' +
+  '<input id="map-num-swaths" type="number" min="2" max="10" step="1" value="' + n + '" onchange="setMapSwathCount(this.value)" oninput="setMapSwathCount(this.value)" style="width:44px;height:26px;text-align:center;background:#0a0a12;border:1px solid #2a2a3a;color:#e2e8f0;border-radius:4px;font-size:12px;font-weight:700;outline:none;" />' +
   '<button type="button" onclick="nudgeMapSwathCount(1)" title="More swaths" style="' + btn + '">+</button>' +
   '</div>' +
   '<div style="font-size:9px;color:#8a9bb0;margin-top:4px;">2\u201310. Bands draw on the preplot for 3D.</div>' +

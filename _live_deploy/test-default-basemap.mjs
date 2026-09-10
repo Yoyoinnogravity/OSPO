@@ -15,7 +15,7 @@ function assert(cond, msg) {
   }
 }
 
-assert(/app\.js\?v=17\.31/.test(html), 'app.js cache bump 17.31 missing');
+assert(/app\.js\?v=17\.32/.test(html), 'app.js cache bump 17.32 missing');
 assert(/const DEFAULT_BASEMAP = 'ocean'/.test(src), 'DEFAULT_BASEMAP must be ocean');
 assert(/GEBCO_basemap_NCEI/.test(src), 'GEBCO NCEI tile service missing');
 assert(/function createGebcoOceanLayer/.test(src), 'createGebcoOceanLayer helper missing');
@@ -31,6 +31,7 @@ assert(/Ocean \/ GEBCO bathymetry \(default\)/.test(html), 'Layers label must na
 assert(/const DEFAULT_MAP_CENTER = \[56\.0, -96\.0\]/.test(src), 'initial view must be Canada');
 assert(/function _persistSwathElection/.test(src), 'swath election persist helper missing');
 assert(/function _restoreSwathElection/.test(src), 'swath election restore helper missing');
+assert(/candooka_swath_election/.test(src), 'device-level swath election blob missing');
 assert(/swathCountUserSet/.test(src), 'user swath count flag missing');
 assert(/function openDefaultPlanningMap/.test(src), 'login must open the GEBCO planning map');
 assert(/ENC_MaritimeChartService/.test(src), 'nautical stack must include CHS Canada ENC');
@@ -79,6 +80,6 @@ console.log(JSON.stringify({
   ok: true,
   defaultBasemap: 'ocean',
   provider: 'GEBCO NCEI',
-  cache: '17.31',
+  cache: '17.32',
 }, null, 2));
 process.exit(0);
