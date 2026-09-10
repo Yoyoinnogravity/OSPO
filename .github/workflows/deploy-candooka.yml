@@ -1,0 +1,68 @@
+# Optional push-button deploy for candooka.world. Aled does not need PowerShell.
+#
+# Primary path for Cursor Cloud Agents is still:
+#   ./_live_deploy/deploy.sh
+# with Cursor environment secret VPS_SSH_PASSWORD.
+#
+# To enable this Action, add the same value as a GitHub Actions secret named
+# VPS_SSH_PASSWORD (Settings → Secrets and variables → Actions). Then Cursor
+# (or anyone) can run: Actions → "Deploy candooka.world" → Run workflow.
+# workflow_dispatch only — it does not deploy on every git push.
+#
+# Does not touch users-db.json / accounts DB.
+name: Deploy candooka.world
+
+on:
+  workflow_dispatch:
+    inputs:
+      check_only:
+        description: SSH check only — list live files, do not overwrite
+        type: boolean
+        default: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: SSH to VPS and sync front-end from this commit
+        uses: appleboy/ssh-action@v1.2.5
+        env:
+          DEPLOY_SHA: ${{ github.sha }}
+          CHECK_ONLY: ${{ github.event.inputs.check_only }}
+        with:
+          host: 159.198.66.11
+          username: root
+          password: ${{ secrets.VPS_SSH_PASSWORD }}
+          command_timeout: 5m
+          envs: DEPLOY_SHA,CHECK_ONLY
+          script: |
+            set -euo pipefail
+            WEB=/var/www/candooka
+            echo "user=$(whoami) host=$(hostname)"
+            ls -l -- "$WEB/index.html" "$WEB/style.css" "$WEB/style.min.css" "$WEB/app.js"
+            echo "--- users-db (listing only, never written) ---"
+            ls -l -- "$WEB/api/users-db.json" 2>/dev/null || echo "(no users-db.json visible — ok)"
+            grep -oE '(style.min.css|app.js)[?]v=[0-9.]+' "$WEB/index.html" | sort -u
+            if [ "${CHECK_ONLY:-false}" = "true" ]; then
+              echo "CHECK OK — no files were changed."
+              exit 0
+            fi
+            BK=/root/cursor-deploy-backup-$(date -u +%Y%m%dT%H%M%SZ)
+            mkdir -p "$BK"
+            cp -a "$WEB/index.html" "$WEB/style.css" "$WEB/style.min.css" "$WEB/app.js" "$BK/"
+            echo "Backup in $BK"
+            BASE="https://raw.githubusercontent.com/Yoyoinnogravity/OSPO/${DEPLOY_SHA}/_live_deploy"
+            curl -fsSL "$BASE/index.html" -o "$WEB/index.html"
+            curl -fsSL "$BASE/style.css" -o "$WEB/style.css"
+            curl -fsSL "$BASE/style.min.css" -o "$WEB/style.min.css"
+            curl -fsSL "$BASE/app.js" -o "$WEB/app.js"
+            if [ -f "$WEB/about.html" ]; then
+              chown --reference="$WEB/about.html" \
+                "$WEB/index.html" "$WEB/style.css" "$WEB/style.min.css" "$WEB/app.js" || true
+            elif id nginx >/dev/null 2>&1; then
+              chown nginx:nginx "$WEB/index.html" "$WEB/style.css" "$WEB/style.min.css" "$WEB/app.js" || true
+            fi
+            echo DONE
+            grep -oE '(style.min.css|app.js)[?]v=[0-9.]+' "$WEB/index.html" | sort -u
+            ls -l -- "$WEB/index.html" "$WEB/style.css" "$WEB/style.min.css" "$WEB/app.js"
+            echo "users-db.json was not part of this deploy."

@@ -1,0 +1,7 @@
+# Live credentials and login logs — never commit; a 0-byte or LFS pointer file wipes sign-in.
+_live_deploy/api/users-db.json
+_live_deploy/api/users-db.json.bak
+_live_deploy/api/*.bak
+_live_deploy/api/login-logs.json
+_live_deploy/api/trial-signups.json
+_live_deploy/api/ray3d_quotes.json
