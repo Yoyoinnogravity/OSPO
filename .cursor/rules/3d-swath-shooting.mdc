@@ -1,0 +1,17 @@
+---
+description: Locked 3D swath shooting rules — do not invent a new tour
+alwaysApply: true
+globs: "_live_deploy/**/*.js"
+---
+
+# 3D swath shooting (locked)
+
+Aled already defined this. Do not "fix" or replace it without his OK.
+
+1. A **swath** is a contiguous band of **neighbouring sail lines** (a line next to a line).
+2. **Acquire per swath**: finish the swath as a block, then the next. Do not skip-k racetrack inside a 3D swath.
+3. Survey Criteria **Low→High / High→Low is the heading on every line in that swath**. No opposite headings on adjacent lines inside a swath (geophysics: feathering / azimuth / residual). Skip-k reverse is **2D only**.
+4. **Minimise opposite adjacent lines.** Pair-alternating default headings still put an opposite pair at a swath join. Do not change that default unless Aled asks.
+5. Live candooka.world (`app.js?v=17.23`) walks swaths 0, 1, 2… with locked per-swath heading. Draft PRs 36/37 (stadium returns, fastest swath-block tour, skip-neighbour interleaved) are **not** live. Do not deploy them without his OK.
+
+If asked "is this the quickest?": the legal 3D plan is neighbour-in-swath + one heading per swath. That is slower than 2D skip-k. Live Auto does **not** search every legal swath-block tour.

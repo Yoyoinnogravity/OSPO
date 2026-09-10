@@ -1,0 +1,21 @@
+---
+description: Do not change Candooka or the live site without Aled's explicit OK
+alwaysApply: true
+---
+
+# Aled's OK is required
+
+Aled Morgan owns candooka.world. Agents forget this and ship planner, login, or live-account changes he did not ask for. Stop.
+
+## Hard stops unless Aled explicitly asked in this conversation
+
+- Do not change 3D swath shooting, route order, headings, Survey Criteria 3D defaults, or `planSwathBlockRacetracks`.
+- Do not POST to `users.php`, change live account roles/passwords, or edit `users-db.json`.
+- Do not deploy to the VPS / candooka.world (`deploy.sh`, rsync, SSH).
+- Do not "improve" a working flow, retarget a PR, or merge behaviour from another draft PR.
+
+If he asked a question, answer it. If he asked to lock a rule, only add the rule/tests. Do not implement extra product changes as a side effect.
+
+## Draft PRs
+
+Open a draft PR only for work he asked for. Leave other draft PRs (3D Auto, stadium returns, login restore, etc.) untouched until he says to use them.
