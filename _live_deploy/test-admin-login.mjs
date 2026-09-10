@@ -19,10 +19,10 @@ const ADMIN_PASSWORD = 'candooka2024';
 const slice = js.slice(begin, end);
 const helpers = new Function(
   'ADMIN_PASSWORD',
-  `${slice}\nreturn { isAdminishUser, isAdminPanelPassword, ADMIN_UNLOCK_PINS, OWNER_USERNAMES, OWNER_EMAILS };`
+  `${slice}\nreturn { isAdminishUser, isAdminPanelPassword, ADMIN_UNLOCK_PINS, collectAdminUnlockIdentities };`
 )(ADMIN_PASSWORD);
 
-const { isAdminishUser, isAdminPanelPassword, ADMIN_UNLOCK_PINS } = helpers;
+const { isAdminishUser, isAdminPanelPassword, ADMIN_UNLOCK_PINS, collectAdminUnlockIdentities } = helpers;
 
 assert.deepEqual(ADMIN_UNLOCK_PINS, ['1234', '9999']);
 assert.equal(isAdminPanelPassword('candooka2024'), true);
@@ -47,8 +47,16 @@ assert.equal(isAdminishUser({ name: 'MURAT', role: 'operator' }), false);
 assert.equal(isAdminishUser({}, 'Aled'), true);
 assert.equal(isAdminishUser({}, 'admin@candooka.world'), true);
 
+const ids = collectAdminUnlockIdentities({ typedUsername: 'GUEST' }).map((s) => s.toLowerCase());
+assert.ok(ids.includes('aled'), 'GUEST in the sign-in box must not hide Aled');
+assert.ok(ids.includes('admin'));
+assert.ok(ids.includes('aledmorgan@gmail.com'));
+assert.ok(ids.includes('guest'));
+
 assert.match(js, /async function adminLogin\s*\(/);
 assert.match(js, /isAdminPanelPassword\(pw\)/);
+assert.match(js, /collectAdminUnlockIdentities\(/);
+assert.match(js, /That is the GUEST password/);
 assert.match(js, /function completeAdminLogin\s*\(/);
 assert.doesNotMatch(
   js,
@@ -56,8 +64,9 @@ assert.doesNotMatch(
   'adminLogin must not only compare the master password'
 );
 
-assert.match(html, /app\.js\?v=17\.29/);
+assert.match(html, /app\.js\?v=17\.30/);
 assert.match(html, /onkeydown="if\(event\.key==='Enter'\)\{event\.preventDefault\(\);adminLogin\(\);\}"/);
 assert.match(html, /event\.preventDefault\(\); showAdminLogin\(\)/);
+assert.match(html, /Not the GUEST sign-in/);
 
 console.log('test-admin-login.mjs: ok');

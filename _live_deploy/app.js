@@ -15153,6 +15153,33 @@ function isAdminPanelPassword(pw) {
  if (ADMIN_UNLOCK_PINS.indexOf(p) !== -1) return true;
  return false;
 }
+
+function collectAdminUnlockIdentities(opts) {
+ opts = opts || {};
+ const out = [];
+ const push = function (v) {
+  const s = String(v || '').trim();
+  if (s) out.push(s);
+ };
+ push('admin');
+ OWNER_USERNAMES.forEach(push);
+ OWNER_EMAILS.forEach(push);
+ push(opts.typedUsername);
+ push(opts.currentName);
+ push(opts.currentEmail);
+ (opts.users || []).forEach(function (u) {
+  if (!isAdminishUser(u)) return;
+  push(u.name);
+  push(u.email);
+ });
+ const seen = new Set();
+ return out.filter(function (id) {
+  const k = id.toLowerCase();
+  if (seen.has(k)) return false;
+  seen.add(k);
+  return true;
+ });
+}
 // --- admin-login-helpers end ---
 
 function isGuestUser(user, identity) {
@@ -15393,12 +15420,17 @@ async function adminLogin() {
   fail('Enter the admin password');
   return;
  }
+ if (pw === GUEST_PASSWORD) {
+  fail('That is the GUEST password. Close this box, change GUEST to Aled, and click SIGN IN.');
+  return;
+ }
  // Master password + documented PINs (1234 / 9999).
  if (isAdminPanelPassword(pw)) {
   completeAdminLogin();
   return;
  }
- // Also accept the live admin account password, or the signed-in owner's password.
+ // Accept any admin / owner account password. Do not rely on the sign-in
+ // username — GUEST is often still in that field when this dialog opens.
  try {
   const tryAuth = async function (identity) {
    if (!identity) return null;
@@ -15412,23 +15444,29 @@ async function adminLogin() {
    if (res.ok && data && data.ok && data.user) return data.user;
    return null;
   };
-  let found = await tryAuth('admin');
-  if (stale()) return;
-  if (!found && window.currentUser) {
-   found = await tryAuth(window.currentUser.email || window.currentUser.name);
-  }
-  if (stale()) return;
-  if (!found) {
-   const typedUser = document.getElementById('signin-username');
-   if (typedUser && typedUser.value) found = await tryAuth(String(typedUser.value).trim());
-  }
-  if (stale()) return;
-  if (found && isAdminishUser(found)) {
-   completeAdminLogin();
-   return;
+  let users = [];
+  try {
+   const listRes = await fetch('api/users.php', { cache: 'no-store' });
+   const listData = await listRes.json().catch(function () { return {}; });
+   if (listData && Array.isArray(listData.users)) users = listData.users;
+  } catch (_) {}
+  const typedUser = document.getElementById('signin-username');
+  const identities = collectAdminUnlockIdentities({
+   typedUsername: typedUser && typedUser.value,
+   currentName: window.currentUser && window.currentUser.name,
+   currentEmail: window.currentUser && window.currentUser.email,
+   users: users
+  });
+  for (let i = 0; i < identities.length; i++) {
+   if (stale()) return;
+   const found = await tryAuth(identities[i]);
+   if (found && isAdminishUser(found, identities[i])) {
+    completeAdminLogin();
+    return;
+   }
   }
  } catch (_) {}
- fail('Incorrect password');
+ fail('Incorrect password. Close this and SIGN IN as Aled, or use the admin password.');
 }
 
 // ===== LOGIN NOTIFICATION =====
