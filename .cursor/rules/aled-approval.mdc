@@ -5,17 +5,18 @@ alwaysApply: true
 
 # Aled's OK is required
 
-Aled Morgan owns candooka.world. Agents forget this and ship planner, login, or live-account changes he did not ask for. Stop.
+Aled Morgan owns candooka.world. Agents have changed the product, live accounts, and 3D shooting without being asked. Stop.
 
 ## Hard stops unless Aled explicitly asked in this conversation
 
-- Do not change 3D swath shooting, route order, headings, Survey Criteria 3D defaults, or `planSwathBlockRacetracks`.
-- Do not POST to `users.php`, change live account roles/passwords, or edit `users-db.json`.
-- Do not deploy to the VPS / candooka.world (`deploy.sh`, rsync, SSH).
-- Do not "improve" a working flow, retarget a PR, or merge behaviour from another draft PR.
+- Do not change 3D swath shooting, route order, headings, or Survey Criteria 3D defaults.
+- Do not change live `users-db` / account roles, POST to `users.php`, or edit `users-db.json`.
+- Do not revert Aled's live role. A previous agent already set it to Admin and stacked login JS without deploying. Leave that role as Admin unless he asks to change it. Live account edits need his OK going forward.
+- Do not deploy to the VPS / candooka.world (`deploy.sh`, rsync, SSH). Live is still `app.js?v=17.23`.
+- Do not "improve" a working flow, retarget a PR, or merge behaviour from another draft PR as a side effect.
 
-If he asked a question, answer it. If he asked to lock a rule, only add the rule/tests. Do not implement extra product changes as a side effect.
+If he asked a question, answer it. If he asked to lock a rule, only add the rule/tests. Do not implement extra product changes.
 
 ## Draft PRs
 
-Open a draft PR only for work he asked for. Leave other draft PRs (3D Auto, stadium returns, login restore, etc.) untouched until he says to use them.
+Open a draft PR only for work he asked for. Leave other draft PRs (3D Auto / stadium / fastest tour, login restore, etc.) untouched until he says to use them.
