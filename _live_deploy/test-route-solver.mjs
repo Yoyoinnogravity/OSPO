@@ -107,7 +107,7 @@ vm.runInContext(`
   else { const _t = showToast; showToast = function(){}; }
 `, ctx);
 
-assert(/app\.js\?v=17\.23/.test(html), 'app.js cache bump 17.23 missing');
+assert(/app\.js\?v=17\.24/.test(html), 'app.js cache bump 17.24 missing');
 assert(/id="val-turn-radius">3\.5km/.test(html), 'toolbar RADIUS default must be 3.5km not 5.1');
 assert(/id="input-turn-radius" value="3500"/.test(html), 'turn-radius input default must be 3500 m');
 assert(!/value="5100"/.test(html), 'HTML must not default min turn radius to 5100');
@@ -132,6 +132,10 @@ assert(src.includes('showLabels: false'), 'labels must default off');
 assert(src.includes('lmSetPriority'), 'Line Manager priority setter missing');
 assert(src.includes('Math.max(1, Math.min(100, priorityNum))'), 'Line Manager 1-100 clamp missing');
 assert(src.includes('function _prioNorm'), 'priority normalizer missing');
+assert(src.includes('Band by line number only'),
+  '3D interleaved must band swaths by line number, not Line Manager Priority');
+assert(!src.includes('Line priorities override swath interleave order'),
+  '3D must not let Priority shred swath blocks');
 assert(src.includes('first !== lo && first !== hi'), 'corner-start guard missing');
 assert(src.includes('swath-blocks'), '3D block-complete stats missing');
 assert(!src.includes('fillBudget:'), 'Family E every-rank fill must be gone');
@@ -401,10 +405,63 @@ const tPrio = plan(makeGrid(12), { surveyType: '2d', progression: 'auto' });
 assert(tPrio.nVisit === 12, 'priority Auto must visit all 12');
 assert(src.includes('min="1" max="100"'), 'Line Manager UI 1-100 missing');
 
+function swathOfRank(rank, n, numSw) {
+  return Math.floor(rank / Math.ceil(n / numSw));
+}
+function swathBlocksIntact(ranks, n, numSw) {
+  const seen = new Set();
+  let prev = swathOfRank(ranks[0], n, numSw);
+  seen.add(prev);
+  for (let i = 1; i < ranks.length; i++) {
+    const s = swathOfRank(ranks[i], n, numSw);
+    if (s !== prev) {
+      if (seen.has(s)) return false;
+      seen.add(s);
+      prev = s;
+    }
+  }
+  return true;
+}
+function adjacentInsideSwath(ranks, n, numSw) {
+  for (let i = 1; i < ranks.length; i++) {
+    if (swathOfRank(ranks[i], n, numSw) !== swathOfRank(ranks[i - 1], n, numSw)) continue;
+    if (Math.abs(ranks[i] - ranks[i - 1]) !== 1) return false;
+  }
+  return true;
+}
+
+// Aled's case: Line Manager P1 on a line in a later swath must NOT jump into
+// swath 1. 83 primes / 10 swaths, P1 on line 81 (last swath).
+const n83 = 83, sw10 = 10;
+setup(makeGrid(n83), { surveyType: '3d', progression: 'interleaved', numSwaths: sw10 });
+vm.runInContext('state.lineStatus[81].priority = 1', ctx);
+vm.runInContext('state._lastRoute = computeRoute()', ctx);
+const r83 = ranksFromNames(visitNames());
+assert(r83.length === n83, '3D+priority must visit all 83, got ' + r83.length);
+assert(swathBlocksIntact(r83, n83, sw10),
+  'P1 must not interleave swaths, first12=' + r83.slice(0, 12).join(','));
+assert(adjacentInsideSwath(r83, n83, sw10),
+  'inside a swath still neighbour-to-neighbour with Priority set');
+assert(r83.slice(0, 2).every((r) => swathOfRank(r, n83, sw10) === swathOfRank(81, n83, sw10)),
+  'P1 swath must be acquired first as a block, first=' + r83.slice(0, 4).join(','));
+assert(!(r83[0] === 81 && swathOfRank(r83[1], n83, sw10) === 0),
+  'P1 line 81 must not be yanked out of its swath into swath 1');
+
+const n20 = 20, sw4 = 4;
+setup(makeGrid(n20), { surveyType: '3d', progression: 'interleaved', numSwaths: sw4 });
+vm.runInContext('state.lineStatus[17].priority = 1', ctx);
+vm.runInContext('state._lastRoute = computeRoute()', ctx);
+const r20 = ranksFromNames(visitNames());
+assert(r20.length === n20, '20-line 3D+priority must visit all 20');
+assert(swathBlocksIntact(r20, n20, sw4),
+  'P1 from swath 4 must not land in swath 1, order=' + r20.join(','));
+assert(r20.slice(0, 5).every((r) => swathOfRank(r, n20, sw4) === swathOfRank(17, n20, sw4)),
+  'first block must be the P1 swath, first5=' + r20.slice(0, 5).join(','));
+
 console.log(JSON.stringify({
   ok: true,
-  cache: '17.23',
-  rule: '2D skip-k racetrack; 3D swath blocks with one heading per swath',
+  cache: '17.24',
+  rule: '2D skip-k racetrack; 3D swath blocks with one heading per swath; Priority does not break swaths',
   kNom,
   nn: { visit: nn.nVisit, mode: nn.stats.mode, ms: nn.ms },
   auto12: { first: auto12.skip.first, mean: +auto12.skip.mean.toFixed(2), mode: auto12.stats.mode },
