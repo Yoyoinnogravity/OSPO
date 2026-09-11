@@ -70,6 +70,7 @@ def test_script_credits_fifteen_squared():
     assert "Fifteen Squared" in script
     assert "END RESULT" in script
     assert "Phi" in script
+    assert "cryptic.fun" in script
 
 
 def test_parse_title_variants():

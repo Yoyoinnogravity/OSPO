@@ -1,37 +1,32 @@
-Two Down
-========
+cryptic.fun
+===========
 
-Two cryptic clues a day, pulled from [Fifteen Squared](https://fifteensquared.net/),
-spoken for a YouTube Short. Channel voice: **Sonia** (`en-GB-SoniaNeural`) —
-clear southern British, slowed slightly so the wordplay lands.
+Two cryptic clues a day from [Fifteen Squared](https://fifteensquared.net/),
+spoken by **Sonia** (`en-GB-SoniaNeural`), published to **cryptic.fun** and
+YouTube Shorts.
 
-This does not invent answers. It reads the 15² blog, checks the enumeration,
-picks a contrasting pair, rewrites a short spoken parse, then renders audio
-and a 9:16 card.
-
-Run
----
+The agent does not invent answers. It reads the 15² blog, checks the
+enumeration, picks a contrasting pair, speaks the parse, then writes the
+site and (when OAuth is present) uploads two unlisted Shorts.
 
 ```bash
-cd two-down
-python3 -m venv .venv
-.venv/bin/pip install -e ".[dev]"
-.venv/bin/twodown voices
-.venv/bin/twodown today
+pip install -e "./two-down[dev]"
+twodown today
 ```
 
-Output lands in `two-down/output/YYYY-MM-DD/<clue>/`:
+Layout: newsprint cream, crimson `.fun`, clue first then reveal.
+Voice: Sonia. Swap with `--voice ryan`.
 
-- `voice.mp3` — Sonia reading the parse
-- `card.png` / `short.mp4` — vertical still + audio
-- `script.txt` — what she says
-- `pair.json` — the day's pair
+YouTube
+-------
 
-Voices: `sonia` (default), `libby`, `ryan`, `thomas`.
+Uploads need an authorized user token (not an API key):
 
 ```bash
-.venv/bin/twodown today --voice ryan
+export TWODOWN_YOUTUBE_TOKEN=/path/to/token.json
+twodown today --youtube-privacy unlisted
 ```
 
-Do not auto-upload. Each video must name the setter, the paper, the 15²
-blogger, and link the post. `cryptic.fit` is the redirect, not a second blog.
+Without that file the pair still lands in `two-down/site/` for cryptic.fun.
+Point the domain’s DNS at GitHub Pages or any static host serving that folder.
+The site `CNAME` is `cryptic.fun`.

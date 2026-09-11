@@ -51,7 +51,7 @@ def write_script(clue: Clue) -> str:
     parse = _spoken_parse(clue.parse, clue.answer)
     definition = f" It means {clue.definition}." if clue.definition else ""
     return (
-        f"Two Down. {setter} in the {paper}. "
+        f"cryptic.fun. {setter} in the {paper}. "
         f"The clue: {clue.clue}{enum}. "
         f"{device} {parse} "
         f"The answer is {clue.answer}.{definition} "

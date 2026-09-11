@@ -8,13 +8,15 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
 from twodown.config import (
-    CARD_BG,
-    CARD_CREAM,
-    CARD_GOLD,
-    CARD_MUTED,
+    CRIMSON,
     FONT_BOLD,
     FONT_REGULAR,
     FONT_SANS,
+    FONT_SANS_BOLD,
+    INK,
+    MUTED,
+    NEWS_BG,
+    NEWS_GRID,
 )
 from twodown.models import Clue
 
@@ -42,63 +44,137 @@ def _wrap(draw: ImageDraw.ImageDraw, text: str, font: ImageFont.FreeTypeFont, ma
     return "\n".join(lines)
 
 
-def draw_card(clue: Clue, dest: Path) -> Path:
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    img = Image.new("RGB", (WIDTH, HEIGHT), CARD_BG)
+def _canvas() -> tuple[Image.Image, ImageDraw.ImageDraw]:
+    img = Image.new("RGB", (WIDTH, HEIGHT), NEWS_BG)
     draw = ImageDraw.Draw(img)
-    title = _font(FONT_SANS, 36)
-    clue_font = _font(FONT_REGULAR, 52)
-    answer_font = _font(FONT_BOLD, 64)
+    for x in range(0, WIDTH, 54):
+        draw.line([(x, 0), (x, HEIGHT)], fill=NEWS_GRID, width=1)
+    for y in range(0, HEIGHT, 54):
+        draw.line([(0, y), (WIDTH, y)], fill=NEWS_GRID, width=1)
+    draw.rectangle([64, 64, WIDTH - 64, 72], fill=CRIMSON)
+    draw.rectangle([64, HEIGHT - 72, WIDTH - 64, HEIGHT - 64], fill=CRIMSON)
+    return img, draw
+
+
+def _wordmark(draw: ImageDraw.ImageDraw) -> None:
+    brand = _font(FONT_SANS_BOLD, 42)
+    draw.text((80, 100), "cryptic", font=brand, fill=INK)
+    w = draw.textlength("cryptic", font=brand)
+    draw.text((80 + w, 100), ".fun", font=brand, fill=CRIMSON)
+
+
+def _meta(draw: ImageDraw.ImageDraw, clue: Clue) -> None:
     meta = _font(FONT_SANS, 28)
-    small = _font(FONT_SANS, 24)
+    draw.text((80, 168), f"{clue.paper} {clue.puzzle_id}  ·  {clue.setter}", font=meta, fill=MUTED)
+    draw.text((80, 210), f"{clue.number} {clue.direction}  ·  {clue.device}", font=meta, fill=CRIMSON)
 
-    draw.text((80, 90), "TWO DOWN", font=title, fill=CARD_GOLD)
-    draw.text(
-        (80, 150),
-        f"{clue.paper} {clue.puzzle_id}  ·  {clue.setter}",
-        font=meta,
-        fill=CARD_MUTED,
-    )
-    draw.text(
-        (80, 190),
-        f"{clue.number} {clue.direction}  ·  {clue.device}",
-        font=meta,
-        fill=CARD_MUTED,
-    )
 
-    clue_body = clue.clue
-    if clue.enumeration:
-        clue_body = f"{clue.clue} ({clue.enumeration})"
-    wrapped = _wrap(draw, clue_body, clue_font, WIDTH - 160)
-    draw.multiline_text((80, 320), wrapped, font=clue_font, fill=CARD_CREAM, spacing=16)
+def _clue_block(draw: ImageDraw.ImageDraw, clue: Clue, y: int = 320) -> int:
+    clue_font = _font(FONT_REGULAR, 56)
+    body = f"{clue.clue} ({clue.enumeration})" if clue.enumeration else clue.clue
+    wrapped = _wrap(draw, body, clue_font, WIDTH - 160)
+    draw.multiline_text((80, y), wrapped, font=clue_font, fill=INK, spacing=18)
+    box = draw.multiline_textbbox((80, y), wrapped, font=clue_font, spacing=18)
+    return box[3]
 
-    clue_box = draw.multiline_textbbox((80, 320), wrapped, font=clue_font, spacing=16)
-    answer_y = min(max(clue_box[3] + 80, 900), 1300)
-    draw.text((80, answer_y), clue.answer, font=answer_font, fill=CARD_GOLD)
 
-    parse = textwrap.fill(clue.parse, width=42)
-    draw.multiline_text((80, answer_y + 110), parse[:320], font=small, fill=CARD_MUTED, spacing=8)
-
-    draw.text((80, HEIGHT - 140), "cryptic.fit", font=meta, fill=CARD_GOLD)
-    draw.text((80, HEIGHT - 90), "Parse via Fifteen Squared", font=small, fill=CARD_MUTED)
+def draw_clue_card(clue: Clue, dest: Path) -> Path:
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    img, draw = _canvas()
+    _wordmark(draw)
+    _meta(draw, clue)
+    _clue_block(draw, clue)
+    hint = _font(FONT_SANS, 28)
+    draw.text((80, HEIGHT - 180), "Have a think. Answer in a moment.", font=hint, fill=MUTED)
     img.save(dest, "PNG")
     return dest
 
 
-def render_video(card: Path, audio: Path, dest: Path) -> Path:
+def draw_reveal_card(clue: Clue, dest: Path) -> Path:
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    img, draw = _canvas()
+    _wordmark(draw)
+    _meta(draw, clue)
+    bottom = _clue_block(draw, clue, y=280)
+    answer_font = _font(FONT_BOLD, 72)
+    parse_font = _font(FONT_SANS, 26)
+    answer_y = min(max(bottom + 70, 860), 1180)
+    draw.text((80, answer_y), clue.answer, font=answer_font, fill=CRIMSON)
+    parse = textwrap.fill(clue.parse, width=40)
+    draw.multiline_text((80, answer_y + 110), parse[:300], font=parse_font, fill=MUTED, spacing=8)
+    foot = _font(FONT_SANS, 24)
+    draw.text((80, HEIGHT - 180), "Parse via Fifteen Squared", font=foot, fill=MUTED)
+    img.save(dest, "PNG")
+    return dest
+
+
+def draw_card(clue: Clue, dest: Path) -> Path:
+    return draw_reveal_card(clue, dest)
+
+
+def _ffprobe_seconds(path: Path) -> float:
+    ffmpeg_probe = shutil.which("ffprobe")
+    if not ffmpeg_probe:
+        return 24.0
+    result = subprocess.run(
+        [
+            ffmpeg_probe,
+            "-v",
+            "error",
+            "-show_entries",
+            "format=duration",
+            "-of",
+            "default=noprint_wrappers=1:nokey=1",
+            str(path),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    try:
+        return float(result.stdout.strip())
+    except ValueError:
+        return 24.0
+
+
+def render_video(
+    clue_card: Path,
+    reveal_card: Path,
+    audio: Path,
+    dest: Path,
+) -> Path:
     dest.parent.mkdir(parents=True, exist_ok=True)
     ffmpeg = shutil.which("ffmpeg")
     if not ffmpeg:
         raise RuntimeError("ffmpeg is required to build the Short")
+    duration = _ffprobe_seconds(audio)
+    clue_secs = max(7.0, min(duration * 0.42, duration - 6.0))
+    reveal_secs = max(6.0, duration - clue_secs + 0.4)
     cmd = [
         ffmpeg,
         "-y",
         "-loop",
         "1",
+        "-t",
+        f"{clue_secs:.2f}",
         "-i",
-        str(card),
+        str(clue_card),
+        "-loop",
+        "1",
+        "-t",
+        f"{reveal_secs:.2f}",
+        "-i",
+        str(reveal_card),
         "-i",
         str(audio),
+        "-filter_complex",
+        "[0:v]fps=30,scale=1080:1920,setsar=1[v0];"
+        "[1:v]fps=30,scale=1080:1920,setsar=1[v1];"
+        "[v0][v1]concat=n=2:v=1:a=0,format=yuv420p[v]",
+        "-map",
+        "[v]",
+        "-map",
+        "2:a",
         "-c:v",
         "libx264",
         "-tune",
@@ -107,11 +183,7 @@ def render_video(card: Path, audio: Path, dest: Path) -> Path:
         "aac",
         "-b:a",
         "192k",
-        "-pix_fmt",
-        "yuv420p",
         "-shortest",
-        "-vf",
-        "scale=1080:1920",
         str(dest),
     ]
     subprocess.run(cmd, check=True, capture_output=True)

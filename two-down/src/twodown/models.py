@@ -60,7 +60,10 @@ class SpokenClue(BaseModel):
     voice: str
     audio_path: str | None = None
     card_path: str | None = None
+    clue_card_path: str | None = None
     video_path: str | None = None
+    youtube_id: str | None = None
+    site_path: str | None = None
 
 
 class DailyPair(BaseModel):
@@ -68,3 +71,5 @@ class DailyPair(BaseModel):
     voice: str
     clues: list[SpokenClue] = Field(default_factory=list)
     source_posts: list[str] = Field(default_factory=list)
+    youtube_ids: list[str] = Field(default_factory=list)
+    site_index: str | None = None

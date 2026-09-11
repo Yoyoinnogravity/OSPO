@@ -128,11 +128,6 @@ def _first_blue_strong(cell: Tag) -> str | None:
     return None
 
 
-def _paragraphs(cell: Tag) -> list[str]:
-    ps = [_clean(p.get_text(" ", strip=True)) for p in cell.find_all("p")]
-    return [p for p in ps if p]
-
-
 def _strip_leading_gloss(text: str) -> str:
     text = text.strip()
     if not text.startswith("("):
