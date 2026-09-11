@@ -15,11 +15,12 @@ from twodown.ingest import LONDON, fetch_daily_posts, posts_for_london_date
 from twodown.models import DailyPair, SpokenClue
 from twodown.parse import parse_post
 from twodown.render import audio_seconds, draw_clue_card, draw_reveal_card, render_video
+from twodown.scenes import pick_scenes
 from twodown.script import write_parts
 from twodown.select import select_pair
 from twodown.site import publish_site
+from twodown.social import publish_pair, setup_hints
 from twodown.voice import resolve_voice, synthesise, synthesise_parts
-from twodown.youtube import upload_pair, youtube_ready
 
 
 def _today_stamp(day: datetime | None) -> str:
@@ -43,6 +44,10 @@ def run_today(
     publish: bool = True,
     youtube: bool = True,
     youtube_privacy: str = "public",
+    scene: str | None = None,
+    tiktok: bool = True,
+    instagram: bool = True,
+    facebook: bool = True,
 ) -> DailyPair:
     posts = fetch_daily_posts()
     todays = posts_for_london_date(posts, day)
@@ -55,21 +60,23 @@ def run_today(
     dest_root.mkdir(parents=True, exist_ok=True)
     alias = _voice_alias(voice)
     resolved_voice = resolve_voice(alias)
+    scene_slugs = pick_scenes(stamp, len(pair_clues), scene)
     spoken: list[SpokenClue] = []
-    for clue in pair_clues:
+    for clue, scene_slug in zip(pair_clues, scene_slugs, strict=True):
         parts = write_parts(clue)
-        item = SpokenClue(clue=clue, script=parts.full, voice=resolved_voice)
+        item = SpokenClue(clue=clue, script=parts.full, voice=resolved_voice, scene=scene_slug)
         slot = dest_root / clue.slug
         slot.mkdir(parents=True, exist_ok=True)
         (slot / "script.txt").write_text(parts.full + "\n", encoding="utf-8")
         (slot / "clue.txt").write_text(
             f"{clue.paper} {clue.puzzle_id} by {clue.setter}\n"
             f"{clue.number} {clue.direction}\n{clue.clue} ({clue.enumeration})\n"
-            f"{clue.answer}\n{clue.device}\n{clue.source_url}\n",
+            f"{clue.answer}\n{clue.device}\n{clue.source_url}\n"
+            f"{scene_slug}\n",
             encoding="utf-8",
         )
-        clue_card = draw_clue_card(clue, slot / "clue.png")
-        reveal = draw_reveal_card(clue, slot / "card.png")
+        clue_card = draw_clue_card(clue, slot / "clue.png", scene=scene_slug)
+        reveal = draw_reveal_card(clue, slot / "card.png", scene=scene_slug)
         item.clue_card_path = str(clue_card)
         item.card_path = str(reveal)
         if speak:
@@ -101,14 +108,23 @@ def run_today(
         site = publish_site(result, SITE_ROOT)
         result.site_index = str(site / "index.html")
         (dest_root / "site-url.txt").write_text("https://cryptic.fun/\n", encoding="utf-8")
-    if youtube:
-        if not youtube_ready():
-            (dest_root / "youtube-skipped.txt").write_text(
-                "Cannot upload as Cryptic Fun: no OAuth token.\n"
-                "Set TWODOWN_YOUTUBE_TOKEN to an authorized user JSON for the Cryptic Fun channel.\n",
-                encoding="utf-8",
-            )
-        else:
-            result.youtube_ids = upload_pair(result, privacy=youtube_privacy)
+    if youtube or tiktok or instagram or facebook:
+        notes = publish_pair(
+            result,
+            youtube=youtube,
+            tiktok=tiktok,
+            instagram=instagram,
+            facebook=facebook,
+            youtube_privacy=youtube_privacy,
+        )
+        lines: list[str] = []
+        hints = setup_hints()
+        for platform, values in notes.items():
+            if values == [hints.get(platform)]:
+                lines.append(f"{platform}: skipped — {values[0]}")
+            elif values:
+                lines.append(f"{platform}: {', '.join(values)}")
+        if lines:
+            (dest_root / "social-status.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
     (dest_root / "pair.json").write_text(result.model_dump_json(indent=2), encoding="utf-8")
     return result

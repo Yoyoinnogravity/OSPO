@@ -63,9 +63,13 @@ class SpokenClue(BaseModel):
     clue_card_path: str | None = None
     video_path: str | None = None
     youtube_id: str | None = None
+    tiktok_id: str | None = None
+    instagram_id: str | None = None
+    facebook_id: str | None = None
     site_path: str | None = None
     voice_paths: dict[str, str] = Field(default_factory=dict)
     clue_hold_seconds: float | None = None
+    scene: str | None = None
 
 
 class DailyPair(BaseModel):
@@ -74,4 +78,7 @@ class DailyPair(BaseModel):
     clues: list[SpokenClue] = Field(default_factory=list)
     source_posts: list[str] = Field(default_factory=list)
     youtube_ids: list[str] = Field(default_factory=list)
+    tiktok_ids: list[str] = Field(default_factory=list)
+    instagram_ids: list[str] = Field(default_factory=list)
+    facebook_ids: list[str] = Field(default_factory=list)
     site_index: str | None = None

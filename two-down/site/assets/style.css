@@ -8,33 +8,59 @@
   --rule: rgba(184, 28, 41, 0.35);
 }
 * { box-sizing: border-box; }
-html { background: var(--news); }
+html { background: #120f0c; }
 body {
   margin: 0;
   color: var(--ink);
   font-family: "Liberation Serif", "Georgia", serif;
+  min-height: 100vh;
+}
+body.scene-newsprint {
   background:
     linear-gradient(transparent 53px, rgba(184,28,41,0.06) 54px),
     linear-gradient(90deg, transparent 53px, rgba(26,21,16,0.05) 54px),
     var(--news);
   background-size: 54px 54px, 54px 54px, auto;
-  min-height: 100vh;
 }
+body.scene-photo {
+  color: var(--cream);
+  background-color: #120f0c;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+}
+body.scene-photo::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(12,10,8,0.48) 0%, rgba(12,10,8,0.28) 42%, rgba(12,10,8,0.58) 100%);
+  pointer-events: none;
+  z-index: 0;
+}
+body > * { position: relative; z-index: 1; }
 a { color: var(--crimson); }
+body.scene-photo a { color: #ffb3b8; }
 header, main, footer { width: min(1100px, calc(100% - 40px)); margin: 0 auto; }
 header {
   display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  padding: 28px 0 18px;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px 18px 14px;
+  margin-top: 18px;
   border-bottom: 4px solid var(--crimson);
+  background: rgba(252, 247, 236, 0.92);
+  color: var(--ink);
+  box-shadow: 0 10px 40px rgba(8,6,4,0.18);
 }
+header a { color: var(--muted); }
+.chrome-top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
 .wordmark { font-family: "Liberation Sans", "Helvetica Neue", sans-serif; font-weight: 700; font-size: 1.6rem; letter-spacing: 0.02em; color: var(--ink); text-decoration: none; }
 .wordmark span { color: var(--crimson); }
 nav a { margin-left: 18px; font-family: "Liberation Sans", sans-serif; font-size: 0.9rem; text-decoration: none; color: var(--muted); }
-.voices { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-.voices span { font-family: "Liberation Sans", sans-serif; font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-right: 4px; }
-.voices button {
+.voices, .places { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.voices span, .places span { font-family: "Liberation Sans", sans-serif; font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-right: 4px; }
+.voices button, .places button {
   font-family: "Liberation Sans", sans-serif;
   background: transparent;
   border: 1px solid var(--rule);
@@ -43,19 +69,26 @@ nav a { margin-left: 18px; font-family: "Liberation Sans", sans-serif; font-size
   cursor: pointer;
   font-size: 0.85rem;
 }
-.voices button.on { background: var(--crimson); color: var(--cream); border-color: var(--crimson); }
-header { flex-wrap: wrap; gap: 12px; }
+.voices button.on, .places button.on { background: var(--crimson); color: var(--cream); border-color: var(--crimson); }
 h1 { font-size: clamp(2rem, 5vw, 3.4rem); line-height: 1.05; margin: 28px 0 8px; }
+body.scene-photo h1, body.scene-photo .lede { text-shadow: 0 2px 18px rgba(0,0,0,0.55); }
 .lede { font-size: 1.15rem; color: var(--muted); max-width: 40rem; }
+body.scene-photo .lede { color: #eadfd0; }
 .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; margin: 36px 0 64px; }
-@media (max-width: 800px) { .pair { grid-template-columns: 1fr; } }
+@media (max-width: 800px) {
+  .pair { grid-template-columns: 1fr; }
+  body.scene-photo { background-attachment: scroll; }
+}
 article.clue {
-  background: var(--cream);
+  background: rgba(252, 247, 236, 0.94);
+  color: var(--ink);
   border: 1px solid var(--rule);
   padding: 22px 22px 18px;
   box-shadow: 6px 6px 0 rgba(184, 28, 41, 0.12);
 }
+article.clue a { color: var(--crimson); }
 .kicker { font-family: "Liberation Sans", sans-serif; font-size: 0.78rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--crimson); margin: 0 0 12px; }
+body.scene-photo > main > .kicker { color: #ffb3b8; }
 .clue-text { font-size: 1.55rem; line-height: 1.25; margin: 0 0 18px; }
 button.reveal {
   font-family: "Liberation Sans", sans-serif;
@@ -74,4 +107,16 @@ audio.parse-voice { width: 100%; margin-top: 8px; }
 .answer { font-size: 2rem; color: var(--crimson); margin: 12px 0 6px; }
 .parse { color: var(--muted); font-size: 0.98rem; }
 .credit { font-family: "Liberation Sans", sans-serif; font-size: 0.85rem; }
-footer { border-top: 2px solid var(--crimson); padding: 24px 0 48px; color: var(--muted); font-family: "Liberation Sans", sans-serif; font-size: 0.85rem; }
+.scene-credits { list-style: none; padding: 0; }
+.scene-credits li { margin: 0 0 8px; }
+footer {
+  border-top: 2px solid var(--crimson);
+  padding: 24px 18px 48px;
+  margin-bottom: 24px;
+  color: var(--muted);
+  font-family: "Liberation Sans", sans-serif;
+  font-size: 0.85rem;
+  background: rgba(252, 247, 236, 0.92);
+}
+footer a { color: var(--crimson); }
+.scene-credit { margin-top: 10px; }

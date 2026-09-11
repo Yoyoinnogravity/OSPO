@@ -3,7 +3,8 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from twodown.config import BRAND, CLUES_PER_DAY, SITE_ORIGIN
+from twodown.captions import youtube_description
+from twodown.config import CLUES_PER_DAY
 from twodown.models import Clue, DailyPair, SpokenClue
 
 YOUTUBE_CHANNEL = "Cryptic Fun"
@@ -48,18 +49,7 @@ def video_title(clue: Clue) -> str:
 
 
 def video_description(item: SpokenClue) -> str:
-    clue = item.clue
-    page = item.site_path or SITE_ORIGIN
-    return (
-        f"{YOUTUBE_CHANNEL} — two cryptic clues a day.\n"
-        f"{BRAND}\n\n"
-        f"{clue.clue} ({clue.enumeration})\n"
-        f"Answer: {clue.answer}\n\n"
-        f"{page}\n"
-        f"Parse: {clue.source_url}\n"
-        f"{clue.paper} {clue.puzzle_id} by {clue.setter}. "
-        f"Blogged by {clue.blogger} on Fifteen Squared.\n"
-    )
+    return youtube_description(item)
 
 
 def upload_short(item: SpokenClue, privacy: str = "public") -> str | None:

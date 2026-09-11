@@ -1,0 +1,76 @@
+from pathlib import Path
+
+from twodown.models import Clue
+from twodown.render import draw_clue_card, draw_reveal_card
+from twodown.scenes import DEFAULT_SCENE, get_scene, list_scenes, pick_scenes, scenic_slugs
+from twodown.youtube import video_description
+from twodown.models import SpokenClue
+
+
+def _clue() -> Clue:
+    return Clue(
+        source_url="https://fifteensquared.net/example/",
+        paper="Independent",
+        puzzle_id="12458",
+        setter="Phi",
+        blogger="duncanshiell",
+        number="11",
+        direction="across",
+        clue="Hotel worker with a lot of guts taking on hotel work",
+        enumeration="7",
+        answer="BELLHOP",
+        parse="BELL + H + OP",
+        device="container",
+        enumeration_ok=True,
+    )
+
+
+def test_catalog_has_authentic_photos_and_newsprint():
+    slugs = [scene.slug for scene in list_scenes()]
+    assert slugs[-1] == "newsprint"
+    assert DEFAULT_SCENE == "machu-picchu"
+    assert "petra" in slugs
+    assert "santorini" in slugs
+    for scene in list_scenes():
+        if scene.is_photo:
+            assert scene.path is not None
+            assert scene.path.exists()
+            assert scene.commons_url
+            assert scene.license
+
+
+def test_pick_scenes_rotates_two_real_places():
+    pair = pick_scenes("2026-09-11", 2)
+    assert len(pair) == 2
+    assert pair[0] != pair[1]
+    assert set(pair) <= set(scenic_slugs())
+    assert pick_scenes("2026-09-11", 2) == pair
+    assert pick_scenes("2026-09-11", 2, scene="newsprint") == ["newsprint", "newsprint"]
+
+
+def test_draw_photo_card_is_not_newsprint(tmp_path: Path):
+    clue = _clue()
+    news = draw_clue_card(clue, tmp_path / "news.png", scene="newsprint")
+    photo = draw_clue_card(clue, tmp_path / "photo.png", scene="machu-picchu")
+    from PIL import Image
+
+    news_px = Image.open(news).getpixel((540, 960))
+    photo_px = Image.open(photo).getpixel((540, 960))
+    assert news_px != photo_px
+    reveal = Image.open(draw_reveal_card(clue, tmp_path / "reveal.png", scene="petra"))
+    assert reveal.size == (1080, 1920)
+
+
+def test_youtube_description_credits_the_photograph():
+    item = SpokenClue(
+        clue=_clue(),
+        script="x",
+        voice="en-GB-SoniaNeural",
+        scene="kyoto",
+        site_path="https://cryptic.fun/c/independent-12458-11a/",
+    )
+    text = video_description(item)
+    scene = get_scene("kyoto")
+    assert scene.photographer in text
+    assert scene.license in text
+    assert "Wikimedia" in text
