@@ -74,6 +74,25 @@ def test_publish_site_writes_spoiler_pages(tmp_path):
     assert (tmp_path / "robots.txt").exists()
     css = (tmp_path / "assets" / "style.css").read_text(encoding="utf-8")
     assert "body.scene-photo header a" in css
+    assert 'rel="canonical"' in index
+    assert 'property="og:title"' in index
+    assert "application/ld+json" in index
+    assert "END RESULT" not in index.split('name="description"', 1)[1].split(">", 1)[0]
+    assert 'data-nosnippet' in clue_page
+    assert "END RESULT" not in clue_page.split('name="description"', 1)[1].split(">", 1)[0]
+    assert "Rioting led unrest" in clue_page.split("<h1>", 1)[1].split("</h1>", 1)[0]
+    robots = (tmp_path / "robots.txt").read_text(encoding="utf-8")
+    assert "Sitemap: https://cryptic.fun/sitemap.xml" in robots
+    sitemap = (tmp_path / "sitemap.xml").read_text(encoding="utf-8")
+    assert "https://cryptic.fun/" in sitemap
+    assert "https://cryptic.fun/c/independent-12458-12a/" in sitemap
+    feed = (tmp_path / "feed.xml").read_text(encoding="utf-8")
+    assert "END RESULT" not in feed
+    assert "Rioting led unrest" in feed
+    assert (tmp_path / "media" / "og.webp").exists()
+    assert (tmp_path / ".nojekyll").exists()
+    assert (tmp_path / "assets" / "favicon.svg").exists()
+    assert "application/rss+xml" in index
 
 
 def test_youtube_titles_use_cryptic_fun_channel():

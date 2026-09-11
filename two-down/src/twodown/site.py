@@ -8,7 +8,25 @@ from shutil import copy2
 from twodown.ads import ads_enabled, ads_txt, adsense_client, adsense_slot
 from twodown.config import BRAND, SITE_ORIGIN, SITE_ROOT, SOURCE_SITE, SPONSOR_EMAIL, SUGGEST_EMAIL, VOICE_LABELS
 from twodown.models import DailyPair, SpokenClue
+from twodown.render import write_share_card
 from twodown.scenes import DEFAULT_SCENE, get_scene, list_scenes
+from twodown.seo import (
+    FAVICON_SVG,
+    PageSeo,
+    SHARE_IMAGE,
+    article_ld,
+    clue_description,
+    clue_share_title,
+    collect_sitemap_urls,
+    dumps_ld,
+    gsc_verification,
+    homepage_description,
+    item_list_ld,
+    robots_txt,
+    rss_xml,
+    sitemap_xml,
+    website_ld,
+)
 
 CSS = """
 :root {
@@ -439,18 +457,53 @@ def _keep_free_teaser(prefix: str) -> str:
     """
 
 
-def _page(title: str, body: str, depth: int = 0, show_ads: bool = False) -> str:
+def _page(body: str, seo: PageSeo, depth: int = 0, show_ads: bool = False) -> str:
     prefix = "../" * depth
     scene_prefix = f"{prefix}media/scenes/"
     default = get_scene(DEFAULT_SCENE)
     background = default.filename or "machu-picchu.webp"
     head_ads = _ads_head() if show_ads else ""
+    image = canonical_share = f"{SITE_ORIGIN}{SHARE_IMAGE}"
+    verify = gsc_verification()
+    verify_tag = (
+        f'<meta name="google-site-verification" content="{_e(verify)}">\n' if verify else ""
+    )
+    ld = ""
+    if seo.json_ld is not None:
+        ld = f'<script type="application/ld+json">{dumps_ld(seo.json_ld)}</script>\n'
+    published = ""
+    if seo.published:
+        published = f'<meta property="article:published_time" content="{_e(seo.published)}">\n'
+    extra = "\n".join(seo.extra)
     return f"""<!DOCTYPE html>
 <html lang="en-GB">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{_e(title)}</title>
+  <title>{_e(seo.title)}</title>
+  <meta name="description" content="{_e(seo.description)}">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <link rel="canonical" href="{_e(seo.canonical)}">
+  <link rel="alternate" hreflang="en-GB" href="{_e(seo.canonical)}">
+  <link rel="alternate" hreflang="x-default" href="{_e(seo.canonical)}">
+  <link rel="alternate" type="application/rss+xml" title="{_e(BRAND)}" href="{SITE_ORIGIN}/feed.xml">
+  <link rel="icon" href="{prefix}assets/favicon.svg" type="image/svg+xml">
+  <meta name="theme-color" content="#b81c29">
+  <meta name="color-scheme" content="light">
+  <meta property="og:site_name" content="{_e(BRAND)}">
+  <meta property="og:type" content="{_e(seo.og_type)}">
+  <meta property="og:locale" content="en_GB">
+  <meta property="og:title" content="{_e(seo.title)}">
+  <meta property="og:description" content="{_e(seo.description)}">
+  <meta property="og:url" content="{_e(seo.canonical)}">
+  <meta property="og:image" content="{_e(image)}">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="{_e(seo.title)}">
+  <meta name="twitter:description" content="{_e(seo.description)}">
+  <meta name="twitter:image" content="{_e(image)}">
+  {published}{verify_tag}{ld}{extra}
   <link rel="stylesheet" href="{prefix}assets/style.css">
   {head_ads}
 </head>
@@ -482,7 +535,7 @@ def _page(title: str, body: str, depth: int = 0, show_ads: bool = False) -> str:
 """
 
 
-def _article(item: SpokenClue, media_prefix: str, open_by_default: bool = False) -> str:
+def _article(item: SpokenClue, media_prefix: str, open_by_default: bool = False, show_clue_text: bool = True) -> str:
     clue = item.clue
     opened = " is-open" if open_by_default else ""
     video = ""
@@ -493,12 +546,13 @@ def _article(item: SpokenClue, media_prefix: str, open_by_default: bool = False)
         f'src="{_e(media_prefix + clue.slug)}-sonia.mp3"></audio>'
     )
     enum = f" ({_e(clue.enumeration)})" if clue.enumeration else ""
+    clue_block = f'<p class="clue-text">{_e(clue.clue)}{enum}</p>' if show_clue_text else ""
     return f"""
     <article class="clue{opened}" data-slug="{_e(clue.slug)}">
       <p class="kicker">{_e(clue.paper)} {_e(clue.puzzle_id)} · {_e(clue.setter)} · {_e(clue.number)} {_e(clue.direction)} · {_e(clue.device)}</p>
-      <p class="clue-text">{_e(clue.clue)}{enum}</p>
+      {clue_block}
       <button class="reveal" type="button">Solve</button>
-      <div class="spoiler">
+      <div class="spoiler" data-nosnippet>
         {video}
         {audio}
         <p class="answer">{_e(clue.answer)}</p>
@@ -556,7 +610,10 @@ def publish_site(pair: DailyPair, dest: Path | None = None) -> Path:
     (root / "assets" / "style.css").write_text(CSS, encoding="utf-8")
     (root / "assets" / "app.js").write_text(JS, encoding="utf-8")
     (root / "CNAME").write_text("cryptic.fun\n", encoding="utf-8")
-    (root / "robots.txt").write_text("User-agent: *\nAllow: /\n", encoding="utf-8")
+    (root / ".nojekyll").write_text("", encoding="utf-8")
+    (root / "robots.txt").write_text(robots_txt(), encoding="utf-8")
+    (root / "assets" / "favicon.svg").write_text(FAVICON_SVG, encoding="utf-8")
+    write_share_card(root / "media" / "og.webp")
     ads_path = root / "ads.txt"
     listing = ads_txt()
     if listing:
@@ -582,15 +639,35 @@ def publish_site(pair: DailyPair, dest: Path | None = None) -> Path:
       <a class="action" href="suggest.html">Suggest today’s clue</a>
     </aside>
     """
-    (root / "index.html").write_text(_page(f"{BRAND} — {pretty}", index_body, show_ads=True), encoding="utf-8")
+    (root / "index.html").write_text(
+        _page(
+            index_body,
+            PageSeo(
+                title=f"Two cryptic clues · {pretty} — {BRAND}",
+                description=homepage_description(pretty),
+                path="/",
+                json_ld=[website_ld(), item_list_ld(pair)],
+                published=pair.date,
+            ),
+            show_ads=True,
+        ),
+        encoding="utf-8",
+    )
 
     day_dir = root / "d" / pair.date
     day_dir.mkdir(parents=True, exist_ok=True)
     day_articles = "\n".join(_article(item, "../../media/") for item in pair.clues)
     (day_dir / "index.html").write_text(
         _page(
-            f"{BRAND} — {pretty}",
             f"<h1>{_e(pretty)}</h1><section class='pair'>{day_articles}</section>{_keep_free_teaser('../../')}",
+            PageSeo(
+                title=f"Two cryptic clues · {pretty} — {BRAND}",
+                description=homepage_description(pretty),
+                path=f"/d/{pair.date}/",
+                og_type="article",
+                json_ld=item_list_ld(pair),
+                published=pair.date,
+            ),
             depth=2,
             show_ads=True,
         ),
@@ -600,9 +677,28 @@ def publish_site(pair: DailyPair, dest: Path | None = None) -> Path:
     for item in pair.clues:
         page_dir = root / "c" / item.clue.slug
         page_dir.mkdir(parents=True, exist_ok=True)
-        body = f"<h1>One clue.</h1>{_article(item, '../../media/', open_by_default=False)}"
+        enum = f" ({_e(item.clue.enumeration)})" if item.clue.enumeration else ""
+        body = (
+            f'<p class="kicker">One clue.</p>'
+            f"<h1>{_e(item.clue.clue)}{enum}</h1>"
+            f"{_article(item, '../../media/', open_by_default=False, show_clue_text=False)}"
+        )
         path = page_dir / "index.html"
-        path.write_text(_page(f"{item.clue.clue} — {BRAND}", body, depth=2), encoding="utf-8")
+        path.write_text(
+            _page(
+                body,
+                PageSeo(
+                    title=clue_share_title(item.clue),
+                    description=clue_description(item.clue),
+                    path=f"/c/{item.clue.slug}/",
+                    og_type="article",
+                    json_ld=article_ld(item.clue, canonical=f"{SITE_ORIGIN}/c/{item.clue.slug}/", published=pair.date),
+                    published=pair.date,
+                ),
+                depth=2,
+            ),
+            encoding="utf-8",
+        )
         item.site_path = f"{SITE_ORIGIN}/c/{item.clue.slug}/"
 
     about = f"""
@@ -616,7 +712,19 @@ def publish_site(pair: DailyPair, dest: Path | None = None) -> Path:
     {_about_credits()}
     {_ad_unit()}
     """
-    (root / "about.html").write_text(_page(f"About — {BRAND}", about, show_ads=True), encoding="utf-8")
+    (root / "about.html").write_text(
+        _page(
+            about,
+            PageSeo(
+                title=f"About — {BRAND}",
+                description="cryptic.fun publishes two cryptic clues a day from the Independent, Guardian and FT blogs on Fifteen Squared. We never invent answers.",
+                path="/about.html",
+                json_ld=website_ld(),
+            ),
+            show_ads=True,
+        ),
+        encoding="utf-8",
+    )
 
     inbox = _e(SUGGEST_EMAIL)
     suggest = f"""
@@ -662,7 +770,17 @@ def publish_site(pair: DailyPair, dest: Path | None = None) -> Path:
       </section>
     </div>
     """
-    (root / "suggest.html").write_text(_page("Suggest a clue — {BRAND}".format(BRAND=BRAND), suggest), encoding="utf-8")
+    (root / "suggest.html").write_text(
+        _page(
+            suggest,
+            PageSeo(
+                title=f"Suggest a clue — {BRAND}",
+                description="Send one homemade cryptic a day, or ask for a daily clue by email. Answers stay off the public page.",
+                path="/suggest.html",
+            ),
+        ),
+        encoding="utf-8",
+    )
 
     sponsor = _e(SPONSOR_EMAIL)
     support = f"""
@@ -692,7 +810,18 @@ def publish_site(pair: DailyPair, dest: Path | None = None) -> Path:
     </ul>
     {_ad_unit()}
     """
-    (root / "support.html").write_text(_page(f"Support — {BRAND}", support, show_ads=True), encoding="utf-8")
+    (root / "support.html").write_text(
+        _page(
+            support,
+            PageSeo(
+                title=f"Support — {BRAND}",
+                description="How cryptic.fun stays free: YouTube Shorts, a labelled site ad under the pair, and crossword sponsors. Ads never sit on the answer.",
+                path="/support.html",
+            ),
+            show_ads=True,
+        ),
+        encoding="utf-8",
+    )
 
     privacy = f"""
     <h1>Privacy.</h1>
@@ -708,6 +837,18 @@ def publish_site(pair: DailyPair, dest: Path | None = None) -> Path:
     </section>
     <p>Questions: <a href="mailto:{_e(SUGGEST_EMAIL)}">{_e(SUGGEST_EMAIL)}</a>.</p>
     """
-    (root / "privacy.html").write_text(_page(f"Privacy — {BRAND}", privacy), encoding="utf-8")
+    (root / "privacy.html").write_text(
+        _page(
+            privacy,
+            PageSeo(
+                title=f"Privacy — {BRAND}",
+                description="cryptic.fun is a static site. Voice and place stay in your browser. Display ads stay off until a UK consent banner is in place.",
+                path="/privacy.html",
+            ),
+        ),
+        encoding="utf-8",
+    )
+    (root / "feed.xml").write_text(rss_xml(pair, pretty), encoding="utf-8")
+    (root / "sitemap.xml").write_text(sitemap_xml(collect_sitemap_urls(root, pair)), encoding="utf-8")
     pair.site_index = f"{SITE_ORIGIN}/"
     return root

@@ -223,8 +223,32 @@ def draw_reveal_card(clue: Clue, dest: Path, scene: str | Scene | None = None) -
     return dest
 
 
-def draw_card(clue: Clue, dest: Path, scene: str | Scene | None = None) -> Path:
-    return draw_reveal_card(clue, dest, scene=scene)
+def write_share_card(dest: Path, scene: str | Scene | None = None) -> Path:
+    """1200×630 Open Graph card. Webp so Git LFS does not swallow it."""
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest = dest.with_suffix(".webp")
+    resolved = get_scene(scene)
+    width, height = 1200, 630
+    if resolved.is_photo and resolved.path and resolved.path.exists():
+        img = _cover_crop(Image.open(resolved.path), (width, height)).convert("RGBA")
+        dim = Image.new("RGBA", (width, height), (12, 10, 8, 96))
+        img = Image.alpha_composite(img, dim).convert("RGB")
+        ink, muted = PHOTO_INK, PHOTO_MUTED
+    else:
+        img = Image.new("RGB", (width, height), NEWS_BG)
+        ink, muted = INK, MUTED
+    draw = ImageDraw.Draw(img)
+    draw.rectangle([0, 0, width, 10], fill=CRIMSON)
+    draw.rectangle([0, height - 10, width, height], fill=CRIMSON)
+    word = _font(FONT_SANS_BOLD, 74)
+    sub = _font(FONT_REGULAR, 34)
+    draw.text((72, 200), "cryptic", font=word, fill=ink)
+    fun_x = 72 + draw.textlength("cryptic", font=word)
+    draw.text((fun_x, 200), ".fun", font=word, fill=CRIMSON)
+    draw.text((72, 300), "Two cryptic clues a day", font=sub, fill=muted)
+    draw.text((72, 350), "from Fifteen Squared", font=sub, fill=muted)
+    img.save(dest, "WEBP", quality=82)
+    return dest
 
 
 def _ffprobe_seconds(path: Path) -> float:

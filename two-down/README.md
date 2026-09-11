@@ -141,3 +141,25 @@ twodown status                                   # ads should read "ready"
 `two-down/site/ads.txt` is written only when the publisher id is set.
 The public copy is `two-down/site/support.html`.
 
+SEO
+---
+
+Every page gets a canonical `https://cryptic.fun/…` URL, a spoiler-safe
+description, Open Graph / Twitter cards, and JSON-LD. Answers are kept out of
+titles, descriptions and the RSS feed, and wrapped in `data-nosnippet` so
+Google should not print them in search results.
+
+Published with the site: `sitemap.xml`, `feed.xml`, `robots.txt`, `media/og.webp`.
+
+After the domain resolves:
+
+1. [Google Search Console](https://search.google.com/search-console) — add
+   `https://cryptic.fun`, then either paste the verification code as
+   `TWODOWN_GSC_VERIFY` and rebuild, or upload the HTML file Google gives you.
+2. Submit `https://cryptic.fun/sitemap.xml`.
+3. Same sitemap in [Bing Webmaster Tools](https://www.bing.com/webmasters).
+
+```bash
+twodown live    # which public URLs actually respond
+```
+

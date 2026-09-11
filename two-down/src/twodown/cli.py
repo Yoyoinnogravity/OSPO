@@ -7,8 +7,9 @@ from datetime import datetime
 from pathlib import Path
 
 from twodown.ads import ads_status
-from twodown.config import DEFAULT_OUTPUT, DEFAULT_VOICE_ALIAS, SOURCE_SITE
+from twodown.config import DEFAULT_OUTPUT, DEFAULT_VOICE_ALIAS, SITE_ORIGIN, SOURCE_SITE
 from twodown.ingest import LONDON
+from twodown.live import probe, public_checks
 from twodown.models import DailyPair
 from twodown.pipeline import run_today
 from twodown.scenes import DEFAULT_SCENE, list_scenes
@@ -142,6 +143,7 @@ def main(argv: list[str] | None = None) -> int:
     scenes.add_argument("--json", action="store_true")
 
     sub.add_parser("status", help="Show which social accounts are connected")
+    sub.add_parser("live", help="Check which public URLs actually respond")
 
     args = parser.parse_args(argv)
 
@@ -180,6 +182,24 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.cmd == "status":
         _print_status()
+        return 0
+
+    if args.cmd == "live":
+        print("Public URLs (live = HTTP 2xx/3xx from here right now)")
+        any_product = False
+        for name, url in public_checks():
+            state, detail = probe(url)
+            mark = "LIVE" if state == "live" else "down"
+            print(f"  {mark:4}  {name:16}  {url}  ({detail})")
+            if state == "live" and name not in {"Pull request"} and "15²" not in name and name != "Fifteen Squared":
+                any_product = True
+        if not any_product:
+            print()
+            print("cryptic.fun is not on the public internet yet.")
+            print("Merge the PR, turn on GitHub Pages, point DNS at GitHub, then these URLs will work:")
+            print(f"  {SITE_ORIGIN}/")
+            print(f"  {SITE_ORIGIN}/support.html")
+            print(f"  {SITE_ORIGIN}/sitemap.xml")
         return 0
 
     if args.cmd == "upload":
