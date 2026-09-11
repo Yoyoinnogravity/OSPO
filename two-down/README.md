@@ -113,6 +113,12 @@ different GoDaddy name — do not point the brand there.
    `185.199.109.153`, `185.199.110.153`, `185.199.111.153`.
 5. GitHub Pages custom domain: `cryptic.fun`.
 
+Do **not** upload with cPanel File Manager, FileZilla, or `scp` to
+`public_html`. That Namecheap article is for their paid web hosting. This
+site is already built in `two-down/site/` and GitHub Actions publishes it.
+Namecheap is only the registrar and DNS. If hosting was added to the cart
+by accident, leave it unused (same trap as `cryptic.fit`).
+
 `twodown live` prints this same order (registry first, then Pages, then DNS).
 
 YouTube still needs `TWODOWN_YOUTUBE_TOKEN` (OAuth for the Cryptic Fun channel),
