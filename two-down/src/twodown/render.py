@@ -19,6 +19,7 @@ from twodown.config import (
     NEWS_GRID,
 )
 from twodown.models import Clue
+from twodown.script import _spoken_parse
 
 WIDTH, HEIGHT = 1080, 1920
 
@@ -100,7 +101,7 @@ def draw_reveal_card(clue: Clue, dest: Path) -> Path:
     parse_font = _font(FONT_SANS, 26)
     answer_y = min(max(bottom + 70, 860), 1180)
     draw.text((80, answer_y), clue.answer, font=answer_font, fill=CRIMSON)
-    parse = textwrap.fill(clue.parse, width=40)
+    parse = textwrap.fill(_spoken_parse(clue.parse, clue.answer), width=40)
     draw.multiline_text((80, answer_y + 110), parse[:300], font=parse_font, fill=MUTED, spacing=8)
     foot = _font(FONT_SANS, 24)
     draw.text((80, HEIGHT - 180), "Parse via Fifteen Squared", font=foot, fill=MUTED)
