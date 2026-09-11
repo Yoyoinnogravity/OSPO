@@ -6,6 +6,7 @@ from pathlib import Path
 import edge_tts
 
 from twodown.config import DEFAULT_VOICE_ALIAS, VOICE_RATE, VOICES
+from twodown.script import ScriptParts, to_ssml
 
 
 def resolve_voice(name: str | None) -> str:
@@ -31,3 +32,13 @@ def synthesise(script: str, dest: Path, voice: str | None = None) -> Path:
     resolved = resolve_voice(voice)
     asyncio.run(_synth(script, dest, resolved))
     return dest
+
+
+def synthesise_parts(
+    parts: ScriptParts,
+    dest: Path,
+    voice: str | None = None,
+    pause_seconds: float | None = None,
+) -> Path:
+    ssml = to_ssml(parts, pause_seconds) if pause_seconds is not None else to_ssml(parts)
+    return synthesise(ssml, dest, voice)

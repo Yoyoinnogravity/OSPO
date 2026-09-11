@@ -8,7 +8,7 @@ CRAWL_GAP_SECONDS = 1.0
 
 DAILY_CATEGORY_SLUGS = frozenset({"independent", "ft", "guardian"})
 
-# Sonia: clear southern British, slightly slow for letter-play.
+# Sonia is the default; visitors can pick any of these on cryptic.fun.
 DEFAULT_VOICE_ALIAS = "sonia"
 VOICES = {
     "sonia": "en-GB-SoniaNeural",
@@ -16,7 +16,15 @@ VOICES = {
     "ryan": "en-GB-RyanNeural",
     "thomas": "en-GB-ThomasNeural",
 }
+VOICE_LABELS = {
+    "sonia": "Sonia",
+    "libby": "Libby",
+    "ryan": "Ryan",
+    "thomas": "Thomas",
+}
 VOICE_RATE = "-8%"
+THINK_PAUSE_SECONDS = 7.0
+CLUES_PER_DAY = 2
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_OUTPUT = PACKAGE_ROOT / "output"

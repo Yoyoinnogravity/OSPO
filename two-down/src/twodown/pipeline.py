@@ -3,21 +3,35 @@ from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
 
-from twodown.config import DEFAULT_OUTPUT, DEFAULT_VOICE_ALIAS, SITE_ROOT
+from twodown.config import (
+    CLUES_PER_DAY,
+    DEFAULT_OUTPUT,
+    DEFAULT_VOICE_ALIAS,
+    SITE_ROOT,
+    THINK_PAUSE_SECONDS,
+    VOICES,
+)
 from twodown.ingest import LONDON, fetch_daily_posts, posts_for_london_date
 from twodown.models import DailyPair, SpokenClue
 from twodown.parse import parse_post
-from twodown.render import draw_clue_card, draw_reveal_card, render_video
-from twodown.script import write_script
+from twodown.render import audio_seconds, draw_clue_card, draw_reveal_card, render_video
+from twodown.script import write_parts
 from twodown.select import select_pair
 from twodown.site import publish_site
-from twodown.voice import resolve_voice, synthesise
+from twodown.voice import resolve_voice, synthesise, synthesise_parts
 from twodown.youtube import upload_short, youtube_ready
 
 
 def _today_stamp(day: datetime | None) -> str:
     when = day or datetime.now(tz=LONDON)
     return when.astimezone(LONDON).date().isoformat()
+
+
+def _voice_alias(name: str | None) -> str:
+    if not name:
+        return DEFAULT_VOICE_ALIAS
+    key = name.strip().lower()
+    return key if key in VOICES else DEFAULT_VOICE_ALIAS
 
 
 def run_today(
@@ -33,20 +47,21 @@ def run_today(
     posts = fetch_daily_posts()
     todays = posts_for_london_date(posts, day)
     clues = [clue for post in todays for clue in parse_post(post)]
-    pair_clues = select_pair(clues, n=2)
+    pair_clues = select_pair(clues, n=CLUES_PER_DAY)
     stamp = _today_stamp(day if todays else None)
     if todays:
         stamp = todays[0].date.astimezone(LONDON).date().isoformat()
     dest_root = Path(out_dir or DEFAULT_OUTPUT) / stamp
     dest_root.mkdir(parents=True, exist_ok=True)
-    resolved_voice = resolve_voice(voice)
+    alias = _voice_alias(voice)
+    resolved_voice = resolve_voice(alias)
     spoken: list[SpokenClue] = []
     for clue in pair_clues:
-        script = write_script(clue)
-        item = SpokenClue(clue=clue, script=script, voice=resolved_voice)
+        parts = write_parts(clue)
+        item = SpokenClue(clue=clue, script=parts.full, voice=resolved_voice)
         slot = dest_root / clue.slug
         slot.mkdir(parents=True, exist_ok=True)
-        (slot / "script.txt").write_text(script + "\n", encoding="utf-8")
+        (slot / "script.txt").write_text(parts.full + "\n", encoding="utf-8")
         (slot / "clue.txt").write_text(
             f"{clue.paper} {clue.puzzle_id} by {clue.setter}\n"
             f"{clue.number} {clue.direction}\n{clue.clue} ({clue.enumeration})\n"
@@ -58,10 +73,22 @@ def run_today(
         item.clue_card_path = str(clue_card)
         item.card_path = str(reveal)
         if speak:
-            audio = synthesise(script, slot / "voice.mp3", resolved_voice)
-            item.audio_path = str(audio)
+            clue_only = synthesise(parts.clue_speech, slot / "clue-only.mp3", alias)
+            item.clue_hold_seconds = audio_seconds(clue_only) + THINK_PAUSE_SECONDS
+            paths: dict[str, str] = {}
+            for other in VOICES:
+                audio = synthesise_parts(parts, slot / f"voice-{other}.mp3", other)
+                paths[other] = str(audio)
+            item.voice_paths = paths
+            item.audio_path = paths[alias]
             if video:
-                movie = render_video(clue_card, reveal, audio, slot / "short.mp4")
+                movie = render_video(
+                    clue_card,
+                    reveal,
+                    Path(paths[alias]),
+                    slot / "short.mp4",
+                    clue_hold=item.clue_hold_seconds,
+                )
                 item.video_path = str(movie)
         spoken.append(item)
     result = DailyPair(

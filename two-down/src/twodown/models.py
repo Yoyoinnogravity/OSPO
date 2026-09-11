@@ -64,6 +64,8 @@ class SpokenClue(BaseModel):
     video_path: str | None = None
     youtube_id: str | None = None
     site_path: str | None = None
+    voice_paths: dict[str, str] = Field(default_factory=dict)
+    clue_hold_seconds: float | None = None
 
 
 class DailyPair(BaseModel):

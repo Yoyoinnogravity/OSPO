@@ -138,19 +138,27 @@ def _ffprobe_seconds(path: Path) -> float:
         return 24.0
 
 
+def audio_seconds(path: Path) -> float:
+    return _ffprobe_seconds(path)
+
+
 def render_video(
     clue_card: Path,
     reveal_card: Path,
     audio: Path,
     dest: Path,
+    clue_hold: float | None = None,
 ) -> Path:
     dest.parent.mkdir(parents=True, exist_ok=True)
     ffmpeg = shutil.which("ffmpeg")
     if not ffmpeg:
         raise RuntimeError("ffmpeg is required to build the Short")
     duration = _ffprobe_seconds(audio)
-    clue_secs = max(7.0, min(duration * 0.42, duration - 6.0))
-    reveal_secs = max(6.0, duration - clue_secs + 0.4)
+    if clue_hold is None:
+        clue_secs = max(7.0, min(duration * 0.42, duration - 6.0))
+    else:
+        clue_secs = max(4.0, min(clue_hold, duration - 4.0))
+    reveal_secs = max(4.0, duration - clue_secs + 0.4)
     cmd = [
         ffmpeg,
         "-y",

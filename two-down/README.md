@@ -14,8 +14,13 @@ pip install -e "./two-down[dev]"
 twodown today
 ```
 
-Layout: newsprint cream, crimson `.fun`, clue first then reveal.
-Voice: Sonia. Swap with `--voice ryan`.
+Layout: newsprint cream, crimson `.fun`, clue first, a long pause, then the breakdown.
+Voices on the site: **Sonia**, **Ryan**, **Libby**, **Thomas** (picker in the header).
+YouTube uses `--voice` (default Sonia).
+
+```bash
+twodown today --voice ryan
+```
 
 YouTube
 -------

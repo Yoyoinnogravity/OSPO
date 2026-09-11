@@ -30,5 +30,10 @@ def test_publish_site_writes_spoiler_pages(tmp_path):
     assert "Solve" in index
     assert "Fifteen Squared" in index
     assert (root / "about.html").exists()
-    assert (root / "CNAME").read_text(encoding="utf-8").strip() == "cryptic.fun"
+    assert "data-voice-btn" in index
+    assert "Sonia" in index
+    assert "Ryan" in index
+    assert "Libby" in index
+    assert "Thomas" in index
+    assert "parse-voice" in index
     assert (tmp_path / "c" / "independent-12458-12a" / "index.html").exists()

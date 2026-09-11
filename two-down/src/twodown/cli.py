@@ -46,7 +46,7 @@ def main(argv: list[str] | None = None) -> int:
 
     today = sub.add_parser("today", help="Ingest 15², pick two clues, speak, publish")
     today.add_argument("--out", type=Path, default=DEFAULT_OUTPUT)
-    today.add_argument("--voice", default=DEFAULT_VOICE_ALIAS, help="sonia, libby, ryan, thomas, or an edge-tts name")
+    today.add_argument("--voice", default=DEFAULT_VOICE_ALIAS, help="YouTube voice: sonia, libby, ryan, thomas. Site visitors can pick any of these.")
     today.add_argument("--date", help="London calendar date YYYY-MM-DD (default: today, else latest)")
     today.add_argument("--quiet", action="store_true", help="Skip TTS, video, site and YouTube")
     today.add_argument("--no-video", action="store_true")

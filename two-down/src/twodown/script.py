@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import html
 import re
+from dataclasses import dataclass
 
+from twodown.config import THINK_PAUSE_SECONDS
 from twodown.models import Clue
 
 DEVICE_LINE = {
@@ -43,17 +46,43 @@ def _spoken_parse(parse: str, answer: str = "") -> str:
     return text
 
 
-def write_script(clue: Clue) -> str:
-    paper = clue.paper
-    setter = clue.setter
+@dataclass(frozen=True)
+class ScriptParts:
+    clue_speech: str
+    breakdown: str
+
+    @property
+    def full(self) -> str:
+        return f"{self.clue_speech}\n\n[pause {THINK_PAUSE_SECONDS:.0f}s]\n\n{self.breakdown}"
+
+
+def write_parts(clue: Clue) -> ScriptParts:
     enum = f" ({clue.enumeration})" if clue.enumeration else ""
     device = DEVICE_LINE.get(clue.device, DEVICE_LINE["unknown"])
     parse = _spoken_parse(clue.parse, clue.answer)
     definition = f" It means {clue.definition}." if clue.definition else ""
-    return (
-        f"cryptic.fun. {setter} in the {paper}. "
-        f"The clue: {clue.clue}{enum}. "
+    clue_speech = (
+        f"cryptic.fun. {clue.setter} in the {clue.paper}. "
+        f"The clue: {clue.clue}{enum}."
+    )
+    breakdown = (
         f"{device} {parse} "
         f"The answer is {clue.answer}.{definition} "
         f"Parse via Fifteen Squared, {clue.blogger}."
+    )
+    return ScriptParts(clue_speech=clue_speech, breakdown=breakdown)
+
+
+def write_script(clue: Clue) -> str:
+    return write_parts(clue).full
+
+
+def to_ssml(parts: ScriptParts, pause_seconds: float = THINK_PAUSE_SECONDS) -> str:
+    pause_ms = int(pause_seconds * 1000)
+    clue_xml = html.escape(parts.clue_speech, quote=False)
+    down_xml = html.escape(parts.breakdown, quote=False)
+    return (
+        '<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="en-GB">'
+        f"{clue_xml}<break time=\"{pause_ms}ms\"/>{down_xml}"
+        "</speak>"
     )

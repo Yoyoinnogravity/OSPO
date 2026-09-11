@@ -5,7 +5,7 @@ from twodown.devices import classify_device
 from twodown.ingest import LONDON, parse_title
 from twodown.models import PuzzlePost
 from twodown.parse import parse_post, usable
-from twodown.script import write_script
+from twodown.script import write_parts, write_script
 from twodown.select import select_pair
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -71,6 +71,11 @@ def test_script_credits_fifteen_squared():
     assert "END RESULT" in script
     assert "Phi" in script
     assert "cryptic.fun" in script
+    parts = write_parts(clue)
+    assert "END RESULT" not in parts.clue_speech
+    assert "The clue:" in parts.clue_speech
+    assert "END RESULT" in parts.breakdown
+    assert "[pause" in script
 
 
 def test_parse_title_variants():
