@@ -3,9 +3,10 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from twodown.config import SITE_ORIGIN
-from twodown.models import SpokenClue
+from twodown.config import BRAND, CLUES_PER_DAY, SITE_ORIGIN
+from twodown.models import Clue, DailyPair, SpokenClue
 
+YOUTUBE_CHANNEL = "Cryptic Fun"
 SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
 TOKEN_ENV = "TWODOWN_YOUTUBE_TOKEN"
 CLIENT_ENV = "TWODOWN_YOUTUBE_CLIENT_SECRET"
@@ -36,8 +37,33 @@ def _credentials():
     return Credentials.from_authorized_user_file(str(token), scopes=SCOPES)
 
 
-def upload_short(item: SpokenClue, privacy: str = "unlisted") -> str | None:
-    """Upload one Short. Returns the video id, or None if credentials are missing."""
+def video_title(clue: Clue) -> str:
+    enum = f" ({clue.enumeration})" if clue.enumeration else ""
+    title = f"{YOUTUBE_CHANNEL} · {clue.clue}{enum} #Shorts"
+    if len(title) <= 100:
+        return title
+    room = 100 - len(f"{YOUTUBE_CHANNEL} · {enum} #Shorts")
+    clipped = clue.clue[: max(10, room - 1)].rstrip() + "…"
+    return f"{YOUTUBE_CHANNEL} · {clipped}{enum} #Shorts"[:100]
+
+
+def video_description(item: SpokenClue) -> str:
+    clue = item.clue
+    page = item.site_path or SITE_ORIGIN
+    return (
+        f"{YOUTUBE_CHANNEL} — two cryptic clues a day.\n"
+        f"{BRAND}\n\n"
+        f"{clue.clue} ({clue.enumeration})\n"
+        f"Answer: {clue.answer}\n\n"
+        f"{page}\n"
+        f"Parse: {clue.source_url}\n"
+        f"{clue.paper} {clue.puzzle_id} by {clue.setter}. "
+        f"Blogged by {clue.blogger} on Fifteen Squared.\n"
+    )
+
+
+def upload_short(item: SpokenClue, privacy: str = "public") -> str | None:
+    """Upload one Short as Cryptic Fun. Returns the video id, or None if credentials are missing."""
     if not item.video_path:
         return None
     creds = _credentials()
@@ -46,24 +72,12 @@ def upload_short(item: SpokenClue, privacy: str = "unlisted") -> str | None:
     from googleapiclient.discovery import build
     from googleapiclient.http import MediaFileUpload
 
-    clue = item.clue
-    title = f"cryptic.fun · {clue.setter} · {clue.clue[:48]} ({clue.enumeration}) #Shorts"
-    title = title[:100]
-    page = item.site_path or SITE_ORIGIN
-    description = (
-        f"{clue.clue} ({clue.enumeration})\n"
-        f"Answer: {clue.answer}\n\n"
-        f"{page}\n"
-        f"Parse: {clue.source_url}\n"
-        f"{clue.paper} {clue.puzzle_id} by {clue.setter}. "
-        f"Blogged by {clue.blogger} on Fifteen Squared.\n"
-    )
     youtube = build("youtube", "v3", credentials=creds)
     body = {
         "snippet": {
-            "title": title,
-            "description": description,
-            "tags": ["cryptic crossword", clue.device, clue.setter, "cryptic.fun"],
+            "title": video_title(item.clue),
+            "description": video_description(item),
+            "tags": ["Cryptic Fun", "cryptic.fun", "cryptic crossword", item.clue.device, item.clue.setter],
             "categoryId": "27",
         },
         "status": {
@@ -76,3 +90,16 @@ def upload_short(item: SpokenClue, privacy: str = "unlisted") -> str | None:
     video_id = result.get("id")
     item.youtube_id = video_id
     return video_id
+
+
+def upload_pair(pair: DailyPair, privacy: str = "public") -> list[str]:
+    ids: list[str] = []
+    for item in pair.clues[:CLUES_PER_DAY]:
+        if item.youtube_id:
+            ids.append(item.youtube_id)
+            continue
+        video_id = upload_short(item, privacy=privacy)
+        if video_id:
+            ids.append(video_id)
+    pair.youtube_ids = ids
+    return ids

@@ -25,13 +25,17 @@ twodown today --voice ryan
 YouTube
 -------
 
-Uploads need an authorized user token (not an API key):
+Uploads go out as **Cryptic Fun** (two Shorts a day). They need an authorized
+user token for the Cryptic Fun channel — not an API key:
 
 ```bash
 export TWODOWN_YOUTUBE_TOKEN=/path/to/token.json
-twodown today --youtube-privacy unlisted
+twodown today
+# or, once videos are already rendered:
+twodown upload --youtube-privacy public
 ```
 
 Without that file the pair still lands in `two-down/site/` for cryptic.fun.
-Point the domain’s DNS at GitHub Pages or any static host serving that folder.
-The site `CNAME` is `cryptic.fun`.
+Point the domain’s DNS at GitHub Pages or any static host serving that folder
+(DNS can take 24–48 hours). The site `CNAME` is `cryptic.fun`.
+

@@ -9,6 +9,7 @@
 <body>
   <header>
     <a class="wordmark" href="../../index.html">cryptic<span>.fun</span></a>
+    <div class="voices" role="group" aria-label="Choose a voice"><span>Voice</span><button type="button" data-voice-btn data-voice="sonia" aria-pressed="false">Sonia</button><button type="button" data-voice-btn data-voice="libby" aria-pressed="false">Libby</button><button type="button" data-voice-btn data-voice="ryan" aria-pressed="false">Ryan</button><button type="button" data-voice-btn data-voice="thomas" aria-pressed="false">Thomas</button></div>
     <nav>
       <a href="../../index.html">Today</a>
       <a href="../../about.html">About</a>
@@ -16,12 +17,13 @@
   </header>
   <main>
     <h1>One clue.</h1>
-    <article class="clue">
+    <article class="clue" data-slug="independent-12458-11a">
       <p class="kicker">Independent 12458 · Phi · 11 across · container</p>
       <p class="clue-text">Hotel worker with a lot of guts taking on hotel work (7)</p>
       <button class="reveal" type="button">Solve</button>
       <div class="spoiler">
-        <video controls playsinline src="../../media/independent-12458-11a.mp4"></video>
+        <video controls playsinline muted src="../../media/independent-12458-11a.mp4"></video>
+        <audio class="parse-voice" controls preload="none" data-prefix="../../media/" src="../../media/independent-12458-11a-sonia.mp3"></audio>
         <p class="answer">BELLHOP</p>
         <p class="parse">BELL y (the part of the body containing the intestines [guts]) excluding the final letter [mostly] Y ) + H (hotel) + OP ( OP us; work) BELL H OP</p>
         <p class="credit">Parse via <a href="https://fifteensquared.net/2026/09/11/independent-12458-phi/">Fifteen Squared · duncanshiell</a></p>
@@ -32,7 +34,7 @@
   <footer>
     Two clues a day from the Independent, Guardian and FT blogs on
     <a href="https://fifteensquared.net/">Fifteen Squared</a>.
-    Not affiliated with those papers. Voice: Sonia.
+    Not affiliated with those papers. Pick Sonia, Ryan, Libby or Thomas.
   </footer>
   <script src="../../assets/app.js"></script>
 </body>

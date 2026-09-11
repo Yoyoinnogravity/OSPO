@@ -19,7 +19,7 @@ from twodown.script import write_parts
 from twodown.select import select_pair
 from twodown.site import publish_site
 from twodown.voice import resolve_voice, synthesise, synthesise_parts
-from twodown.youtube import upload_short, youtube_ready
+from twodown.youtube import upload_pair, youtube_ready
 
 
 def _today_stamp(day: datetime | None) -> str:
@@ -42,7 +42,7 @@ def run_today(
     video: bool = True,
     publish: bool = True,
     youtube: bool = True,
-    youtube_privacy: str = "unlisted",
+    youtube_privacy: str = "public",
 ) -> DailyPair:
     posts = fetch_daily_posts()
     todays = posts_for_london_date(posts, day)
@@ -104,13 +104,11 @@ def run_today(
     if youtube:
         if not youtube_ready():
             (dest_root / "youtube-skipped.txt").write_text(
-                "No YouTube OAuth token. Set TWODOWN_YOUTUBE_TOKEN to an authorized user JSON.\n",
+                "Cannot upload as Cryptic Fun: no OAuth token.\n"
+                "Set TWODOWN_YOUTUBE_TOKEN to an authorized user JSON for the Cryptic Fun channel.\n",
                 encoding="utf-8",
             )
         else:
-            for item in spoken:
-                video_id = upload_short(item, privacy=youtube_privacy)
-                if video_id:
-                    result.youtube_ids.append(video_id)
+            result.youtube_ids = upload_pair(result, privacy=youtube_privacy)
     (dest_root / "pair.json").write_text(result.model_dump_json(indent=2), encoding="utf-8")
     return result

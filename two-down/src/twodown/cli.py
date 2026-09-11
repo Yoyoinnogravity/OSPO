@@ -8,9 +8,10 @@ from pathlib import Path
 
 from twodown.config import DEFAULT_OUTPUT, DEFAULT_VOICE_ALIAS
 from twodown.ingest import LONDON
+from twodown.models import DailyPair
 from twodown.pipeline import run_today
 from twodown.voice import list_voices, resolve_voice
-from twodown.youtube import youtube_ready
+from twodown.youtube import YOUTUBE_CHANNEL, upload_pair, youtube_ready
 
 
 def _print_pair(pair) -> None:
@@ -40,6 +41,19 @@ def _print_pair(pair) -> None:
             print(f"    yt    https://youtu.be/{item.youtube_id}")
 
 
+def _latest_pair(out: Path, date: str | None) -> DailyPair:
+    if date:
+        path = out / date / "pair.json"
+    else:
+        dates = sorted((p for p in out.iterdir() if p.is_dir()), reverse=True)
+        if not dates:
+            raise FileNotFoundError(f"No daily output in {out}")
+        path = dates[0] / "pair.json"
+    if not path.exists():
+        raise FileNotFoundError(f"No pair.json at {path}. Run twodown today first.")
+    return DailyPair.model_validate_json(path.read_text(encoding="utf-8"))
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="twodown", description="Two cryptic clues a day from Fifteen Squared.")
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -52,7 +66,12 @@ def main(argv: list[str] | None = None) -> int:
     today.add_argument("--no-video", action="store_true")
     today.add_argument("--no-site", action="store_true")
     today.add_argument("--no-youtube", action="store_true")
-    today.add_argument("--youtube-privacy", default="unlisted", choices=["unlisted", "private", "public"])
+    today.add_argument("--youtube-privacy", default="public", choices=["unlisted", "private", "public"])
+
+    upload = sub.add_parser("upload", help="Upload today's two Shorts to YouTube as Cryptic Fun")
+    upload.add_argument("--out", type=Path, default=DEFAULT_OUTPUT)
+    upload.add_argument("--date", help="London calendar date YYYY-MM-DD")
+    upload.add_argument("--youtube-privacy", default="public", choices=["unlisted", "private", "public"])
 
     voices = sub.add_parser("voices", help="List built-in British voices")
     voices.add_argument("--json", action="store_true")
@@ -68,6 +87,34 @@ def main(argv: list[str] | None = None) -> int:
             for alias, name in mapping.items():
                 mark = " (default)" if alias == DEFAULT_VOICE_ALIAS else ""
                 print(f"  {alias:8} {name}{mark}")
+        return 0
+
+    if args.cmd == "upload":
+        if not youtube_ready():
+            print(
+                f"Cannot upload as {YOUTUBE_CHANNEL}: no OAuth token.\n"
+                "Create a YouTube Data API desktop OAuth client, authorize the Cryptic Fun channel,\n"
+                "and set TWODOWN_YOUTUBE_TOKEN to the token JSON path.",
+                file=sys.stderr,
+            )
+            return 2
+        try:
+            pair = _latest_pair(args.out, args.date)
+        except FileNotFoundError as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
+        ids = upload_pair(pair, privacy=args.youtube_privacy)
+        if args.date:
+            dest = args.out / args.date / "pair.json"
+        else:
+            dest = sorted((p for p in args.out.iterdir() if p.is_dir()), reverse=True)[0] / "pair.json"
+        dest.write_text(pair.model_dump_json(indent=2), encoding="utf-8")
+        if not ids:
+            print("Upload returned no video ids.", file=sys.stderr)
+            return 1
+        print(f"uploaded {len(ids)} as {YOUTUBE_CHANNEL}")
+        for vid in ids:
+            print(f"https://youtu.be/{vid}")
         return 0
 
     day = None

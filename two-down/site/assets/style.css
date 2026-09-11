@@ -32,6 +32,19 @@ header {
 .wordmark { font-family: "Liberation Sans", "Helvetica Neue", sans-serif; font-weight: 700; font-size: 1.6rem; letter-spacing: 0.02em; color: var(--ink); text-decoration: none; }
 .wordmark span { color: var(--crimson); }
 nav a { margin-left: 18px; font-family: "Liberation Sans", sans-serif; font-size: 0.9rem; text-decoration: none; color: var(--muted); }
+.voices { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.voices span { font-family: "Liberation Sans", sans-serif; font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-right: 4px; }
+.voices button {
+  font-family: "Liberation Sans", sans-serif;
+  background: transparent;
+  border: 1px solid var(--rule);
+  color: var(--ink);
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+.voices button.on { background: var(--crimson); color: var(--cream); border-color: var(--crimson); }
+header { flex-wrap: wrap; gap: 12px; }
 h1 { font-size: clamp(2rem, 5vw, 3.4rem); line-height: 1.05; margin: 28px 0 8px; }
 .lede { font-size: 1.15rem; color: var(--muted); max-width: 40rem; }
 .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; margin: 36px 0 64px; }
@@ -57,6 +70,7 @@ button.reveal {
 article.clue.is-open .spoiler { display: block; }
 article.clue.is-open button.reveal { display: none; }
 video { width: 100%; background: #111; }
+audio.parse-voice { width: 100%; margin-top: 8px; }
 .answer { font-size: 2rem; color: var(--crimson); margin: 12px 0 6px; }
 .parse { color: var(--muted); font-size: 0.98rem; }
 .credit { font-family: "Liberation Sans", sans-serif; font-size: 0.85rem; }
