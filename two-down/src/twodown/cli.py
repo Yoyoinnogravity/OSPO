@@ -115,6 +115,7 @@ def main(argv: list[str] | None = None) -> int:
     today.add_argument("--quiet", action="store_true", help="Skip TTS, video, site and social uploads")
     today.add_argument("--no-video", action="store_true")
     today.add_argument("--no-site", action="store_true")
+    today.add_argument("--force", action="store_true", help="Rebuild even if today's pair is already on the site")
     today.add_argument("--youtube-privacy", default="public", choices=["unlisted", "private", "public"])
     _add_social_flags(today)
 
@@ -223,10 +224,16 @@ def main(argv: list[str] | None = None) -> int:
         tiktok=social and wanted["tiktok"],
         instagram=social and wanted["instagram"],
         facebook=social and wanted["facebook"],
+        force=args.force,
     )
+    if pair.already_published and not pair.clues:
+        print(f"already published {pair.date} — skip (use --force to rebuild)")
+        return 0
     if not pair.clues:
         print("No usable clues found on Fifteen Squared for that date.", file=sys.stderr)
         return 1
+    if pair.already_published:
+        print(f"already published {pair.date}")
     _print_pair(pair)
     return 0
 

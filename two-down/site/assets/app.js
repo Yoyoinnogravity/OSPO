@@ -83,3 +83,80 @@ document.querySelectorAll("article.clue").forEach((article) => {
     audio.currentTime = video.currentTime;
   });
 });
+
+const SUGGEST_KEY = "cryptic-fun-suggest-day";
+const SUBSCRIBE_KEY = "cryptic-fun-subscribe";
+
+function londonDate() {
+  return new Date().toLocaleDateString("en-CA", { timeZone: "Europe/London" });
+}
+
+function lockSuggest(form, message) {
+  form.querySelectorAll("input, textarea, button").forEach((el) => {
+    el.disabled = true;
+  });
+  const status = form.querySelector("[data-suggest-status]");
+  if (status) status.textContent = message;
+}
+
+function mailtoUrl(address, subject, body) {
+  return "mailto:" + address + "?subject=" + encodeURIComponent(subject) + "&body=" + encodeURIComponent(body);
+}
+
+const suggestForm = document.querySelector("[data-suggest-form]");
+if (suggestForm) {
+  const inbox = suggestForm.dataset.inbox;
+  if (localStorage.getItem(SUGGEST_KEY) === londonDate()) {
+    lockSuggest(suggestForm, "You’ve already sent today’s suggestion. One homemade clue a day — see you tomorrow.");
+  }
+  suggestForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    if (localStorage.getItem(SUGGEST_KEY) === londonDate()) {
+      lockSuggest(suggestForm, "You’ve already sent today’s suggestion. One homemade clue a day — see you tomorrow.");
+      return;
+    }
+    const data = new FormData(suggestForm);
+    const clue = String(data.get("clue") || "").trim();
+    const answer = String(data.get("answer") || "").trim();
+    const enumeration = String(data.get("enumeration") || "").trim();
+    const name = String(data.get("name") || "").trim();
+    const email = String(data.get("email") || "").trim();
+    if (!clue || !answer) {
+      const status = suggestForm.querySelector("[data-suggest-status]");
+      if (status) status.textContent = "Need a clue and an answer.";
+      return;
+    }
+    const enumBit = enumeration ? " (" + enumeration + ")" : "";
+    const body = [
+      "Clue: " + clue + enumBit,
+      "Answer: " + answer,
+      name ? "Name: " + name : "",
+      email ? "Email: " + email : "",
+      "Date: " + londonDate(),
+    ].filter(Boolean).join("\n");
+    localStorage.setItem(SUGGEST_KEY, londonDate());
+    window.location.href = mailtoUrl(inbox, "Clue suggestion · " + londonDate(), body);
+    lockSuggest(suggestForm, "Thanks. Your email app should open with today’s suggestion. One a day.");
+  });
+}
+
+const subscribeForm = document.querySelector("[data-subscribe-form]");
+if (subscribeForm) {
+  const inbox = subscribeForm.dataset.inbox;
+  if (localStorage.getItem(SUBSCRIBE_KEY) === "1") {
+    lockSuggest(subscribeForm, "You’re on the list for one emailed clue a day.");
+  }
+  subscribeForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const email = String(new FormData(subscribeForm).get("email") || "").trim();
+    if (!email) {
+      const status = subscribeForm.querySelector("[data-suggest-status]");
+      if (status) status.textContent = "Need an email address.";
+      return;
+    }
+    const body = "Please send me one cryptic clue a day.\nEmail: " + email;
+    localStorage.setItem(SUBSCRIBE_KEY, "1");
+    window.location.href = mailtoUrl(inbox, "Daily clue by email", body);
+    lockSuggest(subscribeForm, "Thanks. Your email app should open. We’ll send one clue a day.");
+  });
+}

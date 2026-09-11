@@ -5,7 +5,7 @@ from datetime import datetime
 from pathlib import Path
 from shutil import copy2
 
-from twodown.config import BRAND, SITE_ORIGIN, SITE_ROOT, VOICE_LABELS
+from twodown.config import BRAND, SITE_ORIGIN, SITE_ROOT, SUGGEST_EMAIL, VOICE_LABELS
 from twodown.models import DailyPair, SpokenClue
 from twodown.scenes import DEFAULT_SCENE, get_scene, list_scenes
 
@@ -131,6 +131,49 @@ footer {
 }
 footer a { color: var(--crimson); }
 .scene-credit { margin-top: 10px; }
+body.scene-photo h2 { text-shadow: 0 2px 18px rgba(0,0,0,0.55); }
+.panel, aside.teaser {
+  background: rgba(252, 247, 236, 0.94);
+  color: var(--ink);
+  border: 1px solid var(--rule);
+  padding: 22px 22px 18px;
+  box-shadow: 6px 6px 0 rgba(184, 28, 41, 0.12);
+  margin: 0 0 36px;
+  max-width: 40rem;
+}
+.panel a, aside.teaser a { color: var(--crimson); }
+.suggest-forms { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; margin: 28px 0 64px; }
+@media (max-width: 800px) { .suggest-forms { grid-template-columns: 1fr; } }
+.suggest-form { display: flex; flex-direction: column; gap: 12px; }
+.suggest-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-family: "Liberation Sans", sans-serif;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.suggest-form input, .suggest-form textarea {
+  font-family: "Liberation Serif", Georgia, serif;
+  font-size: 1.05rem;
+  color: var(--ink);
+  background: var(--cream);
+  border: 1px solid var(--rule);
+  padding: 8px 10px;
+}
+.suggest-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.suggest-form button:disabled { opacity: 0.5; cursor: not-allowed; }
+.suggest-status { font-family: "Liberation Sans", sans-serif; font-size: 0.9rem; color: var(--muted); margin: 0; }
+a.action {
+  display: inline-block;
+  font-family: "Liberation Sans", sans-serif;
+  background: var(--crimson);
+  color: var(--cream) !important;
+  border: 0;
+  padding: 10px 16px;
+  text-decoration: none;
+  font-size: 0.95rem;
+}
 """
 
 JS = """
@@ -218,6 +261,83 @@ document.querySelectorAll("article.clue").forEach((article) => {
     audio.currentTime = video.currentTime;
   });
 });
+
+const SUGGEST_KEY = "cryptic-fun-suggest-day";
+const SUBSCRIBE_KEY = "cryptic-fun-subscribe";
+
+function londonDate() {
+  return new Date().toLocaleDateString("en-CA", { timeZone: "Europe/London" });
+}
+
+function lockSuggest(form, message) {
+  form.querySelectorAll("input, textarea, button").forEach((el) => {
+    el.disabled = true;
+  });
+  const status = form.querySelector("[data-suggest-status]");
+  if (status) status.textContent = message;
+}
+
+function mailtoUrl(address, subject, body) {
+  return "mailto:" + address + "?subject=" + encodeURIComponent(subject) + "&body=" + encodeURIComponent(body);
+}
+
+const suggestForm = document.querySelector("[data-suggest-form]");
+if (suggestForm) {
+  const inbox = suggestForm.dataset.inbox;
+  if (localStorage.getItem(SUGGEST_KEY) === londonDate()) {
+    lockSuggest(suggestForm, "You’ve already sent today’s suggestion. One homemade clue a day — see you tomorrow.");
+  }
+  suggestForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    if (localStorage.getItem(SUGGEST_KEY) === londonDate()) {
+      lockSuggest(suggestForm, "You’ve already sent today’s suggestion. One homemade clue a day — see you tomorrow.");
+      return;
+    }
+    const data = new FormData(suggestForm);
+    const clue = String(data.get("clue") || "").trim();
+    const answer = String(data.get("answer") || "").trim();
+    const enumeration = String(data.get("enumeration") || "").trim();
+    const name = String(data.get("name") || "").trim();
+    const email = String(data.get("email") || "").trim();
+    if (!clue || !answer) {
+      const status = suggestForm.querySelector("[data-suggest-status]");
+      if (status) status.textContent = "Need a clue and an answer.";
+      return;
+    }
+    const enumBit = enumeration ? " (" + enumeration + ")" : "";
+    const body = [
+      "Clue: " + clue + enumBit,
+      "Answer: " + answer,
+      name ? "Name: " + name : "",
+      email ? "Email: " + email : "",
+      "Date: " + londonDate(),
+    ].filter(Boolean).join("\\n");
+    localStorage.setItem(SUGGEST_KEY, londonDate());
+    window.location.href = mailtoUrl(inbox, "Clue suggestion · " + londonDate(), body);
+    lockSuggest(suggestForm, "Thanks. Your email app should open with today’s suggestion. One a day.");
+  });
+}
+
+const subscribeForm = document.querySelector("[data-subscribe-form]");
+if (subscribeForm) {
+  const inbox = subscribeForm.dataset.inbox;
+  if (localStorage.getItem(SUBSCRIBE_KEY) === "1") {
+    lockSuggest(subscribeForm, "You’re on the list for one emailed clue a day.");
+  }
+  subscribeForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const email = String(new FormData(subscribeForm).get("email") || "").trim();
+    if (!email) {
+      const status = subscribeForm.querySelector("[data-suggest-status]");
+      if (status) status.textContent = "Need an email address.";
+      return;
+    }
+    const body = "Please send me one cryptic clue a day.\\nEmail: " + email;
+    localStorage.setItem(SUBSCRIBE_KEY, "1");
+    window.location.href = mailtoUrl(inbox, "Daily clue by email", body);
+    lockSuggest(subscribeForm, "Thanks. Your email app should open. We’ll send one clue a day.");
+  });
+}
 """
 
 
@@ -266,6 +386,7 @@ def _page(title: str, body: str, depth: int = 0) -> str:
       <a class="wordmark" href="{prefix}index.html">cryptic<span>.fun</span></a>
       <nav>
         <a href="{prefix}index.html">Today</a>
+        <a href="{prefix}suggest.html">Suggest</a>
         <a href="{prefix}about.html">About</a>
       </nav>
     </div>
@@ -279,6 +400,8 @@ def _page(title: str, body: str, depth: int = 0) -> str:
     Two clues a day from the Independent, Guardian and FT blogs on
     <a href="https://fifteensquared.net/">Fifteen Squared</a>.
     Not affiliated with those papers. Pick a voice and a place.
+    One homemade clue a day via <a href="{prefix}suggest.html">Suggest</a>,
+    or ask for a clue by email.
     <p class="scene-credit" data-scene-credit>{_e(default.credit_line)}</p>
   </footer>
   <script src="{prefix}assets/app.js"></script>
@@ -362,6 +485,12 @@ def publish_site(pair: DailyPair, dest: Path | None = None) -> Path:
     <section class="pair">
       {articles}
     </section>
+    <aside class="teaser">
+      <p class="kicker">Readers</p>
+      <h2>Suggest a clue.</h2>
+      <p>One homemade cryptic a day, emailed to us. Or get a clue in your inbox each morning.</p>
+      <a class="action" href="suggest.html">Suggest today’s clue</a>
+    </aside>
     """
     (root / "index.html").write_text(_page(f"{BRAND} — {pretty}", index_body), encoding="utf-8")
 
@@ -385,10 +514,57 @@ def publish_site(pair: DailyPair, dest: Path | None = None) -> Path:
     <h1>About.</h1>
     <p class="lede">cryptic.fun publishes two cryptic clues a day, taken from the Fifteen Squared blogs of the Independent, Guardian and Financial Times. Choose Sonia, Ryan, Libby or Thomas, and a real place as the backdrop. The same Shorts go to YouTube, TikTok, Instagram and Facebook when those accounts are connected. The site is the spoiler-safe home.</p>
     <p>Answers and wordplay belong to the setters and the 15² bloggers. We rewrite for speech and always link the original post.</p>
+    <p>Readers can <a href="suggest.html">suggest one homemade clue a day</a>, or ask for a daily clue by email. Both land in Aled’s inbox at <a href="mailto:{_e(SUGGEST_EMAIL)}">{_e(SUGGEST_EMAIL)}</a>.</p>
     <h2>Backgrounds.</h2>
     <p>Photographs are cropped to 9:16 from Wikimedia Commons. Newsprint is still there if you want the paper look.</p>
     {_about_credits()}
     """
     (root / "about.html").write_text(_page(f"About — {BRAND}", about), encoding="utf-8")
+
+    inbox = _e(SUGGEST_EMAIL)
+    suggest = f"""
+    <p class="kicker">Readers</p>
+    <h1>Suggest a clue.</h1>
+    <p class="lede">One homemade cryptic a day. We read them; we don’t promise to publish them. Answers stay off the public page — they go in the email.</p>
+    <div class="suggest-forms">
+      <section class="panel">
+        <h2>Send us today’s clue.</h2>
+        <p>Clue, enumeration and answer. Sends to <a href="mailto:{inbox}">{inbox}</a>.</p>
+        <form class="suggest-form" data-suggest-form data-inbox="{inbox}">
+          <label>The clue
+            <textarea name="clue" required maxlength="280" rows="3" placeholder="Rioting led unrest in the final analysis"></textarea>
+          </label>
+          <div class="suggest-row">
+            <label>Enumeration
+              <input name="enumeration" maxlength="24" placeholder="3,6" autocomplete="off">
+            </label>
+            <label>Answer
+              <input name="answer" required maxlength="80" placeholder="END RESULT" autocomplete="off">
+            </label>
+          </div>
+          <label>Your name (optional)
+            <input name="name" maxlength="80" autocomplete="name">
+          </label>
+          <label>Your email (optional, if you’d like a reply)
+            <input name="email" type="email" maxlength="120" autocomplete="email">
+          </label>
+          <button type="submit" class="reveal">Email today’s suggestion</button>
+          <p class="suggest-status" data-suggest-status></p>
+        </form>
+      </section>
+      <section class="panel">
+        <h2>Get a clue by email.</h2>
+        <p>One a day, spoiler-safe: the clue only, not the answer. Ask from this form and we’ll add you.</p>
+        <form class="suggest-form" data-subscribe-form data-inbox="{inbox}">
+          <label>Your email
+            <input name="email" type="email" required maxlength="120" autocomplete="email" placeholder="you@example.com">
+          </label>
+          <button type="submit" class="reveal">Send me one clue a day</button>
+          <p class="suggest-status" data-suggest-status></p>
+        </form>
+      </section>
+    </div>
+    """
+    (root / "suggest.html").write_text(_page("Suggest a clue — {BRAND}".format(BRAND=BRAND), suggest), encoding="utf-8")
     pair.site_index = f"{SITE_ORIGIN}/"
     return root

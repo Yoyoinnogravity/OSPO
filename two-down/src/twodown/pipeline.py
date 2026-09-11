@@ -35,6 +35,25 @@ def _voice_alias(name: str | None) -> str:
     return key if key in VOICES else DEFAULT_VOICE_ALIAS
 
 
+def published_date(site_root: Path | None, date: str) -> bool:
+    """True when today's archive page is already on the static site."""
+    root = Path(site_root or SITE_ROOT)
+    return (root / "d" / date / "index.html").exists()
+
+
+def _load_complete_pair(dest_root: Path) -> DailyPair | None:
+    path = dest_root / "pair.json"
+    if not path.exists():
+        return None
+    pair = DailyPair.model_validate_json(path.read_text(encoding="utf-8"))
+    if len(pair.clues) < CLUES_PER_DAY:
+        return None
+    for item in pair.clues:
+        if not item.video_path or not Path(item.video_path).exists():
+            return None
+    return pair
+
+
 def run_today(
     out_dir: Path | None = None,
     voice: str | None = DEFAULT_VOICE_ALIAS,
@@ -48,6 +67,7 @@ def run_today(
     tiktok: bool = True,
     instagram: bool = True,
     facebook: bool = True,
+    force: bool = False,
 ) -> DailyPair:
     posts = fetch_daily_posts()
     todays = posts_for_london_date(posts, day)
@@ -58,6 +78,24 @@ def run_today(
         stamp = todays[0].date.astimezone(LONDON).date().isoformat()
     dest_root = Path(out_dir or DEFAULT_OUTPUT) / stamp
     dest_root.mkdir(parents=True, exist_ok=True)
+    if not force:
+        existing = _load_complete_pair(dest_root)
+        if existing:
+            existing.already_published = True
+            return existing
+        if published_date(SITE_ROOT, stamp):
+            skipped = DailyPair(
+                date=stamp,
+                voice=resolve_voice(_voice_alias(voice)),
+                source_posts=[p.url for p in todays],
+                site_index=str(SITE_ROOT / "index.html"),
+                already_published=True,
+            )
+            (dest_root / "already-published.txt").write_text(
+                f"{stamp} already on cryptic.fun. Pass --force to rebuild.\n",
+                encoding="utf-8",
+            )
+            return skipped
     alias = _voice_alias(voice)
     resolved_voice = resolve_voice(alias)
     scene_slugs = pick_scenes(stamp, len(pair_clues), scene)

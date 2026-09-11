@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>cryptic.fun — Friday 11 September 2026</title>
+  <title>Suggest a clue — cryptic.fun</title>
   <link rel="stylesheet" href="assets/style.css">
 </head>
 <body class="scene-photo" data-scene="machu-picchu" data-default-scene="machu-picchu" data-scene-prefix="media/scenes/" style="background-image: url('media/scenes/machu-picchu.webp');">
@@ -21,45 +21,47 @@
   </header>
   <main>
     
-    <p class="kicker">Two clues · Friday 11 September 2026</p>
-    <h1>Today’s pair.</h1>
-    <p class="lede">Have a go before you tap solve. Parses follow Fifteen Squared — we speak them, we don’t nick the grid. Pick a place from the header if you’d rather solve against the Matterhorn than newsprint.</p>
-    <section class="pair">
-      
-    <article class="clue" data-slug="independent-12458-11a">
-      <p class="kicker">Independent 12458 · Phi · 11 across · container</p>
-      <p class="clue-text">Hotel worker with a lot of guts taking on hotel work (7)</p>
-      <button class="reveal" type="button">Solve</button>
-      <div class="spoiler">
-        <video controls playsinline muted src="media/independent-12458-11a.mp4"></video>
-        <audio class="parse-voice" controls preload="none" data-prefix="media/" src="media/independent-12458-11a-sonia.mp3"></audio>
-        <p class="answer">BELLHOP</p>
-        <p class="parse">BELL y (the part of the body containing the intestines [guts]) excluding the final letter [mostly] Y ) + H (hotel) + OP ( OP us; work) BELL H OP</p>
-        <p class="credit">Parse via <a href="https://fifteensquared.net/2026/09/11/independent-12458-phi/">Fifteen Squared · duncanshiell</a></p>
-      </div>
-    </article>
-    
-
-    <article class="clue" data-slug="financial-times-18477-14a">
-      <p class="kicker">Financial Times 18477 · NEO · 14 across · reversal</p>
-      <p class="clue-text">X Y and Z advancing initially with the other reversed (4)</p>
-      <button class="reveal" type="button">Solve</button>
-      <div class="spoiler">
-        <video controls playsinline muted src="media/financial-times-18477-14a.mp4"></video>
-        <audio class="parse-voice" controls preload="none" data-prefix="media/" src="media/financial-times-18477-14a-sonia.mp3"></audio>
-        <p class="answer">AXES</p>
-        <p class="parse">A ( Advancing, first letter of ) XES ( reverse of SEX – the other )</p>
-        <p class="credit">Parse via <a href="https://fifteensquared.net/2026/09/11/financial-times-18477-by-neo/">Fifteen Squared · Turbolegs</a></p>
-      </div>
-    </article>
-    
-    </section>
-    <aside class="teaser">
-      <p class="kicker">Readers</p>
-      <h2>Suggest a clue.</h2>
-      <p>One homemade cryptic a day, emailed to us. Or get a clue in your inbox each morning.</p>
-      <a class="action" href="suggest.html">Suggest today’s clue</a>
-    </aside>
+    <p class="kicker">Readers</p>
+    <h1>Suggest a clue.</h1>
+    <p class="lede">One homemade cryptic a day. We read them; we don’t promise to publish them. Answers stay off the public page — they go in the email.</p>
+    <div class="suggest-forms">
+      <section class="panel">
+        <h2>Send us today’s clue.</h2>
+        <p>Clue, enumeration and answer. Sends to <a href="mailto:aledmorgan@gmail.com">aledmorgan@gmail.com</a>.</p>
+        <form class="suggest-form" data-suggest-form data-inbox="aledmorgan@gmail.com">
+          <label>The clue
+            <textarea name="clue" required maxlength="280" rows="3" placeholder="Rioting led unrest in the final analysis"></textarea>
+          </label>
+          <div class="suggest-row">
+            <label>Enumeration
+              <input name="enumeration" maxlength="24" placeholder="3,6" autocomplete="off">
+            </label>
+            <label>Answer
+              <input name="answer" required maxlength="80" placeholder="END RESULT" autocomplete="off">
+            </label>
+          </div>
+          <label>Your name (optional)
+            <input name="name" maxlength="80" autocomplete="name">
+          </label>
+          <label>Your email (optional, if you’d like a reply)
+            <input name="email" type="email" maxlength="120" autocomplete="email">
+          </label>
+          <button type="submit" class="reveal">Email today’s suggestion</button>
+          <p class="suggest-status" data-suggest-status></p>
+        </form>
+      </section>
+      <section class="panel">
+        <h2>Get a clue by email.</h2>
+        <p>One a day, spoiler-safe: the clue only, not the answer. Ask from this form and we’ll add you.</p>
+        <form class="suggest-form" data-subscribe-form data-inbox="aledmorgan@gmail.com">
+          <label>Your email
+            <input name="email" type="email" required maxlength="120" autocomplete="email" placeholder="you@example.com">
+          </label>
+          <button type="submit" class="reveal">Send me one clue a day</button>
+          <p class="suggest-status" data-suggest-status></p>
+        </form>
+      </section>
+    </div>
     
   </main>
   <footer>

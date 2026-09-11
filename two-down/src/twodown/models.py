@@ -82,3 +82,4 @@ class DailyPair(BaseModel):
     instagram_ids: list[str] = Field(default_factory=list)
     facebook_ids: list[str] = Field(default_factory=list)
     site_index: str | None = None
+    already_published: bool = False

@@ -23,6 +23,9 @@ Daily Shorts rotate two different scenes unless you pass `--scene`.
 Voices on the site: **Sonia**, **Ryan**, **Libby**, **Thomas**.
 YouTube and the other apps use `--voice` (default Sonia).
 
+Visitors can **suggest one homemade clue a day**, or ask for a daily clue by
+email. Both open a message to **aledmorgan@gmail.com**.
+
 ```bash
 twodown today --voice ryan
 twodown today --scene newsprint
@@ -75,3 +78,22 @@ Defaults if the env vars are unset: `~/.config/twodown/youtube-token.json`,
 Without tokens the pair still lands in `two-down/site/` for cryptic.fun.
 Point the domain’s DNS at GitHub Pages or any static host serving that folder
 (DNS can take 24–48 hours). The site `CNAME` is `cryptic.fun`.
+
+Daily agent
+-----------
+
+Yes — pay Cursor to run this every morning. Create a Cloud Agent automation at
+[cursor.com/automations](https://cursor.com/automations):
+
+* Trigger: every day 09:00 Europe/London (optional second run at 12:00 if 15² is late)
+* Repo: this one, so it can commit `two-down/site/`
+* Prompt: copy the block in `two-down/AGENTS.md`
+* Secrets on the environment: the YouTube / TikTok / Meta token files above
+
+That is billed as Cloud Agent usage on Pro and above. The pipeline will not
+invent answers, and it will skip if today’s pair is already on the site
+(`twodown today --force` rebuilds).
+
+A cheaper non-agent option is a machine cron of `twodown today` with those
+same tokens. The paid agent is the one that can recover when 15² changes layout.
+

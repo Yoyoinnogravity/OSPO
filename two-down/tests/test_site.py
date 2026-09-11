@@ -42,12 +42,19 @@ def test_publish_site_writes_spoiler_pages(tmp_path):
     assert "Newsprint" in index
     assert "data-scene-prefix" in index
     assert (tmp_path / "media" / "scenes" / "machu-picchu.webp").exists()
+    assert (tmp_path / "suggest.html").exists()
+    suggest = (tmp_path / "suggest.html").read_text(encoding="utf-8")
+    assert "aledmorgan@gmail.com" in suggest
+    assert "data-suggest-form" in suggest
+    assert "data-subscribe-form" in suggest
+    assert "Suggest" in index
     about = (tmp_path / "about.html").read_text(encoding="utf-8")
     assert "Wikimedia Commons" in about
     assert "Pedro Szekely" in about
     assert "TikTok" in about
     assert "Instagram" in about
     assert "Facebook" in about
+    assert "aledmorgan@gmail.com" in about
     assert (tmp_path / "c" / "independent-12458-12a" / "index.html").exists()
 
 

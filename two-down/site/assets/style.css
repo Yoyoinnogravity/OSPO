@@ -120,3 +120,46 @@ footer {
 }
 footer a { color: var(--crimson); }
 .scene-credit { margin-top: 10px; }
+body.scene-photo h2 { text-shadow: 0 2px 18px rgba(0,0,0,0.55); }
+.panel, aside.teaser {
+  background: rgba(252, 247, 236, 0.94);
+  color: var(--ink);
+  border: 1px solid var(--rule);
+  padding: 22px 22px 18px;
+  box-shadow: 6px 6px 0 rgba(184, 28, 41, 0.12);
+  margin: 0 0 36px;
+  max-width: 40rem;
+}
+.panel a, aside.teaser a { color: var(--crimson); }
+.suggest-forms { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; margin: 28px 0 64px; }
+@media (max-width: 800px) { .suggest-forms { grid-template-columns: 1fr; } }
+.suggest-form { display: flex; flex-direction: column; gap: 12px; }
+.suggest-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-family: "Liberation Sans", sans-serif;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.suggest-form input, .suggest-form textarea {
+  font-family: "Liberation Serif", Georgia, serif;
+  font-size: 1.05rem;
+  color: var(--ink);
+  background: var(--cream);
+  border: 1px solid var(--rule);
+  padding: 8px 10px;
+}
+.suggest-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.suggest-form button:disabled { opacity: 0.5; cursor: not-allowed; }
+.suggest-status { font-family: "Liberation Sans", sans-serif; font-size: 0.9rem; color: var(--muted); margin: 0; }
+a.action {
+  display: inline-block;
+  font-family: "Liberation Sans", sans-serif;
+  background: var(--crimson);
+  color: var(--cream) !important;
+  border: 0;
+  padding: 10px 16px;
+  text-decoration: none;
+  font-size: 0.95rem;
+}
