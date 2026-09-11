@@ -78,8 +78,8 @@ Defaults if the env vars are unset: `~/.config/twodown/youtube-token.json`,
 `tiktok-token.json`, `meta-token.json`.
 
 Without tokens the pair still lands in `two-down/site/` for cryptic.fun.
-Point the domain’s DNS at GitHub Pages or any static host serving that folder
-(DNS can take 24–48 hours). The site `CNAME` is `cryptic.fun`.
+The site `CNAME` is `cryptic.fun`. DNS only works after the name is actually
+registered (see Go live).
 
 Daily agent
 -----------
@@ -98,15 +98,22 @@ Yes — pay Cursor to run this every morning.
    Pick Composer 2.5 or Grok 4.6 so it spends the cheaper Cursor Models pool.
 
 That is the only thing you pay Cursor for. GitHub Pages and YouTube upload are free.
-The domain is already yours; it just needs DNS pointed at GitHub.
 
 **Go live**
 
-* Merge the Cryptic Fun PR.
-* Repo **Settings → Pages → Source: GitHub Actions**.
-* Point `cryptic.fun` at GitHub Pages (`A` records `185.199.108.153`,
-  `185.199.109.153`, `185.199.110.153`, `185.199.111.153`).
-* Custom domain: `cryptic.fun`.
+`cryptic.fun` is **not in the .fun registry** until you buy it. Chrome’s
+`DNS_PROBE_FINISHED_NXDOMAIN` is that fact, not a typo. `cryptic.fit` is a
+different GoDaddy name — do not point the brand there.
+
+1. Buy **cryptic.fun** at [Namecheap](https://www.namecheap.com/domains/registration/results/?domain=cryptic.fun)
+   (domain only — skip extra hosting).
+2. Merge the Cryptic Fun PR.
+3. Repo **Settings → Pages → Source: GitHub Actions**.
+4. In Namecheap Advanced DNS, `A` records for `@` to `185.199.108.153`,
+   `185.199.109.153`, `185.199.110.153`, `185.199.111.153`.
+5. GitHub Pages custom domain: `cryptic.fun`.
+
+`twodown live` prints this same order (registry first, then Pages, then DNS).
 
 YouTube still needs `TWODOWN_YOUTUBE_TOKEN` (OAuth for the Cryptic Fun channel),
 not a payment.

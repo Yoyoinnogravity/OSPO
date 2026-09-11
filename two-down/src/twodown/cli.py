@@ -9,7 +9,14 @@ from pathlib import Path
 from twodown.ads import ads_status
 from twodown.config import DEFAULT_OUTPUT, DEFAULT_VOICE_ALIAS, SITE_ORIGIN, SOURCE_SITE
 from twodown.ingest import LONDON
-from twodown.live import probe, public_checks
+from twodown.live import (
+    PRODUCT_CHECK_NAMES,
+    dns_addresses,
+    go_live_next_steps,
+    probe,
+    public_checks,
+    registry_status,
+)
 from twodown.models import DailyPair
 from twodown.pipeline import run_today
 from twodown.scenes import DEFAULT_SCENE, list_scenes
@@ -186,20 +193,36 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.cmd == "live":
         print("Public URLs (live = HTTP 2xx/3xx from here right now)")
-        any_product = False
+        seen: dict[str, str] = {}
         for name, url in public_checks():
             state, detail = probe(url)
             mark = "LIVE" if state == "live" else "down"
             print(f"  {mark:4}  {name:16}  {url}  ({detail})")
-            if state == "live" and name not in {"Pull request"} and "15²" not in name and name != "Fifteen Squared":
-                any_product = True
-        if not any_product:
+            seen[name] = state
+        registry, reg_detail = registry_status()
+        dns_state, dns_detail = dns_addresses()
+        print()
+        print(f"registry  {registry}  ({reg_detail})")
+        print(f"dns       {dns_state}  ({dns_detail})")
+        domain_live = seen.get("cryptic.fun") == "live"
+        pages_live = seen.get("GitHub Pages") == "live"
+        steps = go_live_next_steps(
+            registry=registry,
+            pages_live=pages_live,
+            domain_live=domain_live,
+        )
+        if steps:
             print()
             print("cryptic.fun is not on the public internet yet.")
-            print("Merge the PR, turn on GitHub Pages, point DNS at GitHub, then these URLs will work:")
-            print(f"  {SITE_ORIGIN}/")
-            print(f"  {SITE_ORIGIN}/support.html")
-            print(f"  {SITE_ORIGIN}/sitemap.xml")
+            if registry == "absent":
+                print("Chrome's DNS_PROBE_FINISHED_NXDOMAIN is this: the name is not registered.")
+            print("Next:")
+            for i, step in enumerate(steps, start=1):
+                print(f"  {i}. {step}")
+            print(f"Then: {SITE_ORIGIN}/")
+        elif not any(seen.get(name) == "live" for name in PRODUCT_CHECK_NAMES):
+            print()
+            print("cryptic.fun is not on the public internet yet.")
         return 0
 
     if args.cmd == "upload":
