@@ -1,5 +1,6 @@
 .venv/
 output/
+cryptic_fun_site.zip
 __pycache__/
 *.pyc
 *.egg-info/
