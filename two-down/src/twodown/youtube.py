@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-import os
-from pathlib import Path
+import json
 
 from twodown.captions import youtube_description
 from twodown.config import CLUES_PER_DAY
 from twodown.models import Clue, DailyPair, SpokenClue
+from twodown.tokens import secret_text
 
 YOUTUBE_CHANNEL = "Cryptic Fun"
 SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
@@ -13,29 +13,23 @@ TOKEN_ENV = "TWODOWN_YOUTUBE_TOKEN"
 CLIENT_ENV = "TWODOWN_YOUTUBE_CLIENT_SECRET"
 
 
-def _token_path() -> Path | None:
-    raw = os.environ.get(TOKEN_ENV)
-    if raw:
-        return Path(raw)
-    default = Path.home() / ".config" / "twodown" / "youtube-token.json"
-    if default.exists():
-        return default
-    return None
-
-
 def youtube_ready() -> bool:
     return _credentials() is not None
 
 
 def _credentials():
-    token = _token_path()
-    if not token or not token.exists():
+    text = secret_text(TOKEN_ENV, "youtube-token.json")
+    if not text or not text.startswith("{"):
         return None
     try:
         from google.oauth2.credentials import Credentials
     except ImportError:
         return None
-    return Credentials.from_authorized_user_file(str(token), scopes=SCOPES)
+    try:
+        info = json.loads(text)
+        return Credentials.from_authorized_user_info(info, scopes=SCOPES)
+    except (json.JSONDecodeError, ValueError, TypeError):
+        return None
 
 
 def video_title(clue: Clue) -> str:

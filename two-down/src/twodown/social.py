@@ -1,13 +1,16 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from twodown.captions import facebook_title, social_caption
-from twodown.config import CLUES_PER_DAY
+from twodown.config import CLUES_PER_DAY, SITE_ROOT
 from twodown.meta import facebook_ready, instagram_ready, upload_facebook, upload_instagram
 from twodown.models import DailyPair
 from twodown.tiktok import tiktok_ready, upload_short as upload_tiktok
 from twodown.youtube import upload_pair as upload_youtube, youtube_ready
 
 PLATFORMS = ("youtube", "tiktok", "instagram", "facebook")
+CURSOR_ENVIRONMENT = "https://cursor.com/dashboard/cloud-agents/environments"
 
 
 def platform_status() -> dict[str, bool]:
@@ -26,6 +29,32 @@ def setup_hints() -> dict[str, str]:
         "instagram": "Set TWODOWN_META_TOKEN (access_token + ig_user_id) for the Instagram professional account.",
         "facebook": "Set TWODOWN_META_TOKEN (access_token + page_id) for the Cryptic Fun Facebook Page.",
     }
+
+
+def connect_instructions() -> str:
+    return (
+        "The upload agent cannot log into YouTube, TikTok, Instagram or Facebook as you.\n"
+        "Connect each app once. Paste the JSON (not your password) as secrets on the\n"
+        f"Cursor Cloud Agent environment: {CURSOR_ENVIRONMENT}\n"
+        "\n"
+        "  TWODOWN_YOUTUBE_TOKEN   YouTube OAuth user JSON with youtube.upload\n"
+        "  TWODOWN_TIKTOK_TOKEN    {\"access_token\": \"...\"}\n"
+        "  TWODOWN_META_TOKEN      {\"access_token\": \"...\", \"page_id\": \"...\", \"ig_user_id\": \"...\"}\n"
+        "\n"
+        "After that, a Cloud Agent can run `twodown today` and `twodown upload` for you.\n"
+    )
+
+
+def attach_site_videos(pair: DailyPair, site_root: Path | None = None) -> DailyPair:
+    """Point clues at two-down/site/media/{slug}.mp4 when the render path is missing."""
+    root = Path(site_root or SITE_ROOT)
+    for item in pair.clues:
+        if item.video_path and Path(item.video_path).exists():
+            continue
+        site_video = root / "media" / f"{item.clue.slug}.mp4"
+        if site_video.exists():
+            item.video_path = str(site_video)
+    return pair
 
 
 def _record(existing: str | None, uploader, notes: list[str]) -> None:
@@ -50,6 +79,7 @@ def publish_pair(
     youtube_privacy: str = "public",
 ) -> dict[str, list[str]]:
     """Upload today's two Shorts to every connected platform. One failure does not stop the rest."""
+    attach_site_videos(pair)
     notes: dict[str, list[str]] = {name: [] for name in PLATFORMS}
     status = platform_status()
     hints = setup_hints()

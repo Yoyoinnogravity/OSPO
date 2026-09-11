@@ -78,8 +78,9 @@ Defaults if the env vars are unset: `~/.config/twodown/youtube-token.json`,
 `tiktok-token.json`, `meta-token.json`.
 
 Without tokens the pair still lands in `two-down/site/` for cryptic.fun.
-The site `CNAME` is `cryptic.fun`. DNS only works after the name is actually
-registered (see Go live).
+That folder is a complete static site. Upload its contents to any host
+(`public_html`, Netlify, Cloudflare Pages). The site `CNAME` is `cryptic.fun`.
+DNS only works after the name is actually registered (see Go live).
 
 Daily agent
 -----------

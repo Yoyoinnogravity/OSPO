@@ -20,7 +20,13 @@ from twodown.live import (
 from twodown.models import DailyPair
 from twodown.pipeline import run_today
 from twodown.scenes import DEFAULT_SCENE, list_scenes
-from twodown.social import PLATFORMS, platform_status, publish_pair, setup_hints
+from twodown.social import (
+    PLATFORMS,
+    connect_instructions,
+    platform_status,
+    publish_pair,
+    setup_hints,
+)
 from twodown.voice import list_voices, resolve_voice
 from twodown.youtube import YOUTUBE_CHANNEL
 
@@ -150,6 +156,7 @@ def main(argv: list[str] | None = None) -> int:
     scenes.add_argument("--json", action="store_true")
 
     sub.add_parser("status", help="Show which social accounts are connected")
+    sub.add_parser("connect", help="Show the token JSON the upload agent needs")
     sub.add_parser("live", help="Check which public URLs actually respond")
 
     args = parser.parse_args(argv)
@@ -188,6 +195,11 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.cmd == "status":
+        _print_status()
+        return 0
+
+    if args.cmd == "connect":
+        print(connect_instructions(), end="")
         _print_status()
         return 0
 

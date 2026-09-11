@@ -5,6 +5,8 @@ import os
 import time
 from pathlib import Path
 
+from twodown.tokens import secret_text
+
 GRAPH_VERSION = "v22.0"
 GRAPH = f"https://graph.facebook.com/{GRAPH_VERSION}"
 TOKEN_ENV = "TWODOWN_META_TOKEN"
@@ -13,21 +15,10 @@ IG_ENV = "TWODOWN_IG_USER_ID"
 ACCESS_ENV = "TWODOWN_META_ACCESS_TOKEN"
 
 
-def _token_path() -> Path | None:
-    raw = os.environ.get(TOKEN_ENV)
-    if raw:
-        return Path(raw)
-    default = Path.home() / ".config" / "twodown" / "meta-token.json"
-    if default.exists():
-        return default
-    return None
-
-
 def _load_meta() -> dict[str, str]:
     data: dict[str, str] = {}
-    path = _token_path()
-    if path and path.exists():
-        text = path.read_text(encoding="utf-8").strip()
+    text = secret_text(TOKEN_ENV, "meta-token.json")
+    if text:
         if text.startswith("{"):
             raw = json.loads(text)
             for key in ("access_token", "token", "page_id", "ig_user_id"):
@@ -35,7 +26,7 @@ def _load_meta() -> dict[str, str]:
                     data[key] = str(raw[key])
             if "access_token" not in data and raw.get("page_access_token"):
                 data["access_token"] = str(raw["page_access_token"])
-        elif text:
+        else:
             data["access_token"] = text
     if os.environ.get(ACCESS_ENV):
         data["access_token"] = os.environ[ACCESS_ENV]

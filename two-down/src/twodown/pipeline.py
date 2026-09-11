@@ -83,6 +83,25 @@ def run_today(
         existing = _load_complete_pair(dest_root)
         if existing:
             existing.already_published = True
+            if youtube or tiktok or instagram or facebook:
+                notes = publish_pair(
+                    existing,
+                    youtube=youtube,
+                    tiktok=tiktok,
+                    instagram=instagram,
+                    facebook=facebook,
+                    youtube_privacy=youtube_privacy,
+                )
+                lines: list[str] = []
+                hints = setup_hints()
+                for platform, values in notes.items():
+                    if values == [hints.get(platform)]:
+                        lines.append(f"{platform}: skipped — {values[0]}")
+                    elif values:
+                        lines.append(f"{platform}: {', '.join(values)}")
+                if lines:
+                    (dest_root / "social-status.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
+                (dest_root / "pair.json").write_text(existing.model_dump_json(indent=2), encoding="utf-8")
             return existing
         if published_date(SITE_ROOT, stamp):
             skipped = DailyPair(

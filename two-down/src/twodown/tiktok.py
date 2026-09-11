@@ -4,6 +4,8 @@ import json
 import os
 from pathlib import Path
 
+from twodown.tokens import secret_text
+
 TOKEN_ENV = "TWODOWN_TIKTOK_TOKEN"
 INIT_URL = "https://open.tiktokapis.com/v2/post/publish/video/init/"
 STATUS_URL = "https://open.tiktokapis.com/v2/post/publish/status/fetch/"
@@ -12,21 +14,8 @@ PREFERRED_PRIVACY = "PUBLIC_TO_EVERYONE"
 WHOLE_FILE_LIMIT = 10 * 1024 * 1024
 
 
-def _token_path() -> Path | None:
-    raw = os.environ.get(TOKEN_ENV)
-    if raw:
-        return Path(raw)
-    default = Path.home() / ".config" / "twodown" / "tiktok-token.json"
-    if default.exists():
-        return default
-    return None
-
-
 def _load_token() -> str | None:
-    path = _token_path()
-    if not path or not path.exists():
-        return None
-    text = path.read_text(encoding="utf-8").strip()
+    text = secret_text(TOKEN_ENV, "tiktok-token.json")
     if not text:
         return None
     if text.startswith("{"):
