@@ -82,18 +82,30 @@ Point the domain’s DNS at GitHub Pages or any static host serving that folder
 Daily agent
 -----------
 
-Yes — pay Cursor to run this every morning. Create a Cloud Agent automation at
-[cursor.com/automations](https://cursor.com/automations):
+Yes — pay Cursor to run this every morning.
 
-* Trigger: every day 09:00 Europe/London (optional second run at 12:00 if 15² is late)
-* Repo: this one, so it can commit `two-down/site/`
-* Prompt: copy the block in `two-down/AGENTS.md`
-* Secrets on the environment: the YouTube / TikTok / Meta token files above
+**How to pay**
 
-That is billed as Cloud Agent usage on Pro and above. The pipeline will not
-invent answers, and it will skip if today’s pair is already on the site
-(`twodown today --force` rebuilds).
+1. Sign in as Aled at [cursor.com/dashboard/billing](https://cursor.com/dashboard/billing).
+2. You need a **paid plan** (Pro is $20/month). Click **Adjust plan** if you are still on Hobby.
+3. Click **Manage Subscription** to add or update a card in Stripe.
+4. On the **Spending** tab, turn on **on-demand usage** and set a monthly cap
+   (Cloud Agents and Automations bill from this after included usage).
+5. Create the daily job at [cursor.com/automations](https://cursor.com/automations)
+   using the prompt in `two-down/AGENTS.md`.
+   Pick Composer 2.5 or Grok 4.6 so it spends the cheaper Cursor Models pool.
 
-A cheaper non-agent option is a machine cron of `twodown today` with those
-same tokens. The paid agent is the one that can recover when 15² changes layout.
+That is the only thing you pay Cursor for. GitHub Pages and YouTube upload are free.
+The domain is already yours; it just needs DNS pointed at GitHub.
+
+**Go live**
+
+* Merge the Cryptic Fun PR.
+* Repo **Settings → Pages → Source: GitHub Actions**.
+* Point `cryptic.fun` at GitHub Pages (`A` records `185.199.108.153`,
+  `185.199.109.153`, `185.199.110.153`, `185.199.111.153`).
+* Custom domain: `cryptic.fun`.
+
+YouTube still needs `TWODOWN_YOUTUBE_TOKEN` (OAuth for the Cryptic Fun channel),
+not a payment.
 
