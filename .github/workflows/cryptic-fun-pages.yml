@@ -25,6 +25,17 @@ jobs:
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+      # CNAME forces the custom domain. Until cryptic.fun is registered it would
+      # redirect the free github.io URL at dead DNS, so publish without it.
+      - name: Use the custom domain only when CRYPTIC_FUN_DOMAIN is set
+        run: |
+          if [ -z "${{ vars.CRYPTIC_FUN_DOMAIN }}" ]; then
+            rm -f two-down/site/CNAME
+            echo "Publishing on github.io (no custom domain)."
+          else
+            echo "${{ vars.CRYPTIC_FUN_DOMAIN }}" > two-down/site/CNAME
+            echo "Publishing on ${{ vars.CRYPTIC_FUN_DOMAIN }}."
+          fi
       - uses: actions/upload-pages-artifact@v3
         with:
           path: two-down/site

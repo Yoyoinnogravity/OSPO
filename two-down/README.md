@@ -100,7 +100,18 @@ Yes — pay Cursor to run this every morning.
 
 That is the only thing you pay Cursor for. GitHub Pages and YouTube upload are free.
 
-**Go live**
+**Go live for free, no domain**
+
+You do not have to buy anything to put this online.
+
+1. Merge the Cryptic Fun PR.
+2. Repo **Settings → Pages → Source: GitHub Actions**.
+3. The site publishes at **https://yoyoinnogravity.github.io/OSPO/**.
+
+The deploy drops `CNAME` unless the repo variable `CRYPTIC_FUN_DOMAIN` is set,
+so the free `github.io` address works on its own.
+
+**Later, on the real domain**
 
 `cryptic.fun` is **not in the .fun registry** until you buy it. Chrome’s
 `DNS_PROBE_FINISHED_NXDOMAIN` is that fact, not a typo. `cryptic.fit` is a
@@ -108,11 +119,11 @@ different GoDaddy name — do not point the brand there.
 
 1. Buy **cryptic.fun** at [Namecheap](https://www.namecheap.com/domains/registration/results/?domain=cryptic.fun)
    (domain only — skip extra hosting).
-2. Merge the Cryptic Fun PR.
-3. Repo **Settings → Pages → Source: GitHub Actions**.
-4. In Namecheap Advanced DNS, `A` records for `@` to `185.199.108.153`,
+2. In Namecheap Advanced DNS, `A` records for `@` to `185.199.108.153`,
    `185.199.109.153`, `185.199.110.153`, `185.199.111.153`.
-5. GitHub Pages custom domain: `cryptic.fun`.
+3. Repo **Settings → Secrets and variables → Actions → Variables**: add
+   `CRYPTIC_FUN_DOMAIN = cryptic.fun`, then re-run the workflow.
+4. GitHub Pages custom domain: `cryptic.fun`.
 
 Do **not** upload with cPanel File Manager, FileZilla, or `scp` to
 `public_html`. That Namecheap article is for their paid web hosting. This
