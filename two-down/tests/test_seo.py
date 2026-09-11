@@ -29,3 +29,4 @@ def test_json_ld_escapes_script_breakers():
     assert "</script>" not in blob
     assert "\\u003c/script>" in blob
     assert website_ld()["url"] == "https://cryptic.fun/"
+    assert "https://www.youtube.com/@crypticfun" in website_ld()["publisher"]["sameAs"]

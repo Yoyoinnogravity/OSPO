@@ -7,7 +7,7 @@ from datetime import datetime
 from pathlib import Path
 from xml.sax.saxutils import escape as xml_escape
 
-from twodown.config import BRAND, SITE_ORIGIN, SOURCE_SITE
+from twodown.config import BRAND, SITE_ORIGIN, SOURCE_SITE, follow_profiles
 from twodown.models import Clue, DailyPair
 
 GSC_ENV = "TWODOWN_GSC_VERIFY"
@@ -57,6 +57,8 @@ def dumps_ld(data: dict | list) -> str:
 
 
 def website_ld() -> dict:
+    same = [f"{SITE_ORIGIN}/", SOURCE_SITE, f"{SITE_ORIGIN}/feed.xml"]
+    same.extend(url for _slug, _label, url in follow_profiles())
     return {
         "@context": "https://schema.org",
         "@type": "WebSite",
@@ -65,7 +67,7 @@ def website_ld() -> dict:
         "url": f"{SITE_ORIGIN}/",
         "description": DEFAULT_DESCRIPTION,
         "inLanguage": "en-GB",
-        "publisher": {"@type": "Organization", "name": "Cryptic Fun", "url": f"{SITE_ORIGIN}/"},
+        "publisher": {"@type": "Organization", "name": "Cryptic Fun", "url": f"{SITE_ORIGIN}/", "sameAs": same},
         "sourceOrganization": {"@type": "Organization", "name": "Fifteen Squared", "url": SOURCE_SITE},
     }
 
@@ -195,6 +197,7 @@ def collect_sitemap_urls(root: Path, pair: DailyPair) -> list[tuple[str, str]]:
         ("/", today),
         ("/about.html", today),
         ("/support.html", today),
+        ("/follow.html", today),
         ("/suggest.html", today),
         ("/privacy.html", today),
         (f"/d/{pair.date}/", today),

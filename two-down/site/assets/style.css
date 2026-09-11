@@ -56,14 +56,16 @@ header {
 header a { color: var(--muted); }
 body.scene-photo header a { color: var(--muted); }
 body.scene-photo header .wordmark { color: var(--ink); }
+body.scene-photo header .follow a { color: var(--ink); }
+body.scene-photo header .follow a.on { color: var(--cream); }
 nav a:hover { color: var(--crimson); }
 .chrome-top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
 .wordmark { font-family: "Liberation Sans", "Helvetica Neue", sans-serif; font-weight: 700; font-size: 1.6rem; letter-spacing: 0.02em; color: var(--ink); text-decoration: none; }
 .wordmark span { color: var(--crimson); }
 nav a { margin-left: 18px; font-family: "Liberation Sans", sans-serif; font-size: 0.9rem; text-decoration: none; color: var(--muted); }
-.voices, .places { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-.voices span, .places span { font-family: "Liberation Sans", sans-serif; font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-right: 4px; }
-.voices button, .places button {
+.voices, .places, .follow { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.voices span, .places span, .follow span { font-family: "Liberation Sans", sans-serif; font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-right: 4px; }
+.voices button, .places button, .follow button, .follow a {
   font-family: "Liberation Sans", sans-serif;
   background: transparent;
   border: 1px solid var(--rule);
@@ -71,8 +73,9 @@ nav a { margin-left: 18px; font-family: "Liberation Sans", sans-serif; font-size
   padding: 6px 10px;
   cursor: pointer;
   font-size: 0.85rem;
+  text-decoration: none;
 }
-.voices button.on, .places button.on { background: var(--crimson); color: var(--cream); border-color: var(--crimson); }
+.voices button.on, .places button.on, .follow button.on, .follow a.on { background: var(--crimson); color: var(--cream); border-color: var(--crimson); }
 h1 { font-size: clamp(2rem, 5vw, 3.4rem); line-height: 1.05; margin: 28px 0 8px; }
 body.scene-photo h1, body.scene-photo .lede { text-shadow: 0 2px 18px rgba(0,0,0,0.55); }
 .lede { font-size: 1.15rem; color: var(--muted); max-width: 40rem; }

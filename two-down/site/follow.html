@@ -3,12 +3,12 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Privacy — cryptic.fun</title>
-  <meta name="description" content="cryptic.fun is a static site. Voice and place stay in your browser. Display ads stay off until a UK consent banner is in place.">
+  <title>Follow — cryptic.fun</title>
+  <meta name="description" content="Follow cryptic.fun by email, RSS or YouTube. Two cryptic clues a day from Fifteen Squared. No account required.">
   <meta name="robots" content="index,follow,max-image-preview:large">
-  <link rel="canonical" href="https://cryptic.fun/privacy.html">
-  <link rel="alternate" hreflang="en-GB" href="https://cryptic.fun/privacy.html">
-  <link rel="alternate" hreflang="x-default" href="https://cryptic.fun/privacy.html">
+  <link rel="canonical" href="https://cryptic.fun/follow.html">
+  <link rel="alternate" hreflang="en-GB" href="https://cryptic.fun/follow.html">
+  <link rel="alternate" hreflang="x-default" href="https://cryptic.fun/follow.html">
   <link rel="alternate" type="application/rss+xml" title="cryptic.fun" href="https://cryptic.fun/feed.xml">
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
   <meta name="theme-color" content="#b81c29">
@@ -16,15 +16,15 @@
   <meta property="og:site_name" content="cryptic.fun">
   <meta property="og:type" content="website">
   <meta property="og:locale" content="en_GB">
-  <meta property="og:title" content="Privacy — cryptic.fun">
-  <meta property="og:description" content="cryptic.fun is a static site. Voice and place stay in your browser. Display ads stay off until a UK consent banner is in place.">
-  <meta property="og:url" content="https://cryptic.fun/privacy.html">
+  <meta property="og:title" content="Follow — cryptic.fun">
+  <meta property="og:description" content="Follow cryptic.fun by email, RSS or YouTube. Two cryptic clues a day from Fifteen Squared. No account required.">
+  <meta property="og:url" content="https://cryptic.fun/follow.html">
   <meta property="og:image" content="https://cryptic.fun/media/og.webp">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Privacy — cryptic.fun">
-  <meta name="twitter:description" content="cryptic.fun is a static site. Voice and place stay in your browser. Display ads stay off until a UK consent banner is in place.">
+  <meta name="twitter:title" content="Follow — cryptic.fun">
+  <meta name="twitter:description" content="Follow cryptic.fun by email, RSS or YouTube. Two cryptic clues a day from Fifteen Squared. No account required.">
   <meta name="twitter:image" content="https://cryptic.fun/media/og.webp">
   
   <link rel="stylesheet" href="assets/style.css">
@@ -50,18 +50,28 @@
   </header>
   <main>
     
-    <h1>Privacy.</h1>
-    <p class="lede">cryptic.fun is a static site. We do not run an account system or a tracker of our own.</p>
-    <section class="panel">
-      <h2>What stays in your browser.</h2>
-      <p>Voice, place, and “already suggested today” are saved in localStorage on your device so the header remembers your picks. That data does not come to us.</p>
-      <p>Suggest-a-clue and the daily-clue signup open your email app. If you send a message, it arrives at <a href="mailto:aledmorgan@gmail.com">aledmorgan@gmail.com</a>.</p>
-    </section>
-    <section class="panel">
-      <h2>Ads.</h2>
-      <p>Display ads are off until we have a live domain, an approved AdSense account, and — for UK visitors — a consent banner. When they are on, Google may set cookies to choose and measure those ads. We will not load the ad script until that is true. See <a href="support.html">Support</a>.</p>
-    </section>
-    <p>Questions: <a href="mailto:aledmorgan@gmail.com">aledmorgan@gmail.com</a>.</p>
+    <p class="kicker">Follow</p>
+    <h1>Follow cryptic.fun.</h1>
+    <p class="lede">Following is the default. Stay for the daily pair, or take it with you by email, RSS or YouTube. There is no account to create on the site.</p>
+    <div class="suggest-forms">
+      <section class="panel" id="email">
+        <h2>Email, one clue a day.</h2>
+        <p>Spoiler-safe: the clue only. Sends to <a href="mailto:aledmorgan@gmail.com">aledmorgan@gmail.com</a>.</p>
+        <form class="suggest-form" data-subscribe-form data-inbox="aledmorgan@gmail.com">
+          <label>Your email
+            <input name="email" type="email" required maxlength="120" autocomplete="email" placeholder="you@example.com">
+          </label>
+          <button type="submit" class="reveal">Send me one clue a day</button>
+          <p class="suggest-status" data-suggest-status></p>
+        </form>
+      </section>
+      <section class="panel">
+        <h2>RSS and YouTube.</h2>
+        <p>The feed is the pair, not the answers. Cryptic Fun Shorts go to YouTube when that channel is connected.</p>
+        <p><a class="action" href="feed.xml" data-follow-link>Subscribe to RSS</a></p>
+        <p><a class="action" href="https://www.youtube.com/@crypticfun" data-follow-link rel="me noopener" target="_blank">Follow on YouTube</a></p>
+      </section>
+    </div>
     
   </main>
   <footer>

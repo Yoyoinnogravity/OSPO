@@ -6,7 +6,7 @@ from pathlib import Path
 from shutil import copy2
 
 from twodown.ads import ads_enabled, ads_txt, adsense_client, adsense_slot
-from twodown.config import BRAND, SITE_ORIGIN, SITE_ROOT, SOURCE_SITE, SPONSOR_EMAIL, SUGGEST_EMAIL, VOICE_LABELS
+from twodown.config import BRAND, SITE_ORIGIN, SITE_ROOT, SOURCE_SITE, SPONSOR_EMAIL, SUGGEST_EMAIL, VOICE_LABELS, follow_profiles
 from twodown.models import DailyPair, SpokenClue
 from twodown.render import write_share_card
 from twodown.scenes import DEFAULT_SCENE, get_scene, list_scenes
@@ -86,14 +86,16 @@ header {
 header a { color: var(--muted); }
 body.scene-photo header a { color: var(--muted); }
 body.scene-photo header .wordmark { color: var(--ink); }
+body.scene-photo header .follow a { color: var(--ink); }
+body.scene-photo header .follow a.on { color: var(--cream); }
 nav a:hover { color: var(--crimson); }
 .chrome-top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
 .wordmark { font-family: "Liberation Sans", "Helvetica Neue", sans-serif; font-weight: 700; font-size: 1.6rem; letter-spacing: 0.02em; color: var(--ink); text-decoration: none; }
 .wordmark span { color: var(--crimson); }
 nav a { margin-left: 18px; font-family: "Liberation Sans", sans-serif; font-size: 0.9rem; text-decoration: none; color: var(--muted); }
-.voices, .places { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-.voices span, .places span { font-family: "Liberation Sans", sans-serif; font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-right: 4px; }
-.voices button, .places button {
+.voices, .places, .follow { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.voices span, .places span, .follow span { font-family: "Liberation Sans", sans-serif; font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-right: 4px; }
+.voices button, .places button, .follow button, .follow a {
   font-family: "Liberation Sans", sans-serif;
   background: transparent;
   border: 1px solid var(--rule);
@@ -101,8 +103,9 @@ nav a { margin-left: 18px; font-family: "Liberation Sans", sans-serif; font-size
   padding: 6px 10px;
   cursor: pointer;
   font-size: 0.85rem;
+  text-decoration: none;
 }
-.voices button.on, .places button.on { background: var(--crimson); color: var(--cream); border-color: var(--crimson); }
+.voices button.on, .places button.on, .follow button.on, .follow a.on { background: var(--crimson); color: var(--cream); border-color: var(--crimson); }
 h1 { font-size: clamp(2rem, 5vw, 3.4rem); line-height: 1.05; margin: 28px 0 8px; }
 body.scene-photo h1, body.scene-photo .lede { text-shadow: 0 2px 18px rgba(0,0,0,0.55); }
 .lede { font-size: 1.15rem; color: var(--muted); max-width: 40rem; }
@@ -283,6 +286,42 @@ document.querySelectorAll("[data-scene-btn]").forEach((btn) => {
 applyVoice(currentVoice());
 applyScene(currentScene());
 
+const FOLLOW_KEY = "cryptic-fun-follow";
+
+function isFollowing() {
+  return localStorage.getItem(FOLLOW_KEY) !== "0";
+}
+
+function applyFollow() {
+  const on = isFollowing();
+  const btn = document.querySelector("[data-follow-toggle]");
+  if (!btn) return;
+  btn.classList.toggle("on", on);
+  btn.setAttribute("aria-pressed", on ? "true" : "false");
+  btn.textContent = on ? "Following" : "Follow";
+}
+
+document.querySelectorAll("[data-follow-link]").forEach((link) => {
+  link.addEventListener("click", () => localStorage.setItem(FOLLOW_KEY, "1"));
+});
+const followToggle = document.querySelector("[data-follow-toggle]");
+if (followToggle) {
+  followToggle.addEventListener("click", () => {
+    if (isFollowing()) {
+      localStorage.setItem(FOLLOW_KEY, "0");
+      applyFollow();
+      return;
+    }
+    localStorage.setItem(FOLLOW_KEY, "1");
+    applyFollow();
+    const href = followToggle.dataset.followHref;
+    if (href && location.pathname.indexOf("follow.html") === -1) {
+      window.location.href = href;
+    }
+  });
+}
+applyFollow();
+
 document.querySelectorAll("button.reveal").forEach((btn) => {
   btn.addEventListener("click", () => btn.closest("article").classList.add("is-open"));
 });
@@ -407,10 +446,27 @@ def _scene_bar() -> str:
     )
 
 
+def _follow_bar(prefix: str) -> str:
+    links = [
+        f'<a href="{prefix}follow.html#email" data-follow-link>Email</a>',
+        f'<a href="{prefix}feed.xml" data-follow-link>RSS</a>',
+    ]
+    for _slug, label, url in follow_profiles():
+        links.append(f'<a href="{_e(url)}" data-follow-link rel="me noopener" target="_blank">{_e(label)}</a>')
+    return (
+        '<div class="follow" role="group" aria-label="Follow cryptic.fun">'
+        "<span>Follow</span>"
+        f'<button type="button" data-follow-toggle data-follow-href="{prefix}follow.html" aria-pressed="true">Following</button>'
+        + "".join(links)
+        + "</div>"
+    )
+
+
 def _nav(prefix: str) -> str:
     return f"""
       <nav>
         <a href="{prefix}index.html">Today</a>
+        <a href="{prefix}follow.html">Follow</a>
         <a href="{prefix}suggest.html">Suggest</a>
         <a href="{prefix}support.html">Support</a>
         <a href="{prefix}about.html">About</a>
@@ -515,6 +571,7 @@ def _page(body: str, seo: PageSeo, depth: int = 0, show_ads: bool = False) -> st
     </div>
     {_voice_bar()}
     {_scene_bar()}
+    {_follow_bar(prefix)}
   </header>
   <main>
     {body}
@@ -524,7 +581,7 @@ def _page(body: str, seo: PageSeo, depth: int = 0, show_ads: bool = False) -> st
     <a href="{SOURCE_SITE}">Fifteen Squared</a>.
     Not affiliated with those papers. Pick a voice and a place.
     One homemade clue a day via <a href="{prefix}suggest.html">Suggest</a>,
-    or ask for a clue by email.
+    or <a href="{prefix}follow.html">follow</a> by email, RSS or YouTube.
     <a href="{prefix}support.html">Support</a> ·
     <a href="{prefix}privacy.html">Privacy</a>
     <p class="scene-credit" data-scene-credit>{_e(default.credit_line)}</p>
@@ -631,6 +688,12 @@ def publish_site(pair: DailyPair, dest: Path | None = None) -> Path:
     <section class="pair">
       {articles}
     </section>
+    <aside class="teaser">
+      <p class="kicker">Follow</p>
+      <h2>Keep the pair coming.</h2>
+      <p>Follow is on by default. Email one clue a day, the RSS feed, or Cryptic Fun on YouTube. No account on the site.</p>
+      <a class="action" href="follow.html">Follow cryptic.fun</a>
+    </aside>
     {_keep_free_teaser("")}
     <aside class="teaser">
       <p class="kicker">Readers</p>
@@ -777,6 +840,46 @@ def publish_site(pair: DailyPair, dest: Path | None = None) -> Path:
                 title=f"Suggest a clue — {BRAND}",
                 description="Send one homemade cryptic a day, or ask for a daily clue by email. Answers stay off the public page.",
                 path="/suggest.html",
+            ),
+        ),
+        encoding="utf-8",
+    )
+
+    profiles = "".join(
+        f'<p><a class="action" href="{_e(url)}" data-follow-link rel="me noopener" target="_blank">Follow on {_e(label)}</a></p>'
+        for _slug, label, url in follow_profiles()
+    )
+    follow_page = f"""
+    <p class="kicker">Follow</p>
+    <h1>Follow cryptic.fun.</h1>
+    <p class="lede">Following is the default. Stay for the daily pair, or take it with you by email, RSS or YouTube. There is no account to create on the site.</p>
+    <div class="suggest-forms">
+      <section class="panel" id="email">
+        <h2>Email, one clue a day.</h2>
+        <p>Spoiler-safe: the clue only. Sends to <a href="mailto:{inbox}">{inbox}</a>.</p>
+        <form class="suggest-form" data-subscribe-form data-inbox="{inbox}">
+          <label>Your email
+            <input name="email" type="email" required maxlength="120" autocomplete="email" placeholder="you@example.com">
+          </label>
+          <button type="submit" class="reveal">Send me one clue a day</button>
+          <p class="suggest-status" data-suggest-status></p>
+        </form>
+      </section>
+      <section class="panel">
+        <h2>RSS and YouTube.</h2>
+        <p>The feed is the pair, not the answers. Cryptic Fun Shorts go to YouTube when that channel is connected.</p>
+        <p><a class="action" href="feed.xml" data-follow-link>Subscribe to RSS</a></p>
+        {profiles}
+      </section>
+    </div>
+    """
+    (root / "follow.html").write_text(
+        _page(
+            follow_page,
+            PageSeo(
+                title=f"Follow — {BRAND}",
+                description="Follow cryptic.fun by email, RSS or YouTube. Two cryptic clues a day from Fifteen Squared. No account required.",
+                path="/follow.html",
             ),
         ),
         encoding="utf-8",

@@ -1,4 +1,5 @@
 from pathlib import Path
+import os
 
 BRAND = "cryptic.fun"
 SITE_ORIGIN = "https://cryptic.fun"
@@ -47,3 +48,23 @@ FONT_REGULAR = "/usr/share/fonts/truetype/liberation/LiberationSerif-Regular.ttf
 FONT_BOLD = "/usr/share/fonts/truetype/liberation/LiberationSerif-Bold.ttf"
 FONT_SANS = "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"
 FONT_SANS_BOLD = "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"
+
+# Public follow URLs. YouTube has a default handle; the others stay off until set.
+YOUTUBE_FOLLOW = os.environ.get("TWODOWN_YOUTUBE_URL", "https://www.youtube.com/@crypticfun").strip()
+TIKTOK_FOLLOW = os.environ.get("TWODOWN_TIKTOK_URL", "").strip()
+INSTAGRAM_FOLLOW = os.environ.get("TWODOWN_INSTAGRAM_URL", "").strip()
+FACEBOOK_FOLLOW = os.environ.get("TWODOWN_FACEBOOK_URL", "").strip()
+
+
+def follow_profiles() -> list[tuple[str, str, str]]:
+    """External Cryptic Fun profiles: slug, label, url. Empty env values are omitted."""
+    rows: list[tuple[str, str, str]] = []
+    for slug, label, url in (
+        ("youtube", "YouTube", YOUTUBE_FOLLOW),
+        ("tiktok", "TikTok", TIKTOK_FOLLOW),
+        ("instagram", "Instagram", INSTAGRAM_FOLLOW),
+        ("facebook", "Facebook", FACEBOOK_FOLLOW),
+    ):
+        if url:
+            rows.append((slug, label, url))
+    return rows

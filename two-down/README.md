@@ -22,6 +22,7 @@ Matterhorn, Santorini, Grand Canyon, Kyoto, aurora, Petra, Ha Long Bay),
 with newsprint still available. Visitors pick **Place** in the header.
 Daily Shorts rotate two different scenes unless you pass `--scene`.
 Voices on the site: **Sonia**, **Ryan**, **Libby**, **Thomas**.
+**Follow** is on by default in the header (email, RSS, YouTube).
 YouTube and the other apps use `--voice` (default Sonia).
 
 Visitors can **suggest one homemade clue a day**, or ask for a daily clue by

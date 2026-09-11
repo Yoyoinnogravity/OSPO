@@ -61,7 +61,16 @@ def test_publish_site_writes_spoiler_pages(tmp_path):
     assert (tmp_path / "c" / "independent-12458-12a" / "index.html").exists()
     assert (tmp_path / "support.html").exists()
     assert (tmp_path / "privacy.html").exists()
-    assert "Support" in index
+    assert "Keep the pair coming" in index
+    assert index.find("Keep the pair coming") < index.find("When the hits come")
+    assert "data-follow-toggle" in index
+    assert "Following" in index
+    assert (tmp_path / "follow.html").exists()
+    follow = (tmp_path / "follow.html").read_text(encoding="utf-8")
+    assert "data-subscribe-form" in follow
+    assert "feed.xml" in follow
+    assert "youtube.com/@crypticfun" in follow
+    assert "https://cryptic.fun/follow.html" in (tmp_path / "sitemap.xml").read_text(encoding="utf-8")
     assert "How we pay for this" in index
     assert "adsbygoogle" not in index
     assert not (tmp_path / "ads.txt").exists()

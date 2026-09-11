@@ -65,6 +65,42 @@ document.querySelectorAll("[data-scene-btn]").forEach((btn) => {
 applyVoice(currentVoice());
 applyScene(currentScene());
 
+const FOLLOW_KEY = "cryptic-fun-follow";
+
+function isFollowing() {
+  return localStorage.getItem(FOLLOW_KEY) !== "0";
+}
+
+function applyFollow() {
+  const on = isFollowing();
+  const btn = document.querySelector("[data-follow-toggle]");
+  if (!btn) return;
+  btn.classList.toggle("on", on);
+  btn.setAttribute("aria-pressed", on ? "true" : "false");
+  btn.textContent = on ? "Following" : "Follow";
+}
+
+document.querySelectorAll("[data-follow-link]").forEach((link) => {
+  link.addEventListener("click", () => localStorage.setItem(FOLLOW_KEY, "1"));
+});
+const followToggle = document.querySelector("[data-follow-toggle]");
+if (followToggle) {
+  followToggle.addEventListener("click", () => {
+    if (isFollowing()) {
+      localStorage.setItem(FOLLOW_KEY, "0");
+      applyFollow();
+      return;
+    }
+    localStorage.setItem(FOLLOW_KEY, "1");
+    applyFollow();
+    const href = followToggle.dataset.followHref;
+    if (href && location.pathname.indexOf("follow.html") === -1) {
+      window.location.href = href;
+    }
+  });
+}
+applyFollow();
+
 document.querySelectorAll("button.reveal").forEach((btn) => {
   btn.addEventListener("click", () => btn.closest("article").classList.add("is-open"));
 });
