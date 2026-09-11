@@ -5,6 +5,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from twodown.config import SOURCE_SITE
+
 Device = Literal[
     "anagram",
     "hidden",
@@ -77,6 +79,7 @@ class DailyPair(BaseModel):
     voice: str
     clues: list[SpokenClue] = Field(default_factory=list)
     source_posts: list[str] = Field(default_factory=list)
+    source_site: str = SOURCE_SITE
     youtube_ids: list[str] = Field(default_factory=list)
     tiktok_ids: list[str] = Field(default_factory=list)
     instagram_ids: list[str] = Field(default_factory=list)

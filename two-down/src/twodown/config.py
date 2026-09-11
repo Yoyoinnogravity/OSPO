@@ -3,8 +3,11 @@ from pathlib import Path
 BRAND = "cryptic.fun"
 SITE_ORIGIN = "https://cryptic.fun"
 SUGGEST_EMAIL = "aledmorgan@gmail.com"
-USER_AGENT = "cryptic.fun/0.1 (+https://cryptic.fun)"
-WP_POSTS = "https://fifteensquared.net/wp-json/wp/v2/posts"
+# The only crossword source. Do not add other blogs.
+SOURCE_SITE = "https://fifteensquared.net/"
+SOURCE_HOST = "fifteensquared.net"
+USER_AGENT = "cryptic.fun/0.1 (+https://cryptic.fun; source=https://fifteensquared.net/)"
+WP_POSTS = f"{SOURCE_SITE.rstrip('/')}/wp-json/wp/v2/posts"
 CRAWL_GAP_SECONDS = 1.0
 
 DAILY_CATEGORY_SLUGS = frozenset({"independent", "ft", "guardian"})

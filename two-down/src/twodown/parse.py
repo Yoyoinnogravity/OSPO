@@ -7,6 +7,7 @@ from typing import Iterable
 from bs4 import BeautifulSoup, Tag
 
 from twodown.devices import classify_device
+from twodown.ingest import is_fifteensquared
 from twodown.models import Clue, PuzzlePost
 
 SECTION_NAMES = {"across", "down"}
@@ -174,6 +175,8 @@ def _direction_from(text: str, current: str) -> str:
 
 
 def parse_post(post: PuzzlePost) -> list[Clue]:
+    if not is_fifteensquared(post.url):
+        return []
     soup = BeautifulSoup(post.html, "lxml")
     clues: list[Clue] = []
     for table in soup.find_all("table"):

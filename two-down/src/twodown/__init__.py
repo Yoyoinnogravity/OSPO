@@ -1,3 +1,3 @@
-"""Two Down: two cryptic clues a day, sourced from Fifteen Squared."""
+"""Two Down: two cryptic clues a day from https://fifteensquared.net/."""
 
 __version__ = "0.1.0"

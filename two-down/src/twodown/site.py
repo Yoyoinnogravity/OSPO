@@ -5,7 +5,7 @@ from datetime import datetime
 from pathlib import Path
 from shutil import copy2
 
-from twodown.config import BRAND, SITE_ORIGIN, SITE_ROOT, SUGGEST_EMAIL, VOICE_LABELS
+from twodown.config import BRAND, SITE_ORIGIN, SITE_ROOT, SOURCE_SITE, SUGGEST_EMAIL, VOICE_LABELS
 from twodown.models import DailyPair, SpokenClue
 from twodown.scenes import DEFAULT_SCENE, get_scene, list_scenes
 
@@ -398,7 +398,7 @@ def _page(title: str, body: str, depth: int = 0) -> str:
   </main>
   <footer>
     Two clues a day from the Independent, Guardian and FT blogs on
-    <a href="https://fifteensquared.net/">Fifteen Squared</a>.
+    <a href="{SOURCE_SITE}">Fifteen Squared</a>.
     Not affiliated with those papers. Pick a voice and a place.
     One homemade clue a day via <a href="{prefix}suggest.html">Suggest</a>,
     or ask for a clue by email.
@@ -512,7 +512,7 @@ def publish_site(pair: DailyPair, dest: Path | None = None) -> Path:
 
     about = f"""
     <h1>About.</h1>
-    <p class="lede">cryptic.fun publishes two cryptic clues a day, taken from the Fifteen Squared blogs of the Independent, Guardian and Financial Times. Choose Sonia, Ryan, Libby or Thomas, and a real place as the backdrop. The same Shorts go to YouTube, TikTok, Instagram and Facebook when those accounts are connected. The site is the spoiler-safe home.</p>
+    <p class="lede">cryptic.fun publishes two cryptic clues a day. The only source is <a href="{SOURCE_SITE}">Fifteen Squared</a> — Independent, Guardian and Financial Times blogs. We never invent answers. Choose Sonia, Ryan, Libby or Thomas, and a real place as the backdrop. The same Shorts go to YouTube, TikTok, Instagram and Facebook when those accounts are connected. The site is the spoiler-safe home.</p>
     <p>Answers and wordplay belong to the setters and the 15² bloggers. We rewrite for speech and always link the original post.</p>
     <p>Readers can <a href="suggest.html">suggest one homemade clue a day</a>, or ask for a daily clue by email. Both land in Aled’s inbox at <a href="mailto:{_e(SUGGEST_EMAIL)}">{_e(SUGGEST_EMAIL)}</a>.</p>
     <h2>Backgrounds.</h2>

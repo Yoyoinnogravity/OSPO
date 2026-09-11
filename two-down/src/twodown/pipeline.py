@@ -8,6 +8,7 @@ from twodown.config import (
     DEFAULT_OUTPUT,
     DEFAULT_VOICE_ALIAS,
     SITE_ROOT,
+    SOURCE_SITE,
     THINK_PAUSE_SECONDS,
     VOICES,
 )
@@ -88,6 +89,7 @@ def run_today(
                 date=stamp,
                 voice=resolve_voice(_voice_alias(voice)),
                 source_posts=[p.url for p in todays],
+                source_site=SOURCE_SITE,
                 site_index=str(SITE_ROOT / "index.html"),
                 already_published=True,
             )
@@ -141,6 +143,7 @@ def run_today(
         voice=resolved_voice,
         clues=spoken,
         source_posts=[p.url for p in todays],
+        source_site=SOURCE_SITE,
     )
     if publish and spoken:
         site = publish_site(result, SITE_ROOT)

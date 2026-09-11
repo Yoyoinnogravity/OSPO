@@ -55,6 +55,8 @@ def test_publish_site_writes_spoiler_pages(tmp_path):
     assert "Instagram" in about
     assert "Facebook" in about
     assert "aledmorgan@gmail.com" in about
+    assert "https://fifteensquared.net/" in about
+    assert "only source" in about
     assert (tmp_path / "c" / "independent-12458-12a" / "index.html").exists()
 
 

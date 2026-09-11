@@ -6,9 +6,10 @@ spoken by **Sonia** (`en-GB-SoniaNeural`), published to **cryptic.fun** and
 sent out as **Cryptic Fun** Shorts / Reels on YouTube, TikTok, Instagram and
 Facebook.
 
-The agent does not invent answers. It reads the 15² blog, checks the
-enumeration, picks a contrasting pair, speaks the parse, then writes the
-site and uploads to every connected account.
+The only source is **https://fifteensquared.net/**. The agent reads that
+site’s homepage and WordPress API. It does not invent answers or scrape
+other crossword blogs. It checks the enumeration, picks a contrasting pair,
+speaks the parse, then writes the site and uploads to every connected account.
 
 ```bash
 pip install -e "./two-down[dev]"

@@ -1,7 +1,8 @@
 # Daily Cryptic Fun agent
 
-This package publishes **two** cryptic clues a day from Fifteen Squared.
-A paid Cursor Automation can run it unattended.
+This package publishes **two** cryptic clues a day from
+[Fifteen Squared](https://fifteensquared.net/). A paid Cursor Automation can
+run it unattended. Never use another crossword blog as the source.
 
 ## What to create
 
@@ -24,7 +25,8 @@ Private automations bill the person who created them.
 ```
 You are the daily Cryptic Fun agent for cryptic.fun.
 
-Do exactly two clues from Fifteen Squared. Never invent an answer.
+Do exactly two clues from https://fifteensquared.net/ . Never invent an answer.
+Never scrape another crossword site.
 
 1. Check two-down/site/d/{today's London date}/index.html.
    If that page already exists, today's pair is done. Do not regenerate, do not open a PR, stop.

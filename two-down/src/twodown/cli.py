@@ -6,7 +6,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-from twodown.config import DEFAULT_OUTPUT, DEFAULT_VOICE_ALIAS
+from twodown.config import DEFAULT_OUTPUT, DEFAULT_VOICE_ALIAS, SOURCE_SITE
 from twodown.ingest import LONDON
 from twodown.models import DailyPair
 from twodown.pipeline import run_today
@@ -17,6 +17,7 @@ from twodown.youtube import YOUTUBE_CHANNEL
 
 
 def _print_pair(pair) -> None:
+    print(f"source {getattr(pair, 'source_site', None) or SOURCE_SITE}")
     print(f"date  {pair.date}")
     print(f"voice {pair.voice}")
     print(f"posts {len(pair.source_posts)}")
@@ -91,6 +92,7 @@ def _wanted(args) -> dict[str, bool]:
 def _print_status() -> None:
     status = platform_status()
     hints = setup_hints()
+    print(f"source  {SOURCE_SITE}")
     print(f"channel {YOUTUBE_CHANNEL}")
     for name in PLATFORMS:
         state = "ready" if status[name] else "needs token"
@@ -100,10 +102,13 @@ def _print_status() -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="twodown", description="Two cryptic clues a day from Fifteen Squared.")
+    parser = argparse.ArgumentParser(
+        prog="twodown",
+        description="Two cryptic clues a day from https://fifteensquared.net/.",
+    )
     sub = parser.add_subparsers(dest="cmd", required=True)
 
-    today = sub.add_parser("today", help="Ingest 15², pick two clues, speak, publish")
+    today = sub.add_parser("today", help="Ingest https://fifteensquared.net/, pick two clues, speak, publish")
     today.add_argument("--out", type=Path, default=DEFAULT_OUTPUT)
     today.add_argument("--voice", default=DEFAULT_VOICE_ALIAS, help="YouTube/social voice: sonia, libby, ryan, thomas. Site visitors can pick any of these.")
     today.add_argument(
@@ -230,7 +235,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"already published {pair.date} — skip (use --force to rebuild)")
         return 0
     if not pair.clues:
-        print("No usable clues found on Fifteen Squared for that date.", file=sys.stderr)
+        print(f"No usable clues found on {SOURCE_SITE} for that date.", file=sys.stderr)
         return 1
     if pair.already_published:
         print(f"already published {pair.date}")
