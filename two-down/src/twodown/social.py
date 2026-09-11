@@ -31,18 +31,53 @@ def setup_hints() -> dict[str, str]:
     }
 
 
+GRAPH_EXPLORER = "https://developers.facebook.com/tools/explorer/"
+META_APPS = "https://developers.facebook.com/apps/"
+TIKTOK_APPS = "https://developers.tiktok.com/apps/"
+GOOGLE_CONSOLE = "https://console.cloud.google.com/apis/credentials"
+META_PERMISSIONS = (
+    "pages_show_list, pages_manage_posts, pages_read_engagement, "
+    "instagram_basic, instagram_content_publish"
+)
+
+
 def connect_instructions() -> str:
-    return (
-        "The upload agent cannot log into YouTube, TikTok, Instagram or Facebook as you.\n"
-        "Connect each app once. Paste the JSON (not your password) as secrets on the\n"
-        f"Cursor Cloud Agent environment: {CURSOR_ENVIRONMENT}\n"
-        "\n"
-        "  TWODOWN_YOUTUBE_TOKEN   YouTube OAuth user JSON with youtube.upload\n"
-        "  TWODOWN_TIKTOK_TOKEN    {\"access_token\": \"...\"}\n"
-        "  TWODOWN_META_TOKEN      {\"access_token\": \"...\", \"page_id\": \"...\", \"ig_user_id\": \"...\"}\n"
-        "\n"
-        "After that, a Cloud Agent can run `twodown today` and `twodown upload` for you.\n"
-    )
+    """Exact steps to get each token. No account passwords are ever needed here."""
+    return f"""The upload agent cannot log into YouTube, TikTok, Instagram or Facebook as you.
+Each app gives you a token. Paste the JSON (never a password) as a secret on the
+Cursor Cloud Agent environment: {CURSOR_ENVIRONMENT}
+
+INSTAGRAM + FACEBOOK  ->  TWODOWN_META_TOKEN      (quickest; one token does both)
+  1. Make a Cryptic Fun Facebook Page. Set Instagram to a professional
+     account and link it to that Page.
+  2. Create an app at {META_APPS} (type: Business).
+  3. Open {GRAPH_EXPLORER}, pick the app, add permissions:
+     {META_PERMISSIONS}
+     then Generate Access Token.
+  4. In the same tool run  GET /me/accounts            -> copy the Page "id"
+     and                   GET /<page_id>?fields=instagram_business_account
+                                                        -> copy that "id"
+  5. Secret value:
+     {{"access_token": "PAGE_TOKEN", "page_id": "PAGE_ID", "ig_user_id": "IG_ID"}}
+     Use the Page token from step 4, not your personal user token, or posts fail.
+
+TIKTOK  ->  TWODOWN_TIKTOK_TOKEN
+  1. Register an app at {TIKTOK_APPS} and add the Content Posting API
+     with the video.publish scope.
+  2. Authorise the Cryptic Fun account and copy the user access token.
+  3. Secret value: {{"access_token": "TIKTOK_USER_TOKEN"}}
+  Note: until TikTok audits the app, posts are limited to private / self-only.
+  Public TikTok posting waits on their review, not on this code.
+
+YOUTUBE  ->  TWODOWN_YOUTUBE_TOKEN
+  1. OAuth desktop client at {GOOGLE_CONSOLE}, YouTube Data API v3 enabled.
+  2. Authorise the Cryptic Fun channel for scope youtube.upload.
+  3. Secret value: the authorized-user JSON (token, refresh_token, token_uri,
+     client_id, client_secret, scopes).
+
+Then a Cloud Agent runs:  twodown upload            (all four)
+                          twodown upload --no-youtube  (TikTok + IG + FB only)
+"""
 
 
 def attach_site_videos(pair: DailyPair, site_root: Path | None = None) -> DailyPair:

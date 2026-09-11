@@ -54,6 +54,8 @@ twodown upload
 twodown upload --no-youtube          # TikTok + Instagram + Facebook only
 ```
 
+`twodown connect` prints the exact steps and links for each app.
+
 Token files:
 
 * **YouTube** — authorized desktop OAuth user JSON for the Cryptic Fun channel.
