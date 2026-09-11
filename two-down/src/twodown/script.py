@@ -17,13 +17,27 @@ DEVICE_LINE = {
 }
 
 
-def _spoken_parse(parse: str) -> str:
+def _drop_construction(text: str, answer: str) -> str:
+    tokens = text.split()
+    compact = re.sub(r"[^A-Z]", "", answer.upper())
+    for n in range(2, min(8, len(tokens)) + 1):
+        tail = "".join(re.sub(r"[^A-Z]", "", t.upper()) for t in tokens[-n:])
+        if tail == compact:
+            return " ".join(tokens[:-n]).rstrip(" .;,-")
+    return text
+
+
+def _spoken_parse(parse: str, answer: str = "") -> str:
     text = parse
-    text = re.sub(r"\s+", " ", text)
     text = text.replace("*", " anagram ")
-    text = re.sub(r"\s+", " ", text).strip(" .;")
+    text = re.sub(r"\[([^]]+)\]", r" \1 ", text)
+    text = text.replace("+", " plus ")
+    text = re.sub(r"\s+", " ", text)
+    if answer:
+        text = _drop_construction(text, answer)
+    text = re.sub(r"\s+", " ", text).strip(" .;,-")
     if len(text) > 220:
-        text = text[:217].rsplit(" ", 1)[0] + "…"
+        text = text[:217].rsplit(" ", 1)[0]
     if text and text[-1] not in ".!?":
         text += "."
     return text
@@ -34,7 +48,7 @@ def write_script(clue: Clue) -> str:
     setter = clue.setter
     enum = f" ({clue.enumeration})" if clue.enumeration else ""
     device = DEVICE_LINE.get(clue.device, DEVICE_LINE["unknown"])
-    parse = _spoken_parse(clue.parse)
+    parse = _spoken_parse(clue.parse, clue.answer)
     definition = f" It means {clue.definition}." if clue.definition else ""
     return (
         f"Two Down. {setter} in the {paper}. "
