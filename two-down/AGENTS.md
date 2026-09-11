@@ -16,6 +16,7 @@ run it unattended. Never use another crossword blog as the source.
 6. Paste the prompt below.
 7. Put social tokens on the Cloud Agent environment so uploads actually leave the machine:
    `TWODOWN_YOUTUBE_TOKEN`, `TWODOWN_TIKTOK_TOKEN`, `TWODOWN_META_TOKEN`.
+   Ads stay off unless `TWODOWN_ADSENSE_CLIENT` and `TWODOWN_ADSENSE_SLOT` are set.
 
 Automations are billed as Cloud Agent usage on your Cursor plan (Pro and up).
 Private automations bill the person who created them.

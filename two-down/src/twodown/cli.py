@@ -6,6 +6,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
+from twodown.ads import ads_status
 from twodown.config import DEFAULT_OUTPUT, DEFAULT_VOICE_ALIAS, SOURCE_SITE
 from twodown.ingest import LONDON
 from twodown.models import DailyPair
@@ -94,6 +95,10 @@ def _print_status() -> None:
     hints = setup_hints()
     print(f"source  {SOURCE_SITE}")
     print(f"channel {YOUTUBE_CHANNEL}")
+    ads_state, ads_hint = ads_status()
+    print(f"  ads        {ads_state}")
+    if ads_state != "ready":
+        print(f"             {ads_hint}")
     for name in PLATFORMS:
         state = "ready" if status[name] else "needs token"
         print(f"  {name:10} {state}")

@@ -1,3 +1,4 @@
+from twodown.captions import youtube_description
 from twodown.models import Clue, DailyPair, SpokenClue
 from twodown.site import publish_site
 from twodown.youtube import YOUTUBE_CHANNEL, video_title
@@ -58,6 +59,21 @@ def test_publish_site_writes_spoiler_pages(tmp_path):
     assert "https://fifteensquared.net/" in about
     assert "only source" in about
     assert (tmp_path / "c" / "independent-12458-12a" / "index.html").exists()
+    assert (tmp_path / "support.html").exists()
+    assert (tmp_path / "privacy.html").exists()
+    assert "Support" in index
+    assert "How we pay for this" in index
+    assert "adsbygoogle" not in index
+    assert not (tmp_path / "ads.txt").exists()
+    support = (tmp_path / "support.html").read_text(encoding="utf-8")
+    assert "YouTube" in support
+    assert "Sponsor" in support
+    assert "never sit on the answer" in support
+    clue_page = (tmp_path / "c" / "independent-12458-12a" / "index.html").read_text(encoding="utf-8")
+    assert "adsbygoogle" not in clue_page
+    assert (tmp_path / "robots.txt").exists()
+    css = (tmp_path / "assets" / "style.css").read_text(encoding="utf-8")
+    assert "body.scene-photo header a" in css
 
 
 def test_youtube_titles_use_cryptic_fun_channel():
@@ -67,3 +83,22 @@ def test_youtube_titles_use_cryptic_fun_channel():
     assert title.endswith("#Shorts")
     assert YOUTUBE_CHANNEL == "Cryptic Fun"
     assert len(title) <= 100
+    assert "https://cryptic.fun/support.html" in youtube_description(_item())
+
+
+def test_ads_on_writes_ads_txt_and_unit(tmp_path, monkeypatch):
+    monkeypatch.setenv("TWODOWN_ADSENSE_CLIENT", "ca-pub-1234567890123456")
+    monkeypatch.setenv("TWODOWN_ADSENSE_SLOT", "1234567890")
+    pair = DailyPair(date="2026-09-11", voice="en-GB-SoniaNeural", clues=[_item(), _item(answer="AXES", number="14")])
+    root = publish_site(pair, tmp_path)
+    ads = (root / "ads.txt").read_text(encoding="utf-8")
+    assert ads.strip() == "google.com, pub-1234567890123456, DIRECT, f08c47fec0942fa0"
+    index = (root / "index.html").read_text(encoding="utf-8")
+    assert "adsbygoogle" in index
+    assert "Advertisement" in index
+    assert "ca-pub-1234567890123456" in index
+    assert "How we pay for this" not in index
+    clue_page = (root / "c" / "independent-12458-12a" / "index.html").read_text(encoding="utf-8")
+    assert "adsbygoogle" not in clue_page
+    assert "pagead2.googlesyndication.com" not in clue_page
+

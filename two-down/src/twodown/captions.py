@@ -48,6 +48,7 @@ def youtube_description(item: SpokenClue) -> str:
         f"{clue_line(clue)}\n"
         f"Answer: {clue.answer}\n\n"
         f"{page}\n"
+        f"Support: {SITE_ORIGIN}/support.html\n"
         f"Parse: {clue.source_url}\n"
         f"{clue.paper} {clue.puzzle_id} by {clue.setter}. "
         f"Blogged by {clue.blogger} on Fifteen Squared.\n"

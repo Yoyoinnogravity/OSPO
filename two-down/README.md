@@ -110,3 +110,34 @@ The domain is already yours; it just needs DNS pointed at GitHub.
 YouTube still needs `TWODOWN_YOUTUBE_TOKEN` (OAuth for the Cryptic Fun channel),
 not a payment.
 
+Money
+-----
+
+Ads stay **off** until the domain is live and AdSense is approved. The layout
+already has a labelled slot **under** today’s pair, never inside Solve.
+
+When hits arrive, the stack is:
+
+1. **YouTube Shorts** — real money once Cryptic Fun is in the Partner Program
+   (1,000 subscribers and 10 million Shorts views in 90 days, or 4,000
+   long-form hours). Same AdSense account can later cover the website.
+2. **One Google display unit on cryptic.fun** — after
+   [adsense.google.com](https://www.google.com/adsense/) approves the custom
+   domain. Manual unit only; do not turn on Auto ads (they can cover the
+   answer). UK visitors need a consent banner before any ad cookie.
+3. **Sponsor a week** — quieter and better paid for a crossword audience.
+   Mail [aledmorgan@gmail.com](mailto:aledmorgan@gmail.com).
+
+AdSense may refuse a site that mostly reprints other people’s puzzles. If
+that happens, skip site ads and keep YouTube + sponsors.
+
+```bash
+export TWODOWN_ADSENSE_CLIENT=ca-pub-XXXXXXXXXXXXXXXX
+export TWODOWN_ADSENSE_SLOT=0000000000
+twodown today --force --no-youtube --no-social   # rebuild site + ads.txt
+twodown status                                   # ads should read "ready"
+```
+
+`two-down/site/ads.txt` is written only when the publisher id is set.
+The public copy is `two-down/site/support.html`.
+

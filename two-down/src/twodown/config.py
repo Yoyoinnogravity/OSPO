@@ -3,6 +3,7 @@ from pathlib import Path
 BRAND = "cryptic.fun"
 SITE_ORIGIN = "https://cryptic.fun"
 SUGGEST_EMAIL = "aledmorgan@gmail.com"
+SPONSOR_EMAIL = SUGGEST_EMAIL
 # The only crossword source. Do not add other blogs.
 SOURCE_SITE = "https://fifteensquared.net/"
 SOURCE_HOST = "fifteensquared.net"

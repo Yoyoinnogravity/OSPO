@@ -5,7 +5,8 @@ from datetime import datetime
 from pathlib import Path
 from shutil import copy2
 
-from twodown.config import BRAND, SITE_ORIGIN, SITE_ROOT, SOURCE_SITE, SUGGEST_EMAIL, VOICE_LABELS
+from twodown.ads import ads_enabled, ads_txt, adsense_client, adsense_slot
+from twodown.config import BRAND, SITE_ORIGIN, SITE_ROOT, SOURCE_SITE, SPONSOR_EMAIL, SUGGEST_EMAIL, VOICE_LABELS
 from twodown.models import DailyPair, SpokenClue
 from twodown.scenes import DEFAULT_SCENE, get_scene, list_scenes
 
@@ -65,6 +66,9 @@ header {
   box-shadow: 0 10px 40px rgba(8,6,4,0.18);
 }
 header a { color: var(--muted); }
+body.scene-photo header a { color: var(--muted); }
+body.scene-photo header .wordmark { color: var(--ink); }
+nav a:hover { color: var(--crimson); }
 .chrome-top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
 .wordmark { font-family: "Liberation Sans", "Helvetica Neue", sans-serif; font-weight: 700; font-size: 1.6rem; letter-spacing: 0.02em; color: var(--ink); text-decoration: none; }
 .wordmark span { color: var(--crimson); }
@@ -174,6 +178,24 @@ a.action {
   text-decoration: none;
   font-size: 0.95rem;
 }
+aside.ad {
+  background: rgba(252, 247, 236, 0.94);
+  color: var(--ink);
+  border: 1px dashed var(--rule);
+  padding: 14px 16px 16px;
+  margin: 0 0 36px;
+  min-height: 90px;
+}
+.ad-label {
+  font-family: "Liberation Sans", sans-serif;
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0 0 8px;
+}
+.rules { max-width: 40rem; }
+.rules li { margin: 0 0 8px; }
 """
 
 JS = """
@@ -367,11 +389,62 @@ def _scene_bar() -> str:
     )
 
 
-def _page(title: str, body: str, depth: int = 0) -> str:
+def _nav(prefix: str) -> str:
+    return f"""
+      <nav>
+        <a href="{prefix}index.html">Today</a>
+        <a href="{prefix}suggest.html">Suggest</a>
+        <a href="{prefix}support.html">Support</a>
+        <a href="{prefix}about.html">About</a>
+      </nav>
+    """
+
+
+def _ads_head() -> str:
+    client = adsense_client()
+    if not ads_enabled() or not client:
+        return ""
+    return (
+        f'<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js'
+        f'?client={_e(client)}" crossorigin="anonymous"></script>\n'
+    )
+
+
+def _ad_unit() -> str:
+    client = adsense_client()
+    slot = adsense_slot()
+    if not client or not slot:
+        return ""
+    return f"""
+    <aside class="ad" aria-label="Advertisement">
+      <p class="ad-label">Advertisement</p>
+      <ins class="adsbygoogle" style="display:block"
+        data-ad-client="{_e(client)}" data-ad-slot="{_e(slot)}"
+        data-ad-format="horizontal" data-full-width-responsive="true"></ins>
+      <script>(adsbygoogle = window.adsbygoogle || []).push({{}});</script>
+    </aside>
+    """
+
+
+def _keep_free_teaser(prefix: str) -> str:
+    if ads_enabled():
+        return _ad_unit()
+    return f"""
+    <aside class="teaser">
+      <p class="kicker">Keep it free</p>
+      <h2>When the hits come.</h2>
+      <p>A small labelled ad will sit here — never on the answer, never over the pause. Until then YouTube is the main bet, and a crossword brand can sponsor a week.</p>
+      <a class="action" href="{prefix}support.html">How we pay for this</a>
+    </aside>
+    """
+
+
+def _page(title: str, body: str, depth: int = 0, show_ads: bool = False) -> str:
     prefix = "../" * depth
     scene_prefix = f"{prefix}media/scenes/"
     default = get_scene(DEFAULT_SCENE)
     background = default.filename or "machu-picchu.webp"
+    head_ads = _ads_head() if show_ads else ""
     return f"""<!DOCTYPE html>
 <html lang="en-GB">
 <head>
@@ -379,16 +452,13 @@ def _page(title: str, body: str, depth: int = 0) -> str:
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{_e(title)}</title>
   <link rel="stylesheet" href="{prefix}assets/style.css">
+  {head_ads}
 </head>
 <body class="scene-photo" data-scene="{_e(default.slug)}" data-default-scene="{_e(default.slug)}" data-scene-prefix="{_e(scene_prefix)}" style="background-image: url('{_e(scene_prefix + background)}');">
   <header>
     <div class="chrome-top">
       <a class="wordmark" href="{prefix}index.html">cryptic<span>.fun</span></a>
-      <nav>
-        <a href="{prefix}index.html">Today</a>
-        <a href="{prefix}suggest.html">Suggest</a>
-        <a href="{prefix}about.html">About</a>
-      </nav>
+      {_nav(prefix)}
     </div>
     {_voice_bar()}
     {_scene_bar()}
@@ -402,6 +472,8 @@ def _page(title: str, body: str, depth: int = 0) -> str:
     Not affiliated with those papers. Pick a voice and a place.
     One homemade clue a day via <a href="{prefix}suggest.html">Suggest</a>,
     or ask for a clue by email.
+    <a href="{prefix}support.html">Support</a> ·
+    <a href="{prefix}privacy.html">Privacy</a>
     <p class="scene-credit" data-scene-credit>{_e(default.credit_line)}</p>
   </footer>
   <script src="{prefix}assets/app.js"></script>
@@ -437,12 +509,22 @@ def _article(item: SpokenClue, media_prefix: str, open_by_default: bool = False)
     """
 
 
+def _copy_file(src: str | Path, dest: Path) -> None:
+    source = Path(src)
+    if not source.exists():
+        return
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    if source.resolve() == dest.resolve():
+        return
+    copy2(source, dest)
+
+
 def _copy_scenes(dest: Path) -> None:
     folder = dest / "media" / "scenes"
     folder.mkdir(parents=True, exist_ok=True)
     for scene in list_scenes():
         if scene.path and scene.path.exists():
-            copy2(scene.path, folder / scene.filename)
+            _copy_file(scene.path, folder / scene.filename)
 
 
 def _copy_media(pair: DailyPair, dest: Path) -> None:
@@ -450,9 +532,9 @@ def _copy_media(pair: DailyPair, dest: Path) -> None:
     media.mkdir(parents=True, exist_ok=True)
     for item in pair.clues:
         if item.video_path:
-            copy2(item.video_path, media / f"{item.clue.slug}.mp4")
+            _copy_file(item.video_path, media / f"{item.clue.slug}.mp4")
         for alias, path in item.voice_paths.items():
-            copy2(path, media / f"{item.clue.slug}-{alias}.mp3")
+            _copy_file(path, media / f"{item.clue.slug}-{alias}.mp3")
     _copy_scenes(dest)
 
 
@@ -474,6 +556,13 @@ def publish_site(pair: DailyPair, dest: Path | None = None) -> Path:
     (root / "assets" / "style.css").write_text(CSS, encoding="utf-8")
     (root / "assets" / "app.js").write_text(JS, encoding="utf-8")
     (root / "CNAME").write_text("cryptic.fun\n", encoding="utf-8")
+    (root / "robots.txt").write_text("User-agent: *\nAllow: /\n", encoding="utf-8")
+    ads_path = root / "ads.txt"
+    listing = ads_txt()
+    if listing:
+        ads_path.write_text(listing, encoding="utf-8")
+    elif ads_path.exists():
+        ads_path.unlink()
     _copy_media(pair, root)
 
     pretty = datetime.strptime(pair.date, "%Y-%m-%d").strftime("%A %-d %B %Y")
@@ -485,6 +574,7 @@ def publish_site(pair: DailyPair, dest: Path | None = None) -> Path:
     <section class="pair">
       {articles}
     </section>
+    {_keep_free_teaser("")}
     <aside class="teaser">
       <p class="kicker">Readers</p>
       <h2>Suggest a clue.</h2>
@@ -492,13 +582,18 @@ def publish_site(pair: DailyPair, dest: Path | None = None) -> Path:
       <a class="action" href="suggest.html">Suggest today’s clue</a>
     </aside>
     """
-    (root / "index.html").write_text(_page(f"{BRAND} — {pretty}", index_body), encoding="utf-8")
+    (root / "index.html").write_text(_page(f"{BRAND} — {pretty}", index_body, show_ads=True), encoding="utf-8")
 
     day_dir = root / "d" / pair.date
     day_dir.mkdir(parents=True, exist_ok=True)
     day_articles = "\n".join(_article(item, "../../media/") for item in pair.clues)
     (day_dir / "index.html").write_text(
-        _page(f"{BRAND} — {pretty}", f"<h1>{_e(pretty)}</h1><section class='pair'>{day_articles}</section>", depth=2),
+        _page(
+            f"{BRAND} — {pretty}",
+            f"<h1>{_e(pretty)}</h1><section class='pair'>{day_articles}</section>{_keep_free_teaser('../../')}",
+            depth=2,
+            show_ads=True,
+        ),
         encoding="utf-8",
     )
 
@@ -515,11 +610,13 @@ def publish_site(pair: DailyPair, dest: Path | None = None) -> Path:
     <p class="lede">cryptic.fun publishes two cryptic clues a day. The only source is <a href="{SOURCE_SITE}">Fifteen Squared</a> — Independent, Guardian and Financial Times blogs. We never invent answers. Choose Sonia, Ryan, Libby or Thomas, and a real place as the backdrop. The same Shorts go to YouTube, TikTok, Instagram and Facebook when those accounts are connected. The site is the spoiler-safe home.</p>
     <p>Answers and wordplay belong to the setters and the 15² bloggers. We rewrite for speech and always link the original post.</p>
     <p>Readers can <a href="suggest.html">suggest one homemade clue a day</a>, or ask for a daily clue by email. Both land in Aled’s inbox at <a href="mailto:{_e(SUGGEST_EMAIL)}">{_e(SUGGEST_EMAIL)}</a>.</p>
+    <p>When the site has readers, a small labelled ad can sit under the pair — never on the answer. How that works is on <a href="support.html">Support</a>.</p>
     <h2>Backgrounds.</h2>
     <p>Photographs are cropped to 9:16 from Wikimedia Commons. Newsprint is still there if you want the paper look.</p>
     {_about_credits()}
+    {_ad_unit()}
     """
-    (root / "about.html").write_text(_page(f"About — {BRAND}", about), encoding="utf-8")
+    (root / "about.html").write_text(_page(f"About — {BRAND}", about, show_ads=True), encoding="utf-8")
 
     inbox = _e(SUGGEST_EMAIL)
     suggest = f"""
@@ -566,5 +663,51 @@ def publish_site(pair: DailyPair, dest: Path | None = None) -> Path:
     </div>
     """
     (root / "suggest.html").write_text(_page("Suggest a clue — {BRAND}".format(BRAND=BRAND), suggest), encoding="utf-8")
+
+    sponsor = _e(SPONSOR_EMAIL)
+    support = f"""
+    <p class="kicker">Money</p>
+    <h1>Keep the clues free.</h1>
+    <p class="lede">When people show up, we can pay for Cryptic Fun without a paywall. Ads are one way. They are not switched on yet. They will never sit on the answer or talk over the seven-second pause.</p>
+    <section class="panel">
+      <h2>1. YouTube is the main bet.</h2>
+      <p>The two daily Shorts on the <strong>Cryptic Fun</strong> channel are where hits turn into money. YouTube’s Partner Program pays a share of ads in the Shorts feed once the channel has 1,000 subscribers and 10 million Shorts views in 90 days (or 4,000 hours of long-form watch time). Until then YouTube may still run ads — we just don’t get a cut.</p>
+      <p>At 500 subscribers, Super Thanks and memberships can open first. Same Google AdSense account can later cover the website.</p>
+    </section>
+    <section class="panel">
+      <h2>2. A small ad on the site.</h2>
+      <p>Once <a href="{SITE_ORIGIN}/">cryptic.fun</a> is live, Google AdSense can put one labelled display unit <em>under</em> the pair. Manual placement only — no Auto ads, no ads inside Solve, no ads on a single-clue spoiler page. The UK needs a consent banner before any ad cookie is set; ads stay off until that is in place.</p>
+      <p>AdSense can refuse sites that mostly reprint other people’s puzzles. We write original pages (this one, About, how the agent works) and we always credit <a href="{SOURCE_SITE}">Fifteen Squared</a>. Approval is not guaranteed. If Google says no, we skip site ads and lean on YouTube and sponsors.</p>
+    </section>
+    <section class="panel">
+      <h2>3. Sponsor a week.</h2>
+      <p>A crossword dictionary, a pen, a bookshop: one quiet line under the pair for seven days. Better money per reader than a banner, and it stays on-brand. Write to <a href="mailto:{sponsor}?subject=Sponsor%20cryptic.fun">{sponsor}</a>.</p>
+    </section>
+    <h2>Rules.</h2>
+    <ul class="rules">
+      <li>The clue stays free. Solve stays a tap, not a paywall.</li>
+      <li>No ad on the answer, the parse, or the spoken pause.</li>
+      <li>Parses still come only from {SOURCE_SITE}.</li>
+      <li>TikTok, Instagram and Facebook are for reach. Their creator funds are extra if they ever qualify — not the plan.</li>
+    </ul>
+    {_ad_unit()}
+    """
+    (root / "support.html").write_text(_page(f"Support — {BRAND}", support, show_ads=True), encoding="utf-8")
+
+    privacy = f"""
+    <h1>Privacy.</h1>
+    <p class="lede">cryptic.fun is a static site. We do not run an account system or a tracker of our own.</p>
+    <section class="panel">
+      <h2>What stays in your browser.</h2>
+      <p>Voice, place, and “already suggested today” are saved in localStorage on your device so the header remembers your picks. That data does not come to us.</p>
+      <p>Suggest-a-clue and the daily-clue signup open your email app. If you send a message, it arrives at <a href="mailto:{_e(SUGGEST_EMAIL)}">{_e(SUGGEST_EMAIL)}</a>.</p>
+    </section>
+    <section class="panel">
+      <h2>Ads.</h2>
+      <p>Display ads are off until we have a live domain, an approved AdSense account, and — for UK visitors — a consent banner. When they are on, Google may set cookies to choose and measure those ads. We will not load the ad script until that is true. See <a href="support.html">Support</a>.</p>
+    </section>
+    <p>Questions: <a href="mailto:{_e(SUGGEST_EMAIL)}">{_e(SUGGEST_EMAIL)}</a>.</p>
+    """
+    (root / "privacy.html").write_text(_page(f"Privacy — {BRAND}", privacy), encoding="utf-8")
     pair.site_index = f"{SITE_ORIGIN}/"
     return root
