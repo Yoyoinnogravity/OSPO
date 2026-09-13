@@ -16,6 +16,10 @@ from twodown.models import PuzzlePost
 LONDON = ZoneInfo("Europe/London")
 
 TITLE_PATTERNS: list[tuple[re.Pattern[str], str]] = [
+    (
+        re.compile(r"Independent\s+on\s+Sunday\s+([\d,]+)\s*(?:/|by)\s*(.+)$", re.I),
+        "Independent on Sunday",
+    ),
     (re.compile(r"Independent\s+([\d,]+)\s*(?:/|by)\s*(.+)$", re.I), "Independent"),
     (re.compile(r"Financial Times\s+([\d,]+)\s+by\s+(.+)$", re.I), "Financial Times"),
     (re.compile(r"Guardian(?: Cryptic(?: crossword)?)?(?: No\.?)?\s*([\d,]+)\s*(?:/|:|by)\s*(.+)$", re.I), "Guardian"),
