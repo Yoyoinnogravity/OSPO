@@ -33,6 +33,8 @@ Never scrape another crossword site.
    If that page already exists, today's pair is done. Do not regenerate, do not open a PR, stop.
 2. From two-down/, run:
      python3 -m twodown today
+   A fresh machine has nothing installed, so if that fails with
+   "No module named twodown", run `pip install -e .` from two-down/ first and retry.
    If it exits 1 because 15² has no usable Independent / FT / Guardian clues yet, stop.
    Do not invent clues. A later scheduled run can pick them up.
 3. If it built a new pair:
