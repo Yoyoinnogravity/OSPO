@@ -2,20 +2,34 @@ cryptic.fun
 ===========
 
 Two cryptic clues a day from [Fifteen Squared](https://fifteensquared.net/),
-spoken by **Sonia** (`en-GB-SoniaNeural`), published to **cryptic.fun** and
-sent out as **Cryptic Fun** Shorts / Reels on YouTube, TikTok, Instagram and
-Facebook.
+cut as newsprint Shorts. **Ryan** opens, **Libby** solves, **Thomas** credits
+the setter and Fifteen Squared. Brand is **Cryptic Fun** on YouTube, TikTok,
+Instagram and Facebook. Site is **cryptic.fun**.
 
-The only source is **https://fifteensquared.net/**. The agent reads that
-site’s homepage and WordPress API. It does not invent answers or scrape
-other crossword blogs. It checks the enumeration, picks a contrasting pair,
-speaks the parse, then writes the site and uploads to every connected account.
+The only source is **https://fifteensquared.net/**. Do not invent answers.
+Do not scrape other crossword blogs.
+
+Make one video (uses the locked beat; does not rebuild the other films):
+
+```bash
+cd two-down
+python3 -m twodown short              # current study clue
+python3 -m twodown short smiles
+python3 -m twodown short cole
+```
+
+Send the next Fifteen Squared clue as: answer, surface, letter count, parse.
+One clue at a time.
+
+Daily pair from today’s 15² blogs:
 
 ```bash
 pip install -e "./two-down[dev]"
 twodown today
 twodown status
 ```
+
+Studio of the films we already cut: `two-down/site/studio.html`.
 
 Layout: cream clue cards on photographs of real places (Machu Picchu,
 Matterhorn, Santorini, Grand Canyon, Kyoto, aurora, Petra, Ha Long Bay),
