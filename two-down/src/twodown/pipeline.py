@@ -126,7 +126,7 @@ def dreamlike_clue() -> Clue:
 
 
 def rasta_clue() -> Clue:
-    """Guardian 30115 20a RASTA — current study Short. On Fifteen Squared.
+    """Guardian 30115 20a RASTA — leftover study construct. On Fifteen Squared.
 
     Definition still may be generated or selected if it is ~80% close.
     Hint the definition, not the wordplay. Do not print RASTA on the hint card.
@@ -151,10 +151,38 @@ def rasta_clue() -> Clue:
     )
 
 
+def fats_clue() -> Clue:
+    """Guardian 30115 1d FATS — current study Short. On Fifteen Squared.
+
+    Definition still may be generated or selected if it is ~80% close.
+    Hint the definition (unhealthy foods), not the wordplay (FAST / twist).
+    Do not print FATS on the hint card.
+    """
+    return attach_hint(
+        Clue(
+            source_url=_RASTA_SOURCE,
+            paper="Guardian",
+            puzzle_id="30115",
+            setter="Brendan",
+            blogger="manehi",
+            number="1",
+            direction="down",
+            clue="Refrain from eating, with final twist, such unhealthy foods",
+            enumeration="4",
+            answer="FATS",
+            definition="such unhealthy foods",
+            parse='FAST="Refrain from eating", with a final twist (last two letters change places)',
+            device="unknown",
+            enumeration_ok=True,
+        )
+    )
+
+
 def study_clues() -> dict[str, Clue]:
-    """RASTA is the study default. DREAMLIKE stays constructable as a leftover."""
+    """FATS is the study default. RASTA and DREAMLIKE stay constructable."""
     dreamlike = dreamlike_clue()
     rasta = rasta_clue()
+    fats = fats_clue()
     return {
         dreamlike.slug: dreamlike,
         "dreamlike": dreamlike,
@@ -163,7 +191,11 @@ def study_clues() -> dict[str, Clue]:
         "rasta": rasta,
         "study-rasta-5": rasta,
         rasta.answer.lower(): rasta,
-        STUDY_SLUG: rasta,
+        fats.slug: fats,
+        "fats": fats,
+        "study-fats-4": fats,
+        fats.answer.lower(): fats,
+        STUDY_SLUG: fats,
     }
 
 

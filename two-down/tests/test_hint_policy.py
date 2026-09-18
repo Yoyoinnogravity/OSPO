@@ -1,50 +1,52 @@
 from pathlib import Path
 
 from twodown.config import PACKAGE_ROOT, PINUP_SLUG, STUDY_SLUG
-from twodown.hints import CLOSE_ENOUGH, RASTA, TRANCE, attach_hint, match_hint
+from twodown.hints import CLOSE_ENOUGH, FATS, RASTA, TRANCE, attach_hint, match_hint
 from twodown.models import Clue
-from twodown.pipeline import dreamlike_clue, published_clue, rasta_clue, study_clue
+from twodown.pipeline import dreamlike_clue, fats_clue, published_clue, rasta_clue, study_clue
 
 
-def test_study_slug_and_hint_fields_are_rasta():
-    assert STUDY_SLUG == "guardian-30115-20a"
+def test_study_slug_and_hint_fields_are_fats():
+    assert STUDY_SLUG == "guardian-30115-1d"
     clue = study_clue()
     assert clue is not None
-    assert clue.answer == "RASTA"
+    assert clue.answer == "FATS"
     assert clue.slug == STUDY_SLUG
-    assert clue.definition
-    assert "Haile Selassie" in clue.definition
+    assert clue.definition == "such unhealthy foods"
     assert clue.hint_line == "Here's a clue."
     assert clue.hint_image
     assert clue.hint_credit
     # Hint the definition, not the wordplay.
-    assert "tsar" not in clue.hint_credit.lower()
-    assert "reversal" not in clue.hint_credit.lower()
-    assert "backing" not in clue.hint_credit.lower()
+    assert "fast" not in clue.hint_credit.lower()
+    assert "twist" not in clue.hint_credit.lower()
+    assert "refrain" not in clue.hint_credit.lower()
     # Never print the answer on the hint card copy.
-    assert "RASTA" not in clue.hint_line
-    assert "RASTA" not in clue.hint_credit
+    assert "FATS" not in clue.hint_line
+    assert "FATS" not in clue.hint_credit
 
 
-def test_rasta_hint_matches_definition_at_80_percent():
-    clue = rasta_clue()
-    assert clue.answer == "RASTA"
+def test_fats_hint_matches_definition_at_80_percent():
+    clue = fats_clue()
+    assert clue.answer == "FATS"
     matched = match_hint(clue.definition or "")
-    assert matched.photo.slug == RASTA.slug
+    assert matched.photo.slug == FATS.slug
     assert matched.closeness >= CLOSE_ENOUGH
     assert matched.close_enough
-    assert clue.hint_image == f"assets/hints/{RASTA.filename}"
-    assert clue.hint_credit == RASTA.credit_line
+    assert clue.hint_image == f"assets/hints/{FATS.filename}"
+    assert clue.hint_credit == FATS.credit_line
     still = PACKAGE_ROOT / clue.hint_image
     assert still.is_file()
     assert still.stat().st_size > 0
 
 
 def test_aled_definition_is_close_enough_for_a_reasonable_matcher():
-    matched = match_hint("a RASTA may be a follower of the Emperor Haile Selassie")
-    assert matched.photo.slug == RASTA.slug
+    matched = match_hint("such unhealthy foods")
+    assert matched.photo.slug == FATS.slug
     assert matched.closeness >= CLOSE_ENOUGH
     assert matched.close_enough
+    leftover = match_hint("a RASTA may be a follower of the Emperor Haile Selassie")
+    assert leftover.photo.slug == RASTA.slug
+    assert leftover.closeness >= CLOSE_ENOUGH
 
 
 def test_dreamlike_leftover_still_matches_at_80_percent():

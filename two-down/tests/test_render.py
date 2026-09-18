@@ -78,16 +78,18 @@ def test_answer_footer_credits_setter_paper_and_fifteen_squared():
     assert _source_footer(clue) == "Eccles in the Independent · Fifteen Squared"
     guardian = clue.model_copy(update={"setter": "Dice", "paper": "Guardian"})
     assert _source_footer(guardian) == "Dice in the Guardian · Fifteen Squared"
-    from twodown.pipeline import dreamlike_clue, rasta_clue, study_clue
+    from twodown.pipeline import dreamlike_clue, fats_clue, rasta_clue, study_clue
 
+    fats = fats_clue()
+    assert fats.answer == "FATS"
+    assert _source_footer(fats) == "Brendan in the Guardian · Fifteen Squared"
     rasta = rasta_clue()
     assert rasta.answer == "RASTA"
     assert _source_footer(rasta) == "Brendan in the Guardian · Fifteen Squared"
     dreamlike = dreamlike_clue()
     assert dreamlike.answer == "DREAMLIKE"
     assert _source_footer(dreamlike) == "Brendan in the Guardian · Fifteen Squared"
-    assert _source_footer(rasta_clue()) == "Brendan in the Guardian · Fifteen Squared"
-    assert _source_footer(dreamlike_clue()) == "Brendan in the Guardian · Fifteen Squared"
+    assert _source_footer(study_clue()) == "Brendan in the Guardian · Fifteen Squared"
 
 
 def test_parse_under_answer_is_very_bold_ink(tmp_path: Path):
@@ -248,6 +250,7 @@ def test_speak_answer_is_a_word_not_letters():
     assert speak_answer("END RESULT") == "The answer is end result."
     assert speak_answer("DREAMLIKE") == "The answer is dreamlike."
     assert speak_answer("RASTA") == "The answer is rasta."
+    assert speak_answer("FATS") == "The answer is fats."
     assert _clue().answer == "PIN-UP"
 
 
@@ -259,7 +262,7 @@ def test_hint_card_keeps_empty_lights(tmp_path: Path):
 
     clue = study_clue()
     assert clue is not None
-    assert clue.answer == "RASTA"
+    assert clue.answer == "FATS"
     hint = draw_beat(clue, tmp_path / "hint.png", "hint")
     answer = draw_beat(clue, tmp_path / "answer.png", "answer")
     hint_img = Image.open(hint)

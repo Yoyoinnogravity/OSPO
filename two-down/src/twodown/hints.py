@@ -41,6 +41,7 @@ _STOP = frozenset(
         "may",
         "be",
         "another",
+        "such",
     }
 )
 
@@ -154,6 +155,33 @@ RASTA = HintPhoto(
     ),
 )
 
+# Definition still for FATS: unhealthy foods, not fasting / FAST.
+# Generated still (AI matching allowed). No answer text, no wordplay.
+FATS = HintPhoto(
+    slug="fats-still",
+    label="Unhealthy foods",
+    source="generated still",
+    license="generated",
+    filename="fats-still.webp",
+    keywords=frozenset(
+        {
+            "fat",
+            "fats",
+            "food",
+            "foods",
+            "unhealthy",
+            "unhealth",
+            "greasy",
+            "fried",
+            "butter",
+            "chips",
+            "oil",
+            "burger",
+        }
+    ),
+)
+
+
 # Commons alternate: imperial Ethiopian / Rastafari Lion of Judah flag.
 LION = HintPhoto(
     slug="lion-of-judah",
@@ -169,12 +197,16 @@ PHOTOS: dict[str, HintPhoto] = {
     TRANCE.slug: TRANCE,
     MOONLIT.slug: MOONLIT,
     RASTA.slug: RASTA,
+    FATS.slug: FATS,
     LION.slug: LION,
     "dreamlike": TRANCE,
     "trance": TRANCE,
     "rasta": RASTA,
+    "fats": FATS,
     "guardian-30115-20a": RASTA,
     "study-rasta-5": RASTA,
+    "guardian-30115-1d": FATS,
+    "study-fats-4": FATS,
     "guardian-30115-12a": TRANCE,
 }
 
@@ -182,7 +214,7 @@ DEFAULT_HINT = TRANCE
 
 
 def _catalog() -> tuple[HintPhoto, ...]:
-    return (TRANCE, MOONLIT, RASTA, LION)
+    return (TRANCE, MOONLIT, RASTA, FATS, LION)
 
 
 def _tokens(text: str) -> frozenset[str]:
@@ -306,6 +338,18 @@ def _generate_rasta_still(dest: Path) -> Path:
     return dest
 
 
+def _generate_fats_still(dest: Path) -> Path:
+    """Last-resort greasy-food colours if the file is missing. No answer text."""
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    img = Image.new("RGB", (1280, 720), (168, 96, 32))
+    draw = ImageDraw.Draw(img)
+    draw.ellipse((180, 80, 620, 520), fill=(232, 176, 64))
+    draw.ellipse((520, 220, 1100, 700), fill=(120, 56, 24))
+    draw.ellipse((700, 40, 1180, 400), fill=(212, 148, 48))
+    img.save(dest, "WEBP", quality=82, method=6)
+    return dest
+
+
 def ensure_hint_photo(photo: HintPhoto | None = None) -> Path:
     resolved = photo or DEFAULT_HINT
     dest = resolved.path
@@ -315,4 +359,6 @@ def ensure_hint_photo(photo: HintPhoto | None = None) -> Path:
         return dest
     if resolved.slug in {RASTA.slug, LION.slug, "rasta"}:
         return _generate_rasta_still(dest)
+    if resolved.slug in {FATS.slug, "fats"}:
+        return _generate_fats_still(dest)
     return _generate_trance_still(dest)

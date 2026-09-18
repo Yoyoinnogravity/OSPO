@@ -1,5 +1,5 @@
 from twodown.config import DEFAULT_VOICE_ALIAS, PINUP_SLUG, SOURCE_VOICE_ALIAS, STUDY_SLUG, VOICE_RATE, VOICES
-from twodown.pipeline import dreamlike_clue, published_clue, rasta_clue, resolve_clue, study_clue
+from twodown.pipeline import dreamlike_clue, fats_clue, published_clue, rasta_clue, resolve_clue, study_clue
 from twodown.script import speak_answer, speak_enumeration, speak_parse_tokens, speak_source, write_parts
 
 
@@ -9,36 +9,35 @@ def test_solver_voice_is_clear_libby():
     assert VOICE_RATE == "-8%"
 
 
-def test_study_clue_is_rasta():
-    assert STUDY_SLUG == "guardian-30115-20a"
+def test_study_clue_is_fats():
+    assert STUDY_SLUG == "guardian-30115-1d"
     clue = study_clue(STUDY_SLUG)
     assert clue is not None
-    assert clue.slug == "guardian-30115-20a"
-    assert clue.answer == "RASTA"
-    assert clue.clue == "One emperor backing follower of another"
-    assert clue.enumeration == "5"
-    assert clue.device == "reversal"
+    assert clue.slug == "guardian-30115-1d"
+    assert clue.answer == "FATS"
+    assert clue.clue == "Refrain from eating, with final twist, such unhealthy foods"
+    assert clue.enumeration == "4"
     assert clue.setter == "Brendan"
     assert clue.paper == "Guardian"
     assert clue.puzzle_id == "30115"
-    assert clue.number == "20"
-    assert clue.direction == "across"
+    assert clue.number == "1"
+    assert clue.direction == "down"
     assert clue.blogger == "manehi"
-    assert clue.definition == "a RASTA may be a follower of the Emperor Haile Selassie"
+    assert clue.definition == "such unhealthy foods"
     assert clue.hint_line == "Here's a clue."
-    assert clue.hint_image == "assets/hints/rasta-still.webp"
+    assert clue.hint_image == "assets/hints/fats-still.webp"
     assert clue.source_url == (
         "https://fifteensquared.net/2026/09/18/guardian-cryptic-crossword-no-30115-by-brendan/"
     )
-    assert "TSAR" in clue.parse
-    assert "backing" in clue.parse
+    assert "FAST" in clue.parse
+    assert "final twist" in clue.parse
     parts = write_parts(clue)
     assert parts.intro_speech == "Here is your daily dose of cryptic fun."
-    assert parts.clue_speech == "One emperor backing follower of another."
-    assert parts.letters_speech == "Five letters."
+    assert parts.clue_speech == "Refrain from eating, with final twist, such unhealthy foods."
+    assert parts.letters_speech == "Four letters."
     assert parts.think_speech == "Pause the video while you think."
     assert parts.hint_speech == "Here's a clue."
-    assert parts.answer_speech == "The answer is rasta."
+    assert parts.answer_speech == "The answer is fats."
     assert parts.answer_speech == speak_answer(clue.answer)
     assert parts.outro_speech == "Thanks for thinking with cryptic.fun."
     assert "Brendan" not in parts.parse_speech
@@ -75,12 +74,12 @@ def test_source_credit_is_its_own_line():
     assert parts.outro_speech == "Thanks for thinking with cryptic.fun."
 
 
-def test_five_letters():
+def test_four_letters():
     clue = study_clue()
     assert clue is not None
-    assert clue.enumeration == "5"
-    assert speak_enumeration("5") == "Five letters."
-    assert speak_enumeration(clue.enumeration) == "Five letters."
+    assert clue.enumeration == "4"
+    assert speak_enumeration("4") == "Four letters."
+    assert speak_enumeration(clue.enumeration) == "Four letters."
 
 
 def test_spoken_parse_says_tsar_as_a_word():
@@ -99,6 +98,21 @@ def test_spoken_parse_says_tsar_as_a_word():
     assert "RASTA" not in parts.hint_speech
 
 
+def test_spoken_parse_says_fast_as_a_word():
+    clue = fats_clue()
+    parts = write_parts(clue)
+    assert "fast" in parts.parse_speech
+    assert "final twist" in parts.parse_speech
+    assert "fats" in parts.answer_speech
+    assert "FAST" not in parts.parse_speech
+    assert "FATS" not in parts.parse_speech
+    assert "F-A-S-T" not in parts.parse_speech
+    assert speak_parse_tokens("FAST") == "fast"
+    assert speak_parse_tokens("FATS") == "fats"
+    assert "fats" not in parts.hint_speech.lower()
+    assert "FATS" not in parts.hint_speech
+
+
 def test_dreamlike_stays_constructable():
     clue = dreamlike_clue()
     assert clue.answer == "DREAMLIKE"
@@ -114,11 +128,12 @@ def test_dreamlike_stays_constructable():
 
 
 def test_resolve_clue_renders_constructed_study_without_site_html():
-    constructed = study_clue("rasta")
+    constructed = study_clue("fats")
     assert constructed is not None
-    resolved = resolve_clue("rasta", clue=constructed)
+    resolved = resolve_clue("fats", clue=constructed)
     assert resolved is constructed
-    assert resolve_clue(STUDY_SLUG).answer == "RASTA"
+    assert resolve_clue(STUDY_SLUG).answer == "FATS"
+    assert resolve_clue("rasta").answer == "RASTA"
     assert resolve_clue("dreamlike").answer == "DREAMLIKE"
 
 
