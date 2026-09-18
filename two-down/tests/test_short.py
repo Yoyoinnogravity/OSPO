@@ -9,6 +9,7 @@ from twodown.pipeline import (
     wellington_clue,
     cole_clue,
     smiles_clue,
+    davis_cup_clue,
 )
 from twodown.script import (
     speak_answer,
@@ -26,35 +27,35 @@ def test_solver_voice_is_clear_libby():
     assert VOICE_RATE == "+0%"
 
 
-def test_study_clue_is_smiles():
-    assert STUDY_SLUG == "guardian-30115-2d"
+def test_study_clue_is_davis_cup():
+    assert STUDY_SLUG == "guardian-30115-18d"
     clue = study_clue(STUDY_SLUG)
     assert clue is not None
-    assert clue.slug == "guardian-30115-2d"
-    assert clue.answer == "SMILES"
-    assert clue.clue == "First in school by a long way, is visibly pleased"
-    assert clue.enumeration == "6"
+    assert clue.slug == "guardian-30115-18d"
+    assert clue.answer == "DAVIS CUP"
+    assert clue.clue == "Frenzied divas caught up in international court event"
+    assert clue.enumeration == "5,3"
     assert clue.setter == "Brendan"
     assert clue.paper == "Guardian"
     assert clue.puzzle_id == "30115"
-    assert clue.number == "2"
+    assert clue.number == "18"
     assert clue.direction == "down"
     assert clue.blogger == "manehi"
-    assert clue.definition == "visibly pleased"
+    assert clue.definition == "international court event"
     assert clue.hint_line == "Have a look at this."
-    assert clue.hint_image == "assets/hints/smiles-still.webp"
+    assert clue.hint_image == "assets/hints/davis-cup-still.webp"
     assert clue.source_url == (
         "https://fifteensquared.net/2026/09/18/guardian-cryptic-crossword-no-30115-by-brendan/"
     )
-    assert "first letter of school" in clue.parse.lower()
-    assert "MILES" in clue.parse
+    assert "frenzied" in clue.parse.lower()
+    assert "divas" in clue.parse.lower()
     parts = write_parts(clue)
     assert parts.intro_speech == "Right — here's your daily dose of cryptic fun."
-    assert parts.clue_speech == "First in school by a long way, is visibly pleased."
-    assert parts.letters_speech == "That's six letters."
+    assert parts.clue_speech == "Frenzied divas caught up in international court event."
+    assert parts.letters_speech == "That's five, three."
     assert parts.think_speech == "Pause here. Have a think."
     assert parts.hint_speech == "Have a look at this."
-    assert parts.answer_speech == "It's smiles."
+    assert parts.answer_speech == "It's davis cup."
     assert parts.answer_speech == speak_answer(clue.answer)
     assert parts.outro_speech == "Thanks for thinking with cryptic.fun."
     assert "Brendan" not in parts.parse_speech
@@ -91,12 +92,12 @@ def test_source_credit_is_its_own_line():
     assert parts.outro_speech == "Thanks for thinking with cryptic.fun."
 
 
-def test_six_letters():
+def test_five_three_letters():
     clue = study_clue()
     assert clue is not None
-    assert clue.enumeration == "6"
-    assert speak_enumeration("6") == "That's six letters."
-    assert speak_enumeration(clue.enumeration) == "That's six letters."
+    assert clue.enumeration == "5,3"
+    assert speak_enumeration("5,3") == "That's five, three."
+    assert speak_enumeration(clue.enumeration) == "That's five, three."
 
 
 def test_spoken_parse_says_tsar_as_a_word():
@@ -130,6 +131,23 @@ def test_spoken_parse_says_smiles_and_miles_as_words():
     assert speak_parse_tokens("SMILES") == "smiles"
     assert "smiles" not in parts.hint_speech.lower()
     assert "SMILES" not in parts.hint_speech
+
+
+def test_spoken_parse_says_davis_cup_as_words():
+    clue = davis_cup_clue()
+    parts = write_parts(clue)
+    assert "davis cup" in parts.answer_speech
+    assert "divas" in parts.parse_speech.lower()
+    assert "frenzied" in parts.parse_speech.lower()
+    assert "caught" in parts.parse_speech.lower()
+    assert "international court event" in parts.parse_speech.lower()
+    assert "DAVIS CUP" not in parts.parse_speech
+    assert "D-A-V-I-S" not in parts.parse_speech
+    assert speak_parse_tokens("DAVIS CUP") == "davis cup"
+    assert speak_parse_tokens("DIVAS") == "divas"
+    assert "davis" not in parts.hint_speech.lower()
+    assert "DAVIS" not in parts.hint_speech
+    assert "(" not in parts.parse_speech
 
 
 def test_spoken_parse_says_cole_as_a_word():
@@ -201,11 +219,12 @@ def test_dreamlike_stays_constructable():
 
 
 def test_resolve_clue_renders_constructed_study_without_site_html():
-    constructed = study_clue("smiles")
+    constructed = study_clue("davis-cup")
     assert constructed is not None
-    resolved = resolve_clue("smiles", clue=constructed)
+    resolved = resolve_clue("davis-cup", clue=constructed)
     assert resolved is constructed
-    assert resolve_clue(STUDY_SLUG).answer == "SMILES"
+    assert resolve_clue(STUDY_SLUG).answer == "DAVIS CUP"
+    assert resolve_clue("smiles").answer == "SMILES"
     assert resolve_clue("cole").answer == "COLE"
     assert resolve_clue("wellington").answer == "WELLINGTON"
     assert resolve_clue("fats").answer == "FATS"

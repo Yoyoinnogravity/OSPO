@@ -203,6 +203,30 @@ WELLINGTON = HintPhoto(
 )
 
 
+# Definition still for DAVIS CUP: tennis court / international court event.
+# Not divas, not cricket, not UP. Never print DAVIS CUP.
+DAVIS = HintPhoto(
+    slug="davis-cup-still",
+    label="Tennis courts",
+    source="generated still",
+    license="generated",
+    filename="davis-cup-still.webp",
+    keywords=frozenset(
+        {
+            "international",
+            "internation",
+            "court",
+            "courts",
+            "event",
+            "tennis",
+            "lawn",
+            "match",
+            "sport",
+        }
+    ),
+)
+
+
 # Definition still for SMILES: visibly pleased, not school / miles.
 SMILES = HintPhoto(
     slug="smiles-still",
@@ -270,6 +294,7 @@ PHOTOS: dict[str, HintPhoto] = {
     WELLINGTON.slug: WELLINGTON,
     COLE.slug: COLE,
     SMILES.slug: SMILES,
+    DAVIS.slug: DAVIS,
     LION.slug: LION,
     "dreamlike": TRANCE,
     "trance": TRANCE,
@@ -289,13 +314,17 @@ PHOTOS: dict[str, HintPhoto] = {
     "smiles": SMILES,
     "guardian-30115-2d": SMILES,
     "study-smiles-6": SMILES,
+    "davis": DAVIS,
+    "davis-cup": DAVIS,
+    "guardian-30115-18d": DAVIS,
+    "study-davis-cup-5-3": DAVIS,
 }
 
 DEFAULT_HINT = TRANCE
 
 
 def _catalog() -> tuple[HintPhoto, ...]:
-    return (TRANCE, MOONLIT, RASTA, FATS, WELLINGTON, COLE, SMILES, LION)
+    return (TRANCE, MOONLIT, RASTA, FATS, WELLINGTON, COLE, SMILES, DAVIS, LION)
 
 
 def _tokens(text: str) -> frozenset[str]:
@@ -466,6 +495,18 @@ def _generate_cole_still(dest: Path) -> Path:
     return dest
 
 
+def _generate_davis_still(dest: Path) -> Path:
+    """Last-resort tennis-court colours if the file is missing. No answer text."""
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    img = Image.new("RGB", (1280, 720), (62, 122, 48))
+    draw = ImageDraw.Draw(img)
+    draw.rectangle((80, 80, 1200, 640), fill=(86, 148, 64))
+    draw.rectangle((620, 80, 660, 640), fill=(248, 248, 244))
+    draw.rectangle((80, 340, 1200, 380), fill=(248, 248, 244))
+    img.save(dest, "WEBP", quality=82, method=6)
+    return dest
+
+
 def ensure_hint_photo(photo: HintPhoto | None = None) -> Path:
     resolved = photo or DEFAULT_HINT
     dest = resolved.path
@@ -483,4 +524,6 @@ def ensure_hint_photo(photo: HintPhoto | None = None) -> Path:
         return _generate_cole_still(dest)
     if resolved.slug in {SMILES.slug, "smiles"}:
         return _generate_smiles_still(dest)
+    if resolved.slug in {DAVIS.slug, "davis", "davis-cup"}:
+        return _generate_davis_still(dest)
     return _generate_trance_still(dest)

@@ -234,7 +234,7 @@ def cole_clue() -> Clue:
 
 
 def smiles_clue() -> Clue:
-    """Guardian 30115 2d SMILES — current study Short. On Fifteen Squared.
+    """Guardian 30115 2d SMILES — leftover study construct. On Fifteen Squared.
 
     Hint visibly pleased (definition), not school / miles.
     Do not print SMILES on the hint card.
@@ -259,14 +259,41 @@ def smiles_clue() -> Clue:
     )
 
 
+def davis_cup_clue() -> Clue:
+    """Guardian 30115 18d DAVIS CUP — current study Short. On Fifteen Squared.
+
+    Hint the tennis-court definition, not divas / cricket C / UP.
+    Do not print DAVIS CUP on the hint card.
+    """
+    return attach_hint(
+        Clue(
+            source_url=_RASTA_SOURCE,
+            paper="Guardian",
+            puzzle_id="30115",
+            setter="Brendan",
+            blogger="manehi",
+            number="18",
+            direction="down",
+            clue="Frenzied divas caught up in international court event",
+            enumeration="5,3",
+            answer="DAVIS CUP",
+            definition="international court event",
+            parse="Frenzied, anagram of divas, plus C, caught, plus UP",
+            device="anagram",
+            enumeration_ok=True,
+        )
+    )
+
+
 def study_clues() -> dict[str, Clue]:
-    """SMILES is the study default. Earlier study clues stay constructable."""
+    """DAVIS CUP is the study default. Earlier study clues stay constructable."""
     dreamlike = dreamlike_clue()
     rasta = rasta_clue()
     fats = fats_clue()
     wellington = wellington_clue()
     cole = cole_clue()
     smiles = smiles_clue()
+    davis = davis_cup_clue()
     return {
         dreamlike.slug: dreamlike,
         "dreamlike": dreamlike,
@@ -291,7 +318,13 @@ def study_clues() -> dict[str, Clue]:
         "smiles": smiles,
         "study-smiles-6": smiles,
         smiles.answer.lower(): smiles,
-        STUDY_SLUG: smiles,
+        davis.slug: davis,
+        "davis": davis,
+        "davis-cup": davis,
+        "davis cup": davis,
+        "study-davis-cup-5-3": davis,
+        davis.answer.lower(): davis,
+        STUDY_SLUG: davis,
     }
 
 
