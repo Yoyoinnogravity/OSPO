@@ -257,6 +257,7 @@ def test_hint_card_keeps_empty_lights(tmp_path: Path):
 
     clue = study_clue()
     assert clue is not None
+    assert clue.answer == "RASTA"
     hint = draw_beat(clue, tmp_path / "hint.png", "hint")
     answer = draw_beat(clue, tmp_path / "answer.png", "answer")
     hint_img = Image.open(hint)
