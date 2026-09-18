@@ -105,7 +105,7 @@ FACEBOOK_FOLLOW = os.environ.get("TWODOWN_FACEBOOK_URL", "").strip()
 
 
 def follow_profiles() -> list[tuple[str, str, str]]:
-    """External Cryptic Fun profiles: slug, label, url. Empty env values are omitted."""
+    """External cryptic.fun profiles: slug, label, url. Empty env values are omitted."""
     rows: list[tuple[str, str, str]] = []
     for slug, label, url in (
         ("youtube", "YouTube", YOUTUBE_FOLLOW),

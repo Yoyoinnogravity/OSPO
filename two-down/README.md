@@ -5,8 +5,8 @@ We provide unique cryptic crossword clues and solutions.
 We credit all — the setter, the paper, Fifteen Squared, and the photograph.
 The only source is [Fifteen Squared](https://fifteensquared.net/),
 cut as newsprint Shorts. **Ryan** opens, **Sonia** solves, **Thomas** credits
-the setter and Fifteen Squared. Brand is **Cryptic Fun** on YouTube, TikTok,
-Instagram and Facebook. Site is **cryptic.fun**.
+the setter and Fifteen Squared. The brand is **cryptic.fun** on the site,
+YouTube, TikTok, Instagram and Facebook.
 
 Do not invent answers. Do not scrape other crossword blogs.
 
@@ -68,7 +68,7 @@ twodown upload --no-youtube          # TikTok + Instagram + Facebook only
 
 Token files:
 
-* **YouTube** — authorized desktop OAuth user JSON for the Cryptic Fun channel.
+* **YouTube** — authorized desktop OAuth user JSON for the cryptic.fun channel.
 * **TikTok** — `{"access_token": "..."}` from a TikTok app with `video.publish`
   (Content Posting API, FILE_UPLOAD). Unaudited apps are limited to private /
   self-only until TikTok reviews the app.
@@ -117,7 +117,7 @@ That is the only thing you pay Cursor for. GitHub Pages and YouTube upload are f
 
 You do not have to buy anything to put this online.
 
-1. Merge the Cryptic Fun PR.
+1. Merge the cryptic.fun PR.
 2. Repo **Settings → Pages → Source: GitHub Actions**.
 3. The site publishes at **https://yoyoinnogravity.github.io/OSPO/**.
 
@@ -146,7 +146,7 @@ by accident, leave it unused (same trap as `cryptic.fit`).
 
 `twodown live` prints this same order (registry first, then Pages, then DNS).
 
-YouTube still needs `TWODOWN_YOUTUBE_TOKEN` (OAuth for the Cryptic Fun channel),
+YouTube still needs `TWODOWN_YOUTUBE_TOKEN` (OAuth for the cryptic.fun channel),
 not a payment.
 
 Money
@@ -157,7 +157,7 @@ already has a labelled slot **under** today’s pair, never inside Solve.
 
 When hits arrive, the stack is:
 
-1. **YouTube Shorts** — real money once Cryptic Fun is in the Partner Program
+1. **YouTube Shorts** — real money once cryptic.fun is in the Partner Program
    (1,000 subscribers and 10 million Shorts views in 90 days, or 4,000
    long-form hours). Same AdSense account can later cover the website.
 2. **One Google display unit on cryptic.fun** — after

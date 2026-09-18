@@ -5,7 +5,7 @@ from twodown.models import Clue, SpokenClue
 from twodown.scenes import get_scene
 
 HASHTAGS = "#crypticcrossword #crypticfun #crossword #shorts"
-SOCIAL_HANDLE = "Cryptic Fun"
+SOCIAL_HANDLE = BRAND
 
 
 def clue_line(clue: Clue) -> str:
@@ -44,8 +44,7 @@ def youtube_description(item: SpokenClue) -> str:
     page = item.site_path or SITE_ORIGIN
     return (
         f"{SOCIAL_HANDLE} — {BRAND_PROMISE}.\n"
-        f"{CREDIT_LINE}\n"
-        f"{BRAND}\n\n"
+        f"{CREDIT_LINE}\n\n"
         f"{clue_line(clue)}\n"
         f"Answer: {clue.answer}\n\n"
         f"{page}\n"

@@ -139,7 +139,7 @@ def test_instagram_and_facebook_reels(tmp_path, monkeypatch):
     item = _item(video)
     session = FakeSession()
     assert upload_instagram(item, social_caption(item), session=session) == "ig_99"
-    assert upload_facebook(item, social_caption(item), "Cryptic Fun · test", session=session) == "fb_1"
+    assert upload_facebook(item, social_caption(item), "cryptic.fun · test", session=session) == "fb_1"
     assert item.instagram_id == "ig_99"
     assert item.facebook_id == "fb_1"
 

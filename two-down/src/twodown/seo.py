@@ -63,11 +63,10 @@ def website_ld() -> dict:
         "@context": "https://schema.org",
         "@type": "WebSite",
         "name": BRAND,
-        "alternateName": "Cryptic Fun",
         "url": f"{SITE_ORIGIN}/",
         "description": DEFAULT_DESCRIPTION,
         "inLanguage": "en-GB",
-        "publisher": {"@type": "Organization", "name": "Cryptic Fun", "url": f"{SITE_ORIGIN}/", "sameAs": same},
+        "publisher": {"@type": "Organization", "name": BRAND, "url": f"{SITE_ORIGIN}/", "sameAs": same},
         "sourceOrganization": {"@type": "Organization", "name": "Fifteen Squared", "url": SOURCE_SITE},
     }
 
@@ -104,7 +103,7 @@ def article_ld(clue: Clue, *, canonical: str, published: str) -> dict:
         "isBasedOn": clue.source_url,
         "author": {"@type": "Person", "name": clue.setter},
         "contributor": {"@type": "Person", "name": clue.blogger},
-        "publisher": {"@type": "Organization", "name": "Cryptic Fun", "url": f"{SITE_ORIGIN}/"},
+        "publisher": {"@type": "Organization", "name": BRAND, "url": f"{SITE_ORIGIN}/"},
         "about": ["Cryptic crossword", clue.paper],
     }
 

@@ -110,9 +110,9 @@ def test_publish_site_writes_spoiler_pages(tmp_path):
 def test_youtube_titles_use_cryptic_fun_channel():
     clue = _item().clue
     title = video_title(clue)
-    assert title.startswith("Cryptic Fun · ")
+    assert title.startswith("cryptic.fun · ")
     assert title.endswith("#Shorts")
-    assert YOUTUBE_CHANNEL == "Cryptic Fun"
+    assert YOUTUBE_CHANNEL == "cryptic.fun"
     assert len(title) <= 100
     assert "https://cryptic.fun/support.html" in youtube_description(_item())
     assert "unique cryptic crossword clues and solutions" in youtube_description(_item())

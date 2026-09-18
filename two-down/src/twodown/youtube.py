@@ -3,11 +3,11 @@ from __future__ import annotations
 import json
 
 from twodown.captions import youtube_description
-from twodown.config import CLUES_PER_DAY
+from twodown.config import BRAND, CLUES_PER_DAY
 from twodown.models import Clue, DailyPair, SpokenClue
 from twodown.tokens import secret_text
 
-YOUTUBE_CHANNEL = "Cryptic Fun"
+YOUTUBE_CHANNEL = BRAND
 SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
 TOKEN_ENV = "TWODOWN_YOUTUBE_TOKEN"
 CLIENT_ENV = "TWODOWN_YOUTUBE_CLIENT_SECRET"
@@ -47,7 +47,7 @@ def video_description(item: SpokenClue) -> str:
 
 
 def upload_short(item: SpokenClue, privacy: str = "public") -> str | None:
-    """Upload one Short as Cryptic Fun. Returns the video id, or None if credentials are missing."""
+    """Upload one Short as cryptic.fun. Returns the video id, or None if credentials are missing."""
     if not item.video_path:
         return None
     creds = _credentials()
@@ -61,7 +61,7 @@ def upload_short(item: SpokenClue, privacy: str = "public") -> str | None:
         "snippet": {
             "title": video_title(item.clue),
             "description": video_description(item),
-            "tags": ["Cryptic Fun", "cryptic.fun", "cryptic crossword", item.clue.device, item.clue.setter],
+            "tags": ["cryptic.fun", "cryptic crossword", item.clue.device, item.clue.setter],
             "categoryId": "27",
         },
         "status": {

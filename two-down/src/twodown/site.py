@@ -715,7 +715,7 @@ def publish_site(pair: DailyPair, dest: Path | None = None) -> Path:
     <aside class="teaser">
       <p class="kicker">Follow</p>
       <h2>Keep the pair coming.</h2>
-      <p>Follow is on by default. Email one clue a day, the RSS feed, or Cryptic Fun on YouTube. No account on the site.</p>
+      <p>Follow is on by default. Email one clue a day, the RSS feed, or cryptic.fun on YouTube. No account on the site.</p>
       <a class="action" href="follow.html">Follow cryptic.fun</a>
     </aside>
     {_keep_free_teaser("")}
@@ -891,7 +891,7 @@ def publish_site(pair: DailyPair, dest: Path | None = None) -> Path:
       </section>
       <section class="panel">
         <h2>RSS and YouTube.</h2>
-        <p>The feed is the pair, not the answers. Cryptic Fun Shorts go to YouTube when that channel is connected.</p>
+        <p>The feed is the pair, not the answers. cryptic.fun Shorts go to YouTube when that channel is connected.</p>
         <p><a class="action" href="feed.xml" data-follow-link>Subscribe to RSS</a></p>
         {profiles}
       </section>
@@ -913,10 +913,10 @@ def publish_site(pair: DailyPair, dest: Path | None = None) -> Path:
     support = f"""
     <p class="kicker">Money</p>
     <h1>Keep the clues free.</h1>
-    <p class="lede">When people show up, we can pay for Cryptic Fun without a paywall. Ads are one way. They are not switched on yet. They will never sit on the answer or talk over the seven-second pause.</p>
+    <p class="lede">When people show up, we can pay for cryptic.fun without a paywall. Ads are one way. They are not switched on yet. They will never sit on the answer or talk over the seven-second pause.</p>
     <section class="panel">
       <h2>1. YouTube is the main bet.</h2>
-      <p>The two daily Shorts on the <strong>Cryptic Fun</strong> channel are where hits turn into money. YouTube’s Partner Program pays a share of ads in the Shorts feed once the channel has 1,000 subscribers and 10 million Shorts views in 90 days (or 4,000 hours of long-form watch time). Until then YouTube may still run ads — we just don’t get a cut.</p>
+      <p>The two daily Shorts on the <strong>cryptic.fun</strong> channel are where hits turn into money. YouTube’s Partner Program pays a share of ads in the Shorts feed once the channel has 1,000 subscribers and 10 million Shorts views in 90 days (or 4,000 hours of long-form watch time). Until then YouTube may still run ads — we just don’t get a cut.</p>
       <p>At 500 subscribers, Super Thanks and memberships can open first. Same Google AdSense account can later cover the website.</p>
     </section>
     <section class="panel">
