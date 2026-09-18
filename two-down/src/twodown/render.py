@@ -192,7 +192,7 @@ def draw_beat(clue: Clue, dest: Path, beat: str = "think") -> Path:
     show_lights = beat != "clue"
     filled = beat in {"answer", "parse"}
     show_answer = beat in {"answer", "parse"}
-    show_parse = beat == "parse"
+    show_parse = beat in {"answer", "parse"}
     bottom = _draw_clue(draw, clue, y=240 if beat == "clue" else 210)
     lights_bottom = bottom
     if show_lights:

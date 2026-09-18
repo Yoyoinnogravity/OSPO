@@ -28,7 +28,9 @@ VOICE_LABELS = {
     "ryan": "Ryan",
     "thomas": "Thomas",
 }
-VOICE_RATE = "-8%"
+# Sonia is the librarian: measured, a touch low. Ryan stays bright on the intro.
+VOICE_RATE = "-18%"
+VOICE_PITCH = "-5Hz"
 INTRO_LINE = "Here is your daily dose of cryptic fun."
 INTRO_VOICE_ALIAS = "ryan"
 INTRO_RATE = "+12%"

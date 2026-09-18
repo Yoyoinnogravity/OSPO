@@ -17,6 +17,7 @@ from twodown.config import (
     INTRO_VOICE_ALIAS,
     LETTERS_PAUSE_SECONDS,
     THINK_PAUSE_SECONDS,
+    VOICE_PITCH,
     VOICE_RATE,
     VOICES,
 )
@@ -57,7 +58,7 @@ def synthesise(
     pitch: str | None = None,
 ) -> Path:
     resolved = resolve_voice(voice)
-    asyncio.run(_synth(script, dest, resolved, rate=rate or VOICE_RATE, pitch=pitch or "+0Hz"))
+    asyncio.run(_synth(script, dest, resolved, rate=rate or VOICE_RATE, pitch=pitch or VOICE_PITCH))
     return dest
 
 

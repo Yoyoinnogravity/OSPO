@@ -57,6 +57,8 @@ def test_clue_card_is_a_solve_along(tmp_path: Path):
     assert draw_beat(_clue(), tmp_path / "only-clue.png", "clue").exists()
     assert draw_beat(_clue(), tmp_path / "letters.png", "letters").exists()
     assert draw_beat(_clue(), tmp_path / "answer.png", "answer").exists()
+    # Parse sits under the answer as soon as it is solved.
+    assert draw_beat(_clue(), tmp_path / "solved.png", "answer").exists()
 
 
 def test_speak_enumeration_is_separate_from_the_clue():
