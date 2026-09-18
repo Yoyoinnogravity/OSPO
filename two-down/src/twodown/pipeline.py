@@ -95,7 +95,13 @@ _DREAMLIKE_PARSE = (
 
 
 def dreamlike_clue() -> Clue:
-    """Construct DREAMLIKE so we can study the locked beat off the published site."""
+    """Construct DREAMLIKE so we can study the locked beat off the published site.
+
+    Product rule: we are not confident an AI can match a cryptic answer to a
+    hint picture. There is no general matcher. This study clue alone carries a
+    human-chosen definition still for “as in a trance” / dreamlike — not
+    wordplay, not model-selected, and the card must not print DREAMLIKE.
+    """
     return Clue(
         source_url="https://fifteensquared.net/2026/09/18/guardian-cryptic-crossword-no-30115-by-brendan/",
         paper="Guardian",
@@ -111,6 +117,11 @@ def dreamlike_clue() -> Clue:
         parse=_DREAMLIKE_PARSE,
         device="anagram",
         enumeration_ok=True,
+        # Curated Commons still (Linda Xu, CC0). Do not fetch/generate via a
+        # general “match answer to picture” model.
+        hint_image="assets/hints/moonlit-moments.webp",
+        hint_credit="Moonlit Moments · Linda Xu / Wikimedia Commons (CC0, via Unsplash)",
+        hint_line="Here's a clue.",
     )
 
 

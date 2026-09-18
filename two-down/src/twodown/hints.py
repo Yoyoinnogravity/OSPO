@@ -1,3 +1,10 @@
+"""Hand-picked definition stills — not an AI image-matcher.
+
+Product rule: no general “match answer to picture” pipeline. Only the
+DREAMLIKE study clue has a human-chosen definition still for “as in a
+trance”. Do not add a matcher, embedder, or vision API here.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -36,7 +43,8 @@ class HintPhoto:
         return f"{self.label} · {self.photographer} / Wikimedia Commons ({self.license})"
 
 
-# Trance / sleep hint for DREAMLIKE. Not a travel scene; credited on the film.
+# Trance / sleep still for DREAMLIKE's definition (“as in a trance”).
+# Human-chosen. Not wordplay. Not a travel scene. Credited on the film.
 MOONLIT = HintPhoto(
     slug="moonlit-moments",
     label="Moon",
