@@ -31,13 +31,8 @@ twodown status
 
 Studio of the films we already cut: `two-down/site/studio.html`.
 
-Layout: cream clue cards on photographs of real places (Machu Picchu,
-Matterhorn, Santorini, Grand Canyon, Kyoto, aurora, Petra, Ha Long Bay),
-with newsprint still available. Visitors pick **Place** in the header.
-Daily Shorts rotate two different scenes unless you pass `--scene`.
-Voices on the site: **Sonia**, **Ryan**, **Libby**, **Thomas**.
-**Follow** is on by default in the header (email, RSS, YouTube).
-YouTube and the other apps use `--voice` (default Sonia).
+Study Shorts are **newsprint**. Older daily pages still have place photos.
+Voices on the film: **Ryan**, **Libby**, **Thomas**. Sonia stays as an optional read.
 
 Visitors can **suggest one homemade clue a day**, or ask for a daily clue by
 email. Both open a message to **aledmorgan@gmail.com**.
