@@ -1,49 +1,51 @@
 from pathlib import Path
 
 from twodown.config import PACKAGE_ROOT, PINUP_SLUG, STUDY_SLUG
-from twodown.hints import CLOSE_ENOUGH, FATS, RASTA, TRANCE, WELLINGTON, attach_hint, match_hint
+from twodown.hints import CLOSE_ENOUGH, COLE, FATS, RASTA, TRANCE, WELLINGTON, attach_hint, match_hint
 from twodown.models import Clue
-from twodown.pipeline import dreamlike_clue, fats_clue, published_clue, rasta_clue, study_clue, wellington_clue
+from twodown.pipeline import cole_clue, dreamlike_clue, fats_clue, published_clue, rasta_clue, study_clue, wellington_clue
 
 
-def test_study_slug_and_hint_fields_are_wellington():
-    assert STUDY_SLUG == "guardian-30115-3d"
+def test_study_slug_and_hint_fields_are_cole():
+    assert STUDY_SLUG == "guardian-30115-8d"
     clue = study_clue()
     assert clue is not None
-    assert clue.answer == "WELLINGTON"
+    assert clue.answer == "COLE"
     assert clue.slug == STUDY_SLUG
-    assert clue.definition == "Duke"
+    assert clue.definition == "Nat King Cole the jazz musician"
     assert clue.hint_line == "Here's a clue."
     assert clue.hint_image
     assert clue.hint_credit
-    # Hint the definition, not the wordplay.
-    assert "well in" not in clue.hint_credit.lower()
-    assert "ton" not in clue.hint_credit.lower()
-    assert "style" not in clue.hint_credit.lower()
+    # Hint the definition, not the nursery-rhyme wordplay.
+    assert "fiddler" not in clue.hint_credit.lower()
+    assert "nursery" not in clue.hint_credit.lower()
     # Never print the answer on the hint card copy.
-    assert "WELLINGTON" not in clue.hint_line
-    assert "WELLINGTON" not in clue.hint_credit
+    assert "COLE" not in clue.hint_line
+    assert "COLE" not in clue.hint_credit
 
 
-def test_wellington_hint_matches_definition_at_80_percent():
-    clue = wellington_clue()
-    assert clue.answer == "WELLINGTON"
+def test_cole_hint_matches_definition_at_80_percent():
+    clue = cole_clue()
+    assert clue.answer == "COLE"
     matched = match_hint(clue.definition or "")
-    assert matched.photo.slug == WELLINGTON.slug
+    assert matched.photo.slug == COLE.slug
     assert matched.closeness >= CLOSE_ENOUGH
     assert matched.close_enough
-    assert clue.hint_image == f"assets/hints/{WELLINGTON.filename}"
-    assert clue.hint_credit == WELLINGTON.credit_line
+    assert clue.hint_image == f"assets/hints/{COLE.filename}"
+    assert clue.hint_credit == COLE.credit_line
     still = PACKAGE_ROOT / clue.hint_image
     assert still.is_file()
     assert still.stat().st_size > 0
 
 
 def test_aled_definition_is_close_enough_for_a_reasonable_matcher():
-    matched = match_hint("Duke")
-    assert matched.photo.slug == WELLINGTON.slug
+    matched = match_hint("Nat King Cole the jazz musician")
+    assert matched.photo.slug == COLE.slug
     assert matched.closeness >= CLOSE_ENOUGH
     assert matched.close_enough
+    leftover = match_hint("Duke")
+    assert leftover.photo.slug == WELLINGTON.slug
+    assert leftover.closeness >= CLOSE_ENOUGH
     leftover = match_hint("such unhealthy foods")
     assert leftover.photo.slug == FATS.slug
     assert leftover.closeness >= CLOSE_ENOUGH

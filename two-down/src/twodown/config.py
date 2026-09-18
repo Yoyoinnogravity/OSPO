@@ -58,8 +58,8 @@ HINT_HOLD_SECONDS = 4.0
 HINT_PAUSE_SECONDS = 2.5
 CLUES_PER_DAY = 2
 # Lock the spoken beat on this constructed study clue before touching the others.
-# WELLINGTON is Guardian 30115 3 down; twodown short rebuilds this clue only.
-STUDY_SLUG = "guardian-30115-3d"
+# COLE is Guardian 30115 8 down; twodown short rebuilds this clue only.
+STUDY_SLUG = "guardian-30115-8d"
 PINUP_SLUG = "independent-12462-6a"
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[2]

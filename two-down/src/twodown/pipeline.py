@@ -179,7 +179,7 @@ def fats_clue() -> Clue:
 
 
 def wellington_clue() -> Clue:
-    """Guardian 30115 3d WELLINGTON — current study Short. On Fifteen Squared.
+    """Guardian 30115 3d WELLINGTON — leftover study construct. On Fifteen Squared.
 
     Hint the definition (Duke), not the wordplay (well in / G / ton).
     Do not print WELLINGTON on the hint card.
@@ -204,12 +204,42 @@ def wellington_clue() -> Clue:
     )
 
 
+def cole_clue() -> Clue:
+    """Guardian 30115 8d COLE — current study Short. On Fifteen Squared.
+
+    Hint Nat King Cole (definition), not Old King Cole / fiddlers three.
+    Do not print COLE on the hint card.
+    """
+    return attach_hint(
+        Clue(
+            source_url=_RASTA_SOURCE,
+            paper="Guardian",
+            puzzle_id="30115",
+            setter="Brendan",
+            blogger="manehi",
+            number="8",
+            direction="down",
+            clue="So-called King of jazz, or another one accompanied by string trio",
+            enumeration="4",
+            answer="COLE",
+            definition="Nat King Cole the jazz musician",
+            parse=(
+                'Nat King Cole (jazz); or Old King Cole and his fiddlers three '
+                '("string trio")'
+            ),
+            device="double_def",
+            enumeration_ok=True,
+        )
+    )
+
+
 def study_clues() -> dict[str, Clue]:
-    """WELLINGTON is the study default. Earlier study clues stay constructable."""
+    """COLE is the study default. Earlier study clues stay constructable."""
     dreamlike = dreamlike_clue()
     rasta = rasta_clue()
     fats = fats_clue()
     wellington = wellington_clue()
+    cole = cole_clue()
     return {
         dreamlike.slug: dreamlike,
         "dreamlike": dreamlike,
@@ -226,7 +256,11 @@ def study_clues() -> dict[str, Clue]:
         "wellington": wellington,
         "study-wellington-10": wellington,
         wellington.answer.lower(): wellington,
-        STUDY_SLUG: wellington,
+        cole.slug: cole,
+        "cole": cole,
+        "study-cole-4": cole,
+        cole.answer.lower(): cole,
+        STUDY_SLUG: cole,
     }
 
 

@@ -78,8 +78,11 @@ def test_answer_footer_credits_setter_paper_and_fifteen_squared():
     assert _source_footer(clue) == "Eccles in the Independent · Fifteen Squared"
     guardian = clue.model_copy(update={"setter": "Dice", "paper": "Guardian"})
     assert _source_footer(guardian) == "Dice in the Guardian · Fifteen Squared"
-    from twodown.pipeline import dreamlike_clue, fats_clue, rasta_clue, study_clue, wellington_clue
+    from twodown.pipeline import cole_clue, dreamlike_clue, fats_clue, rasta_clue, study_clue, wellington_clue
 
+    cole = cole_clue()
+    assert cole.answer == "COLE"
+    assert _source_footer(cole) == "Brendan in the Guardian · Fifteen Squared"
     wellington = wellington_clue()
     assert wellington.answer == "WELLINGTON"
     assert _source_footer(wellington) == "Brendan in the Guardian · Fifteen Squared"
@@ -255,6 +258,7 @@ def test_speak_answer_is_a_word_not_letters():
     assert speak_answer("RASTA") == "The answer is rasta."
     assert speak_answer("FATS") == "The answer is fats."
     assert speak_answer("WELLINGTON") == "The answer is wellington."
+    assert speak_answer("COLE") == "The answer is cole."
     assert _clue().answer == "PIN-UP"
 
 
@@ -266,7 +270,7 @@ def test_hint_card_keeps_empty_lights(tmp_path: Path):
 
     clue = study_clue()
     assert clue is not None
-    assert clue.answer == "WELLINGTON"
+    assert clue.answer == "COLE"
     hint = draw_beat(clue, tmp_path / "hint.png", "hint")
     answer = draw_beat(clue, tmp_path / "answer.png", "answer")
     hint_img = Image.open(hint)
