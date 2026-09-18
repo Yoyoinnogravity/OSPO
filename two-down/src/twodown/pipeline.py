@@ -144,7 +144,7 @@ def rasta_clue() -> Clue:
             enumeration="5",
             answer="RASTA",
             definition="a RASTA may be a follower of the Emperor Haile Selassie",
-            parse='A="One" + TSAR="emperor"; all reversed/"backing"',
+            parse="A + TSAR, backing",
             device="reversal",
             enumeration_ok=True,
         )
