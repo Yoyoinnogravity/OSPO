@@ -7,6 +7,9 @@ from dataclasses import dataclass
 from twodown.config import (
     ANSWER_PAUSE_SECONDS,
     CLUE_LETTERS_GAP_SECONDS,
+    HINT_HOLD_SECONDS,
+    HINT_LINE,
+    HINT_PAUSE_SECONDS,
     INTRO_GAP_SECONDS,
     INTRO_LINE,
     LETTERS_PAUSE_SECONDS,
@@ -156,6 +159,7 @@ class ScriptParts:
     clue_speech: str
     letters_speech: str
     think_speech: str
+    hint_speech: str
     answer_speech: str
     parse_speech: str
     outro_speech: str
@@ -173,6 +177,9 @@ class ScriptParts:
             f"[pause {LETTERS_PAUSE_SECONDS:.0f}s]\n"
             f"{self.think_speech}\n"
             f"[pause {THINK_PAUSE_SECONDS:.0f}s]\n"
+            f"{self.hint_speech}\n"
+            f"[pause {HINT_HOLD_SECONDS:.0f}s]\n"
+            f"[pause {HINT_PAUSE_SECONDS:.1f}s]\n"
             f"{self.answer_speech}\n"
             f"[pause {ANSWER_PAUSE_SECONDS:.0f}s]\n"
             f"{self.parse_speech}\n"
@@ -189,6 +196,7 @@ def write_parts(clue: Clue) -> ScriptParts:
         clue_speech=f"{clue.clue}.",
         letters_speech=speak_enumeration(clue.enumeration),
         think_speech=THINK_PROMPT,
+        hint_speech=HINT_LINE,
         answer_speech=speak_answer(clue.answer),
         parse_speech=speak_parse_tokens(
             f"{parse}{definition} "
@@ -207,6 +215,8 @@ def to_ssml(parts: ScriptParts, pause_seconds: float | None = None) -> str:
     intro_ms = int(INTRO_GAP_SECONDS * 1000)
     gap_ms = int(CLUE_LETTERS_GAP_SECONDS * 1000)
     letters_ms = int(LETTERS_PAUSE_SECONDS * 1000)
+    hint_hold_ms = int(HINT_HOLD_SECONDS * 1000)
+    hint_ms = int(HINT_PAUSE_SECONDS * 1000)
     answer_ms = int(ANSWER_PAUSE_SECONDS * 1000)
     outro_ms = int(OUTRO_GAP_SECONDS * 1000)
     return (
@@ -219,6 +229,9 @@ def to_ssml(parts: ScriptParts, pause_seconds: float | None = None) -> str:
         f'<break time="{letters_ms}ms"/>'
         f"{html.escape(parts.think_speech, quote=False)}"
         f'<break time="{think_ms}ms"/>'
+        f"{html.escape(parts.hint_speech, quote=False)}"
+        f'<break time="{hint_hold_ms}ms"/>'
+        f'<break time="{hint_ms}ms"/>'
         f"{html.escape(parts.answer_speech, quote=False)}"
         f'<break time="{answer_ms}ms"/>'
         f"{html.escape(parts.parse_speech, quote=False)}"

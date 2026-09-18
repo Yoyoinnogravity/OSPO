@@ -16,6 +16,7 @@ from twodown.config import (
     FONT_REGULAR,
     FONT_SANS,
     FONT_SANS_BOLD,
+    HINT_LINE,
     INK,
     INTRO_LINE,
     MUTED,
@@ -24,6 +25,7 @@ from twodown.config import (
     NEWS_GRID,
     THINK_PROMPT,
 )
+from twodown.hints import DEFAULT_HINT, ensure_hint_photo
 from twodown.models import Clue
 from twodown.scenes import DEFAULT_SCENE, Scene, get_scene
 from twodown.script import _spoken_parse
@@ -194,6 +196,25 @@ def _footer(draw: ImageDraw.ImageDraw, text: str) -> None:
     _center_text(draw, HEIGHT - 88, text, foot, MUTED, spacing=0)
 
 
+def _draw_hint_photo(img: Image.Image, draw: ImageDraw.ImageDraw, y: int) -> int:
+    """Inset a credited hint still. Never a full-bleed travel photo."""
+    photo = Image.open(ensure_hint_photo(DEFAULT_HINT)).convert("RGB")
+    frame_w, frame_h = 900, 560
+    left = (WIDTH - frame_w) // 2
+    crop = _cover_crop(photo, (frame_w - 16, frame_h - 16))
+    draw.rounded_rectangle(
+        [left, y, left + frame_w, y + frame_h],
+        radius=10,
+        fill=CREAM,
+        outline=INK,
+        width=3,
+    )
+    img.paste(crop, (left + 8, y + 8))
+    credit = _font(FONT_SANS, 18)
+    wrapped = _wrap(draw, DEFAULT_HINT.credit_line, credit, WIDTH - 160)
+    return _center_text(draw, y + frame_h + 16, wrapped, credit, MUTED, spacing=4)
+
+
 def _new_card() -> tuple[Image.Image, ImageDraw.ImageDraw]:
     return _newsprint_canvas()
 
@@ -229,6 +250,15 @@ def draw_beat(clue: Clue, dest: Path, beat: str = "think") -> Path:
     if beat == "think":
         wrapped = _wrap(draw, THINK_PROMPT, prompt, WIDTH - 160)
         _center_text(draw, prompt_y, wrapped, prompt, CRIMSON, spacing=8)
+    if beat == "hint":
+        # Empty lights stay; the picture is the hint. Never fill or print the answer.
+        prompt_y = min(lights_bottom + 36, 980)
+        wrapped = _wrap(draw, HINT_LINE.rstrip("."), prompt, WIDTH - 160)
+        next_y = _center_text(draw, prompt_y, wrapped, prompt, CRIMSON, spacing=8)
+        _draw_hint_photo(img, draw, min(next_y + 18, 1040))
+        _footer(draw, _source_footer(clue))
+        img.save(dest, "PNG")
+        return dest
     if show_answer:
         answer = _font(FONT_BOLD, 84)
         answer_y = min(lights_bottom + 40, 1080)
@@ -323,13 +353,14 @@ class ShortTimings:
     clue: float
     letters: float
     think: float
+    hint: float
     answer: float
     parse: float
     outro: float
 
     @property
     def until_answer(self) -> float:
-        return self.intro + self.clue + self.letters + self.think
+        return self.intro + self.clue + self.letters + self.think + self.hint
 
 
 def _encode_clips(clips: list[tuple[Path, float]], audio: Path, dest: Path) -> Path:
@@ -400,13 +431,14 @@ def render_video(
         work = Path("/tmp/twodown-beats") / dest.stem
         work.mkdir(parents=True, exist_ok=True)
         if timings is None:
-            slice_ = max(0.6, duration / 6)
-            timings = ShortTimings(slice_, slice_, slice_, slice_, slice_, slice_, slice_)
+            slice_ = max(0.6, duration / 8)
+            timings = ShortTimings(slice_, slice_, slice_, slice_, slice_, slice_, slice_, slice_)
         clips = [
             (draw_beat(clue, work / "intro.png", "intro"), timings.intro),
             (draw_beat(clue, work / "clue.png", "clue"), timings.clue),
             (draw_beat(clue, work / "letters.png", "letters"), timings.letters),
             (draw_beat(clue, work / "think.png", "think"), timings.think),
+            (draw_beat(clue, work / "hint.png", "hint"), timings.hint),
             (draw_beat(clue, work / "answer.png", "answer"), timings.answer),
             (draw_beat(clue, work / "parse.png", "parse"), timings.parse),
             (draw_beat(clue, work / "outro.png", "outro"), timings.outro),

@@ -20,7 +20,7 @@ from twodown.config import (
 from twodown.ingest import LONDON, fetch_daily_posts, posts_for_london_date
 from twodown.models import Clue, DailyPair, SpokenClue
 from twodown.parse import parse_post
-from twodown.render import draw_clue_card, draw_reveal_card, render_video
+from twodown.render import draw_beat, draw_clue_card, draw_reveal_card, render_video
 from twodown.scenes import pick_scenes
 from twodown.script import write_parts
 from twodown.select import select_pair
@@ -157,6 +157,7 @@ def render_one_short(
     (slot / "script.txt").write_text(parts.full + "\n", encoding="utf-8")
     item = SpokenClue(clue=clue, script=parts.full, voice=resolve_voice(primary))
     clue_card = draw_clue_card(clue, slot / "clue.png")
+    draw_beat(clue, slot / "hint.png", "hint")
     reveal = draw_reveal_card(clue, slot / "card.png")
     item.clue_card_path = str(clue_card)
     item.card_path = str(reveal)

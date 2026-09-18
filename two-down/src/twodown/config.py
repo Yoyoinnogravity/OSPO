@@ -43,6 +43,10 @@ CLUE_LETTERS_GAP_SECONDS = 0.35
 LETTERS_PAUSE_SECONDS = 1.0
 ANSWER_PAUSE_SECONDS = 1.2
 THINK_PROMPT = "Pause the video while you think."
+# Linear picture hint after the main think pause. Shorts cannot click mid-film.
+HINT_LINE = "Here's a clue."
+HINT_HOLD_SECONDS = 4.0
+HINT_PAUSE_SECONDS = 2.5
 CLUES_PER_DAY = 2
 # Lock the spoken beat on this constructed study clue before touching the others.
 # DREAMLIKE is not on the published site; render_one_short builds a Clue.

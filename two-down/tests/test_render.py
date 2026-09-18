@@ -4,6 +4,7 @@ from pathlib import Path
 from twodown.models import Clue
 from twodown.render import (
     AUDIO_LOUDNESS,
+    ShortTimings,
     _encode_clips,
     _source_footer,
     draw_beat,
@@ -65,6 +66,7 @@ def test_clue_card_is_a_solve_along(tmp_path: Path):
     assert draw_beat(_clue(), tmp_path / "outro.png", "outro").exists()
     assert draw_beat(_clue(), tmp_path / "only-clue.png", "clue").exists()
     assert draw_beat(_clue(), tmp_path / "letters.png", "letters").exists()
+    assert draw_beat(_clue(), tmp_path / "hint.png", "hint").exists()
     assert draw_beat(_clue(), tmp_path / "answer.png", "answer").exists()
     # Parse sits under the answer as soon as it is solved.
     assert draw_beat(_clue(), tmp_path / "solved.png", "answer").exists()
@@ -120,6 +122,74 @@ def test_parse_under_answer_is_very_bold_ink(tmp_path: Path):
     wrapped = _wrap(draw, _spoken_parse(pinup.parse, pinup.answer), parse_font, WIDTH - 160)
     lines = [line for line in wrapped.split("\n") if line.strip()]
     assert 3 <= len(lines) <= 5
+
+
+def test_short_timings_include_hint_before_answer():
+    timings = ShortTimings(
+        intro=1.0,
+        clue=2.0,
+        letters=1.5,
+        think=8.0,
+        hint=7.5,
+        answer=3.0,
+        parse=5.0,
+        outro=2.0,
+    )
+    assert timings.until_answer == 20.0
+    assert timings.until_answer == timings.intro + timings.clue + timings.letters + timings.think + timings.hint
+
+
+def test_hint_beat_is_newsprint_with_credited_photo(tmp_path: Path):
+    from PIL import Image
+
+    from twodown.config import HINT_LINE, NEWS_BG
+    from twodown.hints import DEFAULT_HINT
+    from twodown.pipeline import study_clue
+
+    clue = study_clue()
+    assert clue is not None
+    path = draw_beat(clue, tmp_path / "hint.png", "hint")
+    img = Image.open(path)
+    assert img.size == (1080, 1920)
+    # Newsprint card, not a full-bleed travel still.
+    assert img.getpixel((24, 40)) == NEWS_BG
+    assert img.getpixel((24, 40)) != (0, 0, 0)
+    # The inset photo is darker than the cream grid.
+    photo = img.getpixel((540, 1050))
+    assert photo != NEWS_BG
+    assert DEFAULT_HINT.photographer == "Linda Xu"
+    assert DEFAULT_HINT.license == "CC0"
+    assert "Wikimedia Commons" in DEFAULT_HINT.credit_line
+    assert HINT_LINE == "Here's a clue."
+    assert DEFAULT_HINT.path.exists()
+
+
+def test_hint_beat_does_not_spoil_dreamlike(tmp_path: Path):
+    from PIL import Image
+
+    from twodown.config import CREAM, CRIMSON
+    from twodown.pipeline import study_clue
+
+    clue = study_clue()
+    assert clue is not None
+    assert clue.answer == "DREAMLIKE"
+    hint = Image.open(draw_beat(clue, tmp_path / "hint.png", "hint"))
+    think = Image.open(draw_beat(clue, tmp_path / "think.png", "think"))
+    answer = Image.open(draw_beat(clue, tmp_path / "answer.png", "answer"))
+    # Lights sit in the same band on think and hint — empty cream cells, not filled letters.
+    hint_lights = list(hint.crop((80, 610, 1000, 740)).get_flattened_data())
+    think_lights = list(think.crop((80, 610, 1000, 740)).get_flattened_data())
+    answer_lights = list(answer.crop((80, 610, 1000, 740)).get_flattened_data())
+    assert hint_lights.count(CREAM) > 400
+    assert abs(hint_lights.count(CREAM) - think_lights.count(CREAM)) < 80
+    assert answer_lights.count(CREAM) < hint_lights.count(CREAM)
+    # The crimson DREAMLIKE headline lives on the answer card only.
+    hint_head = list(hint.crop((80, 880, 1000, 1080)).get_flattened_data())
+    answer_head = list(answer.crop((80, 880, 1000, 1080)).get_flattened_data())
+    assert answer_head.count(CRIMSON) > hint_head.count(CRIMSON) + 200
+    raw = path_bytes = (tmp_path / "hint.png").read_bytes()
+    assert b"DREAMLIKE" not in path_bytes
+    assert b"dreamlike" not in raw.lower()
 
 
 def test_speak_enumeration_is_separate_from_the_clue():

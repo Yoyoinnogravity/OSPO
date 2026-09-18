@@ -27,6 +27,7 @@ def test_study_clue_is_dreamlike():
     assert parts.clue_speech == "Doctor armed with positive response, as in a trance."
     assert parts.letters_speech == "Nine letters."
     assert parts.think_speech == "Pause the video while you think."
+    assert parts.hint_speech == "Here's a clue."
     assert parts.answer_speech == "The answer is dreamlike."
     assert parts.answer_speech == speak_answer(clue.answer)
     assert parts.outro_speech == "Thanks for thinking with cryptic.fun."
@@ -37,7 +38,11 @@ def test_study_clue_is_dreamlike():
     assert script.index(parts.intro_speech) < script.index(parts.clue_speech)
     assert script.index(parts.clue_speech) < script.index(parts.letters_speech)
     assert script.index(parts.letters_speech) < script.index(parts.think_speech)
-    assert script.index(parts.think_speech) < script.index(parts.answer_speech)
+    assert script.index(parts.think_speech) < script.index("[pause 7s]")
+    assert script.index("[pause 7s]") < script.index(parts.hint_speech)
+    assert script.index(parts.hint_speech) < script.index("[pause 4s]")
+    assert script.index("[pause 4s]") < script.index("[pause 2.5s]")
+    assert script.index("[pause 2.5s]") < script.index(parts.answer_speech)
     assert script.index(parts.answer_speech) < script.index(parts.parse_speech)
     assert script.index(parts.parse_speech) < script.index(parts.outro_speech)
 
@@ -72,6 +77,8 @@ def test_spoken_parse_says_armed_and_like_as_words():
     assert speak_parse_tokens("LIKE") == "like"
     assert speak_parse_tokens("DREAMLIKE") == "dreamlike"
     assert speak_parse_tokens("ARMED plus LIKE") == "armed plus like"
+    assert "dreamlike" not in parts.hint_speech.lower()
+    assert "DREAMLIKE" not in parts.hint_speech
 
 
 def test_resolve_clue_renders_constructed_study_without_site_html():
