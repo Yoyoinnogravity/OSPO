@@ -7,7 +7,7 @@ from datetime import datetime
 from pathlib import Path
 
 from twodown.ads import ads_status
-from twodown.config import DEFAULT_OUTPUT, DEFAULT_VOICE_ALIAS, SITE_ORIGIN, SOURCE_SITE
+from twodown.config import DEFAULT_OUTPUT, DEFAULT_VOICE_ALIAS, SITE_ORIGIN, SOURCE_SITE, STUDY_SLUG, VOICES
 from twodown.ingest import LONDON
 from twodown.live import (
     PRODUCT_CHECK_NAMES,
@@ -18,7 +18,7 @@ from twodown.live import (
     registry_status,
 )
 from twodown.models import DailyPair
-from twodown.pipeline import run_today
+from twodown.pipeline import render_one_short, run_today
 from twodown.scenes import DEFAULT_SCENE, list_scenes
 from twodown.social import (
     PLATFORMS,
@@ -149,6 +149,17 @@ def main(argv: list[str] | None = None) -> int:
     upload.add_argument("--youtube-privacy", default="public", choices=["unlisted", "private", "public"])
     _add_social_flags(upload)
 
+    short = sub.add_parser("short", help="Rebuild one published Short while we lock the beat")
+    short.add_argument(
+        "slug",
+        nargs="?",
+        default=STUDY_SLUG,
+        help=f"Published clue slug (default: {STUDY_SLUG}, the beat study)",
+    )
+    short.add_argument("--out", type=Path, default=DEFAULT_OUTPUT)
+    short.add_argument("--all-voices", action="store_true", help="Speak all four voices. Default: Sonia only.")
+    short.add_argument("--no-site", action="store_true", help="Write the film under --out only")
+
     voices = sub.add_parser("voices", help="List built-in British voices")
     voices.add_argument("--json", action="store_true")
 
@@ -235,6 +246,23 @@ def main(argv: list[str] | None = None) -> int:
         elif not any(seen.get(name) == "live" for name in PRODUCT_CHECK_NAMES):
             print()
             print("cryptic.fun is not on the public internet yet.")
+        return 0
+
+    if args.cmd == "short":
+        voices = list(VOICES) if args.all_voices else [DEFAULT_VOICE_ALIAS]
+        item = render_one_short(
+            args.slug,
+            dest=args.out,
+            voices=voices,
+            publish=not args.no_site,
+        )
+        clue = item.clue
+        print(f"study {clue.slug}")
+        print(f"{clue.paper} {clue.puzzle_id} · {clue.setter} · {clue.number} {clue.direction}")
+        print(f"{clue.clue} ({clue.enumeration})")
+        print(item.script)
+        if item.video_path:
+            print(f"video {item.video_path}")
         return 0
 
     if args.cmd == "upload":

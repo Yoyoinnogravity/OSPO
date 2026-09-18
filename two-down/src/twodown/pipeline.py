@@ -1,7 +1,12 @@
 from __future__ import annotations
 
+import html as htmlmod
+import re
 from datetime import datetime
 from pathlib import Path
+from shutil import copy2
+
+from bs4 import BeautifulSoup
 
 from twodown.config import (
     CLUES_PER_DAY,
@@ -9,10 +14,11 @@ from twodown.config import (
     DEFAULT_VOICE_ALIAS,
     SITE_ROOT,
     SOURCE_SITE,
+    STUDY_SLUG,
     VOICES,
 )
 from twodown.ingest import LONDON, fetch_daily_posts, posts_for_london_date
-from twodown.models import DailyPair, SpokenClue
+from twodown.models import Clue, DailyPair, SpokenClue
 from twodown.parse import parse_post
 from twodown.render import draw_clue_card, draw_reveal_card, render_video
 from twodown.scenes import pick_scenes
@@ -21,6 +27,12 @@ from twodown.select import select_pair
 from twodown.site import publish_site
 from twodown.social import publish_pair, setup_hints
 from twodown.voice import build_short_soundtrack, resolve_voice, synthesise_parts
+
+_KICKER = re.compile(
+    r"^(?P<paper>.+) (?P<puzzle_id>\d+) · (?P<setter>.+) · "
+    r"(?P<number>\d+) (?P<direction>\w+) · (?P<device>.+)$"
+)
+_CLUE_LINE = re.compile(r"^(?P<clue>.+) \((?P<enum>[^)]+)\)$")
 
 
 def _today_stamp(day: datetime | None) -> str:
@@ -33,6 +45,96 @@ def _voice_alias(name: str | None) -> str:
         return DEFAULT_VOICE_ALIAS
     key = name.strip().lower()
     return key if key in VOICES else DEFAULT_VOICE_ALIAS
+
+
+def published_clue(slug: str, site_root: Path | None = None) -> Clue:
+    """Read one already-published clue back from the static site."""
+    root = Path(site_root or SITE_ROOT)
+    for page in sorted((root / "d").glob("*/index.html")):
+        soup = BeautifulSoup(page.read_text(encoding="utf-8"), "lxml")
+        article = soup.select_one(f'article.clue[data-slug="{slug}"]')
+        if article is None:
+            continue
+        kicker = article.select_one("p.kicker")
+        line = article.select_one("p.clue-text")
+        answer = article.select_one("p.answer")
+        parse = article.select_one("p.parse")
+        credit = article.select_one("p.credit a")
+        if not all([kicker, line, answer, parse, credit]):
+            raise ValueError(f"Incomplete published clue {slug} on {page}")
+        match = _KICKER.match(kicker.get_text(" ", strip=True))
+        clue_match = _CLUE_LINE.match(line.get_text(" ", strip=True))
+        if not match or not clue_match:
+            raise ValueError(f"Could not parse published clue {slug}")
+        blogger = credit.get_text(" ", strip=True).split("·", 1)[-1].strip()
+        return Clue(
+            source_url=str(credit["href"]),
+            paper=match["paper"],
+            puzzle_id=match["puzzle_id"],
+            setter=match["setter"],
+            blogger=blogger,
+            number=match["number"],
+            direction=match["direction"],
+            clue=clue_match["clue"],
+            enumeration=clue_match["enum"],
+            answer=answer.get_text(" ", strip=True),
+            parse=htmlmod.unescape(parse.get_text(" ", strip=True)),
+            device=match["device"],
+            enumeration_ok=True,
+        )
+    raise FileNotFoundError(f"No published clue {slug}")
+
+
+def render_one_short(
+    slug: str = STUDY_SLUG,
+    dest: Path | None = None,
+    voices: list[str] | None = None,
+    publish: bool = True,
+) -> SpokenClue:
+    """Rebuild one Short. Does not touch the other published films."""
+    clue = published_clue(slug)
+    aliases = list(voices or [DEFAULT_VOICE_ALIAS])
+    primary = aliases[0]
+    slot = Path(dest or DEFAULT_OUTPUT) / "study" / clue.slug
+    slot.mkdir(parents=True, exist_ok=True)
+    parts = write_parts(clue)
+    (slot / "script.txt").write_text(parts.full + "\n", encoding="utf-8")
+    item = SpokenClue(clue=clue, script=parts.full, voice=resolve_voice(primary))
+    clue_card = draw_clue_card(clue, slot / "clue.png")
+    reveal = draw_reveal_card(clue, slot / "card.png")
+    item.clue_card_path = str(clue_card)
+    item.card_path = str(reveal)
+    paths: dict[str, str] = {}
+    timings = None
+    if primary == DEFAULT_VOICE_ALIAS:
+        timings = build_short_soundtrack(parts, slot / f"voice-{primary}.mp3", primary)
+        paths[primary] = str(slot / f"voice-{primary}.mp3")
+        item.clue_hold_seconds = timings.until_answer
+    else:
+        audio = synthesise_parts(parts, slot / f"voice-{primary}.mp3", primary)
+        paths[primary] = str(audio)
+    for alias in aliases[1:]:
+        audio = synthesise_parts(parts, slot / f"voice-{alias}.mp3", alias)
+        paths[alias] = str(audio)
+    item.voice_paths = paths
+    item.audio_path = paths[primary]
+    movie = render_video(
+        clue_card,
+        reveal,
+        Path(paths[primary]),
+        slot / "short.mp4",
+        clue_hold=item.clue_hold_seconds,
+        clue=clue,
+        timings=timings,
+    )
+    item.video_path = str(movie)
+    if publish:
+        media = SITE_ROOT / "media"
+        media.mkdir(parents=True, exist_ok=True)
+        copy2(movie, media / f"{clue.slug}.mp4")
+        for alias, path in paths.items():
+            copy2(path, media / f"{clue.slug}-{alias}.mp3")
+    return item
 
 
 def published_date(site_root: Path | None, date: str) -> bool:
