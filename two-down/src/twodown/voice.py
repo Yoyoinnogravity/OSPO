@@ -21,7 +21,7 @@ from twodown.config import (
     VOICE_RATE,
     VOICES,
 )
-from twodown.render import ShortTimings, audio_seconds
+from twodown.render import AUDIO_LOUDNESS, ShortTimings, audio_seconds
 from twodown.script import ScriptParts, to_ssml
 
 
@@ -118,12 +118,19 @@ def build_short_soundtrack(parts: ScriptParts, dest: Path, voice: str | None = N
                 f"anullsrc=r=24000:cl=mono:d={LETTERS_PAUSE_SECONDS:.2f}[p1];"
                 f"anullsrc=r=24000:cl=mono:d={THINK_PAUSE_SECONDS:.2f}[p2];"
                 f"anullsrc=r=24000:cl=mono:d={ANSWER_PAUSE_SECONDS:.2f}[p3];"
-                "[c0][g0][c1][g][c2][p1][c3][p2][c4][p3][c5]concat=n=11:v=0:a=1[a]"
+                "[c0][g0][c1][g][c2][p1][c3][p2][c4][p3][c5]concat=n=11:v=0:a=1[raw];"
+                f"[raw]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,{AUDIO_LOUDNESS}[a]"
             ),
             "-map",
             "[a]",
             "-c:a",
             "mp3",
+            "-b:a",
+            "192k",
+            "-ar",
+            "48000",
+            "-ac",
+            "2",
             str(dest),
         ]
     )

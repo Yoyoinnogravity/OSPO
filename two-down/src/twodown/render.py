@@ -31,11 +31,14 @@ WIDTH, HEIGHT = 1080, 1920
 PHOTO_INK = (252, 247, 236)
 PHOTO_MUTED = (220, 208, 190)
 MARGIN = 72
-# Parse under the answer: how we got there, not a caption.
+# Parse under the answer: second-loudest thing on the card after the crimson answer.
 PARSE_FONT = FONT_SANS_BOLD
-PARSE_SIZE = 44
+PARSE_SIZE = 60
 PARSE_FILL = INK
-PARSE_MAX_LINES = 4
+PARSE_MAX_LINES = 5
+PARSE_SPACING = 20
+# Map speech into the Short and make it unmistakable (widgets often play quiet).
+AUDIO_LOUDNESS = "loudnorm=I=-16:TP=-1.5:LRA=11,volume=3,alimiter=limit=0.95"
 
 
 def _font(path: str, size: int) -> ImageFont.FreeTypeFont:
@@ -233,7 +236,7 @@ def draw_beat(clue: Clue, dest: Path, beat: str = "think") -> Path:
             parse = _wrap(draw, _spoken_parse(clue.parse, clue.answer), parse_font, WIDTH - 160)
             if parse.count("\n") >= PARSE_MAX_LINES:
                 parse = "\n".join(parse.split("\n")[:PARSE_MAX_LINES])
-            _center_text(draw, answer_y + 110, parse, parse_font, PARSE_FILL, spacing=10)
+            _center_text(draw, answer_y + 118, parse, parse_font, PARSE_FILL, spacing=PARSE_SPACING)
             _footer(draw, _source_footer(clue))
         else:
             _footer(draw, "")
@@ -344,7 +347,7 @@ def _encode_clips(clips: list[tuple[Path, float]], audio: Path, dest: Path) -> P
             ";".join(filters)
             + ";"
             + concat
-            + f";[{audio_i}:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo[a]",
+            + f";[{audio_i}:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,{AUDIO_LOUDNESS}[a]",
             "-map",
             "[v]",
             "-map",
