@@ -1,13 +1,13 @@
 cryptic.fun
 ===========
 
-Two cryptic clues a day from [Fifteen Squared](https://fifteensquared.net/),
-cut as newsprint Shorts. **Ryan** opens, **Libby** solves, **Thomas** credits
+We provide unique cryptic crossword clues and solutions.
+The only source is [Fifteen Squared](https://fifteensquared.net/),
+cut as newsprint Shorts. **Ryan** opens, **Sonia** solves, **Thomas** credits
 the setter and Fifteen Squared. Brand is **Cryptic Fun** on YouTube, TikTok,
 Instagram and Facebook. Site is **cryptic.fun**.
 
-The only source is **https://fifteensquared.net/**. Do not invent answers.
-Do not scrape other crossword blogs.
+Do not invent answers. Do not scrape other crossword blogs.
 
 Make one video (uses the locked beat; does not rebuild the other films):
 

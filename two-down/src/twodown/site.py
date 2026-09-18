@@ -6,7 +6,7 @@ from pathlib import Path
 from shutil import copy2
 
 from twodown.ads import ads_enabled, ads_txt, adsense_client, adsense_slot
-from twodown.config import BRAND, SITE_ORIGIN, SITE_ROOT, SOURCE_SITE, SPONSOR_EMAIL, SUGGEST_EMAIL, VOICE_LABELS, follow_profiles
+from twodown.config import BRAND, BRAND_LINE, SITE_ORIGIN, SITE_ROOT, SOURCE_SITE, SPONSOR_EMAIL, SUGGEST_EMAIL, VOICE_LABELS, follow_profiles
 from twodown.models import DailyPair, SpokenClue
 from twodown.render import write_share_card
 from twodown.scenes import DEFAULT_SCENE, get_scene, list_scenes
@@ -790,7 +790,7 @@ def publish_site(pair: DailyPair, dest: Path | None = None) -> Path:
 
     about = f"""
     <h1>About.</h1>
-    <p class="lede">cryptic.fun publishes two cryptic clues a day. The only source is <a href="{SOURCE_SITE}">Fifteen Squared</a> — Independent, Guardian and Financial Times blogs. We never invent answers. Choose Sonia, Ryan, Libby or Thomas, and a real place as the backdrop. The same Shorts go to YouTube, TikTok, Instagram and Facebook when those accounts are connected. The site is the spoiler-safe home.</p>
+    <p class="lede">{BRAND_LINE} The only source is <a href="{SOURCE_SITE}">Fifteen Squared</a> — Independent, Guardian and Financial Times blogs. We never invent answers. Choose Sonia, Ryan, Libby or Thomas, and a real place as the backdrop. The same Shorts go to YouTube, TikTok, Instagram and Facebook when those accounts are connected. The site is the spoiler-safe home.</p>
     <p>Answers and wordplay belong to the setters and the 15² bloggers. We rewrite for speech and always link the original post.</p>
     <p>Readers can <a href="suggest.html">suggest one homemade clue a day</a>, or ask for a daily clue by email. Both land in Aled’s inbox at <a href="mailto:{_e(SUGGEST_EMAIL)}">{_e(SUGGEST_EMAIL)}</a>.</p>
     <p>When the site has readers, a small labelled ad can sit under the pair — never on the answer. How that works is on <a href="support.html">Support</a>.</p>
@@ -804,7 +804,7 @@ def publish_site(pair: DailyPair, dest: Path | None = None) -> Path:
             about,
             PageSeo(
                 title=f"About — {BRAND}",
-                description="cryptic.fun publishes two cryptic clues a day from the Independent, Guardian and FT blogs on Fifteen Squared. We never invent answers.",
+                description=f"{BRAND_LINE} From the Independent, Guardian and FT blogs on Fifteen Squared. We never invent answers.",
                 path="/about.html",
                 json_ld=website_ld(),
             ),
@@ -902,7 +902,7 @@ def publish_site(pair: DailyPair, dest: Path | None = None) -> Path:
             follow_page,
             PageSeo(
                 title=f"Follow — {BRAND}",
-                description="Follow cryptic.fun by email, RSS or YouTube. Two cryptic clues a day from Fifteen Squared. No account required.",
+                description=f"Follow cryptic.fun by email, RSS or YouTube. {BRAND_LINE} From Fifteen Squared. No account required.",
                 path="/follow.html",
             ),
         ),

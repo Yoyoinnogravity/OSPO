@@ -5,6 +5,9 @@ BRAND = "cryptic.fun"
 SITE_ORIGIN = "https://cryptic.fun"
 SUGGEST_EMAIL = "aledmorgan@gmail.com"
 SPONSOR_EMAIL = SUGGEST_EMAIL
+# Product line. We still credit Fifteen Squared; we do not write the paper clues.
+BRAND_PROMISE = "unique cryptic crossword clues and solutions"
+BRAND_LINE = f"We provide {BRAND_PROMISE}."
 # The only crossword source. Do not add other blogs.
 SOURCE_SITE = "https://fifteensquared.net/"
 SOURCE_HOST = "fifteensquared.net"

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from twodown.config import BRAND, SITE_ORIGIN
+from twodown.config import BRAND, BRAND_PROMISE, SITE_ORIGIN
 from twodown.models import Clue, SpokenClue
 from twodown.scenes import get_scene
 
@@ -43,7 +43,7 @@ def youtube_description(item: SpokenClue) -> str:
     clue = item.clue
     page = item.site_path or SITE_ORIGIN
     return (
-        f"{SOCIAL_HANDLE} — two cryptic clues a day.\n"
+        f"{SOCIAL_HANDLE} — {BRAND_PROMISE}.\n"
         f"{BRAND}\n\n"
         f"{clue_line(clue)}\n"
         f"Answer: {clue.answer}\n\n"

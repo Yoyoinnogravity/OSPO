@@ -7,13 +7,13 @@ from datetime import datetime
 from pathlib import Path
 from xml.sax.saxutils import escape as xml_escape
 
-from twodown.config import BRAND, SITE_ORIGIN, SOURCE_SITE, follow_profiles
+from twodown.config import BRAND, BRAND_LINE, SITE_ORIGIN, SOURCE_SITE, follow_profiles
 from twodown.models import Clue, DailyPair
 
 GSC_ENV = "TWODOWN_GSC_VERIFY"
 SHARE_IMAGE = "/media/og.webp"
 DEFAULT_DESCRIPTION = (
-    "Two cryptic crossword clues a day from Fifteen Squared. "
+    f"{BRAND_LINE} From Fifteen Squared. "
     "Have a go before you tap solve. Spoken parses on cryptic.fun."
 )
 

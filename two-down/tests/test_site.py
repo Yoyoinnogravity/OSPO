@@ -58,6 +58,7 @@ def test_publish_site_writes_spoiler_pages(tmp_path):
     assert "aledmorgan@gmail.com" in about
     assert "https://fifteensquared.net/" in about
     assert "only source" in about
+    assert "unique cryptic crossword clues and solutions" in about
     assert (tmp_path / "c" / "independent-12458-12a" / "index.html").exists()
     assert (tmp_path / "support.html").exists()
     assert (tmp_path / "privacy.html").exists()
@@ -112,6 +113,8 @@ def test_youtube_titles_use_cryptic_fun_channel():
     assert YOUTUBE_CHANNEL == "Cryptic Fun"
     assert len(title) <= 100
     assert "https://cryptic.fun/support.html" in youtube_description(_item())
+    assert "unique cryptic crossword clues and solutions" in youtube_description(_item())
+    assert "Fifteen Squared" in youtube_description(_item())
 
 
 def test_ads_on_writes_ads_txt_and_unit(tmp_path, monkeypatch):
