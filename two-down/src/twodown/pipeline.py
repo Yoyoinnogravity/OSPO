@@ -9,19 +9,18 @@ from twodown.config import (
     DEFAULT_VOICE_ALIAS,
     SITE_ROOT,
     SOURCE_SITE,
-    THINK_PAUSE_SECONDS,
     VOICES,
 )
 from twodown.ingest import LONDON, fetch_daily_posts, posts_for_london_date
 from twodown.models import DailyPair, SpokenClue
 from twodown.parse import parse_post
-from twodown.render import audio_seconds, draw_clue_card, draw_reveal_card, render_video
+from twodown.render import draw_clue_card, draw_reveal_card, render_video
 from twodown.scenes import pick_scenes
 from twodown.script import write_parts
 from twodown.select import select_pair
 from twodown.site import publish_site
 from twodown.social import publish_pair, setup_hints
-from twodown.voice import resolve_voice, synthesise, synthesise_parts
+from twodown.voice import build_short_soundtrack, resolve_voice, synthesise_parts
 
 
 def _today_stamp(day: datetime | None) -> str:
@@ -139,10 +138,13 @@ def run_today(
         item.clue_card_path = str(clue_card)
         item.card_path = str(reveal)
         if speak:
-            clue_only = synthesise(parts.clue_speech, slot / "clue-only.mp3", alias)
-            item.clue_hold_seconds = audio_seconds(clue_only) + THINK_PAUSE_SECONDS
             paths: dict[str, str] = {}
+            timings = build_short_soundtrack(parts, slot / f"voice-{alias}.mp3", alias)
+            paths[alias] = str(slot / f"voice-{alias}.mp3")
+            item.clue_hold_seconds = timings.until_answer
             for other in VOICES:
+                if other == alias:
+                    continue
                 audio = synthesise_parts(parts, slot / f"voice-{other}.mp3", other)
                 paths[other] = str(audio)
             item.voice_paths = paths
@@ -155,6 +157,7 @@ def run_today(
                     slot / "short.mp4",
                     clue_hold=item.clue_hold_seconds,
                     clue=clue,
+                    timings=timings,
                 )
                 item.video_path = str(movie)
         spoken.append(item)

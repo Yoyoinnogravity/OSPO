@@ -30,6 +30,10 @@ VOICE_LABELS = {
 }
 VOICE_RATE = "-8%"
 THINK_PAUSE_SECONDS = 7.0
+CLUE_LETTERS_GAP_SECONDS = 0.35
+LETTERS_PAUSE_SECONDS = 1.0
+ANSWER_PAUSE_SECONDS = 1.2
+THINK_PROMPT = "Pause the video while you think."
 CLUES_PER_DAY = 2
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[2]

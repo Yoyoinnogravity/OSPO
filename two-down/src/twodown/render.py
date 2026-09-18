@@ -7,6 +7,8 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
+from dataclasses import dataclass
+
 from twodown.config import (
     CREAM,
     CRIMSON,
@@ -18,7 +20,7 @@ from twodown.config import (
     MUTED,
     NEWS_BG,
     NEWS_GRID,
-    THINK_PAUSE_SECONDS,
+    THINK_PROMPT,
 )
 from twodown.models import Clue
 from twodown.scenes import DEFAULT_SCENE, Scene, get_scene
@@ -125,8 +127,7 @@ def _draw_kicker(draw: ImageDraw.ImageDraw, clue: Clue) -> None:
 
 def _draw_clue(draw: ImageDraw.ImageDraw, clue: Clue, y: int = 280) -> int:
     clue_font = _font(FONT_REGULAR, 68)
-    body = f"{clue.clue} ({clue.enumeration})" if clue.enumeration else clue.clue
-    wrapped = _wrap(draw, body, clue_font, WIDTH - (MARGIN * 2))
+    wrapped = _wrap(draw, clue.clue, clue_font, WIDTH - (MARGIN * 2))
     return _center_text(draw, y, wrapped, clue_font, INK, spacing=16)
 
 
@@ -165,13 +166,6 @@ def _draw_lights(
     return y + cell
 
 
-def _draw_countdown(draw: ImageDraw.ImageDraw, n: int, y: int) -> None:
-    number = _font(FONT_SANS_BOLD, 160)
-    label = _font(FONT_SANS, 28)
-    _center_text(draw, y, str(n), number, CRIMSON, spacing=0)
-    _center_text(draw, y + 170, "YOUR GO", label, MUTED, spacing=0)
-
-
 def _footer(draw: ImageDraw.ImageDraw, text: str) -> None:
     foot = _font(FONT_SANS, 22)
     _center_text(draw, HEIGHT - 88, text, foot, MUTED, spacing=0)
@@ -181,49 +175,58 @@ def _new_card() -> tuple[Image.Image, ImageDraw.ImageDraw]:
     return _newsprint_canvas()
 
 
-def draw_clue_card(
-    clue: Clue,
-    dest: Path,
-    scene: str | Scene | None = None,
-    countdown: int | None = None,
-) -> Path:
-    """Solve-along think frame. Scene is ignored: the clue is the picture."""
+def draw_beat(clue: Clue, dest: Path, beat: str = "think") -> Path:
+    """One visual beat of the Short. Scene never appears — the clue is the picture."""
     dest.parent.mkdir(parents=True, exist_ok=True)
     img, draw = _new_card()
     _draw_wordmark(draw)
     _draw_kicker(draw, clue)
-    bottom = _draw_clue(draw, clue, y=240)
-    lights_y = min(max(bottom + 48, 680), 900)
-    lights_bottom = _draw_lights(draw, clue, lights_y, filled=False)
-    if countdown is not None:
-        _draw_countdown(draw, countdown, min(lights_bottom + 48, 1180))
+    show_lights = beat != "clue"
+    filled = beat in {"answer", "parse"}
+    show_answer = beat in {"answer", "parse"}
+    show_parse = beat == "parse"
+    bottom = _draw_clue(draw, clue, y=240 if beat == "clue" else 210)
+    lights_bottom = bottom
+    if show_lights:
+        lights_y = min(max(bottom + 44, 620), 880)
+        lights_bottom = _draw_lights(draw, clue, lights_y, filled=filled)
+        if clue.enumeration and beat == "letters":
+            enum_font = _font(FONT_SANS_BOLD, 36)
+            _center_text(draw, lights_bottom + 28, clue.enumeration, enum_font, CRIMSON)
+    prompt_y = min(lights_bottom + 80, 1180)
+    prompt = _font(FONT_SANS, 34)
+    if beat == "think":
+        wrapped = _wrap(draw, THINK_PROMPT, prompt, WIDTH - 160)
+        _center_text(draw, prompt_y, wrapped, prompt, CRIMSON, spacing=8)
+    if show_answer:
+        answer = _font(FONT_BOLD, 84)
+        answer_y = min(lights_bottom + 40, 1080)
+        _center_text(draw, answer_y, clue.answer, answer, CRIMSON, spacing=0)
+        if show_parse:
+            parse_font = _font(FONT_SANS, 30)
+            parse = _wrap(draw, _spoken_parse(clue.parse, clue.answer), parse_font, WIDTH - 160)
+            if parse.count("\n") > 3:
+                parse = "\n".join(parse.split("\n")[:3])
+            _center_text(draw, answer_y + 110, parse, parse_font, MUTED, spacing=8)
+            _footer(draw, "Parse via Fifteen Squared")
+        else:
+            _footer(draw, "")
+    elif beat == "clue":
+        _footer(draw, "")
+    elif beat == "letters":
+        _footer(draw, "How many letters")
     else:
-        hint = _font(FONT_SANS, 30)
-        _center_text(draw, min(lights_bottom + 56, 1200), "Have a go.", hint, MUTED)
-    _footer(draw, "Answer after the pause")
+        _footer(draw, "")
     img.save(dest, "PNG")
     return dest
+
+
+def draw_clue_card(clue: Clue, dest: Path, scene: str | Scene | None = None, **_extra: object) -> Path:
+    return draw_beat(clue, dest, beat="think")
 
 
 def draw_reveal_card(clue: Clue, dest: Path, scene: str | Scene | None = None) -> Path:
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    img, draw = _new_card()
-    _draw_wordmark(draw)
-    _draw_kicker(draw, clue)
-    bottom = _draw_clue(draw, clue, y=220)
-    lights_y = min(max(bottom + 40, 600), 820)
-    lights_bottom = _draw_lights(draw, clue, lights_y, filled=True)
-    answer = _font(FONT_BOLD, 84)
-    answer_y = min(lights_bottom + 40, 1100)
-    _center_text(draw, answer_y, clue.answer, answer, CRIMSON, spacing=0)
-    parse_font = _font(FONT_SANS, 30)
-    parse = _wrap(draw, _spoken_parse(clue.parse, clue.answer), parse_font, WIDTH - 160)
-    if parse.count("\n") > 3:
-        parse = "\n".join(parse.split("\n")[:3])
-    _center_text(draw, answer_y + 110, parse, parse_font, MUTED, spacing=8)
-    _footer(draw, "Parse via Fifteen Squared")
-    img.save(dest, "PNG")
-    return dest
+    return draw_beat(clue, dest, beat="parse")
 
 
 def write_share_card(dest: Path, scene: str | Scene | None = None) -> Path:
@@ -283,44 +286,27 @@ def audio_seconds(path: Path) -> float:
     return _ffprobe_seconds(path)
 
 
-def render_video(
-    clue_card: Path,
-    reveal_card: Path,
-    audio: Path,
-    dest: Path,
-    clue_hold: float | None = None,
-    clue: Clue | None = None,
-) -> Path:
-    dest.parent.mkdir(parents=True, exist_ok=True)
+@dataclass(frozen=True)
+class ShortTimings:
+    clue: float
+    letters: float
+    think: float
+    answer: float
+    parse: float
+
+    @property
+    def until_answer(self) -> float:
+        return self.clue + self.letters + self.think
+
+
+def _encode_clips(clips: list[tuple[Path, float]], audio: Path, dest: Path) -> Path:
     ffmpeg = shutil.which("ffmpeg")
     if not ffmpeg:
         raise RuntimeError("ffmpeg is required to build the Short")
-    duration = _ffprobe_seconds(audio)
-    if clue_hold is None:
-        clue_secs = max(7.0, min(duration * 0.42, duration - 6.0))
-    else:
-        clue_secs = max(4.0, min(clue_hold, duration - 4.0))
-    reveal_secs = max(4.0, duration - clue_secs + 0.4)
-    think = min(int(THINK_PAUSE_SECONDS), max(1, int(clue_secs)))
-    intro = max(0.35, clue_secs - think)
-    clips: list[tuple[Path, float]] = [(clue_card, intro)]
-    work = Path("/tmp/twodown-counts") / dest.stem
-    work.mkdir(parents=True, exist_ok=True)
-    for n in range(think, 0, -1):
-        frame = work / f"count-{n}.png"
-        if clue is not None:
-            draw_clue_card(clue, frame, countdown=n)
-        else:
-            img = Image.open(clue_card).convert("RGB")
-            draw = ImageDraw.Draw(img)
-            _draw_countdown(draw, n, 1280)
-            img.save(frame, "PNG")
-        clips.append((frame, 1.0))
-    clips.append((reveal_card, reveal_secs))
     cmd: list[str] = [ffmpeg, "-y"]
     filters: list[str] = []
     for i, (path, hold) in enumerate(clips):
-        cmd.extend(["-loop", "1", "-t", f"{hold:.2f}", "-i", str(path)])
+        cmd.extend(["-loop", "1", "-t", f"{max(hold, 0.2):.2f}", "-i", str(path)])
         filters.append(f"[{i}:v]fps=30,scale=1080:1920,setsar=1,format=yuv420p[v{i}]")
     audio_i = len(clips)
     cmd.extend(["-i", str(audio)])
@@ -364,3 +350,37 @@ def render_video(
     )
     subprocess.run(cmd, check=True, capture_output=True)
     return dest
+
+
+def render_video(
+    clue_card: Path,
+    reveal_card: Path,
+    audio: Path,
+    dest: Path,
+    clue_hold: float | None = None,
+    clue: Clue | None = None,
+    timings: ShortTimings | None = None,
+) -> Path:
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    duration = _ffprobe_seconds(audio)
+    if clue is not None:
+        work = Path("/tmp/twodown-beats") / dest.stem
+        work.mkdir(parents=True, exist_ok=True)
+        if timings is None:
+            slice_ = max(0.6, duration / 5)
+            timings = ShortTimings(slice_, slice_, slice_, slice_, slice_)
+        clips = [
+            (draw_beat(clue, work / "clue.png", "clue"), timings.clue),
+            (draw_beat(clue, work / "letters.png", "letters"), timings.letters),
+            (draw_beat(clue, work / "think.png", "think"), timings.think),
+            (draw_beat(clue, work / "answer.png", "answer"), timings.answer),
+            (draw_beat(clue, work / "parse.png", "parse"), timings.parse),
+        ]
+        return _encode_clips(clips, audio, dest)
+    if clue_hold is None:
+        clue_secs = max(7.0, min(duration * 0.42, duration - 6.0))
+    else:
+        clue_secs = max(4.0, min(clue_hold, duration - 4.0))
+    reveal_secs = max(4.0, duration - clue_secs + 0.4)
+    return _encode_clips([(clue_card, clue_secs), (reveal_card, reveal_secs)], audio, dest)
+

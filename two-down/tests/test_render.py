@@ -2,7 +2,8 @@ import subprocess
 from pathlib import Path
 
 from twodown.models import Clue
-from twodown.render import draw_clue_card, draw_reveal_card, render_video
+from twodown.render import draw_beat, draw_clue_card, draw_reveal_card, render_video
+from twodown.script import speak_enumeration
 
 
 def _clue() -> Clue:
@@ -52,8 +53,15 @@ def test_clue_card_is_a_solve_along(tmp_path: Path):
     assert img.size == (1080, 1920)
     # Travel photos stay off the Short — the clue is the picture.
     assert img.getpixel((24, 40)) == NEWS_BG
-    counted = draw_clue_card(_clue(), tmp_path / "count.png", countdown=7)
-    assert Image.open(counted).size == (1080, 1920)
+    assert draw_beat(_clue(), tmp_path / "only-clue.png", "clue").exists()
+    assert draw_beat(_clue(), tmp_path / "letters.png", "letters").exists()
+    assert draw_beat(_clue(), tmp_path / "answer.png", "answer").exists()
+
+
+def test_speak_enumeration_is_separate_from_the_clue():
+    assert speak_enumeration("7") == "Seven letters."
+    assert speak_enumeration("3-2") == "Three hyphen two."
+    assert speak_enumeration("3,6") == "Three, six."
 
 
 def test_render_video_is_browser_playable(tmp_path: Path):

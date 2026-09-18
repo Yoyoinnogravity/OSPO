@@ -4,7 +4,13 @@ import html
 import re
 from dataclasses import dataclass
 
-from twodown.config import THINK_PAUSE_SECONDS
+from twodown.config import (
+    ANSWER_PAUSE_SECONDS,
+    CLUE_LETTERS_GAP_SECONDS,
+    LETTERS_PAUSE_SECONDS,
+    THINK_PAUSE_SECONDS,
+    THINK_PROMPT,
+)
 from twodown.models import Clue
 
 DEVICE_LINE = {
@@ -18,6 +24,61 @@ DEVICE_LINE = {
     "double_def": "Two definitions, one answer.",
     "unknown": "Here is the wordplay.",
 }
+
+_ONES = (
+    "zero",
+    "one",
+    "two",
+    "three",
+    "four",
+    "five",
+    "six",
+    "seven",
+    "eight",
+    "nine",
+    "ten",
+    "eleven",
+    "twelve",
+    "thirteen",
+    "fourteen",
+    "fifteen",
+    "sixteen",
+    "seventeen",
+    "eighteen",
+    "nineteen",
+)
+_TENS = ("", "", "twenty", "thirty", "forty", "fifty")
+
+
+def _number_word(n: int) -> str:
+    if n < 20:
+        return _ONES[n]
+    if n < 60:
+        tens, ones = divmod(n, 10)
+        return _TENS[tens] if ones == 0 else f"{_TENS[tens]}-{_ONES[ones]}"
+    return str(n)
+
+
+def speak_enumeration(enumeration: str) -> str:
+    """Speak the letter count after the clue, never as part of it."""
+    raw = (enumeration or "").strip()
+    if not raw:
+        return "Count the letters."
+    tokens = re.findall(r"\d+|[-,]", raw.replace(" ", ""))
+    numbers = [t for t in tokens if t.isdigit()]
+    spoken: list[str] = []
+    for token in tokens:
+        if token.isdigit():
+            spoken.append(_number_word(int(token)))
+        elif token == "-":
+            spoken.append("hyphen")
+        elif token == ",":
+            spoken.append(",")
+    text = " ".join(spoken).replace(" ,", ",")
+    text = text[:1].upper() + text[1:]
+    if len(numbers) == 1 and "-" not in raw and "," not in raw:
+        return f"{text} letters."
+    return f"{text}."
 
 
 def _drop_construction(text: str, answer: str) -> str:
@@ -49,35 +110,63 @@ def _spoken_parse(parse: str, answer: str = "") -> str:
 @dataclass(frozen=True)
 class ScriptParts:
     clue_speech: str
-    breakdown: str
+    letters_speech: str
+    think_speech: str
+    answer_speech: str
+    parse_speech: str
+
+    @property
+    def breakdown(self) -> str:
+        return f"{self.answer_speech} {self.parse_speech}"
 
     @property
     def full(self) -> str:
-        return f"{self.clue_speech}\n\n[pause {THINK_PAUSE_SECONDS:.0f}s]\n\n{self.breakdown}"
+        return (
+            f"{self.clue_speech}\n"
+            f"{self.letters_speech}\n"
+            f"[pause {LETTERS_PAUSE_SECONDS:.0f}s]\n"
+            f"{self.think_speech}\n"
+            f"[pause {THINK_PAUSE_SECONDS:.0f}s]\n"
+            f"{self.answer_speech}\n"
+            f"[pause {ANSWER_PAUSE_SECONDS:.0f}s]\n"
+            f"{self.parse_speech}"
+        )
 
 
 def write_parts(clue: Clue) -> ScriptParts:
-    enum = f" ({clue.enumeration})" if clue.enumeration else ""
     parse = _spoken_parse(clue.parse, clue.answer)
     definition = f" It means {clue.definition}." if clue.definition else ""
-    clue_speech = f"The clue: {clue.clue}{enum}."
-    breakdown = (
-        f"The answer is {clue.answer}.{definition} {parse} "
-        f"{clue.setter} in the {clue.paper}, via Fifteen Squared. cryptic.fun."
+    return ScriptParts(
+        clue_speech=f"{clue.clue}.",
+        letters_speech=speak_enumeration(clue.enumeration),
+        think_speech=THINK_PROMPT,
+        answer_speech=f"The answer is {clue.answer}.",
+        parse_speech=(
+            f"{parse}{definition} "
+            f"{clue.setter} in the {clue.paper}, via Fifteen Squared. cryptic.fun."
+        ),
     )
-    return ScriptParts(clue_speech=clue_speech, breakdown=breakdown)
 
 
 def write_script(clue: Clue) -> str:
     return write_parts(clue).full
 
 
-def to_ssml(parts: ScriptParts, pause_seconds: float = THINK_PAUSE_SECONDS) -> str:
-    pause_ms = int(pause_seconds * 1000)
-    clue_xml = html.escape(parts.clue_speech, quote=False)
-    down_xml = html.escape(parts.breakdown, quote=False)
+def to_ssml(parts: ScriptParts, pause_seconds: float | None = None) -> str:
+    think_ms = int((pause_seconds if pause_seconds is not None else THINK_PAUSE_SECONDS) * 1000)
+    gap_ms = int(CLUE_LETTERS_GAP_SECONDS * 1000)
+    letters_ms = int(LETTERS_PAUSE_SECONDS * 1000)
+    answer_ms = int(ANSWER_PAUSE_SECONDS * 1000)
     return (
         '<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="en-GB">'
-        f"{clue_xml}<break time=\"{pause_ms}ms\"/>{down_xml}"
+        f"{html.escape(parts.clue_speech, quote=False)}"
+        f'<break time="{gap_ms}ms"/>'
+        f"{html.escape(parts.letters_speech, quote=False)}"
+        f'<break time="{letters_ms}ms"/>'
+        f"{html.escape(parts.think_speech, quote=False)}"
+        f'<break time="{think_ms}ms"/>'
+        f"{html.escape(parts.answer_speech, quote=False)}"
+        f'<break time="{answer_ms}ms"/>'
+        f"{html.escape(parts.parse_speech, quote=False)}"
         "</speak>"
     )

@@ -5,7 +5,7 @@ from twodown.devices import classify_device
 from twodown.ingest import LONDON, parse_title
 from twodown.models import PuzzlePost
 from twodown.parse import parse_post, usable
-from twodown.script import write_parts, write_script
+from twodown.script import speak_enumeration, to_ssml, write_parts, write_script
 from twodown.select import select_pair
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -72,10 +72,29 @@ def test_script_credits_fifteen_squared():
     assert "Phi" in script
     assert "cryptic.fun" in script
     parts = write_parts(clue)
-    assert "END RESULT" not in parts.clue_speech
-    assert "The clue:" in parts.clue_speech
+    assert parts.clue_speech == f"{clue.clue}."
+    assert "The clue:" not in parts.clue_speech
+    assert "(" not in parts.clue_speech
+    assert parts.letters_speech == speak_enumeration(clue.enumeration)
+    assert parts.think_speech == "Pause the video while you think."
+    assert parts.answer_speech == f"The answer is {clue.answer}."
     assert "END RESULT" in parts.breakdown
-    assert "[pause" in script
+    assert "Fifteen Squared" in parts.parse_speech
+    assert script.index(parts.clue_speech) < script.index(parts.letters_speech)
+    assert script.index(parts.letters_speech) < script.index("[pause 1s]")
+    assert script.index("[pause 1s]") < script.index(parts.think_speech)
+    assert script.index(parts.think_speech) < script.index("[pause 7s]")
+    assert script.index("[pause 7s]") < script.index(parts.answer_speech)
+    assert script.index(parts.answer_speech) < script.index(parts.parse_speech)
+    ssml = to_ssml(parts)
+    assert ssml.index(parts.clue_speech) < ssml.index('break time="350ms"')
+    assert ssml.index('break time="350ms"') < ssml.index(parts.letters_speech)
+    assert ssml.index(parts.letters_speech) < ssml.index('break time="1000ms"')
+    assert ssml.index('break time="1000ms"') < ssml.index(parts.think_speech)
+    assert ssml.index(parts.think_speech) < ssml.index('break time="7000ms"')
+    assert ssml.index('break time="7000ms"') < ssml.index(parts.answer_speech)
+    assert ssml.index(parts.answer_speech) < ssml.index('break time="1200ms"')
+    assert ssml.index('break time="1200ms"') < ssml.index("Fifteen Squared")
 
 
 def test_parse_title_variants():
