@@ -22,10 +22,10 @@ from twodown.script import (
 from twodown.voice import _speech_sentences
 
 
-def test_solver_voice_is_clear_libby():
-    assert DEFAULT_VOICE_ALIAS == "libby"
-    assert VOICES["libby"] == "en-GB-LibbyNeural"
-    assert VOICE_RATE == "-8%"
+def test_solver_voice_is_warm_sonia():
+    assert DEFAULT_VOICE_ALIAS == "sonia"
+    assert VOICES["sonia"] == "en-GB-SoniaNeural"
+    assert VOICE_RATE == "-10%"
 
 
 def test_parse_is_split_into_spoken_sentences():

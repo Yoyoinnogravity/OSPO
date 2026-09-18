@@ -14,8 +14,8 @@ CRAWL_GAP_SECONDS = 1.0
 
 DAILY_CATEGORY_SLUGS = frozenset({"independent", "ft", "guardian"})
 
-# Libby is the solver: clear, precise British. Sonia stays as the optional softer read.
-DEFAULT_VOICE_ALIAS = "libby"
+# Sonia is the solver: warmer, more empathy. Libby stays as the clearer optional read.
+DEFAULT_VOICE_ALIAS = "sonia"
 VOICES = {
     "sonia": "en-GB-SoniaNeural",
     "libby": "en-GB-LibbyNeural",
@@ -29,22 +29,22 @@ VOICE_LABELS = {
     "thomas": "Thomas",
 }
 # Spoken like people, not a card reader. A bit slower than stock TTS.
-VOICE_RATE = "-8%"
-VOICE_PITCH = "+3Hz"
-VOICE_VOLUME = "+6%"
-CLUE_RATE = "-10%"
-CLUE_PITCH = "+2Hz"
-LETTERS_RATE = "-6%"
-LETTERS_PITCH = "+2Hz"
-THINK_RATE = "-6%"
-THINK_PITCH = "+3Hz"
-HINT_RATE = "-4%"
-HINT_PITCH = "+2Hz"
-ANSWER_RATE = "+2%"
-ANSWER_PITCH = "+4Hz"
+VOICE_RATE = "-10%"
+VOICE_PITCH = "+0Hz"
+VOICE_VOLUME = "+5%"
+CLUE_RATE = "-12%"
+CLUE_PITCH = "-1Hz"
+LETTERS_RATE = "-8%"
+LETTERS_PITCH = "+0Hz"
+THINK_RATE = "-8%"
+THINK_PITCH = "+1Hz"
+HINT_RATE = "-6%"
+HINT_PITCH = "+0Hz"
+ANSWER_RATE = "-2%"
+ANSWER_PITCH = "+1Hz"
 # Parse is the same woman, unhurried, with space around the asides.
-PARSE_RATE = "-6%"
-PARSE_PITCH = "+3Hz"
+PARSE_RATE = "-8%"
+PARSE_PITCH = "+0Hz"
 PARSE_ASIDE_PAUSE_SECONDS = 0.7
 INTRO_LINE = "Right — here's your daily dose of cryptic fun."
 INTRO_VOICE_ALIAS = "ryan"

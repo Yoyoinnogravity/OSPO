@@ -32,7 +32,7 @@ twodown status
 Studio of the films we already cut: `two-down/site/studio.html`.
 
 Study Shorts are **newsprint**. Older daily pages still have place photos.
-Voices on the film: **Ryan**, **Libby**, **Thomas**. Sonia stays as an optional read.
+Voices on the film: **Ryan** opens, **Sonia** solves, **Thomas** credits. Libby stays as the clearer optional read.
 
 Visitors can **suggest one homemade clue a day**, or ask for a daily clue by
 email. Both open a message to **aledmorgan@gmail.com**.
