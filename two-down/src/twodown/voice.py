@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -9,15 +10,24 @@ import edge_tts
 
 from twodown.config import (
     ANSWER_PAUSE_SECONDS,
+    ANSWER_PITCH,
+    ANSWER_RATE,
     CLUE_LETTERS_GAP_SECONDS,
+    CLUE_PITCH,
+    CLUE_RATE,
     DEFAULT_VOICE_ALIAS,
     HINT_HOLD_SECONDS,
     HINT_PAUSE_SECONDS,
+    HINT_PITCH,
+    HINT_RATE,
     INTRO_GAP_SECONDS,
     INTRO_PITCH,
     INTRO_RATE,
     INTRO_VOICE_ALIAS,
+    INTRO_VOLUME,
     LETTERS_PAUSE_SECONDS,
+    LETTERS_PITCH,
+    LETTERS_RATE,
     OUTRO_GAP_SECONDS,
     PARSE_ASIDE_PAUSE_SECONDS,
     PARSE_PITCH,
@@ -28,7 +38,8 @@ from twodown.config import (
     SOURCE_VOICE_ALIAS,
     SOURCE_VOLUME,
     THINK_PAUSE_SECONDS,
-    INTRO_VOLUME,
+    THINK_PITCH,
+    THINK_RATE,
     VOICE_PITCH,
     VOICE_RATE,
     VOICE_VOLUME,
@@ -100,6 +111,62 @@ def synthesise_parts(
     return synthesise(ssml, dest, voice)
 
 
+def _speech_sentences(text: str) -> list[str]:
+    pieces = [part.strip() for part in re.split(r"(?<=[.!?])\s+", text or "") if part.strip()]
+    return pieces or [text]
+
+
+def synthesise_spoken_paragraph(
+    text: str,
+    dest: Path,
+    voice: str | None = None,
+    rate: str | None = None,
+    pitch: str | None = None,
+    pause_seconds: float = PARSE_ASIDE_PAUSE_SECONDS,
+) -> Path:
+    """Speak each sentence on its own so the parse does not run as one machine line."""
+    sentences = _speech_sentences(text)
+    if len(sentences) == 1:
+        return synthesise(sentences[0], dest, voice, rate=rate, pitch=pitch)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    work = dest.parent / f"{dest.stem}-lines"
+    work.mkdir(parents=True, exist_ok=True)
+    clips = [
+        synthesise(sentence, work / f"{i:02d}.mp3", voice, rate=rate, pitch=pitch)
+        for i, sentence in enumerate(sentences)
+    ]
+    ffmpeg = shutil.which("ffmpeg")
+    if not ffmpeg:
+        raise RuntimeError("ffmpeg is required to build the Short soundtrack")
+    cmd = [ffmpeg, "-y"]
+    for clip in clips:
+        cmd.extend(["-i", str(clip)])
+    parts = []
+    for i in range(len(clips)):
+        parts.append(f"[{i}:a]aformat=sample_rates=24000:channel_layouts=mono[s{i}]")
+    concat = "".join(f"[s{i}]" if i == 0 else f"[g{i}][s{i}]" for i in range(len(clips)))
+    # n = sentences + gaps between them
+    n = len(clips) * 2 - 1
+    gaps = "".join(
+        f"anullsrc=r=24000:cl=mono:d={pause_seconds:.2f}[g{i}];" for i in range(1, len(clips))
+    )
+    cmd.extend(
+        [
+            "-filter_complex",
+            f"{';'.join(parts)};{gaps}{concat}concat=n={n}:v=0:a=1[a]",
+            "-map",
+            "[a]",
+            "-c:a",
+            "mp3",
+            "-b:a",
+            "192k",
+            str(dest),
+        ]
+    )
+    subprocess.run(cmd, check=True, capture_output=True)
+    return dest
+
+
 def build_short_soundtrack(parts: ScriptParts, dest: Path, voice: str | None = None) -> ShortTimings:
     """Speak each beat, then stitch the pauses so the picture can follow the voice."""
     dest.parent.mkdir(parents=True, exist_ok=True)
@@ -114,12 +181,22 @@ def build_short_soundtrack(parts: ScriptParts, dest: Path, voice: str | None = N
             pitch=INTRO_PITCH,
             volume=INTRO_VOLUME,
         ),
-        "clue": synthesise(parts.clue_speech, work / "clue.mp3", voice),
-        "letters": synthesise(parts.letters_speech, work / "letters.mp3", voice),
-        "think": synthesise(parts.think_speech, work / "think.mp3", voice),
-        "hint": synthesise(parts.hint_speech, work / "hint.mp3", voice),
-        "answer": synthesise(parts.answer_speech, work / "answer.mp3", voice),
-        "parse": synthesise(
+        "clue": synthesise(
+            parts.clue_speech, work / "clue.mp3", voice, rate=CLUE_RATE, pitch=CLUE_PITCH
+        ),
+        "letters": synthesise(
+            parts.letters_speech, work / "letters.mp3", voice, rate=LETTERS_RATE, pitch=LETTERS_PITCH
+        ),
+        "think": synthesise(
+            parts.think_speech, work / "think.mp3", voice, rate=THINK_RATE, pitch=THINK_PITCH
+        ),
+        "hint": synthesise(
+            parts.hint_speech, work / "hint.mp3", voice, rate=HINT_RATE, pitch=HINT_PITCH
+        ),
+        "answer": synthesise(
+            parts.answer_speech, work / "answer.mp3", voice, rate=ANSWER_RATE, pitch=ANSWER_PITCH
+        ),
+        "parse": synthesise_spoken_paragraph(
             parts.parse_speech,
             work / "parse.mp3",
             voice,

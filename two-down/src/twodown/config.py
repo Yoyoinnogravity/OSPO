@@ -28,33 +28,43 @@ VOICE_LABELS = {
     "ryan": "Ryan",
     "thomas": "Thomas",
 }
-# Spoken like people, not a card reader. Libby stays clear; Ryan stays bright.
-VOICE_RATE = "+0%"
-VOICE_PITCH = "+1Hz"
+# Spoken like people, not a card reader. A bit slower than stock TTS.
+VOICE_RATE = "-8%"
+VOICE_PITCH = "+3Hz"
 VOICE_VOLUME = "+6%"
-# Parse is the same woman, a touch warmer, with space around the asides.
-PARSE_RATE = "+2%"
-PARSE_PITCH = "+2Hz"
-PARSE_ASIDE_PAUSE_SECONDS = 0.55
+CLUE_RATE = "-10%"
+CLUE_PITCH = "+2Hz"
+LETTERS_RATE = "-6%"
+LETTERS_PITCH = "+2Hz"
+THINK_RATE = "-6%"
+THINK_PITCH = "+3Hz"
+HINT_RATE = "-4%"
+HINT_PITCH = "+2Hz"
+ANSWER_RATE = "+2%"
+ANSWER_PITCH = "+4Hz"
+# Parse is the same woman, unhurried, with space around the asides.
+PARSE_RATE = "-6%"
+PARSE_PITCH = "+3Hz"
+PARSE_ASIDE_PAUSE_SECONDS = 0.7
 INTRO_LINE = "Right — here's your daily dose of cryptic fun."
 INTRO_VOICE_ALIAS = "ryan"
-INTRO_RATE = "+5%"
-INTRO_PITCH = "+3Hz"
+INTRO_RATE = "+3%"
+INTRO_PITCH = "+4Hz"
 INTRO_VOLUME = "+8%"
 INTRO_GAP_SECONDS = 0.45
 OUTRO_LINE = "Thanks for thinking with cryptic.fun."
 OUTRO_GAP_SECONDS = 0.4
 # Source credit is not Sonia — Thomas reads the paper and Fifteen Squared.
 SOURCE_VOICE_ALIAS = "thomas"
-SOURCE_RATE = "-2%"
-SOURCE_PITCH = "+1Hz"
+SOURCE_RATE = "-4%"
+SOURCE_PITCH = "+0Hz"
 SOURCE_VOLUME = "+4%"
-SOURCE_GAP_SECONDS = 0.35
+SOURCE_GAP_SECONDS = 0.4
 THINK_PAUSE_SECONDS = 7.0
 CLUE_LETTERS_GAP_SECONDS = 0.35
 LETTERS_PAUSE_SECONDS = 1.0
 ANSWER_PAUSE_SECONDS = 1.2
-THINK_PROMPT = "Pause here. Have a think."
+THINK_PROMPT = "Just pause here, and have a think."
 # Linear picture hint after the main think pause. Shorts cannot click mid-film.
 HINT_LINE = "Have a look at this."
 HINT_HOLD_SECONDS = 4.0

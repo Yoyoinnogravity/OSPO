@@ -19,12 +19,22 @@ from twodown.script import (
     speak_source,
     write_parts,
 )
+from twodown.voice import _speech_sentences
 
 
 def test_solver_voice_is_clear_libby():
     assert DEFAULT_VOICE_ALIAS == "libby"
     assert VOICES["libby"] == "en-GB-LibbyNeural"
-    assert VOICE_RATE == "+0%"
+    assert VOICE_RATE == "-8%"
+
+
+def test_parse_is_split_into_spoken_sentences():
+    lines = _speech_sentences("S, first letter of school, plus miles. A long way. Visibly pleased.")
+    assert lines == [
+        "S, first letter of school, plus miles.",
+        "A long way.",
+        "Visibly pleased.",
+    ]
 
 
 def test_study_clue_is_davis_cup():
@@ -53,7 +63,7 @@ def test_study_clue_is_davis_cup():
     assert parts.intro_speech == "Right — here's your daily dose of cryptic fun."
     assert parts.clue_speech == "Frenzied divas caught up in international court event."
     assert parts.letters_speech == "That's five, three."
-    assert parts.think_speech == "Pause here. Have a think."
+    assert parts.think_speech == "Just pause here, and have a think."
     assert parts.hint_speech == "Have a look at this."
     assert parts.answer_speech == "It's davis cup."
     assert parts.answer_speech == speak_answer(clue.answer)
