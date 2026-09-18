@@ -1,6 +1,6 @@
-from twodown.config import PINUP_SLUG, STUDY_SLUG
+from twodown.config import PINUP_SLUG, SOURCE_VOICE_ALIAS, STUDY_SLUG
 from twodown.pipeline import dreamlike_clue, published_clue, rasta_clue, resolve_clue, study_clue
-from twodown.script import speak_answer, speak_enumeration, speak_parse_tokens, write_parts
+from twodown.script import speak_answer, speak_enumeration, speak_parse_tokens, speak_source, write_parts
 
 
 def test_study_clue_is_rasta():
@@ -35,9 +35,9 @@ def test_study_clue_is_rasta():
     assert parts.answer_speech == "The answer is rasta."
     assert parts.answer_speech == speak_answer(clue.answer)
     assert parts.outro_speech == "Thanks for thinking with cryptic.fun."
-    assert "Brendan" in parts.parse_speech
-    assert "Guardian" in parts.parse_speech
-    assert "Fifteen Squared" in parts.parse_speech
+    assert "Brendan" not in parts.parse_speech
+    assert "Fifteen Squared" not in parts.parse_speech
+    assert parts.source_speech == "Brendan in the Guardian, via Fifteen Squared."
     script = parts.full
     assert script.index(parts.intro_speech) < script.index(parts.clue_speech)
     assert script.index(parts.clue_speech) < script.index(parts.letters_speech)
@@ -48,7 +48,8 @@ def test_study_clue_is_rasta():
     assert script.index("[pause 4s]") < script.index("[pause 2.5s]")
     assert script.index("[pause 2.5s]") < script.index(parts.answer_speech)
     assert script.index(parts.answer_speech) < script.index(parts.parse_speech)
-    assert script.index(parts.parse_speech) < script.index(parts.outro_speech)
+    assert script.index(parts.parse_speech) < script.index(parts.source_speech)
+    assert script.index(parts.source_speech) < script.index(parts.outro_speech)
 
 
 def test_speak_answer_rasta_is_a_word():
@@ -56,6 +57,16 @@ def test_speak_answer_rasta_is_a_word():
     assert speak_answer("RASTA") != "The answer is R-A-S-T-A."
     assert "rasta" in speak_answer("RASTA")
     assert "R-A-S-T-A" not in speak_answer("RASTA")
+
+
+def test_source_credit_is_its_own_line():
+    clue = rasta_clue()
+    assert speak_source(clue) == "Brendan in the Guardian, via Fifteen Squared."
+    assert SOURCE_VOICE_ALIAS == "thomas"
+    parts = write_parts(clue)
+    assert parts.source_speech == speak_source(clue)
+    assert "Fifteen Squared" not in parts.parse_speech
+    assert parts.outro_speech == "Thanks for thinking with cryptic.fun."
 
 
 def test_five_letters():

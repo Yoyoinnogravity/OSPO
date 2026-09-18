@@ -64,6 +64,7 @@ def test_clue_card_is_a_solve_along(tmp_path: Path):
     assert img.getpixel((24, 40)) == NEWS_BG
     assert draw_beat(_clue(), tmp_path / "intro.png", "intro").exists()
     assert draw_beat(_clue(), tmp_path / "outro.png", "outro").exists()
+    assert draw_beat(_clue(), tmp_path / "source.png", "source").exists()
     assert draw_beat(_clue(), tmp_path / "only-clue.png", "clue").exists()
     assert draw_beat(_clue(), tmp_path / "letters.png", "letters").exists()
     assert draw_beat(_clue(), tmp_path / "hint.png", "hint").exists()
@@ -138,6 +139,7 @@ def test_short_timings_include_hint_before_answer():
         hint=7.5,
         answer=3.0,
         parse=5.0,
+        source=3.0,
         outro=2.0,
     )
     assert timings.until_answer == 20.0

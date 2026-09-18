@@ -241,9 +241,9 @@ def draw_beat(clue: Clue, dest: Path, beat: str = "think") -> Path:
         return dest
     _draw_kicker(draw, clue)
     show_lights = beat != "clue"
-    filled = beat in {"answer", "parse"}
-    show_answer = beat in {"answer", "parse"}
-    show_parse = beat in {"answer", "parse"}
+    filled = beat in {"answer", "parse", "source"}
+    show_answer = beat in {"answer", "parse", "source"}
+    show_parse = beat in {"answer", "parse", "source"}
     bottom = _draw_clue(draw, clue, y=240 if beat == "clue" else 210)
     lights_bottom = bottom
     if show_lights:
@@ -364,6 +364,7 @@ class ShortTimings:
     hint: float
     answer: float
     parse: float
+    source: float
     outro: float
 
     @property
@@ -442,7 +443,9 @@ def render_video(
         work.mkdir(parents=True, exist_ok=True)
         if timings is None:
             slice_ = max(0.6, duration / 8)
-            timings = ShortTimings(slice_, slice_, slice_, slice_, slice_, slice_, slice_, slice_)
+            timings = ShortTimings(
+                slice_, slice_, slice_, slice_, slice_, slice_, slice_, slice_, slice_
+            )
         clips = [
             (draw_beat(clue, work / "intro.png", "intro"), timings.intro),
             (draw_beat(clue, work / "clue.png", "clue"), timings.clue),
@@ -451,6 +454,7 @@ def render_video(
             (draw_beat(clue, work / "hint.png", "hint"), timings.hint),
             (draw_beat(clue, work / "answer.png", "answer"), timings.answer),
             (draw_beat(clue, work / "parse.png", "parse"), timings.parse),
+            (draw_beat(clue, work / "source.png", "source"), timings.source),
             (draw_beat(clue, work / "outro.png", "outro"), timings.outro),
         ]
         return _encode_clips(clips, audio, dest)

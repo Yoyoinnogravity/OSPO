@@ -83,7 +83,9 @@ def test_script_credits_fifteen_squared():
     assert parts.answer_speech == speak_answer(clue.answer)
     assert parts.answer_speech == "The answer is end result."
     assert "end result" in parts.breakdown
-    assert "Fifteen Squared" in parts.parse_speech
+    assert "Fifteen Squared" not in parts.parse_speech
+    assert "Fifteen Squared" in parts.source_speech
+    assert "Phi" in parts.source_speech
     assert parts.outro_speech == "Thanks for thinking with cryptic.fun."
     assert script.index(parts.intro_speech) < script.index(parts.clue_speech)
     assert script.index(parts.clue_speech) < script.index(parts.letters_speech)
@@ -95,7 +97,8 @@ def test_script_credits_fifteen_squared():
     assert script.index("[pause 4s]") < script.index("[pause 2.5s]")
     assert script.index("[pause 2.5s]") < script.index(parts.answer_speech)
     assert script.index(parts.answer_speech) < script.index(parts.parse_speech)
-    assert script.index(parts.parse_speech) < script.index(parts.outro_speech)
+    assert script.index(parts.parse_speech) < script.index(parts.source_speech)
+    assert script.index(parts.source_speech) < script.index(parts.outro_speech)
     ssml = to_ssml(parts)
     assert ssml.index(parts.intro_speech) < ssml.index(parts.clue_speech)
     assert ssml.index(parts.clue_speech) < ssml.index('break time="350ms"')
@@ -108,9 +111,11 @@ def test_script_credits_fifteen_squared():
     assert ssml.index('break time="4000ms"') < ssml.index('break time="2500ms"')
     assert ssml.index('break time="2500ms"') < ssml.index(parts.answer_speech)
     assert ssml.index(parts.answer_speech) < ssml.index('break time="1200ms"')
-    assert ssml.index('break time="1200ms"') < ssml.index("Fifteen Squared")
-    assert ssml.index("Fifteen Squared") < ssml.index('break time="400ms"')
+    assert ssml.index('break time="1200ms"') < ssml.index(parts.parse_speech)
+    assert ssml.index(parts.parse_speech) < ssml.index(parts.source_speech)
+    assert ssml.index(parts.source_speech) < ssml.index('break time="400ms"')
     assert ssml.index('break time="400ms"') < ssml.index(parts.outro_speech)
+    assert "Fifteen Squared" in parts.source_speech
 
 
 def test_parse_title_variants():

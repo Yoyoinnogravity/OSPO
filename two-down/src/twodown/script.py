@@ -15,6 +15,7 @@ from twodown.config import (
     LETTERS_PAUSE_SECONDS,
     OUTRO_GAP_SECONDS,
     OUTRO_LINE,
+    SOURCE_GAP_SECONDS,
     THINK_PAUSE_SECONDS,
     THINK_PROMPT,
 )
@@ -162,6 +163,7 @@ class ScriptParts:
     hint_speech: str
     answer_speech: str
     parse_speech: str
+    source_speech: str
     outro_speech: str
 
     @property
@@ -183,9 +185,22 @@ class ScriptParts:
             f"{self.answer_speech}\n"
             f"[pause {ANSWER_PAUSE_SECONDS:.0f}s]\n"
             f"{self.parse_speech}\n"
+            f"[pause {SOURCE_GAP_SECONDS:.2f}s]\n"
+            f"{self.source_speech}\n"
             f"[pause {OUTRO_GAP_SECONDS:.1f}s]\n"
             f"{self.outro_speech}"
         )
+
+
+def speak_source(clue: Clue) -> str:
+    """Credit the setter, paper, and Fifteen Squared — spoken in a different voice."""
+    setter = (clue.setter or "").strip()
+    paper = (clue.paper or "").strip()
+    if setter and paper:
+        return f"{setter} in the {paper}, via Fifteen Squared."
+    if setter:
+        return f"{setter}, via Fifteen Squared."
+    return "Via Fifteen Squared."
 
 
 def write_parts(clue: Clue) -> ScriptParts:
@@ -198,10 +213,8 @@ def write_parts(clue: Clue) -> ScriptParts:
         think_speech=THINK_PROMPT,
         hint_speech=clue.hint_line or HINT_LINE,
         answer_speech=speak_answer(clue.answer),
-        parse_speech=speak_parse_tokens(
-            f"{parse}{definition} "
-            f"{clue.setter} in the {clue.paper}, via Fifteen Squared. cryptic.fun."
-        ),
+        parse_speech=speak_parse_tokens(f"{parse}{definition}".strip()),
+        source_speech=speak_source(clue),
         outro_speech=OUTRO_LINE,
     )
 
@@ -218,6 +231,7 @@ def to_ssml(parts: ScriptParts, pause_seconds: float | None = None) -> str:
     hint_hold_ms = int(HINT_HOLD_SECONDS * 1000)
     hint_ms = int(HINT_PAUSE_SECONDS * 1000)
     answer_ms = int(ANSWER_PAUSE_SECONDS * 1000)
+    source_ms = int(SOURCE_GAP_SECONDS * 1000)
     outro_ms = int(OUTRO_GAP_SECONDS * 1000)
     return (
         '<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="en-GB">'
@@ -235,6 +249,8 @@ def to_ssml(parts: ScriptParts, pause_seconds: float | None = None) -> str:
         f"{html.escape(parts.answer_speech, quote=False)}"
         f'<break time="{answer_ms}ms"/>'
         f"{html.escape(parts.parse_speech, quote=False)}"
+        f'<break time="{source_ms}ms"/>'
+        f"{html.escape(parts.source_speech, quote=False)}"
         f'<break time="{outro_ms}ms"/>'
         f"{html.escape(parts.outro_speech, quote=False)}"
         "</speak>"

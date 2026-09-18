@@ -38,6 +38,11 @@ INTRO_PITCH = "+8Hz"
 INTRO_GAP_SECONDS = 0.45
 OUTRO_LINE = "Thanks for thinking with cryptic.fun."
 OUTRO_GAP_SECONDS = 0.4
+# Source credit is not Sonia — Thomas reads the paper and Fifteen Squared.
+SOURCE_VOICE_ALIAS = "thomas"
+SOURCE_RATE = "-6%"
+SOURCE_PITCH = "+0Hz"
+SOURCE_GAP_SECONDS = 0.35
 THINK_PAUSE_SECONDS = 7.0
 CLUE_LETTERS_GAP_SECONDS = 0.35
 LETTERS_PAUSE_SECONDS = 1.0
