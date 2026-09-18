@@ -11,7 +11,7 @@ run it unattended. Never use another crossword blog as the source.
    (`CRON_TZ=Europe/London 0 9 * * *`, or `0 8 * * *` UTC).
    Add a second trigger at **12:00 London** in case the 15² blogs are late.
 3. Repository: **Yoyoinnogravity/OSPO**, branch `main` (or this feature branch until it merges).
-4. Model: Composer 2.5 or Grok 4.6 (Cursor Models pool — cheaper than Claude for a daily chore).
+4. Model: Claude Sonnet (Anthropic). Do not pick Grok. Other Models pool — this is the quality pick Aled locked.
 5. Tools: pull request creation on. Memories optional.
 6. Paste the prompt below.
 7. Put social tokens on the Cloud Agent environment so uploads actually leave the machine:
