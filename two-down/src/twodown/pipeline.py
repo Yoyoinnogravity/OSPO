@@ -152,7 +152,7 @@ def rasta_clue() -> Clue:
 
 
 def fats_clue() -> Clue:
-    """Guardian 30115 1d FATS — current study Short. On Fifteen Squared.
+    """Guardian 30115 1d FATS — leftover study construct. On Fifteen Squared.
 
     Definition still may be generated or selected if it is ~80% close.
     Hint the definition (unhealthy foods), not the wordplay (FAST / twist).
@@ -178,11 +178,38 @@ def fats_clue() -> Clue:
     )
 
 
+def wellington_clue() -> Clue:
+    """Guardian 30115 3d WELLINGTON — current study Short. On Fifteen Squared.
+
+    Hint the definition (Duke), not the wordplay (well in / G / ton).
+    Do not print WELLINGTON on the hint card.
+    """
+    return attach_hint(
+        Clue(
+            source_url=_RASTA_SOURCE,
+            paper="Guardian",
+            puzzle_id="30115",
+            setter="Brendan",
+            blogger="manehi",
+            number="3",
+            direction="down",
+            clue="Duke is thoroughly acquainted with good style",
+            enumeration="10",
+            answer="WELLINGTON",
+            definition="Duke",
+            parse='WELL IN="thoroughly acquainted" + G (good) + TON="style"',
+            device="charade",
+            enumeration_ok=True,
+        )
+    )
+
+
 def study_clues() -> dict[str, Clue]:
-    """FATS is the study default. RASTA and DREAMLIKE stay constructable."""
+    """WELLINGTON is the study default. Earlier study clues stay constructable."""
     dreamlike = dreamlike_clue()
     rasta = rasta_clue()
     fats = fats_clue()
+    wellington = wellington_clue()
     return {
         dreamlike.slug: dreamlike,
         "dreamlike": dreamlike,
@@ -195,7 +222,11 @@ def study_clues() -> dict[str, Clue]:
         "fats": fats,
         "study-fats-4": fats,
         fats.answer.lower(): fats,
-        STUDY_SLUG: fats,
+        wellington.slug: wellington,
+        "wellington": wellington,
+        "study-wellington-10": wellington,
+        wellington.answer.lower(): wellington,
+        STUDY_SLUG: wellington,
     }
 
 

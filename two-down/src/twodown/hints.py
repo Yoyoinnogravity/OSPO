@@ -182,6 +182,27 @@ FATS = HintPhoto(
 )
 
 
+# Definition still for WELLINGTON: a Duke, not boots / well-in / ton.
+WELLINGTON = HintPhoto(
+    slug="wellington-still",
+    label="Duke",
+    source="generated still",
+    license="generated",
+    filename="wellington-still.webp",
+    keywords=frozenset(
+        {
+            "duke",
+            "ducal",
+            "noble",
+            "aristocrat",
+            "military",
+            "portrait",
+            "general",
+        }
+    ),
+)
+
+
 # Commons alternate: imperial Ethiopian / Rastafari Lion of Judah flag.
 LION = HintPhoto(
     slug="lion-of-judah",
@@ -198,6 +219,7 @@ PHOTOS: dict[str, HintPhoto] = {
     MOONLIT.slug: MOONLIT,
     RASTA.slug: RASTA,
     FATS.slug: FATS,
+    WELLINGTON.slug: WELLINGTON,
     LION.slug: LION,
     "dreamlike": TRANCE,
     "trance": TRANCE,
@@ -208,13 +230,16 @@ PHOTOS: dict[str, HintPhoto] = {
     "guardian-30115-1d": FATS,
     "study-fats-4": FATS,
     "guardian-30115-12a": TRANCE,
+    "wellington": WELLINGTON,
+    "guardian-30115-3d": WELLINGTON,
+    "study-wellington-10": WELLINGTON,
 }
 
 DEFAULT_HINT = TRANCE
 
 
 def _catalog() -> tuple[HintPhoto, ...]:
-    return (TRANCE, MOONLIT, RASTA, FATS, LION)
+    return (TRANCE, MOONLIT, RASTA, FATS, WELLINGTON, LION)
 
 
 def _tokens(text: str) -> frozenset[str]:
@@ -350,6 +375,17 @@ def _generate_fats_still(dest: Path) -> Path:
     return dest
 
 
+def _generate_wellington_still(dest: Path) -> Path:
+    """Last-resort ducal colours if the file is missing. No answer text."""
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    img = Image.new("RGB", (1280, 720), (28, 24, 22))
+    draw = ImageDraw.Draw(img)
+    draw.ellipse((420, 60, 860, 560), fill=(176, 48, 40))
+    draw.ellipse((520, 140, 760, 420), fill=(196, 156, 120))
+    img.save(dest, "WEBP", quality=82, method=6)
+    return dest
+
+
 def ensure_hint_photo(photo: HintPhoto | None = None) -> Path:
     resolved = photo or DEFAULT_HINT
     dest = resolved.path
@@ -361,4 +397,6 @@ def ensure_hint_photo(photo: HintPhoto | None = None) -> Path:
         return _generate_rasta_still(dest)
     if resolved.slug in {FATS.slug, "fats"}:
         return _generate_fats_still(dest)
+    if resolved.slug in {WELLINGTON.slug, "wellington"}:
+        return _generate_wellington_still(dest)
     return _generate_trance_still(dest)

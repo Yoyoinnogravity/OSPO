@@ -1,5 +1,13 @@
 from twodown.config import DEFAULT_VOICE_ALIAS, PINUP_SLUG, SOURCE_VOICE_ALIAS, STUDY_SLUG, VOICE_RATE, VOICES
-from twodown.pipeline import dreamlike_clue, fats_clue, published_clue, rasta_clue, resolve_clue, study_clue
+from twodown.pipeline import (
+    dreamlike_clue,
+    fats_clue,
+    published_clue,
+    rasta_clue,
+    resolve_clue,
+    study_clue,
+    wellington_clue,
+)
 from twodown.script import speak_answer, speak_enumeration, speak_parse_tokens, speak_source, write_parts
 
 
@@ -9,35 +17,35 @@ def test_solver_voice_is_clear_libby():
     assert VOICE_RATE == "-8%"
 
 
-def test_study_clue_is_fats():
-    assert STUDY_SLUG == "guardian-30115-1d"
+def test_study_clue_is_wellington():
+    assert STUDY_SLUG == "guardian-30115-3d"
     clue = study_clue(STUDY_SLUG)
     assert clue is not None
-    assert clue.slug == "guardian-30115-1d"
-    assert clue.answer == "FATS"
-    assert clue.clue == "Refrain from eating, with final twist, such unhealthy foods"
-    assert clue.enumeration == "4"
+    assert clue.slug == "guardian-30115-3d"
+    assert clue.answer == "WELLINGTON"
+    assert clue.clue == "Duke is thoroughly acquainted with good style"
+    assert clue.enumeration == "10"
     assert clue.setter == "Brendan"
     assert clue.paper == "Guardian"
     assert clue.puzzle_id == "30115"
-    assert clue.number == "1"
+    assert clue.number == "3"
     assert clue.direction == "down"
     assert clue.blogger == "manehi"
-    assert clue.definition == "such unhealthy foods"
+    assert clue.definition == "Duke"
     assert clue.hint_line == "Here's a clue."
-    assert clue.hint_image == "assets/hints/fats-still.webp"
+    assert clue.hint_image == "assets/hints/wellington-still.webp"
     assert clue.source_url == (
         "https://fifteensquared.net/2026/09/18/guardian-cryptic-crossword-no-30115-by-brendan/"
     )
-    assert "FAST" in clue.parse
-    assert "final twist" in clue.parse
+    assert "WELL IN" in clue.parse
+    assert "TON" in clue.parse
     parts = write_parts(clue)
     assert parts.intro_speech == "Here is your daily dose of cryptic fun."
-    assert parts.clue_speech == "Refrain from eating, with final twist, such unhealthy foods."
-    assert parts.letters_speech == "Four letters."
+    assert parts.clue_speech == "Duke is thoroughly acquainted with good style."
+    assert parts.letters_speech == "Ten letters."
     assert parts.think_speech == "Pause the video while you think."
     assert parts.hint_speech == "Here's a clue."
-    assert parts.answer_speech == "The answer is fats."
+    assert parts.answer_speech == "The answer is wellington."
     assert parts.answer_speech == speak_answer(clue.answer)
     assert parts.outro_speech == "Thanks for thinking with cryptic.fun."
     assert "Brendan" not in parts.parse_speech
@@ -74,12 +82,12 @@ def test_source_credit_is_its_own_line():
     assert parts.outro_speech == "Thanks for thinking with cryptic.fun."
 
 
-def test_four_letters():
+def test_ten_letters():
     clue = study_clue()
     assert clue is not None
-    assert clue.enumeration == "4"
-    assert speak_enumeration("4") == "Four letters."
-    assert speak_enumeration(clue.enumeration) == "Four letters."
+    assert clue.enumeration == "10"
+    assert speak_enumeration("10") == "Ten letters."
+    assert speak_enumeration(clue.enumeration) == "Ten letters."
 
 
 def test_spoken_parse_says_tsar_as_a_word():
@@ -96,6 +104,21 @@ def test_spoken_parse_says_tsar_as_a_word():
     assert speak_parse_tokens("RASTA") == "rasta"
     assert "rasta" not in parts.hint_speech.lower()
     assert "RASTA" not in parts.hint_speech
+
+
+def test_spoken_parse_says_wellington_pieces_as_words():
+    clue = wellington_clue()
+    parts = write_parts(clue)
+    assert "well in" in parts.parse_speech
+    assert "ton" in parts.parse_speech
+    assert "wellington" in parts.answer_speech
+    assert "WELLINGTON" not in parts.parse_speech
+    assert "W-E-L-L" not in parts.parse_speech
+    assert speak_parse_tokens("WELL IN") == "well in"
+    assert speak_parse_tokens("TON") == "ton"
+    assert speak_parse_tokens("WELLINGTON") == "wellington"
+    assert "wellington" not in parts.hint_speech.lower()
+    assert "WELLINGTON" not in parts.hint_speech
 
 
 def test_spoken_parse_says_fast_as_a_word():
@@ -128,11 +151,12 @@ def test_dreamlike_stays_constructable():
 
 
 def test_resolve_clue_renders_constructed_study_without_site_html():
-    constructed = study_clue("fats")
+    constructed = study_clue("wellington")
     assert constructed is not None
-    resolved = resolve_clue("fats", clue=constructed)
+    resolved = resolve_clue("wellington", clue=constructed)
     assert resolved is constructed
-    assert resolve_clue(STUDY_SLUG).answer == "FATS"
+    assert resolve_clue(STUDY_SLUG).answer == "WELLINGTON"
+    assert resolve_clue("fats").answer == "FATS"
     assert resolve_clue("rasta").answer == "RASTA"
     assert resolve_clue("dreamlike").answer == "DREAMLIKE"
 
