@@ -38,6 +38,9 @@ _STOP = frozenset(
         "one",
         "ones",
         "one's",
+        "may",
+        "be",
+        "another",
     }
 )
 

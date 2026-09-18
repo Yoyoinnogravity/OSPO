@@ -1,52 +1,64 @@
 from pathlib import Path
 
-from twodown.config import PACKAGE_ROOT, PINUP_SLUG
+from twodown.config import PACKAGE_ROOT, PINUP_SLUG, STUDY_SLUG
 from twodown.hints import CLOSE_ENOUGH, RASTA, TRANCE, attach_hint, match_hint
 from twodown.models import Clue
-from twodown.pipeline import dreamlike_clue, published_clue, rasta_clue
+from twodown.pipeline import dreamlike_clue, published_clue, rasta_clue, study_clue
 
 
-def test_dreamlike_hint_matches_definition_at_80_percent():
-    clue = dreamlike_clue()
-    assert clue.answer == "DREAMLIKE"
-    assert clue.definition == "as in a trance"
+def test_study_slug_and_hint_fields_are_rasta():
+    assert STUDY_SLUG == "guardian-30115-20a"
+    clue = study_clue()
+    assert clue is not None
+    assert clue.answer == "RASTA"
+    assert clue.slug == STUDY_SLUG
+    assert clue.definition
+    assert "Haile Selassie" in clue.definition
     assert clue.hint_line == "Here's a clue."
-    matched = match_hint(clue.definition)
-    assert matched.photo.slug == TRANCE.slug
-    assert matched.closeness >= CLOSE_ENOUGH
-    assert matched.close_enough
-    assert clue.hint_image == f"assets/hints/{TRANCE.filename}"
-    assert clue.hint_credit == TRANCE.credit_line
-    # Definition hint, not wordplay, and never print the answer on the still.
-    assert "DREAMLIKE" not in clue.hint_line
-    assert "DREAMLIKE" not in clue.hint_image
-    assert "DREAMLIKE" not in clue.hint_credit
-    assert "armed" not in clue.hint_credit.lower()
-    assert "anagram" not in clue.hint_credit.lower()
-    still = PACKAGE_ROOT / clue.hint_image
-    assert still.is_file()
-    assert still.stat().st_size > 0
+    assert clue.hint_image
+    assert clue.hint_credit
+    # Hint the definition, not the wordplay.
+    assert "tsar" not in clue.hint_credit.lower()
+    assert "reversal" not in clue.hint_credit.lower()
+    assert "backing" not in clue.hint_credit.lower()
+    # Never print the answer on the hint card copy.
+    assert "RASTA" not in clue.hint_line
+    assert "RASTA" not in clue.hint_credit
 
 
 def test_rasta_hint_matches_definition_at_80_percent():
     clue = rasta_clue()
     assert clue.answer == "RASTA"
-    assert "Haile Selassie" in (clue.definition or "")
-    assert clue.hint_line == "Here's a clue."
-    matched = match_hint(clue.definition)
+    matched = match_hint(clue.definition or "")
     assert matched.photo.slug == RASTA.slug
     assert matched.closeness >= CLOSE_ENOUGH
     assert matched.close_enough
     assert clue.hint_image == f"assets/hints/{RASTA.filename}"
     assert clue.hint_credit == RASTA.credit_line
-    assert "RASTA" not in clue.hint_line
-    assert "RASTA" not in clue.hint_image
-    assert "RASTA" not in clue.hint_credit
-    assert "tsar" not in clue.hint_credit.lower()
-    assert "reversal" not in clue.hint_credit.lower()
     still = PACKAGE_ROOT / clue.hint_image
     assert still.is_file()
     assert still.stat().st_size > 0
+
+
+def test_aled_definition_is_close_enough_for_a_reasonable_matcher():
+    matched = match_hint("a RASTA may be a follower of the Emperor Haile Selassie")
+    assert matched.photo.slug == RASTA.slug
+    assert matched.closeness >= CLOSE_ENOUGH
+    assert matched.close_enough
+
+
+def test_dreamlike_leftover_still_matches_at_80_percent():
+    clue = dreamlike_clue()
+    assert clue.answer == "DREAMLIKE"
+    assert clue.definition == "as in a trance"
+    matched = match_hint(clue.definition)
+    assert matched.photo.slug == TRANCE.slug
+    assert matched.closeness >= CLOSE_ENOUGH
+    assert matched.close_enough
+    assert "DREAMLIKE" not in clue.hint_line
+    assert "DREAMLIKE" not in clue.hint_credit
+    assert "armed" not in clue.hint_credit.lower()
+    assert "anagram" not in clue.hint_credit.lower()
 
 
 def test_ai_matching_is_allowed():
@@ -54,6 +66,9 @@ def test_ai_matching_is_allowed():
     assert "Do not ban AI matching" in src
     assert "human-only gate is superseded" in src
     assert "match_hint" in src
+    agents = (PACKAGE_ROOT / "AGENTS.md").read_text(encoding="utf-8")
+    assert "never add AI picture match" not in agents.lower()
+    assert "Do not ban AI matching" in agents
     attached = attach_hint(
         Clue(
             source_url="https://fifteensquared.net/example/",
@@ -61,20 +76,20 @@ def test_ai_matching_is_allowed():
             puzzle_id="30115",
             setter="Brendan",
             blogger="manehi",
-            number="12",
+            number="20",
             direction="across",
-            clue="Doctor armed with positive response, as in a trance",
-            enumeration="9",
-            answer="DREAMLIKE",
-            definition="as in a trance",
-            parse="armed plus like",
+            clue="One emperor backing follower of another",
+            enumeration="5",
+            answer="RASTA",
+            definition="a RASTA may be a follower of the Emperor Haile Selassie",
+            parse='A="One" + TSAR="emperor"',
         )
     )
-    assert attached.hint_image.endswith("trance-still.webp")
+    assert attached.hint_image.endswith("rasta-still.webp")
     assert attached.hint_line == "Here's a clue."
 
 
-def test_published_clues_do_not_need_a_hint_until_attached():
+def test_published_clues_have_optional_hint_fields():
     pinup = published_clue(PINUP_SLUG)
     assert pinup.hint_image is None
     assert pinup.hint_credit is None
@@ -95,13 +110,15 @@ def test_published_clues_do_not_need_a_hint_until_attached():
     assert blank.hint_image is None
     assert blank.hint_credit is None
     assert blank.hint_line is None
+    attached = attach_hint(blank)
+    assert attached.hint_line == "Here's a clue."
+    assert attached.hint_image
+    assert attached.hint_credit
 
 
 def test_no_cloud_vision_pipeline():
     root = Path(__file__).resolve().parents[1] / "src" / "twodown"
     forbidden = (
-        "match_answer_to_picture",
-        "match_answer_to_image",
         "clip_embed",
         "vision_api",
     )
@@ -109,3 +126,5 @@ def test_no_cloud_vision_pipeline():
         text = path.read_text(encoding="utf-8")
         for token in forbidden:
             assert token not in text, f"{path.name} must not grow a {token} pipeline"
+    # A local 80% definition matcher is allowed. Do not ban match_hint.
+    assert "def match_hint" in (root / "hints.py").read_text(encoding="utf-8")

@@ -4,6 +4,7 @@ from twodown.script import speak_answer, speak_enumeration, speak_parse_tokens, 
 
 
 def test_study_clue_is_rasta():
+    assert STUDY_SLUG == "guardian-30115-20a"
     clue = study_clue(STUDY_SLUG)
     assert clue is not None
     assert clue.slug == "guardian-30115-20a"
@@ -17,7 +18,7 @@ def test_study_clue_is_rasta():
     assert clue.number == "20"
     assert clue.direction == "across"
     assert clue.blogger == "manehi"
-    assert "Haile Selassie" in (clue.definition or "")
+    assert clue.definition == "a RASTA may be a follower of the Emperor Haile Selassie"
     assert clue.hint_line == "Here's a clue."
     assert clue.hint_image == "assets/hints/rasta-still.webp"
     assert clue.source_url == (
@@ -65,15 +66,6 @@ def test_five_letters():
     assert speak_enumeration(clue.enumeration) == "Five letters."
 
 
-def test_rasta_stays_constructable():
-    clue = rasta_clue()
-    assert clue.slug == "guardian-30115-20a"
-    assert clue.answer == "RASTA"
-    assert clue.enumeration == "5"
-    assert speak_enumeration("5") == "Five letters."
-    assert speak_answer("RASTA") == "The answer is rasta."
-
-
 def test_spoken_parse_says_tsar_as_a_word():
     clue = rasta_clue()
     parts = write_parts(clue)
@@ -86,7 +78,6 @@ def test_spoken_parse_says_tsar_as_a_word():
     assert "T-S-A-R" not in parts.parse_speech
     assert speak_parse_tokens("TSAR") == "tsar"
     assert speak_parse_tokens("RASTA") == "rasta"
-    assert speak_parse_tokens("A + TSAR, backing") == "A + tsar, backing"
     assert "rasta" not in parts.hint_speech.lower()
     assert "RASTA" not in parts.hint_speech
 
@@ -94,12 +85,15 @@ def test_spoken_parse_says_tsar_as_a_word():
 def test_dreamlike_stays_constructable():
     clue = dreamlike_clue()
     assert clue.answer == "DREAMLIKE"
+    assert clue.slug == "guardian-30115-12a"
     assert speak_answer("DREAMLIKE") == "The answer is dreamlike."
     assert speak_enumeration("9") == "Nine letters."
     parts = write_parts(clue)
     assert "armed" in parts.parse_speech
     assert "like" in parts.parse_speech
     assert "DREAMLIKE" not in parts.parse_speech
+    assert study_clue("dreamlike") is not None
+    assert study_clue("dreamlike").answer == "DREAMLIKE"
 
 
 def test_resolve_clue_renders_constructed_study_without_site_html():

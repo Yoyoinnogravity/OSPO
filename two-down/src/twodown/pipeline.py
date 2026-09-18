@@ -126,7 +126,11 @@ def dreamlike_clue() -> Clue:
 
 
 def rasta_clue() -> Clue:
-    """Guardian 30115 20a RASTA — current study Short. On Fifteen Squared."""
+    """Guardian 30115 20a RASTA — current study Short. On Fifteen Squared.
+
+    Definition still may be generated or selected if it is ~80% close.
+    Hint the definition, not the wordplay. Do not print RASTA on the hint card.
+    """
     return attach_hint(
         Clue(
             source_url=_RASTA_SOURCE,
@@ -139,8 +143,8 @@ def rasta_clue() -> Clue:
             clue="One emperor backing follower of another",
             enumeration="5",
             answer="RASTA",
-            definition="a follower of the Emperor Haile Selassie",
-            parse="A + TSAR, backing",
+            definition="a RASTA may be a follower of the Emperor Haile Selassie",
+            parse='A="One" + TSAR="emperor"; all reversed/"backing"',
             device="reversal",
             enumeration_ok=True,
         )
@@ -148,18 +152,18 @@ def rasta_clue() -> Clue:
 
 
 def study_clues() -> dict[str, Clue]:
-    """Constructed beat-study clues, keyed by slug and a few aliases."""
-    rasta = rasta_clue()
+    """RASTA is the study default. DREAMLIKE stays constructable as a leftover."""
     dreamlike = dreamlike_clue()
+    rasta = rasta_clue()
     return {
-        rasta.slug: rasta,
-        STUDY_SLUG: rasta,
-        "rasta": rasta,
-        "study-rasta-5": rasta,
-        rasta.answer.lower(): rasta,
         dreamlike.slug: dreamlike,
         "dreamlike": dreamlike,
         dreamlike.answer.lower(): dreamlike,
+        rasta.slug: rasta,
+        "rasta": rasta,
+        "study-rasta-5": rasta,
+        rasta.answer.lower(): rasta,
+        STUDY_SLUG: rasta,
     }
 
 
