@@ -304,7 +304,7 @@ def render_video(
     think = min(int(THINK_PAUSE_SECONDS), max(1, int(clue_secs)))
     intro = max(0.35, clue_secs - think)
     clips: list[tuple[Path, float]] = [(clue_card, intro)]
-    work = dest.parent / f".{dest.stem}-counts"
+    work = Path("/tmp/twodown-counts") / dest.stem
     work.mkdir(parents=True, exist_ok=True)
     for n in range(think, 0, -1):
         frame = work / f"count-{n}.png"
