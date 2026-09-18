@@ -222,10 +222,10 @@ def cole_clue() -> Clue:
             clue="So-called King of jazz, or another one accompanied by string trio",
             enumeration="4",
             answer="COLE",
-            definition="Nat King Cole the jazz musician",
+            definition="King, as in Nat King Cole the jazz musician",
             parse=(
-                'Nat King Cole (jazz); or Old King Cole and his fiddlers three '
-                '("string trio")'
+                "King as in Nat King Cole; or Old King Cole, who called for "
+                "his fiddlers three, a string trio"
             ),
             device="double_def",
             enumeration_ok=True,

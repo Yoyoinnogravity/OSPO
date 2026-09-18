@@ -12,7 +12,7 @@ def test_study_slug_and_hint_fields_are_cole():
     assert clue is not None
     assert clue.answer == "COLE"
     assert clue.slug == STUDY_SLUG
-    assert clue.definition == "Nat King Cole the jazz musician"
+    assert clue.definition == "King, as in Nat King Cole the jazz musician"
     assert clue.hint_line == "Here's a clue."
     assert clue.hint_image
     assert clue.hint_credit

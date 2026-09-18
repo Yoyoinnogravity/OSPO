@@ -39,7 +39,7 @@ def test_study_clue_is_cole():
     assert clue.number == "8"
     assert clue.direction == "down"
     assert clue.blogger == "manehi"
-    assert clue.definition == "Nat King Cole the jazz musician"
+    assert clue.definition == "King, as in Nat King Cole the jazz musician"
     assert clue.hint_line == "Here's a clue."
     assert clue.hint_image == "assets/hints/cole-still.webp"
     assert clue.source_url == (
@@ -120,6 +120,9 @@ def test_spoken_parse_says_cole_as_a_word():
     assert "cole" in parts.answer_speech
     assert "nat king cole" in parts.parse_speech.lower()
     assert "fiddlers three" in parts.parse_speech.lower()
+    assert "string trio" in parts.parse_speech.lower()
+    assert "Jazz.;" not in parts.parse_speech
+    assert "(" not in parts.parse_speech
     assert "COLE" not in parts.parse_speech
     assert "C-O-L-E" not in parts.parse_speech
     assert speak_parse_tokens("COLE") == "cole"
