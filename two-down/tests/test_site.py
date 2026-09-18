@@ -59,6 +59,8 @@ def test_publish_site_writes_spoiler_pages(tmp_path):
     assert "https://fifteensquared.net/" in about
     assert "only source" in about
     assert "unique cryptic crossword clues and solutions" in about
+    assert "We credit all" in about
+    assert "the photograph" in about
     assert (tmp_path / "c" / "independent-12458-12a" / "index.html").exists()
     assert (tmp_path / "support.html").exists()
     assert (tmp_path / "privacy.html").exists()
@@ -114,6 +116,7 @@ def test_youtube_titles_use_cryptic_fun_channel():
     assert len(title) <= 100
     assert "https://cryptic.fun/support.html" in youtube_description(_item())
     assert "unique cryptic crossword clues and solutions" in youtube_description(_item())
+    assert "We credit all" in youtube_description(_item())
     assert "Fifteen Squared" in youtube_description(_item())
 
 

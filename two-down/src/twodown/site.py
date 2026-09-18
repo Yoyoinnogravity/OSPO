@@ -6,7 +6,7 @@ from pathlib import Path
 from shutil import copy2
 
 from twodown.ads import ads_enabled, ads_txt, adsense_client, adsense_slot
-from twodown.config import BRAND, BRAND_LINE, SITE_ORIGIN, SITE_ROOT, SOURCE_SITE, SPONSOR_EMAIL, SUGGEST_EMAIL, VOICE_LABELS, follow_profiles
+from twodown.config import BRAND, BRAND_LINE, CREDIT_LINE, CREDIT_WHO, SITE_ORIGIN, SITE_ROOT, SOURCE_SITE, SPONSOR_EMAIL, SUGGEST_EMAIL, VOICE_LABELS, follow_profiles
 from twodown.models import DailyPair, SpokenClue
 from twodown.render import write_share_card
 from twodown.scenes import DEFAULT_SCENE, get_scene, list_scenes
@@ -790,7 +790,7 @@ def publish_site(pair: DailyPair, dest: Path | None = None) -> Path:
 
     about = f"""
     <h1>About.</h1>
-    <p class="lede">{BRAND_LINE} The only source is <a href="{SOURCE_SITE}">Fifteen Squared</a> — Independent, Guardian and Financial Times blogs. We never invent answers. Choose Sonia, Ryan, Libby or Thomas, and a real place as the backdrop. The same Shorts go to YouTube, TikTok, Instagram and Facebook when those accounts are connected. The site is the spoiler-safe home.</p>
+    <p class="lede">{BRAND_LINE} {CREDIT_LINE} {CREDIT_WHO.capitalize()}. The only source is <a href="{SOURCE_SITE}">Fifteen Squared</a> — Independent, Guardian and Financial Times blogs. We never invent answers. Choose Sonia, Ryan, Libby or Thomas, and a real place as the backdrop. The same Shorts go to YouTube, TikTok, Instagram and Facebook when those accounts are connected. The site is the spoiler-safe home.</p>
     <p>Answers and wordplay belong to the setters and the 15² bloggers. We rewrite for speech and always link the original post.</p>
     <p>Readers can <a href="suggest.html">suggest one homemade clue a day</a>, or ask for a daily clue by email. Both land in Aled’s inbox at <a href="mailto:{_e(SUGGEST_EMAIL)}">{_e(SUGGEST_EMAIL)}</a>.</p>
     <p>When the site has readers, a small labelled ad can sit under the pair — never on the answer. How that works is on <a href="support.html">Support</a>.</p>
@@ -804,7 +804,7 @@ def publish_site(pair: DailyPair, dest: Path | None = None) -> Path:
             about,
             PageSeo(
                 title=f"About — {BRAND}",
-                description=f"{BRAND_LINE} From the Independent, Guardian and FT blogs on Fifteen Squared. We never invent answers.",
+                description=f"{BRAND_LINE} {CREDIT_LINE} From the Independent, Guardian and FT blogs on Fifteen Squared. We never invent answers.",
                 path="/about.html",
                 json_ld=website_ld(),
             ),
@@ -902,7 +902,7 @@ def publish_site(pair: DailyPair, dest: Path | None = None) -> Path:
             follow_page,
             PageSeo(
                 title=f"Follow — {BRAND}",
-                description=f"Follow cryptic.fun by email, RSS or YouTube. {BRAND_LINE} From Fifteen Squared. No account required.",
+                description=f"Follow cryptic.fun by email, RSS or YouTube. {BRAND_LINE} {CREDIT_LINE} From Fifteen Squared. No account required.",
                 path="/follow.html",
             ),
         ),
@@ -922,7 +922,7 @@ def publish_site(pair: DailyPair, dest: Path | None = None) -> Path:
     <section class="panel">
       <h2>2. A small ad on the site.</h2>
       <p>Once <a href="{SITE_ORIGIN}/">cryptic.fun</a> is live, Google AdSense can put one labelled display unit <em>under</em> the pair. Manual placement only — no Auto ads, no ads inside Solve, no ads on a single-clue spoiler page. The UK needs a consent banner before any ad cookie is set; ads stay off until that is in place.</p>
-      <p>AdSense can refuse sites that mostly reprint other people’s puzzles. We write original pages (this one, About, how the agent works) and we always credit <a href="{SOURCE_SITE}">Fifteen Squared</a>. Approval is not guaranteed. If Google says no, we skip site ads and lean on YouTube and sponsors.</p>
+      <p>AdSense can refuse sites that mostly reprint other people’s puzzles. We write original pages (this one, About, how the agent works) and we credit all — the setter, the paper, <a href="{SOURCE_SITE}">Fifteen Squared</a>, and the photograph. Approval is not guaranteed. If Google says no, we skip site ads and lean on YouTube and sponsors.</p>
     </section>
     <section class="panel">
       <h2>3. Sponsor a week.</h2>

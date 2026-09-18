@@ -2,6 +2,7 @@ cryptic.fun
 ===========
 
 We provide unique cryptic crossword clues and solutions.
+We credit all — the setter, the paper, Fifteen Squared, and the photograph.
 The only source is [Fifteen Squared](https://fifteensquared.net/),
 cut as newsprint Shorts. **Ryan** opens, **Sonia** solves, **Thomas** credits
 the setter and Fifteen Squared. Brand is **Cryptic Fun** on YouTube, TikTok,
