@@ -167,6 +167,19 @@ def _draw_lights(
     return y + cell
 
 
+def _source_footer(clue: Clue) -> str:
+    """One Short line naming the setter, paper, and Fifteen Squared."""
+    setter = (clue.setter or "").strip()
+    paper = (clue.paper or "").strip()
+    if paper and not paper.lower().startswith("the "):
+        paper = f"the {paper}"
+    if setter and paper:
+        return f"{setter} in {paper} · Fifteen Squared"
+    if setter:
+        return f"Parse via Fifteen Squared · {setter}"
+    return "Parse via Fifteen Squared"
+
+
 def _footer(draw: ImageDraw.ImageDraw, text: str) -> None:
     foot = _font(FONT_SANS, 22)
     _center_text(draw, HEIGHT - 88, text, foot, MUTED, spacing=0)
@@ -216,7 +229,7 @@ def draw_beat(clue: Clue, dest: Path, beat: str = "think") -> Path:
             if parse.count("\n") > 3:
                 parse = "\n".join(parse.split("\n")[:3])
             _center_text(draw, answer_y + 110, parse, parse_font, MUTED, spacing=8)
-            _footer(draw, "Parse via Fifteen Squared")
+            _footer(draw, _source_footer(clue))
         else:
             _footer(draw, "")
     elif beat == "clue":

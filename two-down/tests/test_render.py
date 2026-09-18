@@ -2,7 +2,7 @@ import subprocess
 from pathlib import Path
 
 from twodown.models import Clue
-from twodown.render import draw_beat, draw_clue_card, draw_reveal_card, render_video
+from twodown.render import _source_footer, draw_beat, draw_clue_card, draw_reveal_card, render_video
 from twodown.script import speak_enumeration
 
 
@@ -59,6 +59,13 @@ def test_clue_card_is_a_solve_along(tmp_path: Path):
     assert draw_beat(_clue(), tmp_path / "answer.png", "answer").exists()
     # Parse sits under the answer as soon as it is solved.
     assert draw_beat(_clue(), tmp_path / "solved.png", "answer").exists()
+
+
+def test_answer_footer_credits_setter_paper_and_fifteen_squared():
+    clue = _clue()
+    assert _source_footer(clue) == "Eccles in the Independent · Fifteen Squared"
+    guardian = clue.model_copy(update={"setter": "Dice", "paper": "Guardian"})
+    assert _source_footer(guardian) == "Dice in the Guardian · Fifteen Squared"
 
 
 def test_speak_enumeration_is_separate_from_the_clue():
