@@ -282,7 +282,7 @@ def test_render_video_is_browser_playable(tmp_path: Path):
     render_video(clue_card, reveal, audio, dest, clue_hold=1.4, clue=clue)
     data = dest.read_bytes()
     assert 0 < data.find(b"moov") < data.find(b"mdat")
-    assert _probe(dest, "stream=sample_rate") == "48000"
+    assert _probe(dest, "stream=sample_rate") == "44100"
     assert _probe(dest, "stream=width,height").splitlines()[0] == "1080"
     assert "aac" in _probe(dest, "stream=codec_name")
     assert "loudnorm" in AUDIO_LOUDNESS

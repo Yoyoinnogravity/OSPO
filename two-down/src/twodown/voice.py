@@ -137,7 +137,7 @@ def build_short_soundtrack(parts: ScriptParts, dest: Path, voice: str | None = N
                 f"anullsrc=r=24000:cl=mono:d={ANSWER_PAUSE_SECONDS:.2f}[p3];"
                 f"anullsrc=r=24000:cl=mono:d={OUTRO_GAP_SECONDS:.2f}[g1];"
                 "[c0][g0][c1][g][c2][p1][c3][p2][c4][h1][h2][c5][p3][c6][g1][c7]concat=n=16:v=0:a=1[raw];"
-                f"[raw]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,{AUDIO_LOUDNESS}[a]"
+                f"[raw]aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo,{AUDIO_LOUDNESS}[a]"
             ),
             "-map",
             "[a]",
@@ -146,7 +146,7 @@ def build_short_soundtrack(parts: ScriptParts, dest: Path, voice: str | None = N
             "-b:a",
             "192k",
             "-ar",
-            "48000",
+            "44100",
             "-ac",
             "2",
             str(dest),
