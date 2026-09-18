@@ -49,8 +49,7 @@ class Clue(BaseModel):
     device: Device = "unknown"
     enumeration_ok: bool = False
     skipped_reason: str | None = None
-    # Human-chosen definition still only. Never an AI-selected match.
-    # Leave None on published clues — there is no general picture matcher.
+    # Definition-hint still. Auto / AI match at ~80% closeness is Aled's bar.
     hint_image: str | None = None
     hint_credit: str | None = None
     hint_line: str | None = None

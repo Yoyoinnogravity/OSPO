@@ -28,8 +28,8 @@ You are the daily Cryptic Fun agent for cryptic.fun.
 
 Do exactly two clues from https://fifteensquared.net/ . Never invent an answer.
 Never scrape another crossword site.
-Do not add a general AI that matches cryptic answers to hint pictures.
-Only the DREAMLIKE study clue may carry a human-chosen definition still.
+Hint pictures may be auto / AI matched to the definition at about 80% closeness.
+That is good enough. Do not ban AI matching. Do not build a cloud vision pipeline.
 
 1. Check two-down/site/d/{today's London date}/index.html.
    If that page already exists, today's pair is done. Do not regenerate, do not open a PR, stop.

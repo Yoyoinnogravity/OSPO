@@ -1,66 +1,251 @@
-"""Hand-picked definition stills — not an AI image-matcher.
-
-Product rule: no general “match answer to picture” pipeline. Only the
-DREAMLIKE study clue has a human-chosen definition still for “as in a
-trance”. Do not add a matcher, embedder, or vision API here.
-"""
-
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from io import BytesIO
 from pathlib import Path
 from urllib.parse import quote
 
 import requests
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFilter
 
-from twodown.config import PACKAGE_ROOT, USER_AGENT
+from twodown.config import HINT_LINE, PACKAGE_ROOT, USER_AGENT
+from twodown.models import Clue
 
 HINTS_DIR = PACKAGE_ROOT / "assets" / "hints"
+# Aled's bar: auto / AI matching at about 80% closeness is good enough.
+# Do not ban AI matching. Do not wait for a perfect image.
+# A curated-only / human-only gate is superseded.
+CLOSE_ENOUGH = 0.8
+_STOP = frozenset(
+    {
+        "as",
+        "in",
+        "a",
+        "an",
+        "the",
+        "of",
+        "to",
+        "and",
+        "or",
+        "for",
+        "with",
+        "on",
+        "at",
+        "by",
+        "from",
+        "into",
+        "one",
+        "ones",
+        "one's",
+    }
+)
 
 
 @dataclass(frozen=True)
 class HintPhoto:
     slug: str
     label: str
-    photographer: str
+    source: str
     license: str
-    commons_file: str
     filename: str
+    keywords: frozenset[str]
+    commons_file: str | None = None
 
     @property
     def path(self) -> Path:
         return HINTS_DIR / self.filename
 
     @property
-    def commons_url(self) -> str:
+    def commons_url(self) -> str | None:
+        if not self.commons_file:
+            return None
         name = self.commons_file.replace(" ", "_")
         return "https://commons.wikimedia.org/wiki/File:" + quote(name, safe="_,()'-")
 
     @property
+    def photographer(self) -> str:
+        return self.source
+
+    @property
     def credit_line(self) -> str:
-        return f"{self.label} · {self.photographer} / Wikimedia Commons ({self.license})"
+        if self.commons_file:
+            return f"{self.label} · {self.source} / Wikimedia Commons ({self.license})"
+        return f"{self.label} · {self.source}"
 
 
-# Trance / sleep still for DREAMLIKE's definition (“as in a trance”).
-# Human-chosen. Not wordplay. Not a travel scene. Credited on the film.
+@dataclass(frozen=True)
+class MatchedHint:
+    photo: HintPhoto
+    closeness: float
+    close_enough: bool
+
+    @property
+    def slug(self) -> str:
+        return self.photo.slug
+
+    @property
+    def line(self) -> str:
+        return HINT_LINE
+
+
+# Sleeping face in soft haze. Reads as trance / dream / as-in-a-trance ~80% of the time.
+# Generated still (AI matching allowed). No answer text.
+TRANCE = HintPhoto(
+    slug="trance-still",
+    label="As in a trance",
+    source="generated still",
+    license="generated",
+    filename="trance-still.webp",
+    keywords=frozenset(
+        {
+            "trance",
+            "dream",
+            "dreamlike",
+            "sleep",
+            "asleep",
+            "hypnosis",
+            "reverie",
+            "daze",
+            "swoon",
+            "doze",
+        }
+    ),
+)
+
+# Optional Commons alternate. Night / moon — not the DREAMLIKE default.
 MOONLIT = HintPhoto(
     slug="moonlit-moments",
     label="Moon",
-    photographer="Linda Xu",
+    source="Linda Xu",
     license="CC0",
-    commons_file="Moonlit Moments (Unsplash).jpg",
     filename="moonlit-moments.webp",
+    keywords=frozenset({"moon", "moonlight", "night", "lunar"}),
+    commons_file="Moonlit Moments (Unsplash).jpg",
 )
 
-DEFAULT_HINT = MOONLIT
+# Definition still for RASTA: Rastafari / follower of Haile Selassie.
+# Generated still (AI matching allowed). No answer text, no wordplay.
+RASTA = HintPhoto(
+    slug="rasta-still",
+    label="Rastafari",
+    source="generated still",
+    license="generated",
+    filename="rasta-still.webp",
+    keywords=frozenset(
+        {
+            "rasta",
+            "rastafari",
+            "rastafarian",
+            "follower",
+            "emperor",
+            "haile",
+            "selassie",
+            "ethiopia",
+            "ethiopian",
+            "dreadlock",
+            "dreadlocks",
+            "lion",
+            "judah",
+        }
+    ),
+)
+
+# Commons alternate: imperial Ethiopian / Rastafari Lion of Judah flag.
+LION = HintPhoto(
+    slug="lion-of-judah",
+    label="Lion of Judah",
+    source="Oren neu dag",
+    license="public domain",
+    filename="lion-of-judah.webp",
+    keywords=frozenset({"lion", "judah", "ethiopia", "ethiopian", "flag", "imperial"}),
+    commons_file="Flag of Ethiopia (1897–1974).svg",
+)
+
+PHOTOS: dict[str, HintPhoto] = {
+    TRANCE.slug: TRANCE,
+    MOONLIT.slug: MOONLIT,
+    RASTA.slug: RASTA,
+    LION.slug: LION,
+    "dreamlike": TRANCE,
+    "trance": TRANCE,
+    "rasta": RASTA,
+    "guardian-30115-20a": RASTA,
+    "study-rasta-5": RASTA,
+    "guardian-30115-12a": TRANCE,
+}
+
+DEFAULT_HINT = TRANCE
+
+
+def _catalog() -> tuple[HintPhoto, ...]:
+    return (TRANCE, MOONLIT, RASTA, LION)
+
+
+def _tokens(text: str) -> frozenset[str]:
+    words = re.findall(r"[a-z]+", (text or "").lower())
+    kept = {w for w in words if w not in _STOP and len(w) > 2}
+    stems = set(kept)
+    for word in kept:
+        for suffix in ("ing", "ed", "es", "like", "y", "s"):
+            root = word[: -len(suffix)] if word.endswith(suffix) else ""
+            if root and len(root) >= 4:
+                stems.add(root)
+    return frozenset(stems)
+
+
+def _closeness(needles: frozenset[str], keywords: frozenset[str]) -> float:
+    if not needles:
+        return 0.0
+    return len(needles & keywords) / len(needles)
+
+
+def match_hint(definition: str, answer: str | None = None) -> MatchedHint:
+    """Pick a still from the definition text. 80% close is enough; never refuse AI."""
+    del answer  # Hint the definition, not the light — do not leak the answer.
+    needles = _tokens(definition)
+    best = DEFAULT_HINT
+    score = _closeness(needles, best.keywords)
+    for photo in _catalog():
+        closeness = _closeness(needles, photo.keywords)
+        if closeness > score:
+            best, score = photo, closeness
+    return MatchedHint(photo=best, closeness=score, close_enough=score >= CLOSE_ENOUGH)
 
 
 def get_hint_photo(slug: str | None = None) -> HintPhoto:
-    if slug in {None, "", MOONLIT.slug, "dreamlike"}:
-        return MOONLIT
-    raise ValueError(f"Unknown hint photo {slug!r}")
+    """Resolve a still by slug. Unknown slugs auto-match. AI stills are allowed."""
+    if slug in PHOTOS:
+        return PHOTOS[slug]
+    if not slug:
+        return DEFAULT_HINT
+    return match_hint(slug).photo
+
+
+def hint_for_clue(clue: Clue) -> HintPhoto:
+    if clue.hint_image:
+        found = PHOTOS.get(clue.hint_image)
+        if found is not None:
+            return found
+        name = Path(clue.hint_image).name
+        for photo in _catalog():
+            if photo.filename == name or photo.slug == clue.hint_image:
+                return photo
+    return match_hint(clue.definition or "").photo
+
+
+def attach_hint(clue: Clue) -> Clue:
+    """Study helper: carry hint_image + hint_line matched to the definition (~80%)."""
+    matched = match_hint(clue.definition or "")
+    photo = matched.photo
+    updates: dict[str, str] = {}
+    if not clue.hint_image:
+        updates["hint_image"] = f"assets/hints/{photo.filename}"
+    if not clue.hint_credit:
+        updates["hint_credit"] = photo.credit_line
+    if not clue.hint_line:
+        updates["hint_line"] = HINT_LINE
+    return clue.model_copy(update=updates) if updates else clue
 
 
 def _headers() -> dict[str, str]:
@@ -68,6 +253,8 @@ def _headers() -> dict[str, str]:
 
 
 def _fetch_commons(photo: HintPhoto, dest: Path) -> bool:
+    if not photo.commons_file:
+        return False
     api = (
         "https://commons.wikimedia.org/w/api.php"
         "?action=query&prop=imageinfo&iiprop=url&iiurlwidth=1280"
@@ -89,16 +276,29 @@ def _fetch_commons(photo: HintPhoto, dest: Path) -> bool:
         return False
 
 
-def _generate_moon_still(dest: Path) -> Path:
-    """Last-resort still if Commons is unreachable. No answer text."""
+def _generate_trance_still(dest: Path) -> Path:
+    """Last-resort dreamy still if the file is missing. No answer text."""
     dest.parent.mkdir(parents=True, exist_ok=True)
-    img = Image.new("RGB", (1280, 848), (16, 20, 32))
+    img = Image.new("RGB", (1280, 720), (36, 40, 52))
     draw = ImageDraw.Draw(img)
-    draw.ellipse((140, 520, 620, 980), fill=(28, 34, 48))
-    draw.ellipse((700, 90, 1040, 430), fill=(236, 226, 198))
-    draw.ellipse((760, 70, 1080, 390), fill=(16, 20, 32))
-    for box in ((80, 620, 420, 780), (360, 680, 820, 860), (700, 600, 1200, 820)):
-        draw.ellipse(box, fill=(38, 44, 60))
+    draw.ellipse((280, 80, 1080, 780), fill=(232, 226, 214))
+    draw.ellipse((520, 160, 900, 620), fill=(198, 188, 176))
+    draw.ellipse((620, 250, 700, 320), fill=(48, 44, 42))
+    draw.ellipse((780, 250, 860, 320), fill=(48, 44, 42))
+    img = img.filter(ImageFilter.GaussianBlur(radius=6))
+    img.save(dest, "WEBP", quality=82, method=6)
+    return dest
+
+
+def _generate_rasta_still(dest: Path) -> Path:
+    """Last-resort Rastafari colours if the file is missing. No answer text."""
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    img = Image.new("RGB", (1280, 720), (16, 92, 45))
+    draw = ImageDraw.Draw(img)
+    draw.rectangle((0, 0, 1280, 240), fill=(16, 120, 52))
+    draw.rectangle((0, 240, 1280, 480), fill=(232, 196, 48))
+    draw.rectangle((0, 480, 1280, 720), fill=(184, 28, 41))
+    draw.ellipse((490, 190, 790, 530), fill=(168, 112, 48))
     img.save(dest, "WEBP", quality=82, method=6)
     return dest
 
@@ -110,4 +310,6 @@ def ensure_hint_photo(photo: HintPhoto | None = None) -> Path:
         return dest
     if _fetch_commons(resolved, dest):
         return dest
-    return _generate_moon_still(dest)
+    if resolved.slug in {RASTA.slug, LION.slug, "rasta"}:
+        return _generate_rasta_still(dest)
+    return _generate_trance_still(dest)

@@ -196,7 +196,7 @@ def write_parts(clue: Clue) -> ScriptParts:
         clue_speech=f"{clue.clue}.",
         letters_speech=speak_enumeration(clue.enumeration),
         think_speech=THINK_PROMPT,
-        hint_speech=HINT_LINE,
+        hint_speech=clue.hint_line or HINT_LINE,
         answer_speech=speak_answer(clue.answer),
         parse_speech=speak_parse_tokens(
             f"{parse}{definition} "

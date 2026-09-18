@@ -17,6 +17,7 @@ from twodown.config import (
     STUDY_SLUG,
     VOICES,
 )
+from twodown.hints import attach_hint
 from twodown.ingest import LONDON, fetch_daily_posts, posts_for_london_date
 from twodown.models import Clue, DailyPair, SpokenClue
 from twodown.parse import parse_post
@@ -85,54 +86,80 @@ def published_clue(slug: str, site_root: Path | None = None) -> Clue:
     raise FileNotFoundError(f"No published clue {slug}")
 
 
-# Guardian 30115 12a — Aled's study clue. Metadata from Fifteen Squared
+# Guardian 30115 — Aled's study clues. Metadata from Fifteen Squared
 # https://fifteensquared.net/2026/09/18/guardian-cryptic-crossword-no-30115-by-brendan/
-# (setter Brendan, blogger manehi). Clue/parse wording is Aled's.
+# (setter Brendan, blogger manehi). Clue/parse wording is Aled's / the blog.
 _DREAMLIKE_PARSE = (
     'anagram/"Doctor" of (armed)*; plus LIKE="positive response" e.g. on social media. '
     '"Doctor" as a verb meaning to falsify or to tamper with, to indicate the anagram.'
+)
+_RASTA_SOURCE = (
+    "https://fifteensquared.net/2026/09/18/guardian-cryptic-crossword-no-30115-by-brendan/"
 )
 
 
 def dreamlike_clue() -> Clue:
     """Construct DREAMLIKE so we can study the locked beat off the published site.
 
-    Product rule: we are not confident an AI can match a cryptic answer to a
-    hint picture. There is no general matcher. This study clue alone carries a
-    human-chosen definition still for “as in a trance” / dreamlike — not
-    wordplay, not model-selected, and the card must not print DREAMLIKE.
+    Aled's bar: auto / AI matching at about 80% closeness is good enough.
+    attach_hint picks a trance/dream still from the definition text.
+    The still must not print DREAMLIKE.
     """
-    return Clue(
-        source_url="https://fifteensquared.net/2026/09/18/guardian-cryptic-crossword-no-30115-by-brendan/",
-        paper="Guardian",
-        puzzle_id="30115",
-        setter="Brendan",
-        blogger="manehi",
-        number="12",
-        direction="across",
-        clue="Doctor armed with positive response, as in a trance",
-        enumeration="9",
-        answer="DREAMLIKE",
-        definition="as in a trance",
-        parse=_DREAMLIKE_PARSE,
-        device="anagram",
-        enumeration_ok=True,
-        # Curated Commons still (Linda Xu, CC0). Do not fetch/generate via a
-        # general “match answer to picture” model.
-        hint_image="assets/hints/moonlit-moments.webp",
-        hint_credit="Moonlit Moments · Linda Xu / Wikimedia Commons (CC0, via Unsplash)",
-        hint_line="Here's a clue.",
+    return attach_hint(
+        Clue(
+            source_url=_RASTA_SOURCE,
+            paper="Guardian",
+            puzzle_id="30115",
+            setter="Brendan",
+            blogger="manehi",
+            number="12",
+            direction="across",
+            clue="Doctor armed with positive response, as in a trance",
+            enumeration="9",
+            answer="DREAMLIKE",
+            definition="as in a trance",
+            parse=_DREAMLIKE_PARSE,
+            device="anagram",
+            enumeration_ok=True,
+        )
+    )
+
+
+def rasta_clue() -> Clue:
+    """Guardian 30115 20a RASTA — current study Short. On Fifteen Squared."""
+    return attach_hint(
+        Clue(
+            source_url=_RASTA_SOURCE,
+            paper="Guardian",
+            puzzle_id="30115",
+            setter="Brendan",
+            blogger="manehi",
+            number="20",
+            direction="across",
+            clue="One emperor backing follower of another",
+            enumeration="5",
+            answer="RASTA",
+            definition="a follower of the Emperor Haile Selassie",
+            parse="A + TSAR, backing",
+            device="reversal",
+            enumeration_ok=True,
+        )
     )
 
 
 def study_clues() -> dict[str, Clue]:
     """Constructed beat-study clues, keyed by slug and a few aliases."""
-    clue = dreamlike_clue()
+    rasta = rasta_clue()
+    dreamlike = dreamlike_clue()
     return {
-        clue.slug: clue,
-        STUDY_SLUG: clue,
-        "dreamlike": clue,
-        clue.answer.lower(): clue,
+        rasta.slug: rasta,
+        STUDY_SLUG: rasta,
+        "rasta": rasta,
+        "study-rasta-5": rasta,
+        rasta.answer.lower(): rasta,
+        dreamlike.slug: dreamlike,
+        "dreamlike": dreamlike,
+        dreamlike.answer.lower(): dreamlike,
     }
 
 

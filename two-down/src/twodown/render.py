@@ -25,7 +25,7 @@ from twodown.config import (
     NEWS_GRID,
     THINK_PROMPT,
 )
-from twodown.hints import DEFAULT_HINT, ensure_hint_photo
+from twodown.hints import ensure_hint_photo, hint_for_clue
 from twodown.models import Clue
 from twodown.scenes import DEFAULT_SCENE, Scene, get_scene
 from twodown.script import _spoken_parse
@@ -196,9 +196,15 @@ def _footer(draw: ImageDraw.ImageDraw, text: str) -> None:
     _center_text(draw, HEIGHT - 88, text, foot, MUTED, spacing=0)
 
 
-def _draw_hint_photo(img: Image.Image, draw: ImageDraw.ImageDraw, y: int) -> int:
+def _draw_hint_photo(
+    img: Image.Image,
+    draw: ImageDraw.ImageDraw,
+    y: int,
+    clue: Clue,
+) -> int:
     """Inset a credited hint still. Never a full-bleed travel photo."""
-    photo = Image.open(ensure_hint_photo(DEFAULT_HINT)).convert("RGB")
+    matched = hint_for_clue(clue)
+    photo = Image.open(ensure_hint_photo(matched)).convert("RGB")
     frame_w, frame_h = 900, 560
     left = (WIDTH - frame_w) // 2
     crop = _cover_crop(photo, (frame_w - 16, frame_h - 16))
@@ -211,7 +217,8 @@ def _draw_hint_photo(img: Image.Image, draw: ImageDraw.ImageDraw, y: int) -> int
     )
     img.paste(crop, (left + 8, y + 8))
     credit = _font(FONT_SANS, 18)
-    wrapped = _wrap(draw, DEFAULT_HINT.credit_line, credit, WIDTH - 160)
+    line = clue.hint_credit or matched.credit_line
+    wrapped = _wrap(draw, line, credit, WIDTH - 160)
     return _center_text(draw, y + frame_h + 16, wrapped, credit, MUTED, spacing=4)
 
 
@@ -253,9 +260,10 @@ def draw_beat(clue: Clue, dest: Path, beat: str = "think") -> Path:
     if beat == "hint":
         # Empty lights stay; the picture is the hint. Never fill or print the answer.
         prompt_y = min(lights_bottom + 36, 980)
-        wrapped = _wrap(draw, HINT_LINE.rstrip("."), prompt, WIDTH - 160)
+        line = (clue.hint_line or HINT_LINE).rstrip(".")
+        wrapped = _wrap(draw, line, prompt, WIDTH - 160)
         next_y = _center_text(draw, prompt_y, wrapped, prompt, CRIMSON, spacing=8)
-        _draw_hint_photo(img, draw, min(next_y + 18, 1040))
+        _draw_hint_photo(img, draw, min(next_y + 18, 1040), clue)
         _footer(draw, _source_footer(clue))
         img.save(dest, "PNG")
         return dest

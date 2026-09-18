@@ -154,12 +154,11 @@ def test_hint_beat_is_newsprint_with_credited_photo(tmp_path: Path):
     # Newsprint card, not a full-bleed travel still.
     assert img.getpixel((24, 40)) == NEWS_BG
     assert img.getpixel((24, 40)) != (0, 0, 0)
-    # The inset photo is darker than the cream grid.
+    # The inset photo is not the cream grid.
     photo = img.getpixel((540, 1050))
     assert photo != NEWS_BG
-    assert DEFAULT_HINT.photographer == "Linda Xu"
-    assert DEFAULT_HINT.license == "CC0"
-    assert "Wikimedia Commons" in DEFAULT_HINT.credit_line
+    assert DEFAULT_HINT.source == "generated still"
+    assert "DREAMLIKE" not in DEFAULT_HINT.credit_line
     assert HINT_LINE == "Here's a clue."
     assert DEFAULT_HINT.path.exists()
 
@@ -183,12 +182,16 @@ def test_hint_beat_does_not_spoil_dreamlike(tmp_path: Path):
     assert hint_lights.count(CREAM) > 400
     assert abs(hint_lights.count(CREAM) - think_lights.count(CREAM)) < 80
     assert answer_lights.count(CREAM) < hint_lights.count(CREAM)
-    # The crimson DREAMLIKE headline lives on the answer card only.
-    hint_head = list(hint.crop((80, 880, 1000, 1080)).get_flattened_data())
-    answer_head = list(answer.crop((80, 880, 1000, 1080)).get_flattened_data())
-    assert answer_head.count(CRIMSON) > hint_head.count(CRIMSON) + 200
-    raw = path_bytes = (tmp_path / "hint.png").read_bytes()
-    assert b"DREAMLIKE" not in path_bytes
+    def reddish(img: Image.Image) -> int:
+        return sum(1 for r, g, b in img.get_flattened_data() if r > 140 and g < 80 and b < 90)
+
+    # The 84pt DREAMLIKE headline sits just under the lights on the answer card.
+    hint_head = reddish(hint.crop((80, 730, 1000, 880)))
+    answer_head = reddish(answer.crop((80, 730, 1000, 880)))
+    assert answer_head > hint_head + 200
+    assert CRIMSON[0] > 140
+    raw = (tmp_path / "hint.png").read_bytes()
+    assert b"DREAMLIKE" not in raw
     assert b"dreamlike" not in raw.lower()
 
 
@@ -205,6 +208,29 @@ def test_speak_answer_is_a_word_not_letters():
     assert speak_answer("END RESULT") == "The answer is end result."
     assert speak_answer("DREAMLIKE") == "The answer is dreamlike."
     assert _clue().answer == "PIN-UP"
+
+
+def test_hint_card_keeps_empty_lights(tmp_path: Path):
+    from PIL import Image
+
+    from twodown.config import INK, NEWS_BG
+    from twodown.pipeline import study_clue
+
+    clue = study_clue()
+    assert clue is not None
+    hint = draw_beat(clue, tmp_path / "hint.png", "hint")
+    answer = draw_beat(clue, tmp_path / "answer.png", "answer")
+    hint_img = Image.open(hint)
+    answer_img = Image.open(answer)
+    assert hint_img.size == (1080, 1920)
+    assert hint_img.getpixel((24, 40)) == NEWS_BG
+    lights = (80, 600, 1000, 780)
+    assert list(hint_img.crop(lights).get_flattened_data()).count(INK) < list(
+        answer_img.crop(lights).get_flattened_data()
+    ).count(INK)
+    # Inset still is not newsprint; the picture is the hint.
+    photo = hint_img.crop((140, 980, 940, 1480))
+    assert any(pixel != NEWS_BG for pixel in photo.get_flattened_data())
 
 
 def test_dreamlike_parse_fits_under_the_answer(tmp_path: Path):

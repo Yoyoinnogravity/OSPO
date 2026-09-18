@@ -64,17 +64,17 @@ def test_draw_photo_card_is_not_newsprint(tmp_path: Path):
     assert share.getpixel((20, 80)) != NEWS_BG
 
 
-def test_hint_photo_is_credited_commons_not_travel_aurora():
-    from twodown.hints import DEFAULT_HINT, ensure_hint_photo
+def test_hint_photo_is_a_definition_still_not_travel_aurora():
+    from twodown.hints import DEFAULT_HINT, MOONLIT, TRANCE, ensure_hint_photo
 
     photo = ensure_hint_photo()
     assert photo.exists()
-    assert DEFAULT_HINT.commons_file == "Moonlit Moments (Unsplash).jpg"
-    assert DEFAULT_HINT.photographer == "Linda Xu"
-    assert DEFAULT_HINT.license == "CC0"
-    assert "Wikimedia Commons" in DEFAULT_HINT.credit_line
+    assert DEFAULT_HINT.slug == TRANCE.slug
+    assert DEFAULT_HINT.source == "generated still"
+    assert "DREAMLIKE" not in DEFAULT_HINT.credit_line
     assert "aurora" not in DEFAULT_HINT.slug
-    assert DEFAULT_HINT.commons_url.endswith("Moonlit_Moments_(Unsplash).jpg")
+    assert MOONLIT.commons_file == "Moonlit Moments (Unsplash).jpg"
+    assert MOONLIT.source == "Linda Xu"
 
 
 def test_youtube_description_credits_the_photograph():
