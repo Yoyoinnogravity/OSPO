@@ -77,11 +77,16 @@ def test_answer_footer_credits_setter_paper_and_fifteen_squared():
     assert _source_footer(clue) == "Eccles in the Independent · Fifteen Squared"
     guardian = clue.model_copy(update={"setter": "Dice", "paper": "Guardian"})
     assert _source_footer(guardian) == "Dice in the Guardian · Fifteen Squared"
-    from twodown.pipeline import study_clue
+    from twodown.pipeline import dreamlike_clue, rasta_clue, study_clue
 
-    dreamlike = study_clue()
-    assert dreamlike is not None
+    rasta = rasta_clue()
+    assert rasta.answer == "RASTA"
+    assert _source_footer(rasta) == "Brendan in the Guardian · Fifteen Squared"
+    dreamlike = dreamlike_clue()
+    assert dreamlike.answer == "DREAMLIKE"
     assert _source_footer(dreamlike) == "Brendan in the Guardian · Fifteen Squared"
+    assert _source_footer(rasta_clue()) == "Brendan in the Guardian · Fifteen Squared"
+    assert _source_footer(dreamlike_clue()) == "Brendan in the Guardian · Fifteen Squared"
 
 
 def test_parse_under_answer_is_very_bold_ink(tmp_path: Path):
@@ -143,11 +148,11 @@ def test_hint_beat_is_newsprint_with_credited_photo(tmp_path: Path):
     from PIL import Image
 
     from twodown.config import HINT_LINE, NEWS_BG
-    from twodown.hints import DEFAULT_HINT
-    from twodown.pipeline import study_clue
+    from twodown.hints import DEFAULT_HINT, RASTA, TRANCE, ensure_hint_photo
+    from twodown.pipeline import dreamlike_clue, rasta_clue
 
-    clue = study_clue()
-    assert clue is not None
+    clue = dreamlike_clue()
+    assert clue.answer == "DREAMLIKE"
     path = draw_beat(clue, tmp_path / "hint.png", "hint")
     img = Image.open(path)
     assert img.size == (1080, 1920)
@@ -157,21 +162,23 @@ def test_hint_beat_is_newsprint_with_credited_photo(tmp_path: Path):
     # The inset photo is not the cream grid.
     photo = img.getpixel((540, 1050))
     assert photo != NEWS_BG
-    assert DEFAULT_HINT.source == "generated still"
-    assert "DREAMLIKE" not in DEFAULT_HINT.credit_line
+    assert clue.hint_credit == TRANCE.credit_line
+    assert "DREAMLIKE" not in (clue.hint_credit or "")
     assert HINT_LINE == "Here's a clue."
-    assert DEFAULT_HINT.path.exists()
+    assert DEFAULT_HINT.source == "generated still"
+    assert ensure_hint_photo(TRANCE).exists()
+    assert ensure_hint_photo(RASTA).exists()
+    assert rasta_clue().answer == "RASTA"
 
 
-def test_hint_beat_does_not_spoil_dreamlike(tmp_path: Path):
+def test_hint_beat_does_not_spoil_rasta(tmp_path: Path):
     from PIL import Image
 
     from twodown.config import CREAM, CRIMSON
-    from twodown.pipeline import study_clue
+    from twodown.pipeline import rasta_clue
 
-    clue = study_clue()
-    assert clue is not None
-    assert clue.answer == "DREAMLIKE"
+    clue = rasta_clue()
+    assert clue.answer == "RASTA"
     hint = Image.open(draw_beat(clue, tmp_path / "hint.png", "hint"))
     think = Image.open(draw_beat(clue, tmp_path / "think.png", "think"))
     answer = Image.open(draw_beat(clue, tmp_path / "answer.png", "answer"))
@@ -182,10 +189,40 @@ def test_hint_beat_does_not_spoil_dreamlike(tmp_path: Path):
     assert hint_lights.count(CREAM) > 400
     assert abs(hint_lights.count(CREAM) - think_lights.count(CREAM)) < 80
     assert answer_lights.count(CREAM) < hint_lights.count(CREAM)
+
     def reddish(img: Image.Image) -> int:
         return sum(1 for r, g, b in img.get_flattened_data() if r > 140 and g < 80 and b < 90)
 
-    # The 84pt DREAMLIKE headline sits just under the lights on the answer card.
+    # The 84pt RASTA headline sits just under the lights on the answer card.
+    hint_head = reddish(hint.crop((80, 730, 1000, 880)))
+    answer_head = reddish(answer.crop((80, 730, 1000, 880)))
+    assert answer_head > hint_head + 200
+    assert CRIMSON[0] > 140
+    raw = (tmp_path / "hint.png").read_bytes()
+    assert b"RASTA" not in raw
+    assert b"rasta" not in raw.lower()
+
+
+def test_hint_beat_does_not_spoil_dreamlike(tmp_path: Path):
+    from PIL import Image
+
+    from twodown.config import CREAM, CRIMSON
+    from twodown.pipeline import dreamlike_clue
+
+    clue = dreamlike_clue()
+    hint = Image.open(draw_beat(clue, tmp_path / "hint.png", "hint"))
+    think = Image.open(draw_beat(clue, tmp_path / "think.png", "think"))
+    answer = Image.open(draw_beat(clue, tmp_path / "answer.png", "answer"))
+    hint_lights = list(hint.crop((80, 610, 1000, 740)).get_flattened_data())
+    think_lights = list(think.crop((80, 610, 1000, 740)).get_flattened_data())
+    answer_lights = list(answer.crop((80, 610, 1000, 740)).get_flattened_data())
+    assert hint_lights.count(CREAM) > 400
+    assert abs(hint_lights.count(CREAM) - think_lights.count(CREAM)) < 80
+    assert answer_lights.count(CREAM) < hint_lights.count(CREAM)
+
+    def reddish(img: Image.Image) -> int:
+        return sum(1 for r, g, b in img.get_flattened_data() if r > 140 and g < 80 and b < 90)
+
     hint_head = reddish(hint.crop((80, 730, 1000, 880)))
     answer_head = reddish(answer.crop((80, 730, 1000, 880)))
     assert answer_head > hint_head + 200
@@ -196,6 +233,7 @@ def test_hint_beat_does_not_spoil_dreamlike(tmp_path: Path):
 
 
 def test_speak_enumeration_is_separate_from_the_clue():
+    assert speak_enumeration("5") == "Five letters."
     assert speak_enumeration("7") == "Seven letters."
     assert speak_enumeration("9") == "Nine letters."
     assert speak_enumeration("3-2") == "Three hyphen two."
@@ -207,6 +245,7 @@ def test_speak_answer_is_a_word_not_letters():
     assert speak_answer("SMASH-UP") == "The answer is smash-up."
     assert speak_answer("END RESULT") == "The answer is end result."
     assert speak_answer("DREAMLIKE") == "The answer is dreamlike."
+    assert speak_answer("RASTA") == "The answer is rasta."
     assert _clue().answer == "PIN-UP"
 
 
@@ -237,11 +276,10 @@ def test_dreamlike_parse_fits_under_the_answer(tmp_path: Path):
     from PIL import Image, ImageDraw
 
     from twodown.config import FONT_SANS_BOLD, INK
-    from twodown.pipeline import study_clue
+    from twodown.pipeline import dreamlike_clue, rasta_clue
     from twodown.render import PARSE_FONT, PARSE_MAX_LINES, PARSE_SIZE, WIDTH, _font, _wrap
 
-    clue = study_clue()
-    assert clue is not None
+    clue = dreamlike_clue()
     assert clue.answer == "DREAMLIKE"
     path = draw_beat(clue, tmp_path / "dreamlike-answer.png", "answer")
     img = Image.open(path)
@@ -256,6 +294,16 @@ def test_dreamlike_parse_fits_under_the_answer(tmp_path: Path):
     assert 1 <= len(lines) <= PARSE_MAX_LINES
     assert PARSE_SIZE == 60
     assert PARSE_FONT == FONT_SANS_BOLD
+
+    rasta = rasta_clue()
+    rasta_path = draw_beat(rasta, tmp_path / "rasta-answer.png", "answer")
+    rasta_img = Image.open(rasta_path)
+    rasta_band = list(rasta_img.crop((80, 830, 1000, 1500)).get_flattened_data())
+    assert rasta_band.count(INK) > 800
+    rasta_wrapped = _wrap(draw, _spoken_parse(rasta.parse, rasta.answer), parse_font, WIDTH - 160)
+    rasta_lines = [line for line in rasta_wrapped.split("\n") if line.strip()]
+    assert 1 <= len(rasta_lines) <= PARSE_MAX_LINES
+    assert "tsar" in rasta_wrapped.lower() or "TSAR" in rasta_wrapped
 
 
 def test_render_video_is_browser_playable(tmp_path: Path):

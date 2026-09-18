@@ -65,7 +65,7 @@ def test_draw_photo_card_is_not_newsprint(tmp_path: Path):
 
 
 def test_hint_photo_is_a_definition_still_not_travel_aurora():
-    from twodown.hints import DEFAULT_HINT, MOONLIT, TRANCE, ensure_hint_photo
+    from twodown.hints import DEFAULT_HINT, LION, MOONLIT, RASTA, TRANCE, ensure_hint_photo
 
     photo = ensure_hint_photo()
     assert photo.exists()
@@ -75,6 +75,10 @@ def test_hint_photo_is_a_definition_still_not_travel_aurora():
     assert "aurora" not in DEFAULT_HINT.slug
     assert MOONLIT.commons_file == "Moonlit Moments (Unsplash).jpg"
     assert MOONLIT.source == "Linda Xu"
+    assert ensure_hint_photo(RASTA).exists()
+    assert "RASTA" not in RASTA.credit_line
+    assert LION.commons_file == "Flag of Ethiopia (1897–1974).svg"
+    assert "Wikimedia Commons" in LION.credit_line
 
 
 def test_youtube_description_credits_the_photograph():

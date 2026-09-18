@@ -49,8 +49,8 @@ HINT_HOLD_SECONDS = 4.0
 HINT_PAUSE_SECONDS = 2.5
 CLUES_PER_DAY = 2
 # Lock the spoken beat on this constructed study clue before touching the others.
-# DREAMLIKE is not on the published site; render_one_short builds a Clue.
-STUDY_SLUG = "guardian-30115-12a"
+# RASTA is on Fifteen Squared; twodown short rebuilds this clue only.
+STUDY_SLUG = "guardian-30115-20a"
 PINUP_SLUG = "independent-12462-6a"
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[2]

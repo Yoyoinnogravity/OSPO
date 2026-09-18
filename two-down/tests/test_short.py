@@ -17,6 +17,9 @@ def test_study_clue_is_rasta():
     assert clue.number == "20"
     assert clue.direction == "across"
     assert clue.blogger == "manehi"
+    assert "Haile Selassie" in (clue.definition or "")
+    assert clue.hint_line == "Here's a clue."
+    assert clue.hint_image == "assets/hints/rasta-still.webp"
     assert clue.source_url == (
         "https://fifteensquared.net/2026/09/18/guardian-cryptic-crossword-no-30115-by-brendan/"
     )
@@ -60,6 +63,15 @@ def test_five_letters():
     assert clue.enumeration == "5"
     assert speak_enumeration("5") == "Five letters."
     assert speak_enumeration(clue.enumeration) == "Five letters."
+
+
+def test_rasta_stays_constructable():
+    clue = rasta_clue()
+    assert clue.slug == "guardian-30115-20a"
+    assert clue.answer == "RASTA"
+    assert clue.enumeration == "5"
+    assert speak_enumeration("5") == "Five letters."
+    assert speak_answer("RASTA") == "The answer is rasta."
 
 
 def test_spoken_parse_says_tsar_as_a_word():
