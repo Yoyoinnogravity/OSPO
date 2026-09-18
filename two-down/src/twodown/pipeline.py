@@ -252,7 +252,7 @@ def smiles_clue() -> Clue:
             enumeration="6",
             answer="SMILES",
             definition="visibly pleased",
-            parse='S from first in school plus MILES="a long way"',
+            parse='S, first letter of school, plus MILES="a long way"',
             device="charade",
             enumeration_ok=True,
         )

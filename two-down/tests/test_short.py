@@ -23,7 +23,7 @@ from twodown.script import (
 def test_solver_voice_is_clear_libby():
     assert DEFAULT_VOICE_ALIAS == "libby"
     assert VOICES["libby"] == "en-GB-LibbyNeural"
-    assert VOICE_RATE == "-8%"
+    assert VOICE_RATE == "+0%"
 
 
 def test_study_clue_is_smiles():
@@ -41,25 +41,25 @@ def test_study_clue_is_smiles():
     assert clue.direction == "down"
     assert clue.blogger == "manehi"
     assert clue.definition == "visibly pleased"
-    assert clue.hint_line == "Here's a clue."
+    assert clue.hint_line == "Have a look at this."
     assert clue.hint_image == "assets/hints/smiles-still.webp"
     assert clue.source_url == (
         "https://fifteensquared.net/2026/09/18/guardian-cryptic-crossword-no-30115-by-brendan/"
     )
-    assert "first in school" in clue.parse.lower()
+    assert "first letter of school" in clue.parse.lower()
     assert "MILES" in clue.parse
     parts = write_parts(clue)
-    assert parts.intro_speech == "Here is your daily dose of cryptic fun."
+    assert parts.intro_speech == "Right — here's your daily dose of cryptic fun."
     assert parts.clue_speech == "First in school by a long way, is visibly pleased."
-    assert parts.letters_speech == "Six letters."
-    assert parts.think_speech == "Pause the video while you think."
-    assert parts.hint_speech == "Here's a clue."
-    assert parts.answer_speech == "The answer is smiles."
+    assert parts.letters_speech == "That's six letters."
+    assert parts.think_speech == "Pause here. Have a think."
+    assert parts.hint_speech == "Have a look at this."
+    assert parts.answer_speech == "It's smiles."
     assert parts.answer_speech == speak_answer(clue.answer)
     assert parts.outro_speech == "Thanks for thinking with cryptic.fun."
     assert "Brendan" not in parts.parse_speech
     assert "Fifteen Squared" not in parts.parse_speech
-    assert parts.source_speech == "Brendan in the Guardian, via Fifteen Squared."
+    assert parts.source_speech == "That's Brendan, in the Guardian — via Fifteen Squared."
     script = parts.full
     assert script.index(parts.intro_speech) < script.index(parts.clue_speech)
     assert script.index(parts.clue_speech) < script.index(parts.letters_speech)
@@ -75,7 +75,7 @@ def test_study_clue_is_smiles():
 
 
 def test_speak_answer_rasta_is_a_word():
-    assert speak_answer("RASTA") == "The answer is rasta."
+    assert speak_answer("RASTA") == "It's rasta."
     assert speak_answer("RASTA") != "The answer is R-A-S-T-A."
     assert "rasta" in speak_answer("RASTA")
     assert "R-A-S-T-A" not in speak_answer("RASTA")
@@ -83,7 +83,7 @@ def test_speak_answer_rasta_is_a_word():
 
 def test_source_credit_is_its_own_line():
     clue = rasta_clue()
-    assert speak_source(clue) == "Brendan in the Guardian, via Fifteen Squared."
+    assert speak_source(clue) == "That's Brendan, in the Guardian — via Fifteen Squared."
     assert SOURCE_VOICE_ALIAS == "thomas"
     parts = write_parts(clue)
     assert parts.source_speech == speak_source(clue)
@@ -95,8 +95,8 @@ def test_six_letters():
     clue = study_clue()
     assert clue is not None
     assert clue.enumeration == "6"
-    assert speak_enumeration("6") == "Six letters."
-    assert speak_enumeration(clue.enumeration) == "Six letters."
+    assert speak_enumeration("6") == "That's six letters."
+    assert speak_enumeration(clue.enumeration) == "That's six letters."
 
 
 def test_spoken_parse_says_tsar_as_a_word():
@@ -120,7 +120,7 @@ def test_spoken_parse_says_smiles_and_miles_as_words():
     parts = write_parts(clue)
     assert "smiles" in parts.answer_speech
     assert "miles" in parts.parse_speech.lower()
-    assert "first in school" in parts.parse_speech.lower()
+    assert "first letter of school" in parts.parse_speech.lower()
     assert "a long way" in parts.parse_speech.lower()
     assert "visibly pleased" in parts.parse_speech.lower()
     assert "SMILES" not in parts.parse_speech
@@ -190,8 +190,8 @@ def test_dreamlike_stays_constructable():
     clue = dreamlike_clue()
     assert clue.answer == "DREAMLIKE"
     assert clue.slug == "guardian-30115-12a"
-    assert speak_answer("DREAMLIKE") == "The answer is dreamlike."
-    assert speak_enumeration("9") == "Nine letters."
+    assert speak_answer("DREAMLIKE") == "It's dreamlike."
+    assert speak_enumeration("9") == "That's nine letters."
     parts = write_parts(clue)
     assert "armed" in parts.parse_speech
     assert "like" in parts.parse_speech

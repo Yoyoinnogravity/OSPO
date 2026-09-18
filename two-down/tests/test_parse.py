@@ -73,15 +73,15 @@ def test_script_credits_fifteen_squared():
     assert "Phi" in script
     assert "cryptic.fun" in script
     parts = write_parts(clue)
-    assert parts.intro_speech == "Here is your daily dose of cryptic fun."
+    assert parts.intro_speech == "Right — here's your daily dose of cryptic fun."
     assert parts.clue_speech == f"{clue.clue}."
     assert "The clue:" not in parts.clue_speech
     assert "(" not in parts.clue_speech
     assert parts.letters_speech == speak_enumeration(clue.enumeration)
-    assert parts.think_speech == "Pause the video while you think."
-    assert parts.hint_speech == "Here's a clue."
+    assert parts.think_speech == "Pause here. Have a think."
+    assert parts.hint_speech == "Have a look at this."
     assert parts.answer_speech == speak_answer(clue.answer)
-    assert parts.answer_speech == "The answer is end result."
+    assert parts.answer_speech == "It's end result."
     assert "end result" in parts.breakdown
     assert "Fifteen Squared" not in parts.parse_speech
     assert "Fifteen Squared" in parts.source_speech

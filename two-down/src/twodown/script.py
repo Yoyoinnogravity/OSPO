@@ -86,8 +86,8 @@ def speak_enumeration(enumeration: str) -> str:
     text = " ".join(spoken).replace(" ,", ",")
     text = text[:1].upper() + text[1:]
     if len(numbers) == 1 and "-" not in raw and "," not in raw:
-        return f"{text} letters."
-    return f"{text}."
+        return f"That's {text.lower()} letters."
+    return f"That's {text.lower()}."
 
 
 # ALL-CAPS crossword lights/fodder (PIN-UP, PUP, END RESULT). Leave numbers
@@ -104,8 +104,8 @@ def speak_answer(answer: str) -> str:
     """Speak the crossword light as a word, not letter-by-letter."""
     spoken = speak_construction(answer)
     if not spoken:
-        return "The answer is ready."
-    return f"The answer is {spoken}."
+        return "Here it is."
+    return f"It's {spoken}."
 
 
 def speak_parse_tokens(text: str) -> str:
@@ -225,15 +225,18 @@ def speak_source(clue: Clue) -> str:
     setter = (clue.setter or "").strip()
     paper = (clue.paper or "").strip()
     if setter and paper:
-        return f"{setter} in the {paper}, via Fifteen Squared."
+        return f"That's {setter}, in the {paper} — via Fifteen Squared."
     if setter:
-        return f"{setter}, via Fifteen Squared."
-    return "Via Fifteen Squared."
+        return f"That's {setter} — via Fifteen Squared."
+    return "That's via Fifteen Squared."
 
 
 def write_parts(clue: Clue) -> ScriptParts:
     parse = speak_parse_tokens(_spoken_parse(clue.parse, clue.answer))
-    definition = f" It means {clue.definition}." if clue.definition else ""
+    meaning = ""
+    if clue.definition:
+        gloss = clue.definition.strip(" .")
+        meaning = f" {gloss[0].upper()}{gloss[1:]}."
     return ScriptParts(
         intro_speech=INTRO_LINE,
         clue_speech=f"{clue.clue}.",
@@ -241,7 +244,7 @@ def write_parts(clue: Clue) -> ScriptParts:
         think_speech=THINK_PROMPT,
         hint_speech=clue.hint_line or HINT_LINE,
         answer_speech=speak_answer(clue.answer),
-        parse_speech=speak_parse_asides(speak_parse_tokens(f"{parse}{definition}".strip())),
+        parse_speech=speak_parse_asides(speak_parse_tokens(f"{parse}{meaning}".strip())),
         source_speech=speak_source(clue),
         outro_speech=OUTRO_LINE,
     )

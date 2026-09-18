@@ -13,7 +13,7 @@ def test_study_slug_and_hint_fields_are_smiles():
     assert clue.answer == "SMILES"
     assert clue.slug == STUDY_SLUG
     assert clue.definition == "visibly pleased"
-    assert clue.hint_line == "Here's a clue."
+    assert clue.hint_line == "Have a look at this."
     assert clue.hint_image
     assert clue.hint_credit
     # Hint the definition, not school / miles.
@@ -96,7 +96,7 @@ def test_ai_matching_is_allowed():
         )
     )
     assert attached.hint_image.endswith("rasta-still.webp")
-    assert attached.hint_line == "Here's a clue."
+    assert attached.hint_line == "Have a look at this."
 
 
 def test_published_clues_have_optional_hint_fields():
@@ -121,7 +121,7 @@ def test_published_clues_have_optional_hint_fields():
     assert blank.hint_credit is None
     assert blank.hint_line is None
     attached = attach_hint(blank)
-    assert attached.hint_line == "Here's a clue."
+    assert attached.hint_line == "Have a look at this."
     assert attached.hint_image
     assert attached.hint_credit
 

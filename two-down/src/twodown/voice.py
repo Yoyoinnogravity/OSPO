@@ -26,13 +26,16 @@ from twodown.config import (
     SOURCE_PITCH,
     SOURCE_RATE,
     SOURCE_VOICE_ALIAS,
+    SOURCE_VOLUME,
     THINK_PAUSE_SECONDS,
+    INTRO_VOLUME,
     VOICE_PITCH,
     VOICE_RATE,
+    VOICE_VOLUME,
     VOICES,
 )
 from twodown.render import AUDIO_LOUDNESS, ShortTimings, audio_seconds
-from twodown.script import ScriptParts, parse_to_ssml, to_ssml
+from twodown.script import ScriptParts, to_ssml
 
 
 def resolve_voice(name: str | None) -> str:
@@ -54,9 +57,14 @@ async def _synth(
     voice: str,
     rate: str = VOICE_RATE,
     pitch: str = "+0Hz",
+    volume: str = VOICE_VOLUME,
 ) -> None:
     dest.parent.mkdir(parents=True, exist_ok=True)
-    communicate = edge_tts.Communicate(script, voice=voice, rate=rate, pitch=pitch)
+    # Plain speech only. Full <speak> documents get escaped by edge-tts and
+    # the voice starts reading the markup.
+    communicate = edge_tts.Communicate(
+        script, voice=voice, rate=rate, pitch=pitch, volume=volume
+    )
     await communicate.save(str(dest))
 
 
@@ -66,9 +74,19 @@ def synthesise(
     voice: str | None = None,
     rate: str | None = None,
     pitch: str | None = None,
+    volume: str | None = None,
 ) -> Path:
     resolved = resolve_voice(voice)
-    asyncio.run(_synth(script, dest, resolved, rate=rate or VOICE_RATE, pitch=pitch or VOICE_PITCH))
+    asyncio.run(
+        _synth(
+            script,
+            dest,
+            resolved,
+            rate=rate or VOICE_RATE,
+            pitch=pitch or VOICE_PITCH,
+            volume=volume or VOICE_VOLUME,
+        )
+    )
     return dest
 
 
@@ -94,6 +112,7 @@ def build_short_soundtrack(parts: ScriptParts, dest: Path, voice: str | None = N
             INTRO_VOICE_ALIAS,
             rate=INTRO_RATE,
             pitch=INTRO_PITCH,
+            volume=INTRO_VOLUME,
         ),
         "clue": synthesise(parts.clue_speech, work / "clue.mp3", voice),
         "letters": synthesise(parts.letters_speech, work / "letters.mp3", voice),
@@ -101,7 +120,7 @@ def build_short_soundtrack(parts: ScriptParts, dest: Path, voice: str | None = N
         "hint": synthesise(parts.hint_speech, work / "hint.mp3", voice),
         "answer": synthesise(parts.answer_speech, work / "answer.mp3", voice),
         "parse": synthesise(
-            parse_to_ssml(parts.parse_speech),
+            parts.parse_speech,
             work / "parse.mp3",
             voice,
             rate=PARSE_RATE,
@@ -113,6 +132,7 @@ def build_short_soundtrack(parts: ScriptParts, dest: Path, voice: str | None = N
             SOURCE_VOICE_ALIAS,
             rate=SOURCE_RATE,
             pitch=SOURCE_PITCH,
+            volume=SOURCE_VOLUME,
         ),
         "outro": synthesise(
             parts.outro_speech,
@@ -120,6 +140,7 @@ def build_short_soundtrack(parts: ScriptParts, dest: Path, voice: str | None = N
             INTRO_VOICE_ALIAS,
             rate=INTRO_RATE,
             pitch=INTRO_PITCH,
+            volume=INTRO_VOLUME,
         ),
     }
     intro_d = audio_seconds(clips["intro"])
