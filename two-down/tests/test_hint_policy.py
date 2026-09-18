@@ -1,29 +1,42 @@
 from pathlib import Path
 
 from twodown.config import PACKAGE_ROOT, PINUP_SLUG, STUDY_SLUG
-from twodown.hints import CLOSE_ENOUGH, COLE, DAVIS, FATS, RASTA, SMILES, TRANCE, WELLINGTON, attach_hint, match_hint
+from twodown.hints import AIM, CLOSE_ENOUGH, COLE, DAVIS, FATS, RASTA, SMILES, TRANCE, WELLINGTON, attach_hint, match_hint
 from twodown.models import Clue
-from twodown.pipeline import cole_clue, davis_cup_clue, dreamlike_clue, fats_clue, published_clue, rasta_clue, smiles_clue, study_clue, wellington_clue
+from twodown.pipeline import aimlessly_clue, cole_clue, davis_cup_clue, dreamlike_clue, fats_clue, published_clue, rasta_clue, smiles_clue, study_clue, wellington_clue
 
 
-def test_study_slug_and_hint_fields_are_davis_cup():
-    assert STUDY_SLUG == "guardian-30115-18d"
+def test_study_slug_and_hint_fields_are_aimlessly():
+    assert STUDY_SLUG == "guardian-30115-9a"
     clue = study_clue()
     assert clue is not None
-    assert clue.answer == "DAVIS CUP"
+    assert clue.answer == "AIMLESSLY"
     assert clue.slug == STUDY_SLUG
-    assert clue.definition == "international court event"
+    assert clue.definition == "end, as in a goal or aim"
     assert clue.hint_line == "Have a look at this."
     assert clue.hint_image
     assert clue.hint_credit
-    # Hint the tennis-court definition, not divas / cricket / UP.
-    assert "divas" not in clue.hint_credit.lower()
-    assert "cricket" not in clue.hint_credit.lower()
+    # Hint the goal / aim definition, not sly / e-mails / recycle.
+    assert "sly" not in clue.hint_credit.lower()
+    assert "mail" not in clue.hint_credit.lower()
+    assert "recycl" not in clue.hint_credit.lower()
     # Never print the answer on the hint card copy.
-    assert "DAVIS" not in clue.hint_line
-    assert "DAVIS" not in clue.hint_credit
-    assert "CUP" not in clue.hint_line
-    assert "CUP" not in clue.hint_credit
+    assert "AIMLESSLY" not in clue.hint_line
+    assert "AIMLESSLY" not in clue.hint_credit
+
+
+def test_aimlessly_hint_matches_definition_at_80_percent():
+    clue = aimlessly_clue()
+    assert clue.answer == "AIMLESSLY"
+    matched = match_hint(clue.definition or "")
+    assert matched.photo.slug == AIM.slug
+    assert matched.closeness >= CLOSE_ENOUGH
+    assert matched.close_enough
+    assert clue.hint_image == f"assets/hints/{AIM.filename}"
+    assert clue.hint_credit == AIM.credit_line
+    still = PACKAGE_ROOT / clue.hint_image
+    assert still.is_file()
+    assert still.stat().st_size > 0
 
 
 def test_davis_cup_hint_matches_definition_at_80_percent():
@@ -56,6 +69,9 @@ def test_aled_definition_is_close_enough_for_a_reasonable_matcher():
     assert leftover.closeness >= CLOSE_ENOUGH
     leftover = match_hint("international court event")
     assert leftover.photo.slug == DAVIS.slug
+    assert leftover.closeness >= CLOSE_ENOUGH
+    leftover = match_hint("end, as in a goal or aim")
+    assert leftover.photo.slug == AIM.slug
     assert leftover.closeness >= CLOSE_ENOUGH
     rasta = match_hint("a RASTA may be a follower of the Emperor Haile Selassie")
     assert rasta.photo.slug == RASTA.slug

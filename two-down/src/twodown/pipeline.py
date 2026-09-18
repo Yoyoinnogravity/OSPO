@@ -260,7 +260,7 @@ def smiles_clue() -> Clue:
 
 
 def davis_cup_clue() -> Clue:
-    """Guardian 30115 18d DAVIS CUP — current study Short. On Fifteen Squared.
+    """Guardian 30115 18d DAVIS CUP — leftover. Aled said no. On ice.
 
     Hint the tennis-court definition, not divas / cricket C / UP.
     Do not print DAVIS CUP on the hint card.
@@ -285,8 +285,34 @@ def davis_cup_clue() -> Clue:
     )
 
 
+def aimlessly_clue() -> Clue:
+    """Guardian 30115 9a AIMLESSLY — current study Short. On Fifteen Squared.
+
+    Hint end as a goal or aim, not sly / e-mails / recycle.
+    Do not print AIMLESSLY on the hint card.
+    """
+    return attach_hint(
+        Clue(
+            source_url=_RASTA_SOURCE,
+            paper="Guardian",
+            puzzle_id="30115",
+            setter="Brendan",
+            blogger="manehi",
+            number="9",
+            direction="across",
+            clue="Sly e-mails recycled without end",
+            enumeration="9",
+            answer="AIMLESSLY",
+            definition="end, as in a goal or aim",
+            parse='anagram/"recycled" of (Sly e-mails)*',
+            device="anagram",
+            enumeration_ok=True,
+        )
+    )
+
+
 def study_clues() -> dict[str, Clue]:
-    """DAVIS CUP is the study default. Earlier study clues stay constructable."""
+    """AIMLESSLY is the study default. Earlier study clues stay constructable."""
     dreamlike = dreamlike_clue()
     rasta = rasta_clue()
     fats = fats_clue()
@@ -294,6 +320,7 @@ def study_clues() -> dict[str, Clue]:
     cole = cole_clue()
     smiles = smiles_clue()
     davis = davis_cup_clue()
+    aimlessly = aimlessly_clue()
     return {
         dreamlike.slug: dreamlike,
         "dreamlike": dreamlike,
@@ -324,7 +351,11 @@ def study_clues() -> dict[str, Clue]:
         "davis cup": davis,
         "study-davis-cup-5-3": davis,
         davis.answer.lower(): davis,
-        STUDY_SLUG: davis,
+        aimlessly.slug: aimlessly,
+        "aimlessly": aimlessly,
+        "study-aimlessly-9": aimlessly,
+        aimlessly.answer.lower(): aimlessly,
+        STUDY_SLUG: aimlessly,
     }
 
 

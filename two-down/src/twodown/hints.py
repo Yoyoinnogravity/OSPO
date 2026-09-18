@@ -203,6 +203,31 @@ WELLINGTON = HintPhoto(
 )
 
 
+# Definition still for AIMLESSLY: end as a goal or aim.
+# Not sly, not e-mails, not recycle. Never print AIMLESSLY.
+AIM = HintPhoto(
+    slug="aim-still",
+    label="A goal",
+    source="generated still",
+    license="generated",
+    filename="aim-still.webp",
+    keywords=frozenset(
+        {
+            "end",
+            "ends",
+            "ending",
+            "goal",
+            "goals",
+            "aim",
+            "aims",
+            "target",
+            "purpose",
+            "bullseye",
+        }
+    ),
+)
+
+
 # Definition still for DAVIS CUP: tennis court / international court event.
 # Not divas, not cricket, not UP. Never print DAVIS CUP.
 DAVIS = HintPhoto(
@@ -295,6 +320,7 @@ PHOTOS: dict[str, HintPhoto] = {
     COLE.slug: COLE,
     SMILES.slug: SMILES,
     DAVIS.slug: DAVIS,
+    AIM.slug: AIM,
     LION.slug: LION,
     "dreamlike": TRANCE,
     "trance": TRANCE,
@@ -318,13 +344,17 @@ PHOTOS: dict[str, HintPhoto] = {
     "davis-cup": DAVIS,
     "guardian-30115-18d": DAVIS,
     "study-davis-cup-5-3": DAVIS,
+    "aim": AIM,
+    "aimlessly": AIM,
+    "guardian-30115-9a": AIM,
+    "study-aimlessly-9": AIM,
 }
 
 DEFAULT_HINT = TRANCE
 
 
 def _catalog() -> tuple[HintPhoto, ...]:
-    return (TRANCE, MOONLIT, RASTA, FATS, WELLINGTON, COLE, SMILES, DAVIS, LION)
+    return (TRANCE, MOONLIT, RASTA, FATS, WELLINGTON, COLE, SMILES, DAVIS, AIM, LION)
 
 
 def _tokens(text: str) -> frozenset[str]:
@@ -507,6 +537,19 @@ def _generate_davis_still(dest: Path) -> Path:
     return dest
 
 
+def _generate_aim_still(dest: Path) -> Path:
+    """Last-resort target / goal if the file is missing. No answer text."""
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    img = Image.new("RGB", (1280, 720), (243, 234, 214))
+    draw = ImageDraw.Draw(img)
+    draw.ellipse((340, 60, 940, 660), fill=(252, 247, 236))
+    draw.ellipse((400, 120, 880, 600), fill=(184, 28, 41))
+    draw.ellipse((490, 210, 790, 510), fill=(252, 247, 236))
+    draw.ellipse((560, 280, 720, 440), fill=(184, 28, 41))
+    img.save(dest, "WEBP", quality=82, method=6)
+    return dest
+
+
 def ensure_hint_photo(photo: HintPhoto | None = None) -> Path:
     resolved = photo or DEFAULT_HINT
     dest = resolved.path
@@ -526,4 +569,6 @@ def ensure_hint_photo(photo: HintPhoto | None = None) -> Path:
         return _generate_smiles_still(dest)
     if resolved.slug in {DAVIS.slug, "davis", "davis-cup"}:
         return _generate_davis_still(dest)
+    if resolved.slug in {AIM.slug, "aim", "aimlessly"}:
+        return _generate_aim_still(dest)
     return _generate_trance_still(dest)

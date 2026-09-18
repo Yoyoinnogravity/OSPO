@@ -10,6 +10,7 @@ from twodown.pipeline import (
     cole_clue,
     smiles_clue,
     davis_cup_clue,
+    aimlessly_clue,
 )
 from twodown.script import (
     speak_answer,
@@ -37,35 +38,35 @@ def test_parse_is_split_into_spoken_sentences():
     ]
 
 
-def test_study_clue_is_davis_cup():
-    assert STUDY_SLUG == "guardian-30115-18d"
+def test_study_clue_is_aimlessly():
+    assert STUDY_SLUG == "guardian-30115-9a"
     clue = study_clue(STUDY_SLUG)
     assert clue is not None
-    assert clue.slug == "guardian-30115-18d"
-    assert clue.answer == "DAVIS CUP"
-    assert clue.clue == "Frenzied divas caught up in international court event"
-    assert clue.enumeration == "5,3"
+    assert clue.slug == "guardian-30115-9a"
+    assert clue.answer == "AIMLESSLY"
+    assert clue.clue == "Sly e-mails recycled without end"
+    assert clue.enumeration == "9"
     assert clue.setter == "Brendan"
     assert clue.paper == "Guardian"
     assert clue.puzzle_id == "30115"
-    assert clue.number == "18"
-    assert clue.direction == "down"
+    assert clue.number == "9"
+    assert clue.direction == "across"
     assert clue.blogger == "manehi"
-    assert clue.definition == "international court event"
+    assert clue.definition == "end, as in a goal or aim"
     assert clue.hint_line == "Have a look at this."
-    assert clue.hint_image == "assets/hints/davis-cup-still.webp"
+    assert clue.hint_image == "assets/hints/aim-still.webp"
     assert clue.source_url == (
         "https://fifteensquared.net/2026/09/18/guardian-cryptic-crossword-no-30115-by-brendan/"
     )
-    assert "frenzied" in clue.parse.lower()
-    assert "divas" in clue.parse.lower()
+    assert "recycled" in clue.parse.lower()
+    assert "e-mails" in clue.parse.lower()
     parts = write_parts(clue)
     assert parts.intro_speech == "Right — here's your daily dose of cryptic fun."
-    assert parts.clue_speech == "Frenzied divas caught up in international court event."
-    assert parts.letters_speech == "That's five, three."
+    assert parts.clue_speech == "Sly e-mails recycled without end."
+    assert parts.letters_speech == "That's nine letters."
     assert parts.think_speech == "Just pause here, and have a think."
     assert parts.hint_speech == "Have a look at this."
-    assert parts.answer_speech == "It's davis cup."
+    assert parts.answer_speech == "It's aimlessly."
     assert parts.answer_speech == speak_answer(clue.answer)
     assert parts.outro_speech == "Thanks for thinking with cryptic.fun."
     assert "Brendan" not in parts.parse_speech
@@ -103,11 +104,25 @@ def test_source_credit_is_its_own_line():
 
 
 def test_five_three_letters():
-    clue = study_clue()
-    assert clue is not None
+    clue = davis_cup_clue()
     assert clue.enumeration == "5,3"
     assert speak_enumeration("5,3") == "That's five, three."
     assert speak_enumeration(clue.enumeration) == "That's five, three."
+
+
+def test_spoken_parse_says_aimlessly_as_a_word():
+    clue = aimlessly_clue()
+    parts = write_parts(clue)
+    assert "aimlessly" in parts.answer_speech
+    assert "recycled" in parts.parse_speech.lower()
+    assert "sly" in parts.parse_speech.lower()
+    assert "e-mails" in parts.parse_speech.lower() or "emails" in parts.parse_speech.lower()
+    assert "goal" in parts.parse_speech.lower() or "aim" in parts.parse_speech.lower()
+    assert "AIMLESSLY" not in parts.parse_speech
+    assert "A-I-M-L-E-S-S-L-Y" not in parts.parse_speech
+    assert speak_parse_tokens("AIMLESSLY") == "aimlessly"
+    assert "aimlessly" not in parts.hint_speech.lower()
+    assert "AIMLESSLY" not in parts.hint_speech
 
 
 def test_spoken_parse_says_tsar_as_a_word():
@@ -233,7 +248,9 @@ def test_resolve_clue_renders_constructed_study_without_site_html():
     assert constructed is not None
     resolved = resolve_clue("davis-cup", clue=constructed)
     assert resolved is constructed
-    assert resolve_clue(STUDY_SLUG).answer == "DAVIS CUP"
+    assert resolve_clue(STUDY_SLUG).answer == "AIMLESSLY"
+    assert resolve_clue("aimlessly").answer == "AIMLESSLY"
+    assert resolve_clue("davis-cup").answer == "DAVIS CUP"
     assert resolve_clue("smiles").answer == "SMILES"
     assert resolve_clue("cole").answer == "COLE"
     assert resolve_clue("wellington").answer == "WELLINGTON"
