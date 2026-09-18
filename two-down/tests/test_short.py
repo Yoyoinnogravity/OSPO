@@ -1,6 +1,6 @@
 from twodown.config import STUDY_SLUG
 from twodown.pipeline import published_clue
-from twodown.script import speak_answer, write_parts
+from twodown.script import speak_answer, speak_parse_tokens, write_parts
 
 
 def test_study_clue_is_pin_up():
@@ -24,3 +24,17 @@ def test_study_clue_is_pin_up():
     assert script.index(parts.think_speech) < script.index(parts.answer_speech)
     assert script.index(parts.answer_speech) < script.index(parts.parse_speech)
     assert script.index(parts.parse_speech) < script.index(parts.outro_speech)
+
+
+def test_spoken_parse_says_pup_as_a_word():
+    clue = published_clue(STUDY_SLUG)
+    parts = write_parts(clue)
+    assert "pup" in parts.parse_speech
+    assert "PUP" not in parts.parse_speech
+    assert speak_parse_tokens("PUP") == "pup"
+    assert speak_parse_tokens("PUP containing IN") == "pup containing in"
+    assert speak_parse_tokens("PIN-UP") == "pin-up"
+    assert speak_parse_tokens("END RESULT") == "end result"
+    assert speak_parse_tokens("Three hyphen two.") == "Three hyphen two."
+    assert speak_parse_tokens("Slang for an attractive person.") == "Slang for an attractive person."
+    assert speak_parse_tokens("12 across, 3-2") == "12 across, 3-2"

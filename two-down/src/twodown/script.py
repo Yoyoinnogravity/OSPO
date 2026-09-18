@@ -85,12 +85,31 @@ def speak_enumeration(enumeration: str) -> str:
     return f"{text}."
 
 
+# ALL-CAPS crossword lights/fodder (PIN-UP, PUP, END RESULT). Leave numbers
+# and ordinary sentence case alone so Edge-TTS does not spell them.
+_ALL_CAPS_TOKEN = re.compile(r"(?<![A-Za-z])[A-Z]{2,}(?:-[A-Z]+)*(?![A-Za-z])")
+
+
+def speak_construction(text: str) -> str:
+    """Speak a crossword light as a word, not letter-by-letter."""
+    return re.sub(r"\s+", " ", (text or "").strip()).lower()
+
+
 def speak_answer(answer: str) -> str:
     """Speak the crossword light as a word, not letter-by-letter."""
-    spoken = re.sub(r"\s+", " ", (answer or "").strip()).lower()
+    spoken = speak_construction(answer)
     if not spoken:
         return "The answer is ready."
     return f"The answer is {spoken}."
+
+
+def speak_parse_tokens(text: str) -> str:
+    """Lowercase ALL-CAPS constructions in speech so TTS says words, not letters."""
+
+    def _word(match: re.Match[str]) -> str:
+        return speak_construction(match.group(0))
+
+    return _ALL_CAPS_TOKEN.sub(_word, text)
 
 
 def _drop_construction(text: str, answer: str) -> str:
@@ -151,7 +170,7 @@ class ScriptParts:
 
 
 def write_parts(clue: Clue) -> ScriptParts:
-    parse = _spoken_parse(clue.parse, clue.answer)
+    parse = speak_parse_tokens(_spoken_parse(clue.parse, clue.answer))
     definition = f" It means {clue.definition}." if clue.definition else ""
     return ScriptParts(
         intro_speech=INTRO_LINE,
@@ -159,7 +178,7 @@ def write_parts(clue: Clue) -> ScriptParts:
         letters_speech=speak_enumeration(clue.enumeration),
         think_speech=THINK_PROMPT,
         answer_speech=speak_answer(clue.answer),
-        parse_speech=(
+        parse_speech=speak_parse_tokens(
             f"{parse}{definition} "
             f"{clue.setter} in the {clue.paper}, via Fifteen Squared. cryptic.fun."
         ),
