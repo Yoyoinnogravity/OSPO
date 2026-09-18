@@ -10,11 +10,13 @@ def test_study_clue_is_pin_up():
     assert clue.clue == "Model youngster eating in"
     assert clue.enumeration == "3-2"
     parts = write_parts(clue)
+    assert parts.intro_speech == "Here is your daily dose of cryptic fun."
     assert parts.clue_speech == "Model youngster eating in."
     assert parts.letters_speech == "Three hyphen two."
     assert parts.think_speech == "Pause the video while you think."
     assert parts.answer_speech == "The answer is PIN-UP."
     script = parts.full
+    assert script.index(parts.intro_speech) < script.index(parts.clue_speech)
     assert script.index(parts.clue_speech) < script.index(parts.letters_speech)
     assert script.index(parts.letters_speech) < script.index(parts.think_speech)
     assert script.index(parts.think_speech) < script.index(parts.answer_speech)

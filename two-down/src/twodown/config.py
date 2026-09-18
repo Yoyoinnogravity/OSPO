@@ -29,6 +29,11 @@ VOICE_LABELS = {
     "thomas": "Thomas",
 }
 VOICE_RATE = "-8%"
+INTRO_LINE = "Here is your daily dose of cryptic fun."
+INTRO_VOICE_ALIAS = "ryan"
+INTRO_RATE = "+12%"
+INTRO_PITCH = "+8Hz"
+INTRO_GAP_SECONDS = 0.45
 THINK_PAUSE_SECONDS = 7.0
 CLUE_LETTERS_GAP_SECONDS = 0.35
 LETTERS_PAUSE_SECONDS = 1.0

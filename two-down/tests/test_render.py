@@ -53,6 +53,7 @@ def test_clue_card_is_a_solve_along(tmp_path: Path):
     assert img.size == (1080, 1920)
     # Travel photos stay off the Short — the clue is the picture.
     assert img.getpixel((24, 40)) == NEWS_BG
+    assert draw_beat(_clue(), tmp_path / "intro.png", "intro").exists()
     assert draw_beat(_clue(), tmp_path / "only-clue.png", "clue").exists()
     assert draw_beat(_clue(), tmp_path / "letters.png", "letters").exists()
     assert draw_beat(_clue(), tmp_path / "answer.png", "answer").exists()

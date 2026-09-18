@@ -72,6 +72,7 @@ def test_script_credits_fifteen_squared():
     assert "Phi" in script
     assert "cryptic.fun" in script
     parts = write_parts(clue)
+    assert parts.intro_speech == "Here is your daily dose of cryptic fun."
     assert parts.clue_speech == f"{clue.clue}."
     assert "The clue:" not in parts.clue_speech
     assert "(" not in parts.clue_speech
@@ -80,6 +81,7 @@ def test_script_credits_fifteen_squared():
     assert parts.answer_speech == f"The answer is {clue.answer}."
     assert "END RESULT" in parts.breakdown
     assert "Fifteen Squared" in parts.parse_speech
+    assert script.index(parts.intro_speech) < script.index(parts.clue_speech)
     assert script.index(parts.clue_speech) < script.index(parts.letters_speech)
     assert script.index(parts.letters_speech) < script.index("[pause 1s]")
     assert script.index("[pause 1s]") < script.index(parts.think_speech)
@@ -87,6 +89,7 @@ def test_script_credits_fifteen_squared():
     assert script.index("[pause 7s]") < script.index(parts.answer_speech)
     assert script.index(parts.answer_speech) < script.index(parts.parse_speech)
     ssml = to_ssml(parts)
+    assert ssml.index(parts.intro_speech) < ssml.index(parts.clue_speech)
     assert ssml.index(parts.clue_speech) < ssml.index('break time="350ms"')
     assert ssml.index('break time="350ms"') < ssml.index(parts.letters_speech)
     assert ssml.index(parts.letters_speech) < ssml.index('break time="1000ms"')

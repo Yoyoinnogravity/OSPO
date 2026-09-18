@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from twodown.config import (
     ANSWER_PAUSE_SECONDS,
     CLUE_LETTERS_GAP_SECONDS,
+    INTRO_GAP_SECONDS,
+    INTRO_LINE,
     LETTERS_PAUSE_SECONDS,
     THINK_PAUSE_SECONDS,
     THINK_PROMPT,
@@ -109,6 +111,7 @@ def _spoken_parse(parse: str, answer: str = "") -> str:
 
 @dataclass(frozen=True)
 class ScriptParts:
+    intro_speech: str
     clue_speech: str
     letters_speech: str
     think_speech: str
@@ -122,6 +125,7 @@ class ScriptParts:
     @property
     def full(self) -> str:
         return (
+            f"{self.intro_speech}\n"
             f"{self.clue_speech}\n"
             f"{self.letters_speech}\n"
             f"[pause {LETTERS_PAUSE_SECONDS:.0f}s]\n"
@@ -137,6 +141,7 @@ def write_parts(clue: Clue) -> ScriptParts:
     parse = _spoken_parse(clue.parse, clue.answer)
     definition = f" It means {clue.definition}." if clue.definition else ""
     return ScriptParts(
+        intro_speech=INTRO_LINE,
         clue_speech=f"{clue.clue}.",
         letters_speech=speak_enumeration(clue.enumeration),
         think_speech=THINK_PROMPT,
@@ -154,11 +159,14 @@ def write_script(clue: Clue) -> str:
 
 def to_ssml(parts: ScriptParts, pause_seconds: float | None = None) -> str:
     think_ms = int((pause_seconds if pause_seconds is not None else THINK_PAUSE_SECONDS) * 1000)
+    intro_ms = int(INTRO_GAP_SECONDS * 1000)
     gap_ms = int(CLUE_LETTERS_GAP_SECONDS * 1000)
     letters_ms = int(LETTERS_PAUSE_SECONDS * 1000)
     answer_ms = int(ANSWER_PAUSE_SECONDS * 1000)
     return (
         '<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="en-GB">'
+        f"{html.escape(parts.intro_speech, quote=False)}"
+        f'<break time="{intro_ms}ms"/>'
         f"{html.escape(parts.clue_speech, quote=False)}"
         f'<break time="{gap_ms}ms"/>'
         f"{html.escape(parts.letters_speech, quote=False)}"

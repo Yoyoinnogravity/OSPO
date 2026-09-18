@@ -17,6 +17,7 @@ from twodown.config import (
     FONT_SANS,
     FONT_SANS_BOLD,
     INK,
+    INTRO_LINE,
     MUTED,
     NEWS_BG,
     NEWS_GRID,
@@ -180,6 +181,13 @@ def draw_beat(clue: Clue, dest: Path, beat: str = "think") -> Path:
     dest.parent.mkdir(parents=True, exist_ok=True)
     img, draw = _new_card()
     _draw_wordmark(draw)
+    if beat == "intro":
+        line_font = _font(FONT_REGULAR, 72)
+        wrapped = _wrap(draw, INTRO_LINE.rstrip("."), line_font, WIDTH - 160)
+        _center_text(draw, 760, wrapped, line_font, INK, spacing=18)
+        _footer(draw, "")
+        img.save(dest, "PNG")
+        return dest
     _draw_kicker(draw, clue)
     show_lights = beat != "clue"
     filled = beat in {"answer", "parse"}
@@ -288,6 +296,7 @@ def audio_seconds(path: Path) -> float:
 
 @dataclass(frozen=True)
 class ShortTimings:
+    intro: float
     clue: float
     letters: float
     think: float
@@ -296,7 +305,7 @@ class ShortTimings:
 
     @property
     def until_answer(self) -> float:
-        return self.clue + self.letters + self.think
+        return self.intro + self.clue + self.letters + self.think
 
 
 def _encode_clips(clips: list[tuple[Path, float]], audio: Path, dest: Path) -> Path:
@@ -367,9 +376,10 @@ def render_video(
         work = Path("/tmp/twodown-beats") / dest.stem
         work.mkdir(parents=True, exist_ok=True)
         if timings is None:
-            slice_ = max(0.6, duration / 5)
-            timings = ShortTimings(slice_, slice_, slice_, slice_, slice_)
+            slice_ = max(0.6, duration / 6)
+            timings = ShortTimings(slice_, slice_, slice_, slice_, slice_, slice_)
         clips = [
+            (draw_beat(clue, work / "intro.png", "intro"), timings.intro),
             (draw_beat(clue, work / "clue.png", "clue"), timings.clue),
             (draw_beat(clue, work / "letters.png", "letters"), timings.letters),
             (draw_beat(clue, work / "think.png", "think"), timings.think),
