@@ -234,7 +234,7 @@ def cole_clue() -> Clue:
 
 
 def smiles_clue() -> Clue:
-    """Guardian 30115 2d SMILES — current study Short. On Fifteen Squared.
+    """Guardian 30115 2d SMILES — leftover study construct. On Fifteen Squared.
 
     Hint visibly pleased (definition), not school / miles.
     Do not print SMILES on the hint card.
@@ -260,7 +260,7 @@ def smiles_clue() -> Clue:
 
 
 def davis_cup_clue() -> Clue:
-    """Guardian 30115 18d DAVIS CUP — leftover construct. On Fifteen Squared.
+    """Guardian 30115 18d DAVIS CUP — current study Short. On Fifteen Squared.
 
     Hint the tennis-court definition, not divas / cricket C / UP.
     Do not print DAVIS CUP on the hint card.
@@ -286,7 +286,7 @@ def davis_cup_clue() -> Clue:
 
 
 def study_clues() -> dict[str, Clue]:
-    """SMILES is the study default. Earlier study clues stay constructable."""
+    """DAVIS CUP is the study default. Earlier study clues stay constructable."""
     dreamlike = dreamlike_clue()
     rasta = rasta_clue()
     fats = fats_clue()
@@ -324,7 +324,7 @@ def study_clues() -> dict[str, Clue]:
         "davis cup": davis,
         "study-davis-cup-5-3": davis,
         davis.answer.lower(): davis,
-        STUDY_SLUG: smiles,
+        STUDY_SLUG: davis,
     }
 
 

@@ -6,22 +6,24 @@ from twodown.models import Clue
 from twodown.pipeline import cole_clue, davis_cup_clue, dreamlike_clue, fats_clue, published_clue, rasta_clue, smiles_clue, study_clue, wellington_clue
 
 
-def test_study_slug_and_hint_fields_are_smiles():
-    assert STUDY_SLUG == "guardian-30115-2d"
+def test_study_slug_and_hint_fields_are_davis_cup():
+    assert STUDY_SLUG == "guardian-30115-18d"
     clue = study_clue()
     assert clue is not None
-    assert clue.answer == "SMILES"
+    assert clue.answer == "DAVIS CUP"
     assert clue.slug == STUDY_SLUG
-    assert clue.definition == "visibly pleased"
+    assert clue.definition == "international court event"
     assert clue.hint_line == "Have a look at this."
     assert clue.hint_image
     assert clue.hint_credit
-    # Hint the definition, not school / miles.
-    assert "school" not in clue.hint_credit.lower()
-    assert "miles" not in clue.hint_credit.lower()
+    # Hint the tennis-court definition, not divas / cricket / UP.
+    assert "divas" not in clue.hint_credit.lower()
+    assert "cricket" not in clue.hint_credit.lower()
     # Never print the answer on the hint card copy.
-    assert "SMILES" not in clue.hint_line
-    assert "SMILES" not in clue.hint_credit
+    assert "DAVIS" not in clue.hint_line
+    assert "DAVIS" not in clue.hint_credit
+    assert "CUP" not in clue.hint_line
+    assert "CUP" not in clue.hint_credit
 
 
 def test_davis_cup_hint_matches_definition_at_80_percent():

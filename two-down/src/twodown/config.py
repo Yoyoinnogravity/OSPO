@@ -36,7 +36,7 @@ VOICE_VOLUME = "+6%"
 PARSE_RATE = "+2%"
 PARSE_PITCH = "+2Hz"
 PARSE_ASIDE_PAUSE_SECONDS = 0.55
-INTRO_LINE = "Here is your next question."
+INTRO_LINE = "Right — here's your daily dose of cryptic fun."
 INTRO_VOICE_ALIAS = "ryan"
 INTRO_RATE = "+5%"
 INTRO_PITCH = "+3Hz"
@@ -61,8 +61,8 @@ HINT_HOLD_SECONDS = 4.0
 HINT_PAUSE_SECONDS = 2.5
 CLUES_PER_DAY = 2
 # Lock the spoken beat on this constructed study clue before touching the others.
-# SMILES is Guardian 30115 2 down; twodown short rebuilds this clue only.
-STUDY_SLUG = "guardian-30115-2d"
+# DAVIS CUP is Guardian 30115 18 down; twodown short rebuilds this clue only.
+STUDY_SLUG = "guardian-30115-18d"
 PINUP_SLUG = "independent-12462-6a"
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[2]
