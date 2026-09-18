@@ -27,35 +27,35 @@ def test_solver_voice_is_clear_libby():
     assert VOICE_RATE == "+0%"
 
 
-def test_study_clue_is_davis_cup():
-    assert STUDY_SLUG == "guardian-30115-18d"
+def test_study_clue_is_smiles():
+    assert STUDY_SLUG == "guardian-30115-2d"
     clue = study_clue(STUDY_SLUG)
     assert clue is not None
-    assert clue.slug == "guardian-30115-18d"
-    assert clue.answer == "DAVIS CUP"
-    assert clue.clue == "Frenzied divas caught up in international court event"
-    assert clue.enumeration == "5,3"
+    assert clue.slug == "guardian-30115-2d"
+    assert clue.answer == "SMILES"
+    assert clue.clue == "First in school by a long way, is visibly pleased"
+    assert clue.enumeration == "6"
     assert clue.setter == "Brendan"
     assert clue.paper == "Guardian"
     assert clue.puzzle_id == "30115"
-    assert clue.number == "18"
+    assert clue.number == "2"
     assert clue.direction == "down"
     assert clue.blogger == "manehi"
-    assert clue.definition == "international court event"
+    assert clue.definition == "visibly pleased"
     assert clue.hint_line == "Have a look at this."
-    assert clue.hint_image == "assets/hints/davis-cup-still.webp"
+    assert clue.hint_image == "assets/hints/smiles-still.webp"
     assert clue.source_url == (
         "https://fifteensquared.net/2026/09/18/guardian-cryptic-crossword-no-30115-by-brendan/"
     )
-    assert "frenzied" in clue.parse.lower()
-    assert "divas" in clue.parse.lower()
+    assert "first letter of school" in clue.parse.lower()
+    assert "MILES" in clue.parse
     parts = write_parts(clue)
-    assert parts.intro_speech == "Right — here's your daily dose of cryptic fun."
-    assert parts.clue_speech == "Frenzied divas caught up in international court event."
-    assert parts.letters_speech == "That's five, three."
+    assert parts.intro_speech == "Here is your next question."
+    assert parts.clue_speech == "First in school by a long way, is visibly pleased."
+    assert parts.letters_speech == "That's six letters."
     assert parts.think_speech == "Pause here. Have a think."
     assert parts.hint_speech == "Have a look at this."
-    assert parts.answer_speech == "It's davis cup."
+    assert parts.answer_speech == "It's smiles."
     assert parts.answer_speech == speak_answer(clue.answer)
     assert parts.outro_speech == "Thanks for thinking with cryptic.fun."
     assert "Brendan" not in parts.parse_speech
@@ -92,12 +92,12 @@ def test_source_credit_is_its_own_line():
     assert parts.outro_speech == "Thanks for thinking with cryptic.fun."
 
 
-def test_five_three_letters():
+def test_six_letters():
     clue = study_clue()
     assert clue is not None
-    assert clue.enumeration == "5,3"
-    assert speak_enumeration("5,3") == "That's five, three."
-    assert speak_enumeration(clue.enumeration) == "That's five, three."
+    assert clue.enumeration == "6"
+    assert speak_enumeration("6") == "That's six letters."
+    assert speak_enumeration(clue.enumeration) == "That's six letters."
 
 
 def test_spoken_parse_says_tsar_as_a_word():
@@ -219,12 +219,12 @@ def test_dreamlike_stays_constructable():
 
 
 def test_resolve_clue_renders_constructed_study_without_site_html():
-    constructed = study_clue("davis-cup")
+    constructed = study_clue("smiles")
     assert constructed is not None
-    resolved = resolve_clue("davis-cup", clue=constructed)
+    resolved = resolve_clue("smiles", clue=constructed)
     assert resolved is constructed
-    assert resolve_clue(STUDY_SLUG).answer == "DAVIS CUP"
-    assert resolve_clue("smiles").answer == "SMILES"
+    assert resolve_clue(STUDY_SLUG).answer == "SMILES"
+    assert resolve_clue("davis-cup").answer == "DAVIS CUP"
     assert resolve_clue("cole").answer == "COLE"
     assert resolve_clue("wellington").answer == "WELLINGTON"
     assert resolve_clue("fats").answer == "FATS"
