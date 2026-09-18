@@ -19,6 +19,9 @@ from twodown.config import (
     INTRO_VOICE_ALIAS,
     LETTERS_PAUSE_SECONDS,
     OUTRO_GAP_SECONDS,
+    PARSE_ASIDE_PAUSE_SECONDS,
+    PARSE_PITCH,
+    PARSE_RATE,
     SOURCE_GAP_SECONDS,
     SOURCE_PITCH,
     SOURCE_RATE,
@@ -29,7 +32,7 @@ from twodown.config import (
     VOICES,
 )
 from twodown.render import AUDIO_LOUDNESS, ShortTimings, audio_seconds
-from twodown.script import ScriptParts, to_ssml
+from twodown.script import ScriptParts, parse_to_ssml, to_ssml
 
 
 def resolve_voice(name: str | None) -> str:
@@ -97,7 +100,13 @@ def build_short_soundtrack(parts: ScriptParts, dest: Path, voice: str | None = N
         "think": synthesise(parts.think_speech, work / "think.mp3", voice),
         "hint": synthesise(parts.hint_speech, work / "hint.mp3", voice),
         "answer": synthesise(parts.answer_speech, work / "answer.mp3", voice),
-        "parse": synthesise(parts.parse_speech, work / "parse.mp3", voice),
+        "parse": synthesise(
+            parse_to_ssml(parts.parse_speech),
+            work / "parse.mp3",
+            voice,
+            rate=PARSE_RATE,
+            pitch=PARSE_PITCH,
+        ),
         "source": synthesise(
             parts.source_speech,
             work / "source.mp3",

@@ -31,6 +31,10 @@ VOICE_LABELS = {
 # Measured, not breathy. Ryan stays bright on the intro.
 VOICE_RATE = "-8%"
 VOICE_PITCH = "+0Hz"
+# Parse is the same woman, but warmer, with space around the asides.
+PARSE_RATE = "+6%"
+PARSE_PITCH = "+6Hz"
+PARSE_ASIDE_PAUSE_SECONDS = 0.45
 INTRO_LINE = "Here is your daily dose of cryptic fun."
 INTRO_VOICE_ALIAS = "ryan"
 INTRO_RATE = "+12%"

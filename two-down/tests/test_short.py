@@ -8,7 +8,14 @@ from twodown.pipeline import (
     study_clue,
     wellington_clue,
 )
-from twodown.script import speak_answer, speak_enumeration, speak_parse_tokens, speak_source, write_parts
+from twodown.script import (
+    speak_answer,
+    speak_enumeration,
+    speak_parse_asides,
+    speak_parse_tokens,
+    speak_source,
+    write_parts,
+)
 
 
 def test_solver_voice_is_clear_libby():
@@ -109,11 +116,19 @@ def test_spoken_parse_says_tsar_as_a_word():
 def test_spoken_parse_says_wellington_pieces_as_words():
     clue = wellington_clue()
     parts = write_parts(clue)
-    assert "well in" in parts.parse_speech
-    assert "ton" in parts.parse_speech
+    assert "well in" in parts.parse_speech.lower()
+    assert "ton" in parts.parse_speech.lower()
+    assert "(" not in parts.parse_speech
+    assert ")" not in parts.parse_speech
+    assert ". Thoroughly acquainted." in parts.parse_speech
+    assert ". Good." in parts.parse_speech
+    assert ". Style." in parts.parse_speech
     assert "wellington" in parts.answer_speech
     assert "WELLINGTON" not in parts.parse_speech
     assert "W-E-L-L" not in parts.parse_speech
+    spaced = speak_parse_asides("well in (thoroughly acquainted) plus G (good).")
+    assert "(" not in spaced
+    assert spaced.lower().index("well in") < spaced.lower().index("thoroughly acquainted")
     assert speak_parse_tokens("WELL IN") == "well in"
     assert speak_parse_tokens("TON") == "ton"
     assert speak_parse_tokens("WELLINGTON") == "wellington"
@@ -124,8 +139,8 @@ def test_spoken_parse_says_wellington_pieces_as_words():
 def test_spoken_parse_says_fast_as_a_word():
     clue = fats_clue()
     parts = write_parts(clue)
-    assert "fast" in parts.parse_speech
-    assert "final twist" in parts.parse_speech
+    assert "fast" in parts.parse_speech.lower()
+    assert "final twist" in parts.parse_speech.lower()
     assert "fats" in parts.answer_speech
     assert "FAST" not in parts.parse_speech
     assert "FATS" not in parts.parse_speech

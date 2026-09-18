@@ -15,6 +15,7 @@ from twodown.config import (
     LETTERS_PAUSE_SECONDS,
     OUTRO_GAP_SECONDS,
     OUTRO_LINE,
+    PARSE_ASIDE_PAUSE_SECONDS,
     SOURCE_GAP_SECONDS,
     THINK_PAUSE_SECONDS,
     THINK_PROMPT,
@@ -116,6 +117,33 @@ def speak_parse_tokens(text: str) -> str:
     return _ALL_CAPS_TOKEN.sub(_word, text)
 
 
+_ASIDE = re.compile(r"\s*\(([^)]+)\)(?:,)?")
+
+
+def speak_parse_asides(text: str) -> str:
+    """Give parenthetical asides their own sentence so they do not glue to the construction."""
+
+    def _aside(match: re.Match[str]) -> str:
+        inner = re.sub(r"\s+", " ", match.group(1)).strip(" .")
+        if not inner:
+            return ""
+        return f". {inner}."
+
+    opened = _ASIDE.sub(_aside, text)
+    opened = re.sub(r"\.\s*\.", ".", opened)
+    opened = re.sub(r"\.\s*,", ".", opened)
+    opened = re.sub(r"\s+", " ", opened).strip()
+    opened = re.sub(r"\s+([.;,:])", r"\1", opened)
+
+    def _cap(match: re.Match[str]) -> str:
+        return match.group(1) + match.group(2).upper()
+
+    opened = re.sub(r"(^|[.!?]\s+)([a-z])", _cap, opened)
+    if opened and opened[-1] not in ".!?":
+        opened += "."
+    return opened
+
+
 def _drop_construction(text: str, answer: str) -> str:
     tokens = text.split()
     compact = re.sub(r"[^A-Z]", "", answer.upper())
@@ -213,7 +241,7 @@ def write_parts(clue: Clue) -> ScriptParts:
         think_speech=THINK_PROMPT,
         hint_speech=clue.hint_line or HINT_LINE,
         answer_speech=speak_answer(clue.answer),
-        parse_speech=speak_parse_tokens(f"{parse}{definition}".strip()),
+        parse_speech=speak_parse_asides(speak_parse_tokens(f"{parse}{definition}".strip())),
         source_speech=speak_source(clue),
         outro_speech=OUTRO_LINE,
     )
@@ -221,6 +249,22 @@ def write_parts(clue: Clue) -> ScriptParts:
 
 def write_script(clue: Clue) -> str:
     return write_parts(clue).full
+
+
+def parse_to_ssml(text: str) -> str:
+    """Speak the parse with air around each aside / sentence."""
+    pieces = [part.strip() for part in re.split(r"(?<=[.!?])\s+", text) if part.strip()]
+    if not pieces:
+        pieces = [text]
+    pause_ms = int(PARSE_ASIDE_PAUSE_SECONDS * 1000)
+    body = f'<break time="{pause_ms}ms"/>'.join(
+        html.escape(part, quote=False) for part in pieces
+    )
+    return (
+        '<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="en-GB">'
+        f"{body}"
+        "</speak>"
+    )
 
 
 def to_ssml(parts: ScriptParts, pause_seconds: float | None = None) -> str:
