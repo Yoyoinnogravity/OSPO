@@ -44,8 +44,10 @@ LETTERS_PAUSE_SECONDS = 1.0
 ANSWER_PAUSE_SECONDS = 1.2
 THINK_PROMPT = "Pause the video while you think."
 CLUES_PER_DAY = 2
-# Lock the spoken beat on this one published clue before touching the others.
-STUDY_SLUG = "independent-12462-6a"
+# Lock the spoken beat on this constructed study clue before touching the others.
+# DREAMLIKE is not on the published site; render_one_short builds a Clue.
+STUDY_SLUG = "guardian-30115-12a"
+PINUP_SLUG = "independent-12462-6a"
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_OUTPUT = PACKAGE_ROOT / "output"

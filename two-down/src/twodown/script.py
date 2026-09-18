@@ -124,6 +124,13 @@ def _drop_construction(text: str, answer: str) -> str:
 
 def _spoken_parse(parse: str, answer: str = "") -> str:
     text = parse
+    # 15² / Aled notation: LIKE="positive response" and anagram/"Doctor".
+    notation = bool(re.search(r'="|\banagram\s*/', text))
+    text = re.sub(r'="([^"]+)"', r" (\1)", text)
+    text = re.sub(r'(?i)\banagram\s*/\s*"([^"]+)"', r"\1 (anagram indicator)", text)
+    if "anagram indicator" in text.lower():
+        text = re.sub(r"\(([^)]+)\)\*", r"\1", text)
+        text = re.sub(r",?\s*e\.g\.[^.]*", "", text)
     text = text.replace("*", " anagram ")
     text = re.sub(r"\[([^]]+)\]", r" \1 ", text)
     text = text.replace("+", " plus ")
@@ -131,6 +138,11 @@ def _spoken_parse(parse: str, answer: str = "") -> str:
     if answer:
         text = _drop_construction(text, answer)
     text = re.sub(r"\s+", " ", text).strip(" .;,-")
+    if notation and "anagram indicator" in text.lower():
+        first = re.split(r"(?<=\.)\s+", text, maxsplit=1)[0].strip(" .;,-")
+        if first:
+            text = first
+    text = re.sub(r"\s+([.;,:])", r"\1", text)
     if len(text) > 220:
         text = text[:217].rsplit(" ", 1)[0]
     if text and text[-1] not in ".!?":

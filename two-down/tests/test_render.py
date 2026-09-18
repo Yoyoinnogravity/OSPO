@@ -75,6 +75,11 @@ def test_answer_footer_credits_setter_paper_and_fifteen_squared():
     assert _source_footer(clue) == "Eccles in the Independent · Fifteen Squared"
     guardian = clue.model_copy(update={"setter": "Dice", "paper": "Guardian"})
     assert _source_footer(guardian) == "Dice in the Guardian · Fifteen Squared"
+    from twodown.pipeline import study_clue
+
+    dreamlike = study_clue()
+    assert dreamlike is not None
+    assert _source_footer(dreamlike) == "Brendan in the Guardian · Fifteen Squared"
 
 
 def test_parse_under_answer_is_very_bold_ink(tmp_path: Path):
@@ -105,10 +110,10 @@ def test_parse_under_answer_is_very_bold_ink(tmp_path: Path):
     assert band.count(INK) > 800
     assert band.count(MUTED) == 0
 
-    from twodown.config import STUDY_SLUG
+    from twodown.config import PINUP_SLUG
     from twodown.pipeline import published_clue
 
-    pinup = published_clue(STUDY_SLUG)
+    pinup = published_clue(PINUP_SLUG)
     probe = Image.new("RGB", (WIDTH, 200))
     draw = ImageDraw.Draw(probe)
     parse_font = _font(PARSE_FONT, PARSE_SIZE)
@@ -119,6 +124,7 @@ def test_parse_under_answer_is_very_bold_ink(tmp_path: Path):
 
 def test_speak_enumeration_is_separate_from_the_clue():
     assert speak_enumeration("7") == "Seven letters."
+    assert speak_enumeration("9") == "Nine letters."
     assert speak_enumeration("3-2") == "Three hyphen two."
     assert speak_enumeration("3,6") == "Three, six."
 
@@ -127,7 +133,33 @@ def test_speak_answer_is_a_word_not_letters():
     assert speak_answer("PIN-UP") == "The answer is pin-up."
     assert speak_answer("SMASH-UP") == "The answer is smash-up."
     assert speak_answer("END RESULT") == "The answer is end result."
+    assert speak_answer("DREAMLIKE") == "The answer is dreamlike."
     assert _clue().answer == "PIN-UP"
+
+
+def test_dreamlike_parse_fits_under_the_answer(tmp_path: Path):
+    from PIL import Image, ImageDraw
+
+    from twodown.config import FONT_SANS_BOLD, INK
+    from twodown.pipeline import study_clue
+    from twodown.render import PARSE_FONT, PARSE_MAX_LINES, PARSE_SIZE, WIDTH, _font, _wrap
+
+    clue = study_clue()
+    assert clue is not None
+    assert clue.answer == "DREAMLIKE"
+    path = draw_beat(clue, tmp_path / "dreamlike-answer.png", "answer")
+    img = Image.open(path)
+    band = list(img.crop((80, 830, 1000, 1500)).get_flattened_data())
+    assert band.count(INK) > 800
+
+    probe = Image.new("RGB", (WIDTH, 200))
+    draw = ImageDraw.Draw(probe)
+    parse_font = _font(PARSE_FONT, PARSE_SIZE)
+    wrapped = _wrap(draw, _spoken_parse(clue.parse, clue.answer), parse_font, WIDTH - 160)
+    lines = [line for line in wrapped.split("\n") if line.strip()]
+    assert 1 <= len(lines) <= PARSE_MAX_LINES
+    assert PARSE_SIZE == 60
+    assert PARSE_FONT == FONT_SANS_BOLD
 
 
 def test_render_video_is_browser_playable(tmp_path: Path):

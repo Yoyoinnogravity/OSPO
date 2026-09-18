@@ -85,14 +85,70 @@ def published_clue(slug: str, site_root: Path | None = None) -> Clue:
     raise FileNotFoundError(f"No published clue {slug}")
 
 
+# Guardian 30115 12a — Aled's study clue. Metadata from Fifteen Squared
+# https://fifteensquared.net/2026/09/18/guardian-cryptic-crossword-no-30115-by-brendan/
+# (setter Brendan, blogger manehi). Clue/parse wording is Aled's.
+_DREAMLIKE_PARSE = (
+    'anagram/"Doctor" of (armed)*; plus LIKE="positive response" e.g. on social media. '
+    '"Doctor" as a verb meaning to falsify or to tamper with, to indicate the anagram.'
+)
+
+
+def dreamlike_clue() -> Clue:
+    """Construct DREAMLIKE so we can study the locked beat off the published site."""
+    return Clue(
+        source_url="https://fifteensquared.net/2026/09/18/guardian-cryptic-crossword-no-30115-by-brendan/",
+        paper="Guardian",
+        puzzle_id="30115",
+        setter="Brendan",
+        blogger="manehi",
+        number="12",
+        direction="across",
+        clue="Doctor armed with positive response, as in a trance",
+        enumeration="9",
+        answer="DREAMLIKE",
+        definition="as in a trance",
+        parse=_DREAMLIKE_PARSE,
+        device="anagram",
+        enumeration_ok=True,
+    )
+
+
+def study_clues() -> dict[str, Clue]:
+    """Constructed beat-study clues, keyed by slug and a few aliases."""
+    clue = dreamlike_clue()
+    return {
+        clue.slug: clue,
+        STUDY_SLUG: clue,
+        "dreamlike": clue,
+        clue.answer.lower(): clue,
+    }
+
+
+def study_clue(slug: str | None = None) -> Clue | None:
+    """Return a constructed study Clue, or None if this slug is not a study clue."""
+    return study_clues().get(slug or STUDY_SLUG)
+
+
+def resolve_clue(slug: str, site_root: Path | None = None, clue: Clue | None = None) -> Clue:
+    """Prefer a passed Clue, then a constructed study clue, then published site HTML."""
+    if clue is not None:
+        return clue
+    constructed = study_clue(slug)
+    if constructed is not None:
+        return constructed
+    return published_clue(slug, site_root)
+
+
 def render_one_short(
     slug: str = STUDY_SLUG,
     dest: Path | None = None,
     voices: list[str] | None = None,
     publish: bool = True,
+    clue: Clue | None = None,
 ) -> SpokenClue:
     """Rebuild one Short. Does not touch the other published films."""
-    clue = published_clue(slug)
+    clue = resolve_clue(slug, clue=clue)
     aliases = list(voices or [DEFAULT_VOICE_ALIAS])
     primary = aliases[0]
     slot = Path(dest or DEFAULT_OUTPUT) / "study" / clue.slug

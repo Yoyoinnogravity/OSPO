@@ -149,12 +149,12 @@ def main(argv: list[str] | None = None) -> int:
     upload.add_argument("--youtube-privacy", default="public", choices=["unlisted", "private", "public"])
     _add_social_flags(upload)
 
-    short = sub.add_parser("short", help="Rebuild one published Short while we lock the beat")
+    short = sub.add_parser("short", help="Rebuild one Short while we lock the beat")
     short.add_argument(
         "slug",
         nargs="?",
         default=STUDY_SLUG,
-        help=f"Published clue slug (default: {STUDY_SLUG}, the beat study)",
+        help=f"Study or published clue slug (default: {STUDY_SLUG}, DREAMLIKE)",
     )
     short.add_argument("--out", type=Path, default=DEFAULT_OUTPUT)
     short.add_argument("--all-voices", action="store_true", help="Speak all four voices. Default: Sonia only.")
