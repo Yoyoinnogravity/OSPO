@@ -31,6 +31,11 @@ WIDTH, HEIGHT = 1080, 1920
 PHOTO_INK = (252, 247, 236)
 PHOTO_MUTED = (220, 208, 190)
 MARGIN = 72
+# Parse under the answer: how we got there, not a caption.
+PARSE_FONT = FONT_SANS_BOLD
+PARSE_SIZE = 44
+PARSE_FILL = INK
+PARSE_MAX_LINES = 4
 
 
 def _font(path: str, size: int) -> ImageFont.FreeTypeFont:
@@ -224,11 +229,11 @@ def draw_beat(clue: Clue, dest: Path, beat: str = "think") -> Path:
         answer_y = min(lights_bottom + 40, 1080)
         _center_text(draw, answer_y, clue.answer, answer, CRIMSON, spacing=0)
         if show_parse:
-            parse_font = _font(FONT_SANS, 30)
+            parse_font = _font(PARSE_FONT, PARSE_SIZE)
             parse = _wrap(draw, _spoken_parse(clue.parse, clue.answer), parse_font, WIDTH - 160)
-            if parse.count("\n") > 3:
-                parse = "\n".join(parse.split("\n")[:3])
-            _center_text(draw, answer_y + 110, parse, parse_font, MUTED, spacing=8)
+            if parse.count("\n") >= PARSE_MAX_LINES:
+                parse = "\n".join(parse.split("\n")[:PARSE_MAX_LINES])
+            _center_text(draw, answer_y + 110, parse, parse_font, PARSE_FILL, spacing=10)
             _footer(draw, _source_footer(clue))
         else:
             _footer(draw, "")

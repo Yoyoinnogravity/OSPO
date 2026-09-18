@@ -68,6 +68,25 @@ def test_answer_footer_credits_setter_paper_and_fifteen_squared():
     assert _source_footer(guardian) == "Dice in the Guardian · Fifteen Squared"
 
 
+def test_parse_under_answer_is_bold_ink(tmp_path: Path):
+    from PIL import Image
+
+    from twodown.config import FONT_SANS_BOLD, INK, MUTED
+    from twodown.render import PARSE_FILL, PARSE_FONT, PARSE_MAX_LINES, PARSE_SIZE
+
+    assert PARSE_FONT == FONT_SANS_BOLD
+    assert 40 <= PARSE_SIZE <= 48
+    assert PARSE_FILL == INK
+    assert PARSE_MAX_LINES == 4
+
+    path = draw_beat(_clue(), tmp_path / "answer.png", "answer")
+    img = Image.open(path)
+    # Parse sits just under the crimson PIN-UP headline — ink, not muted caption brown.
+    band = list(img.crop((80, 830, 1000, 1100)).get_flattened_data())
+    assert band.count(INK) > 400
+    assert band.count(MUTED) == 0
+
+
 def test_speak_enumeration_is_separate_from_the_clue():
     assert speak_enumeration("7") == "Seven letters."
     assert speak_enumeration("3-2") == "Three hyphen two."
