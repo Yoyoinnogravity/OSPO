@@ -5,7 +5,7 @@ from twodown.devices import classify_device
 from twodown.ingest import LONDON, parse_title
 from twodown.models import PuzzlePost
 from twodown.parse import parse_post, usable
-from twodown.script import speak_enumeration, to_ssml, write_parts, write_script
+from twodown.script import speak_answer, speak_enumeration, to_ssml, write_parts, write_script
 from twodown.select import select_pair
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -68,7 +68,8 @@ def test_script_credits_fifteen_squared():
     clue = next(c for c in parse_post(_post(html)) if c.number == "12")
     script = write_script(clue)
     assert "Fifteen Squared" in script
-    assert "END RESULT" in script
+    assert clue.answer == "END RESULT"
+    assert "end result" in script
     assert "Phi" in script
     assert "cryptic.fun" in script
     parts = write_parts(clue)
@@ -78,9 +79,11 @@ def test_script_credits_fifteen_squared():
     assert "(" not in parts.clue_speech
     assert parts.letters_speech == speak_enumeration(clue.enumeration)
     assert parts.think_speech == "Pause the video while you think."
-    assert parts.answer_speech == f"The answer is {clue.answer}."
-    assert "END RESULT" in parts.breakdown
+    assert parts.answer_speech == speak_answer(clue.answer)
+    assert parts.answer_speech == "The answer is end result."
+    assert "end result" in parts.breakdown
     assert "Fifteen Squared" in parts.parse_speech
+    assert parts.outro_speech == "Thanks for thinking with cryptic.fun."
     assert script.index(parts.intro_speech) < script.index(parts.clue_speech)
     assert script.index(parts.clue_speech) < script.index(parts.letters_speech)
     assert script.index(parts.letters_speech) < script.index("[pause 1s]")
@@ -88,6 +91,7 @@ def test_script_credits_fifteen_squared():
     assert script.index(parts.think_speech) < script.index("[pause 7s]")
     assert script.index("[pause 7s]") < script.index(parts.answer_speech)
     assert script.index(parts.answer_speech) < script.index(parts.parse_speech)
+    assert script.index(parts.parse_speech) < script.index(parts.outro_speech)
     ssml = to_ssml(parts)
     assert ssml.index(parts.intro_speech) < ssml.index(parts.clue_speech)
     assert ssml.index(parts.clue_speech) < ssml.index('break time="350ms"')
@@ -98,6 +102,8 @@ def test_script_credits_fifteen_squared():
     assert ssml.index('break time="7000ms"') < ssml.index(parts.answer_speech)
     assert ssml.index(parts.answer_speech) < ssml.index('break time="1200ms"')
     assert ssml.index('break time="1200ms"') < ssml.index("Fifteen Squared")
+    assert ssml.index("Fifteen Squared") < ssml.index('break time="400ms"')
+    assert ssml.index('break time="400ms"') < ssml.index(parts.outro_speech)
 
 
 def test_parse_title_variants():

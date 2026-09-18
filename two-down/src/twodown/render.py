@@ -19,6 +19,7 @@ from twodown.config import (
     INK,
     INTRO_LINE,
     MUTED,
+    OUTRO_LINE,
     NEWS_BG,
     NEWS_GRID,
     THINK_PROMPT,
@@ -202,9 +203,10 @@ def draw_beat(clue: Clue, dest: Path, beat: str = "think") -> Path:
     dest.parent.mkdir(parents=True, exist_ok=True)
     img, draw = _new_card()
     _draw_wordmark(draw)
-    if beat == "intro":
+    if beat in {"intro", "outro"}:
+        line = INTRO_LINE if beat == "intro" else OUTRO_LINE
         line_font = _font(FONT_REGULAR, 72)
-        wrapped = _wrap(draw, INTRO_LINE.rstrip("."), line_font, WIDTH - 160)
+        wrapped = _wrap(draw, line.rstrip("."), line_font, WIDTH - 160)
         _center_text(draw, 760, wrapped, line_font, INK, spacing=18)
         _footer(draw, "")
         img.save(dest, "PNG")
@@ -323,6 +325,7 @@ class ShortTimings:
     think: float
     answer: float
     parse: float
+    outro: float
 
     @property
     def until_answer(self) -> float:
@@ -398,7 +401,7 @@ def render_video(
         work.mkdir(parents=True, exist_ok=True)
         if timings is None:
             slice_ = max(0.6, duration / 6)
-            timings = ShortTimings(slice_, slice_, slice_, slice_, slice_, slice_)
+            timings = ShortTimings(slice_, slice_, slice_, slice_, slice_, slice_, slice_)
         clips = [
             (draw_beat(clue, work / "intro.png", "intro"), timings.intro),
             (draw_beat(clue, work / "clue.png", "clue"), timings.clue),
@@ -406,6 +409,7 @@ def render_video(
             (draw_beat(clue, work / "think.png", "think"), timings.think),
             (draw_beat(clue, work / "answer.png", "answer"), timings.answer),
             (draw_beat(clue, work / "parse.png", "parse"), timings.parse),
+            (draw_beat(clue, work / "outro.png", "outro"), timings.outro),
         ]
         return _encode_clips(clips, audio, dest)
     if clue_hold is None:

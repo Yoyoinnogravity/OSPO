@@ -16,6 +16,7 @@ from twodown.config import (
     INTRO_RATE,
     INTRO_VOICE_ALIAS,
     LETTERS_PAUSE_SECONDS,
+    OUTRO_GAP_SECONDS,
     THINK_PAUSE_SECONDS,
     VOICE_PITCH,
     VOICE_RATE,
@@ -90,6 +91,13 @@ def build_short_soundtrack(parts: ScriptParts, dest: Path, voice: str | None = N
         "think": synthesise(parts.think_speech, work / "think.mp3", voice),
         "answer": synthesise(parts.answer_speech, work / "answer.mp3", voice),
         "parse": synthesise(parts.parse_speech, work / "parse.mp3", voice),
+        "outro": synthesise(
+            parts.outro_speech,
+            work / "outro.mp3",
+            INTRO_VOICE_ALIAS,
+            rate=INTRO_RATE,
+            pitch=INTRO_PITCH,
+        ),
     }
     intro_d = audio_seconds(clips["intro"])
     clue_d = audio_seconds(clips["clue"])
@@ -97,11 +105,12 @@ def build_short_soundtrack(parts: ScriptParts, dest: Path, voice: str | None = N
     think_d = audio_seconds(clips["think"])
     answer_d = audio_seconds(clips["answer"])
     parse_d = audio_seconds(clips["parse"])
+    outro_d = audio_seconds(clips["outro"])
     ffmpeg = shutil.which("ffmpeg")
     if not ffmpeg:
         raise RuntimeError("ffmpeg is required to build the Short soundtrack")
     cmd = [ffmpeg, "-y"]
-    for key in ("intro", "clue", "letters", "think", "answer", "parse"):
+    for key in ("intro", "clue", "letters", "think", "answer", "parse", "outro"):
         cmd.extend(["-i", str(clips[key])])
     cmd.extend(
         [
@@ -113,12 +122,14 @@ def build_short_soundtrack(parts: ScriptParts, dest: Path, voice: str | None = N
                 "[3:a]aformat=sample_rates=24000:channel_layouts=mono[c3];"
                 "[4:a]aformat=sample_rates=24000:channel_layouts=mono[c4];"
                 "[5:a]aformat=sample_rates=24000:channel_layouts=mono[c5];"
+                "[6:a]aformat=sample_rates=24000:channel_layouts=mono[c6];"
                 f"anullsrc=r=24000:cl=mono:d={INTRO_GAP_SECONDS:.2f}[g0];"
                 f"anullsrc=r=24000:cl=mono:d={CLUE_LETTERS_GAP_SECONDS:.2f}[g];"
                 f"anullsrc=r=24000:cl=mono:d={LETTERS_PAUSE_SECONDS:.2f}[p1];"
                 f"anullsrc=r=24000:cl=mono:d={THINK_PAUSE_SECONDS:.2f}[p2];"
                 f"anullsrc=r=24000:cl=mono:d={ANSWER_PAUSE_SECONDS:.2f}[p3];"
-                "[c0][g0][c1][g][c2][p1][c3][p2][c4][p3][c5]concat=n=11:v=0:a=1[raw];"
+                f"anullsrc=r=24000:cl=mono:d={OUTRO_GAP_SECONDS:.2f}[g1];"
+                "[c0][g0][c1][g][c2][p1][c3][p2][c4][p3][c5][g1][c6]concat=n=13:v=0:a=1[raw];"
                 f"[raw]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,{AUDIO_LOUDNESS}[a]"
             ),
             "-map",
@@ -141,5 +152,6 @@ def build_short_soundtrack(parts: ScriptParts, dest: Path, voice: str | None = N
         letters=letters_d + LETTERS_PAUSE_SECONDS,
         think=think_d + THINK_PAUSE_SECONDS,
         answer=answer_d + ANSWER_PAUSE_SECONDS,
-        parse=parse_d + 0.4,
+        parse=parse_d + OUTRO_GAP_SECONDS,
+        outro=outro_d + 0.4,
     )

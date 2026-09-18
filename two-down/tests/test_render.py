@@ -11,7 +11,7 @@ from twodown.render import (
     draw_reveal_card,
     render_video,
 )
-from twodown.script import _spoken_parse, speak_enumeration
+from twodown.script import _spoken_parse, speak_answer, speak_enumeration
 
 
 def _clue() -> Clue:
@@ -62,6 +62,7 @@ def test_clue_card_is_a_solve_along(tmp_path: Path):
     # Travel photos stay off the Short — the clue is the picture.
     assert img.getpixel((24, 40)) == NEWS_BG
     assert draw_beat(_clue(), tmp_path / "intro.png", "intro").exists()
+    assert draw_beat(_clue(), tmp_path / "outro.png", "outro").exists()
     assert draw_beat(_clue(), tmp_path / "only-clue.png", "clue").exists()
     assert draw_beat(_clue(), tmp_path / "letters.png", "letters").exists()
     assert draw_beat(_clue(), tmp_path / "answer.png", "answer").exists()
@@ -120,6 +121,13 @@ def test_speak_enumeration_is_separate_from_the_clue():
     assert speak_enumeration("7") == "Seven letters."
     assert speak_enumeration("3-2") == "Three hyphen two."
     assert speak_enumeration("3,6") == "Three, six."
+
+
+def test_speak_answer_is_a_word_not_letters():
+    assert speak_answer("PIN-UP") == "The answer is pin-up."
+    assert speak_answer("SMASH-UP") == "The answer is smash-up."
+    assert speak_answer("END RESULT") == "The answer is end result."
+    assert _clue().answer == "PIN-UP"
 
 
 def test_render_video_is_browser_playable(tmp_path: Path):

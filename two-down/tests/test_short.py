@@ -1,6 +1,6 @@
 from twodown.config import STUDY_SLUG
 from twodown.pipeline import published_clue
-from twodown.script import write_parts
+from twodown.script import speak_answer, write_parts
 
 
 def test_study_clue_is_pin_up():
@@ -14,10 +14,13 @@ def test_study_clue_is_pin_up():
     assert parts.clue_speech == "Model youngster eating in."
     assert parts.letters_speech == "Three hyphen two."
     assert parts.think_speech == "Pause the video while you think."
-    assert parts.answer_speech == "The answer is PIN-UP."
+    assert parts.answer_speech == "The answer is pin-up."
+    assert parts.answer_speech == speak_answer(clue.answer)
+    assert parts.outro_speech == "Thanks for thinking with cryptic.fun."
     script = parts.full
     assert script.index(parts.intro_speech) < script.index(parts.clue_speech)
     assert script.index(parts.clue_speech) < script.index(parts.letters_speech)
     assert script.index(parts.letters_speech) < script.index(parts.think_speech)
     assert script.index(parts.think_speech) < script.index(parts.answer_speech)
     assert script.index(parts.answer_speech) < script.index(parts.parse_speech)
+    assert script.index(parts.parse_speech) < script.index(parts.outro_speech)

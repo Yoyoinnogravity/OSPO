@@ -10,6 +10,8 @@ from twodown.config import (
     INTRO_GAP_SECONDS,
     INTRO_LINE,
     LETTERS_PAUSE_SECONDS,
+    OUTRO_GAP_SECONDS,
+    OUTRO_LINE,
     THINK_PAUSE_SECONDS,
     THINK_PROMPT,
 )
@@ -83,6 +85,14 @@ def speak_enumeration(enumeration: str) -> str:
     return f"{text}."
 
 
+def speak_answer(answer: str) -> str:
+    """Speak the crossword light as a word, not letter-by-letter."""
+    spoken = re.sub(r"\s+", " ", (answer or "").strip()).lower()
+    if not spoken:
+        return "The answer is ready."
+    return f"The answer is {spoken}."
+
+
 def _drop_construction(text: str, answer: str) -> str:
     tokens = text.split()
     compact = re.sub(r"[^A-Z]", "", answer.upper())
@@ -117,6 +127,7 @@ class ScriptParts:
     think_speech: str
     answer_speech: str
     parse_speech: str
+    outro_speech: str
 
     @property
     def breakdown(self) -> str:
@@ -133,7 +144,9 @@ class ScriptParts:
             f"[pause {THINK_PAUSE_SECONDS:.0f}s]\n"
             f"{self.answer_speech}\n"
             f"[pause {ANSWER_PAUSE_SECONDS:.0f}s]\n"
-            f"{self.parse_speech}"
+            f"{self.parse_speech}\n"
+            f"[pause {OUTRO_GAP_SECONDS:.1f}s]\n"
+            f"{self.outro_speech}"
         )
 
 
@@ -145,11 +158,12 @@ def write_parts(clue: Clue) -> ScriptParts:
         clue_speech=f"{clue.clue}.",
         letters_speech=speak_enumeration(clue.enumeration),
         think_speech=THINK_PROMPT,
-        answer_speech=f"The answer is {clue.answer}.",
+        answer_speech=speak_answer(clue.answer),
         parse_speech=(
             f"{parse}{definition} "
             f"{clue.setter} in the {clue.paper}, via Fifteen Squared. cryptic.fun."
         ),
+        outro_speech=OUTRO_LINE,
     )
 
 
@@ -163,6 +177,7 @@ def to_ssml(parts: ScriptParts, pause_seconds: float | None = None) -> str:
     gap_ms = int(CLUE_LETTERS_GAP_SECONDS * 1000)
     letters_ms = int(LETTERS_PAUSE_SECONDS * 1000)
     answer_ms = int(ANSWER_PAUSE_SECONDS * 1000)
+    outro_ms = int(OUTRO_GAP_SECONDS * 1000)
     return (
         '<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="en-GB">'
         f"{html.escape(parts.intro_speech, quote=False)}"
@@ -176,5 +191,7 @@ def to_ssml(parts: ScriptParts, pause_seconds: float | None = None) -> str:
         f"{html.escape(parts.answer_speech, quote=False)}"
         f'<break time="{answer_ms}ms"/>'
         f"{html.escape(parts.parse_speech, quote=False)}"
+        f'<break time="{outro_ms}ms"/>'
+        f"{html.escape(parts.outro_speech, quote=False)}"
         "</speak>"
     )
