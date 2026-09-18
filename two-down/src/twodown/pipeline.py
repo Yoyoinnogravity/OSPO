@@ -154,6 +154,7 @@ def run_today(
                     Path(paths[alias]),
                     slot / "short.mp4",
                     clue_hold=item.clue_hold_seconds,
+                    clue=clue,
                 )
                 item.video_path = str(movie)
         spoken.append(item)

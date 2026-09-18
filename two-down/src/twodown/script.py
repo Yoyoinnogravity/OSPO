@@ -58,17 +58,12 @@ class ScriptParts:
 
 def write_parts(clue: Clue) -> ScriptParts:
     enum = f" ({clue.enumeration})" if clue.enumeration else ""
-    device = DEVICE_LINE.get(clue.device, DEVICE_LINE["unknown"])
     parse = _spoken_parse(clue.parse, clue.answer)
     definition = f" It means {clue.definition}." if clue.definition else ""
-    clue_speech = (
-        f"cryptic.fun. {clue.setter} in the {clue.paper}. "
-        f"The clue: {clue.clue}{enum}."
-    )
+    clue_speech = f"The clue: {clue.clue}{enum}."
     breakdown = (
-        f"{device} {parse} "
-        f"The answer is {clue.answer}.{definition} "
-        f"Parse via Fifteen Squared, {clue.blogger}."
+        f"The answer is {clue.answer}.{definition} {parse} "
+        f"{clue.setter} in the {clue.paper}, via Fifteen Squared. cryptic.fun."
     )
     return ScriptParts(clue_speech=clue_speech, breakdown=breakdown)
 

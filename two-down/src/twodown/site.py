@@ -139,6 +139,16 @@ button.reveal {
 article.clue.is-open .spoiler { display: block; }
 article.clue.is-open button.reveal { display: none; }
 video { width: 100%; background: #111; }
+video.short {
+  display: block;
+  width: min(100%, 22rem);
+  max-height: min(72vh, 38rem);
+  height: auto;
+  aspect-ratio: 9 / 16;
+  margin: 0 auto;
+  background: #111;
+  border-radius: 12px;
+}
 audio.parse-voice { width: 100%; margin-top: 8px; }
 .answer { font-size: 2rem; color: var(--crimson); margin: 12px 0 6px; }
 .parse { color: var(--muted); font-size: 0.98rem; }
@@ -251,6 +261,8 @@ function applyVoice(alias) {
       if (wasPlaying) audio.play();
     };
     audio.addEventListener("loadedmetadata", resume, { once: true });
+    const video = article.querySelector("video");
+    if (video) video.muted = alias !== "sonia";
   });
 }
 
@@ -330,8 +342,17 @@ document.querySelectorAll("article.clue").forEach((article) => {
   const video = article.querySelector("video");
   const audio = article.querySelector("audio.parse-voice");
   if (!video || !audio) return;
-  video.muted = true;
+  const otherVoice = () => currentVoice() !== "sonia";
+  const applyMute = () => {
+    video.muted = otherVoice();
+  };
+  applyMute();
   video.addEventListener("play", () => {
+    applyMute();
+    if (!otherVoice()) {
+      audio.pause();
+      return;
+    }
     audio.currentTime = video.currentTime;
     audio.play();
   });
@@ -597,7 +618,10 @@ def _article(item: SpokenClue, media_prefix: str, open_by_default: bool = False,
     opened = " is-open" if open_by_default else ""
     video = ""
     if item.video_path:
-        video = f'<video controls playsinline muted src="{_e(media_prefix + clue.slug + ".mp4")}"></video>'
+        video = (
+            f'<video class="short" controls playsinline preload="metadata" '
+            f'src="{_e(media_prefix + clue.slug + ".mp4")}"></video>'
+        )
     audio = (
         f'<audio class="parse-voice" controls preload="none" data-prefix="{_e(media_prefix)}" '
         f'src="{_e(media_prefix + clue.slug)}-sonia.mp3"></audio>'

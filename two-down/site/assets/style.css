@@ -109,6 +109,16 @@ button.reveal {
 article.clue.is-open .spoiler { display: block; }
 article.clue.is-open button.reveal { display: none; }
 video { width: 100%; background: #111; }
+video.short {
+  display: block;
+  width: min(100%, 22rem);
+  max-height: min(72vh, 38rem);
+  height: auto;
+  aspect-ratio: 9 / 16;
+  margin: 0 auto;
+  background: #111;
+  border-radius: 12px;
+}
 audio.parse-voice { width: 100%; margin-top: 8px; }
 .answer { font-size: 2rem; color: var(--crimson); margin: 12px 0 6px; }
 .parse { color: var(--muted); font-size: 0.98rem; }

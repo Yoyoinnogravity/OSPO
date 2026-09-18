@@ -1,13 +1,14 @@
 from __future__ import annotations
 
+import re
 import shutil
 import subprocess
-import textwrap
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
 from twodown.config import (
+    CREAM,
     CRIMSON,
     FONT_BOLD,
     FONT_REGULAR,
@@ -17,6 +18,7 @@ from twodown.config import (
     MUTED,
     NEWS_BG,
     NEWS_GRID,
+    THINK_PAUSE_SECONDS,
 )
 from twodown.models import Clue
 from twodown.scenes import DEFAULT_SCENE, Scene, get_scene
@@ -25,7 +27,7 @@ from twodown.script import _spoken_parse
 WIDTH, HEIGHT = 1080, 1920
 PHOTO_INK = (252, 247, 236)
 PHOTO_MUTED = (220, 208, 190)
-PHOTO_SHADOW = (8, 6, 4)
+MARGIN = 72
 
 
 def _font(path: str, size: int) -> ImageFont.FreeTypeFont:
@@ -61,32 +63,6 @@ def _cover_crop(photo: Image.Image, size: tuple[int, int] = (WIDTH, HEIGHT)) -> 
     return image.crop((left, top, left + width, top + height))
 
 
-def _gradient_band(size: tuple[int, int], top: bool, depth: int, max_alpha: int) -> Image.Image:
-    width, height = size
-    ramp = Image.linear_gradient("L")
-    if not top:
-        ramp = ramp.transpose(Image.Transpose.FLIP_TOP_BOTTOM)
-    strip = ramp.resize((width, depth), Image.Resampling.BILINEAR)
-    alpha = Image.new("L", (width, height), 0)
-    alpha.paste(strip.point(lambda p: int(p * max_alpha / 255)), (0, 0 if top else height - depth))
-    overlay = Image.new("RGBA", (width, height), (10, 8, 6, 0))
-    overlay.putalpha(alpha)
-    return overlay
-
-
-def _photo_canvas(scene: Scene) -> Image.Image:
-    path = scene.path
-    if path is None or not path.exists():
-        img, _ = _newsprint_canvas()
-        return img
-    base = _cover_crop(Image.open(path)).convert("RGBA")
-    dim = Image.new("RGBA", (WIDTH, HEIGHT), (12, 10, 8, 78))
-    base = Image.alpha_composite(base, dim)
-    base = Image.alpha_composite(base, _gradient_band((WIDTH, HEIGHT), top=True, depth=520, max_alpha=170))
-    base = Image.alpha_composite(base, _gradient_band((WIDTH, HEIGHT), top=False, depth=420, max_alpha=190))
-    return base.convert("RGB")
-
-
 def _newsprint_canvas() -> tuple[Image.Image, ImageDraw.ImageDraw]:
     img = Image.new("RGB", (WIDTH, HEIGHT), NEWS_BG)
     draw = ImageDraw.Draw(img)
@@ -94,131 +70,158 @@ def _newsprint_canvas() -> tuple[Image.Image, ImageDraw.ImageDraw]:
         draw.line([(x, 0), (x, HEIGHT)], fill=NEWS_GRID, width=1)
     for y in range(0, HEIGHT, 54):
         draw.line([(0, y), (WIDTH, y)], fill=NEWS_GRID, width=1)
+    draw.rectangle([0, 0, WIDTH, 18], fill=CRIMSON)
+    draw.rectangle([0, HEIGHT - 18, WIDTH, HEIGHT], fill=CRIMSON)
     return img, draw
 
 
-def _canvas(scene: Scene) -> tuple[Image.Image, ImageDraw.ImageDraw, bool]:
-    if scene.is_photo:
-        img = _photo_canvas(scene)
-        draw = ImageDraw.Draw(img)
-        photo = True
-    else:
-        img, draw = _newsprint_canvas()
-        photo = False
-    draw.rectangle([64, 64, WIDTH - 64, 72], fill=CRIMSON)
-    draw.rectangle([64, HEIGHT - 72, WIDTH - 64, HEIGHT - 64], fill=CRIMSON)
-    return img, draw, photo
+def _enum_groups(clue: Clue) -> list[int]:
+    found = [int(n) for n in re.findall(r"\d+", clue.enumeration or "")]
+    if found:
+        return found
+    letters = re.sub(r"[^A-Za-z]", "", clue.answer)
+    return [len(letters)] if letters else [1]
 
 
-def _palette(photo: bool) -> tuple[tuple[int, int, int], tuple[int, int, int], tuple[int, int, int] | None]:
-    if photo:
-        return PHOTO_INK, PHOTO_MUTED, PHOTO_SHADOW
-    return INK, MUTED, None
+def _cell_letters(clue: Clue, groups: list[int]) -> list[str]:
+    compact = re.sub(r"[^A-Za-z]", "", clue.answer).upper()
+    needed = sum(groups)
+    compact = (compact + (" " * needed))[:needed]
+    return list(compact)
 
 
-def _text(
+def _center_text(
     draw: ImageDraw.ImageDraw,
-    xy: tuple[int, int],
+    y: int,
     text: str,
     font: ImageFont.FreeTypeFont,
     fill: tuple[int, int, int],
-    shadow: tuple[int, int, int] | None = None,
-) -> None:
-    if shadow:
-        draw.text((xy[0] + 2, xy[1] + 3), text, font=font, fill=shadow)
-    draw.text(xy, text, font=font, fill=fill)
-
-
-def _multiline(
-    draw: ImageDraw.ImageDraw,
-    xy: tuple[int, int],
-    text: str,
-    font: ImageFont.FreeTypeFont,
-    fill: tuple[int, int, int],
-    spacing: int,
-    shadow: tuple[int, int, int] | None = None,
-) -> tuple[int, int, int, int]:
-    if shadow:
-        draw.multiline_text((xy[0] + 2, xy[1] + 3), text, font=font, fill=shadow, spacing=spacing)
-    draw.multiline_text(xy, text, font=font, fill=fill, spacing=spacing)
-    return draw.multiline_textbbox(xy, text, font=font, spacing=spacing)
-
-
-def _wordmark(draw: ImageDraw.ImageDraw, ink: tuple[int, int, int], shadow: tuple[int, int, int] | None) -> None:
-    brand = _font(FONT_SANS_BOLD, 42)
-    _text(draw, (80, 100), "cryptic", brand, ink, shadow)
-    w = draw.textlength("cryptic", font=brand)
-    _text(draw, (80 + int(w), 100), ".fun", brand, CRIMSON, shadow)
-
-
-def _meta(
-    draw: ImageDraw.ImageDraw,
-    clue: Clue,
-    muted: tuple[int, int, int],
-    shadow: tuple[int, int, int] | None,
-) -> None:
-    meta = _font(FONT_SANS, 28)
-    _text(draw, (80, 168), f"{clue.paper} {clue.puzzle_id}  ·  {clue.setter}", meta, muted, shadow)
-    _text(draw, (80, 210), f"{clue.number} {clue.direction}  ·  {clue.device}", meta, CRIMSON, shadow)
-
-
-def _clue_block(
-    draw: ImageDraw.ImageDraw,
-    clue: Clue,
-    ink: tuple[int, int, int],
-    shadow: tuple[int, int, int] | None,
-    y: int = 320,
+    *,
+    spacing: int = 10,
 ) -> int:
-    clue_font = _font(FONT_REGULAR, 56)
+    cursor = y
+    for line in text.split("\n"):
+        width = draw.textlength(line, font=font)
+        draw.text(((WIDTH - width) / 2, cursor), line, font=font, fill=fill)
+        box = draw.textbbox((0, 0), line or " ", font=font)
+        cursor += (box[3] - box[1]) + spacing
+    return cursor
+
+
+def _draw_wordmark(draw: ImageDraw.ImageDraw) -> None:
+    brand = _font(FONT_SANS_BOLD, 34)
+    cryptic = "cryptic"
+    w = draw.textlength(cryptic, font=brand)
+    x = (WIDTH - w - draw.textlength(".fun", font=brand)) / 2
+    draw.text((x, 48), cryptic, font=brand, fill=INK)
+    draw.text((x + w, 48), ".fun", font=brand, fill=CRIMSON)
+
+
+def _draw_kicker(draw: ImageDraw.ImageDraw, clue: Clue) -> None:
+    kicker = _font(FONT_SANS, 24)
+    line = f"{clue.paper} {clue.puzzle_id}  ·  {clue.setter}  ·  {clue.number} {clue.direction}"
+    _center_text(draw, 100, line.upper(), kicker, MUTED, spacing=0)
+
+
+def _draw_clue(draw: ImageDraw.ImageDraw, clue: Clue, y: int = 280) -> int:
+    clue_font = _font(FONT_REGULAR, 68)
     body = f"{clue.clue} ({clue.enumeration})" if clue.enumeration else clue.clue
-    wrapped = _wrap(draw, body, clue_font, WIDTH - 160)
-    box = _multiline(draw, (80, y), wrapped, clue_font, ink, 18, shadow)
-    return box[3]
+    wrapped = _wrap(draw, body, clue_font, WIDTH - (MARGIN * 2))
+    return _center_text(draw, y, wrapped, clue_font, INK, spacing=16)
 
 
-def _credit(draw: ImageDraw.ImageDraw, scene: Scene, muted: tuple[int, int, int], shadow: tuple[int, int, int] | None) -> None:
+def _draw_lights(
+    draw: ImageDraw.ImageDraw,
+    clue: Clue,
+    y: int,
+    *,
+    filled: bool,
+) -> int:
+    groups = _enum_groups(clue)
+    letters = _cell_letters(clue, groups)
+    total = sum(groups)
+    gap = 8
+    hyphen_w = 28
+    cell = min(92, int((WIDTH - 160 - (total - 1) * gap - max(0, len(groups) - 1) * hyphen_w) / max(total, 1)))
+    cell = max(52, cell)
+    row_w = total * cell + max(0, total - 1) * gap + max(0, len(groups) - 1) * hyphen_w
+    x = (WIDTH - row_w) // 2
+    letter_i = 0
+    font = _font(FONT_SANS_BOLD, max(30, cell - 24))
+    for g, size in enumerate(groups):
+        if g:
+            mid_y = y + cell // 2
+            draw.rectangle([x + 4, mid_y - 3, x + hyphen_w - 4, mid_y + 3], fill=INK)
+            x += hyphen_w
+        for _ in range(size):
+            box = (x, y, x + cell, y + cell)
+            draw.rounded_rectangle(box, radius=6, fill=CREAM, outline=INK, width=3)
+            if filled:
+                glyph = letters[letter_i]
+                if glyph.strip():
+                    draw.text((x + cell / 2, y + cell / 2), glyph, font=font, fill=INK, anchor="mm")
+            letter_i += 1
+            x += cell + gap
+    return y + cell
+
+
+def _draw_countdown(draw: ImageDraw.ImageDraw, n: int, y: int) -> None:
+    number = _font(FONT_SANS_BOLD, 160)
+    label = _font(FONT_SANS, 28)
+    _center_text(draw, y, str(n), number, CRIMSON, spacing=0)
+    _center_text(draw, y + 170, "YOUR GO", label, MUTED, spacing=0)
+
+
+def _footer(draw: ImageDraw.ImageDraw, text: str) -> None:
     foot = _font(FONT_SANS, 22)
-    _text(draw, (80, HEIGHT - 118), scene.credit_line[:64], foot, muted, shadow)
+    _center_text(draw, HEIGHT - 88, text, foot, MUTED, spacing=0)
 
 
-def _resolve_scene(scene: str | Scene | None) -> Scene:
-    if isinstance(scene, Scene):
-        return scene
-    return get_scene(scene or DEFAULT_SCENE)
+def _new_card() -> tuple[Image.Image, ImageDraw.ImageDraw]:
+    return _newsprint_canvas()
 
 
-def draw_clue_card(clue: Clue, dest: Path, scene: str | Scene | None = None) -> Path:
+def draw_clue_card(
+    clue: Clue,
+    dest: Path,
+    scene: str | Scene | None = None,
+    countdown: int | None = None,
+) -> Path:
+    """Solve-along think frame. Scene is ignored: the clue is the picture."""
     dest.parent.mkdir(parents=True, exist_ok=True)
-    resolved = _resolve_scene(scene)
-    img, draw, photo = _canvas(resolved)
-    ink, muted, shadow = _palette(photo)
-    _wordmark(draw, ink, shadow)
-    _meta(draw, clue, muted, shadow)
-    _clue_block(draw, clue, ink, shadow)
-    hint = _font(FONT_SANS, 28)
-    _text(draw, (80, HEIGHT - 180), "Have a think. Answer in a moment.", hint, muted, shadow)
-    _credit(draw, resolved, muted, shadow)
+    img, draw = _new_card()
+    _draw_wordmark(draw)
+    _draw_kicker(draw, clue)
+    bottom = _draw_clue(draw, clue, y=240)
+    lights_y = min(max(bottom + 48, 680), 900)
+    lights_bottom = _draw_lights(draw, clue, lights_y, filled=False)
+    if countdown is not None:
+        _draw_countdown(draw, countdown, min(lights_bottom + 48, 1180))
+    else:
+        hint = _font(FONT_SANS, 30)
+        _center_text(draw, min(lights_bottom + 56, 1200), "Have a go.", hint, MUTED)
+    _footer(draw, "Answer after the pause")
     img.save(dest, "PNG")
     return dest
 
 
 def draw_reveal_card(clue: Clue, dest: Path, scene: str | Scene | None = None) -> Path:
     dest.parent.mkdir(parents=True, exist_ok=True)
-    resolved = _resolve_scene(scene)
-    img, draw, photo = _canvas(resolved)
-    ink, muted, shadow = _palette(photo)
-    _wordmark(draw, ink, shadow)
-    _meta(draw, clue, muted, shadow)
-    bottom = _clue_block(draw, clue, ink, shadow, y=280)
-    answer_font = _font(FONT_BOLD, 72)
-    parse_font = _font(FONT_SANS, 26)
-    answer_y = min(max(bottom + 70, 860), 1180)
-    _text(draw, (80, answer_y), clue.answer, answer_font, CRIMSON, shadow)
-    parse = textwrap.fill(_spoken_parse(clue.parse, clue.answer), width=40)
-    _multiline(draw, (80, answer_y + 110), parse[:300], parse_font, muted, 8, shadow)
-    foot = _font(FONT_SANS, 24)
-    _text(draw, (80, HEIGHT - 180), "Parse via Fifteen Squared", foot, muted, shadow)
-    _credit(draw, resolved, muted, shadow)
+    img, draw = _new_card()
+    _draw_wordmark(draw)
+    _draw_kicker(draw, clue)
+    bottom = _draw_clue(draw, clue, y=220)
+    lights_y = min(max(bottom + 40, 600), 820)
+    lights_bottom = _draw_lights(draw, clue, lights_y, filled=True)
+    answer = _font(FONT_BOLD, 84)
+    answer_y = min(lights_bottom + 40, 1100)
+    _center_text(draw, answer_y, clue.answer, answer, CRIMSON, spacing=0)
+    parse_font = _font(FONT_SANS, 30)
+    parse = _wrap(draw, _spoken_parse(clue.parse, clue.answer), parse_font, WIDTH - 160)
+    if parse.count("\n") > 3:
+        parse = "\n".join(parse.split("\n")[:3])
+    _center_text(draw, answer_y + 110, parse, parse_font, MUTED, spacing=8)
+    _footer(draw, "Parse via Fifteen Squared")
     img.save(dest, "PNG")
     return dest
 
@@ -286,6 +289,7 @@ def render_video(
     audio: Path,
     dest: Path,
     clue_hold: float | None = None,
+    clue: Clue | None = None,
 ) -> Path:
     dest.parent.mkdir(parents=True, exist_ok=True)
     ffmpeg = shutil.which("ffmpeg")
@@ -297,41 +301,66 @@ def render_video(
     else:
         clue_secs = max(4.0, min(clue_hold, duration - 4.0))
     reveal_secs = max(4.0, duration - clue_secs + 0.4)
-    cmd = [
-        ffmpeg,
-        "-y",
-        "-loop",
-        "1",
-        "-t",
-        f"{clue_secs:.2f}",
-        "-i",
-        str(clue_card),
-        "-loop",
-        "1",
-        "-t",
-        f"{reveal_secs:.2f}",
-        "-i",
-        str(reveal_card),
-        "-i",
-        str(audio),
-        "-filter_complex",
-        "[0:v]fps=30,scale=1080:1920,setsar=1[v0];"
-        "[1:v]fps=30,scale=1080:1920,setsar=1[v1];"
-        "[v0][v1]concat=n=2:v=1:a=0,format=yuv420p[v]",
-        "-map",
-        "[v]",
-        "-map",
-        "2:a",
-        "-c:v",
-        "libx264",
-        "-tune",
-        "stillimage",
-        "-c:a",
-        "aac",
-        "-b:a",
-        "192k",
-        "-shortest",
-        str(dest),
-    ]
+    think = min(int(THINK_PAUSE_SECONDS), max(1, int(clue_secs)))
+    intro = max(0.35, clue_secs - think)
+    clips: list[tuple[Path, float]] = [(clue_card, intro)]
+    work = dest.parent / f".{dest.stem}-counts"
+    work.mkdir(parents=True, exist_ok=True)
+    for n in range(think, 0, -1):
+        frame = work / f"count-{n}.png"
+        if clue is not None:
+            draw_clue_card(clue, frame, countdown=n)
+        else:
+            img = Image.open(clue_card).convert("RGB")
+            draw = ImageDraw.Draw(img)
+            _draw_countdown(draw, n, 1280)
+            img.save(frame, "PNG")
+        clips.append((frame, 1.0))
+    clips.append((reveal_card, reveal_secs))
+    cmd: list[str] = [ffmpeg, "-y"]
+    filters: list[str] = []
+    for i, (path, hold) in enumerate(clips):
+        cmd.extend(["-loop", "1", "-t", f"{hold:.2f}", "-i", str(path)])
+        filters.append(f"[{i}:v]fps=30,scale=1080:1920,setsar=1,format=yuv420p[v{i}]")
+    audio_i = len(clips)
+    cmd.extend(["-i", str(audio)])
+    concat = "".join(f"[v{i}]" for i in range(len(clips))) + f"concat=n={len(clips)}:v=1:a=0[v]"
+    cmd.extend(
+        [
+            "-filter_complex",
+            ";".join(filters)
+            + ";"
+            + concat
+            + f";[{audio_i}:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo[a]",
+            "-map",
+            "[v]",
+            "-map",
+            "[a]",
+            "-c:v",
+            "libx264",
+            "-profile:v",
+            "high",
+            "-level",
+            "4.1",
+            "-pix_fmt",
+            "yuv420p",
+            "-preset",
+            "veryfast",
+            "-crf",
+            "20",
+            "-c:a",
+            "aac",
+            "-b:a",
+            "160k",
+            "-ar",
+            "48000",
+            "-ac",
+            "2",
+            "-movflags",
+            "+faststart",
+            "-shortest",
+            str(dest),
+        ]
+    )
     subprocess.run(cmd, check=True, capture_output=True)
     return dest

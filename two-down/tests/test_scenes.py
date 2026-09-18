@@ -49,16 +49,19 @@ def test_pick_scenes_rotates_two_real_places():
 
 
 def test_draw_photo_card_is_not_newsprint(tmp_path: Path):
-    clue = _clue()
-    news = draw_clue_card(clue, tmp_path / "news.png", scene="newsprint")
-    photo = draw_clue_card(clue, tmp_path / "photo.png", scene="machu-picchu")
     from PIL import Image
 
-    news_px = Image.open(news).getpixel((540, 960))
-    photo_px = Image.open(photo).getpixel((540, 960))
-    assert news_px != photo_px
+    from twodown.config import NEWS_BG
+    from twodown.render import write_share_card
+
+    clue = _clue()
+    film = Image.open(draw_clue_card(clue, tmp_path / "film.png", scene="machu-picchu"))
+    assert film.getpixel((24, 40)) == NEWS_BG
     reveal = Image.open(draw_reveal_card(clue, tmp_path / "reveal.png", scene="petra"))
     assert reveal.size == (1080, 1920)
+    share = Image.open(write_share_card(tmp_path / "og.webp", scene="machu-picchu"))
+    assert share.size == (1200, 630)
+    assert share.getpixel((20, 80)) != NEWS_BG
 
 
 def test_youtube_description_credits_the_photograph():

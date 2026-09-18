@@ -30,6 +30,8 @@ function applyVoice(alias) {
       if (wasPlaying) audio.play();
     };
     audio.addEventListener("loadedmetadata", resume, { once: true });
+    const video = article.querySelector("video");
+    if (video) video.muted = alias !== "sonia";
   });
 }
 
@@ -109,8 +111,17 @@ document.querySelectorAll("article.clue").forEach((article) => {
   const video = article.querySelector("video");
   const audio = article.querySelector("audio.parse-voice");
   if (!video || !audio) return;
-  video.muted = true;
+  const otherVoice = () => currentVoice() !== "sonia";
+  const applyMute = () => {
+    video.muted = otherVoice();
+  };
+  applyMute();
   video.addEventListener("play", () => {
+    applyMute();
+    if (!otherVoice()) {
+      audio.pause();
+      return;
+    }
     audio.currentTime = video.currentTime;
     audio.play();
   });
