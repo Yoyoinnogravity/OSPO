@@ -203,6 +203,32 @@ WELLINGTON = HintPhoto(
 )
 
 
+# Definition still for SMILES: visibly pleased, not school / miles.
+SMILES = HintPhoto(
+    slug="smiles-still",
+    label="Visibly pleased",
+    source="generated still",
+    license="generated",
+    filename="smiles-still.webp",
+    keywords=frozenset(
+        {
+            "pleased",
+            "pleas",
+            "visibly",
+            "visibl",
+            "visible",
+            "smile",
+            "smiling",
+            "happy",
+            "grin",
+            "joyful",
+            "delighted",
+            "beaming",
+        }
+    ),
+)
+
+
 # Definition still for COLE: Nat King Cole / jazz, not fiddlers three.
 COLE = HintPhoto(
     slug="cole-still",
@@ -243,6 +269,7 @@ PHOTOS: dict[str, HintPhoto] = {
     FATS.slug: FATS,
     WELLINGTON.slug: WELLINGTON,
     COLE.slug: COLE,
+    SMILES.slug: SMILES,
     LION.slug: LION,
     "dreamlike": TRANCE,
     "trance": TRANCE,
@@ -259,13 +286,16 @@ PHOTOS: dict[str, HintPhoto] = {
     "cole": COLE,
     "guardian-30115-8d": COLE,
     "study-cole-4": COLE,
+    "smiles": SMILES,
+    "guardian-30115-2d": SMILES,
+    "study-smiles-6": SMILES,
 }
 
 DEFAULT_HINT = TRANCE
 
 
 def _catalog() -> tuple[HintPhoto, ...]:
-    return (TRANCE, MOONLIT, RASTA, FATS, WELLINGTON, COLE, LION)
+    return (TRANCE, MOONLIT, RASTA, FATS, WELLINGTON, COLE, SMILES, LION)
 
 
 def _tokens(text: str) -> frozenset[str]:
@@ -412,6 +442,19 @@ def _generate_wellington_still(dest: Path) -> Path:
     return dest
 
 
+def _generate_smiles_still(dest: Path) -> Path:
+    """Last-resort pleased-face colours if the file is missing. No answer text."""
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    img = Image.new("RGB", (1280, 720), (236, 214, 188))
+    draw = ImageDraw.Draw(img)
+    draw.ellipse((420, 40, 860, 620), fill=(232, 196, 160))
+    draw.ellipse((520, 220, 600, 300), fill=(48, 36, 32))
+    draw.ellipse((680, 220, 760, 300), fill=(48, 36, 32))
+    draw.arc((500, 280, 780, 520), start=20, end=160, fill=(140, 64, 56), width=18)
+    img.save(dest, "WEBP", quality=82, method=6)
+    return dest
+
+
 def _generate_cole_still(dest: Path) -> Path:
     """Last-resort jazz-club colours if the file is missing. No answer text."""
     dest.parent.mkdir(parents=True, exist_ok=True)
@@ -438,4 +481,6 @@ def ensure_hint_photo(photo: HintPhoto | None = None) -> Path:
         return _generate_wellington_still(dest)
     if resolved.slug in {COLE.slug, "cole"}:
         return _generate_cole_still(dest)
+    if resolved.slug in {SMILES.slug, "smiles"}:
+        return _generate_smiles_still(dest)
     return _generate_trance_still(dest)

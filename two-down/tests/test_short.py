@@ -8,6 +8,7 @@ from twodown.pipeline import (
     study_clue,
     wellington_clue,
     cole_clue,
+    smiles_clue,
 )
 from twodown.script import (
     speak_answer,
@@ -25,35 +26,35 @@ def test_solver_voice_is_clear_libby():
     assert VOICE_RATE == "-8%"
 
 
-def test_study_clue_is_cole():
-    assert STUDY_SLUG == "guardian-30115-8d"
+def test_study_clue_is_smiles():
+    assert STUDY_SLUG == "guardian-30115-2d"
     clue = study_clue(STUDY_SLUG)
     assert clue is not None
-    assert clue.slug == "guardian-30115-8d"
-    assert clue.answer == "COLE"
-    assert clue.clue == "So-called King of jazz, or another one accompanied by string trio"
-    assert clue.enumeration == "4"
+    assert clue.slug == "guardian-30115-2d"
+    assert clue.answer == "SMILES"
+    assert clue.clue == "First in school by a long way, is visibly pleased"
+    assert clue.enumeration == "6"
     assert clue.setter == "Brendan"
     assert clue.paper == "Guardian"
     assert clue.puzzle_id == "30115"
-    assert clue.number == "8"
+    assert clue.number == "2"
     assert clue.direction == "down"
     assert clue.blogger == "manehi"
-    assert clue.definition == "King, as in Nat King Cole the jazz musician"
+    assert clue.definition == "visibly pleased"
     assert clue.hint_line == "Here's a clue."
-    assert clue.hint_image == "assets/hints/cole-still.webp"
+    assert clue.hint_image == "assets/hints/smiles-still.webp"
     assert clue.source_url == (
         "https://fifteensquared.net/2026/09/18/guardian-cryptic-crossword-no-30115-by-brendan/"
     )
-    assert "fiddlers three" in clue.parse
-    assert "Nat King Cole" in clue.parse
+    assert "first in school" in clue.parse.lower()
+    assert "MILES" in clue.parse
     parts = write_parts(clue)
     assert parts.intro_speech == "Here is your daily dose of cryptic fun."
-    assert parts.clue_speech == "So-called King of jazz, or another one accompanied by string trio."
-    assert parts.letters_speech == "Four letters."
+    assert parts.clue_speech == "First in school by a long way, is visibly pleased."
+    assert parts.letters_speech == "Six letters."
     assert parts.think_speech == "Pause the video while you think."
     assert parts.hint_speech == "Here's a clue."
-    assert parts.answer_speech == "The answer is cole."
+    assert parts.answer_speech == "The answer is smiles."
     assert parts.answer_speech == speak_answer(clue.answer)
     assert parts.outro_speech == "Thanks for thinking with cryptic.fun."
     assert "Brendan" not in parts.parse_speech
@@ -90,12 +91,12 @@ def test_source_credit_is_its_own_line():
     assert parts.outro_speech == "Thanks for thinking with cryptic.fun."
 
 
-def test_four_letters():
+def test_six_letters():
     clue = study_clue()
     assert clue is not None
-    assert clue.enumeration == "4"
-    assert speak_enumeration("4") == "Four letters."
-    assert speak_enumeration(clue.enumeration) == "Four letters."
+    assert clue.enumeration == "6"
+    assert speak_enumeration("6") == "Six letters."
+    assert speak_enumeration(clue.enumeration) == "Six letters."
 
 
 def test_spoken_parse_says_tsar_as_a_word():
@@ -112,6 +113,23 @@ def test_spoken_parse_says_tsar_as_a_word():
     assert speak_parse_tokens("RASTA") == "rasta"
     assert "rasta" not in parts.hint_speech.lower()
     assert "RASTA" not in parts.hint_speech
+
+
+def test_spoken_parse_says_smiles_and_miles_as_words():
+    clue = smiles_clue()
+    parts = write_parts(clue)
+    assert "smiles" in parts.answer_speech
+    assert "miles" in parts.parse_speech.lower()
+    assert "first in school" in parts.parse_speech.lower()
+    assert "a long way" in parts.parse_speech.lower()
+    assert "visibly pleased" in parts.parse_speech.lower()
+    assert "SMILES" not in parts.parse_speech
+    assert "MILES" not in parts.parse_speech
+    assert "S-M-I-L-E-S" not in parts.parse_speech
+    assert speak_parse_tokens("MILES") == "miles"
+    assert speak_parse_tokens("SMILES") == "smiles"
+    assert "smiles" not in parts.hint_speech.lower()
+    assert "SMILES" not in parts.hint_speech
 
 
 def test_spoken_parse_says_cole_as_a_word():
@@ -183,11 +201,12 @@ def test_dreamlike_stays_constructable():
 
 
 def test_resolve_clue_renders_constructed_study_without_site_html():
-    constructed = study_clue("cole")
+    constructed = study_clue("smiles")
     assert constructed is not None
-    resolved = resolve_clue("cole", clue=constructed)
+    resolved = resolve_clue("smiles", clue=constructed)
     assert resolved is constructed
-    assert resolve_clue(STUDY_SLUG).answer == "COLE"
+    assert resolve_clue(STUDY_SLUG).answer == "SMILES"
+    assert resolve_clue("cole").answer == "COLE"
     assert resolve_clue("wellington").answer == "WELLINGTON"
     assert resolve_clue("fats").answer == "FATS"
     assert resolve_clue("rasta").answer == "RASTA"

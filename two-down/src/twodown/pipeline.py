@@ -205,7 +205,7 @@ def wellington_clue() -> Clue:
 
 
 def cole_clue() -> Clue:
-    """Guardian 30115 8d COLE — current study Short. On Fifteen Squared.
+    """Guardian 30115 8d COLE — leftover study construct. On Fifteen Squared.
 
     Hint Nat King Cole (definition), not Old King Cole / fiddlers three.
     Do not print COLE on the hint card.
@@ -233,13 +233,40 @@ def cole_clue() -> Clue:
     )
 
 
+def smiles_clue() -> Clue:
+    """Guardian 30115 2d SMILES — current study Short. On Fifteen Squared.
+
+    Hint visibly pleased (definition), not school / miles.
+    Do not print SMILES on the hint card.
+    """
+    return attach_hint(
+        Clue(
+            source_url=_RASTA_SOURCE,
+            paper="Guardian",
+            puzzle_id="30115",
+            setter="Brendan",
+            blogger="manehi",
+            number="2",
+            direction="down",
+            clue="First in school by a long way, is visibly pleased",
+            enumeration="6",
+            answer="SMILES",
+            definition="visibly pleased",
+            parse='S from first in school plus MILES="a long way"',
+            device="charade",
+            enumeration_ok=True,
+        )
+    )
+
+
 def study_clues() -> dict[str, Clue]:
-    """COLE is the study default. Earlier study clues stay constructable."""
+    """SMILES is the study default. Earlier study clues stay constructable."""
     dreamlike = dreamlike_clue()
     rasta = rasta_clue()
     fats = fats_clue()
     wellington = wellington_clue()
     cole = cole_clue()
+    smiles = smiles_clue()
     return {
         dreamlike.slug: dreamlike,
         "dreamlike": dreamlike,
@@ -260,7 +287,11 @@ def study_clues() -> dict[str, Clue]:
         "cole": cole,
         "study-cole-4": cole,
         cole.answer.lower(): cole,
-        STUDY_SLUG: cole,
+        smiles.slug: smiles,
+        "smiles": smiles,
+        "study-smiles-6": smiles,
+        smiles.answer.lower(): smiles,
+        STUDY_SLUG: smiles,
     }
 
 

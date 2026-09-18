@@ -65,7 +65,7 @@ def test_draw_photo_card_is_not_newsprint(tmp_path: Path):
 
 
 def test_hint_photo_is_a_definition_still_not_travel_aurora():
-    from twodown.hints import COLE, DEFAULT_HINT, FATS, LION, MOONLIT, RASTA, TRANCE, WELLINGTON, ensure_hint_photo
+    from twodown.hints import COLE, DEFAULT_HINT, FATS, LION, MOONLIT, RASTA, SMILES, TRANCE, WELLINGTON, ensure_hint_photo
 
     photo = ensure_hint_photo()
     assert photo.exists()
@@ -83,6 +83,8 @@ def test_hint_photo_is_a_definition_still_not_travel_aurora():
     assert "WELLINGTON" not in WELLINGTON.credit_line
     assert ensure_hint_photo(COLE).exists()
     assert "COLE" not in COLE.credit_line
+    assert ensure_hint_photo(SMILES).exists()
+    assert "SMILES" not in SMILES.credit_line
     assert LION.commons_file == "Flag of Ethiopia (1897–1974).svg"
     assert "Wikimedia Commons" in LION.credit_line
 
