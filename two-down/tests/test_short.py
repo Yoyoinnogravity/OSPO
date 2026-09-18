@@ -1,6 +1,12 @@
-from twodown.config import PINUP_SLUG, SOURCE_VOICE_ALIAS, STUDY_SLUG
+from twodown.config import DEFAULT_VOICE_ALIAS, PINUP_SLUG, SOURCE_VOICE_ALIAS, STUDY_SLUG, VOICE_RATE, VOICES
 from twodown.pipeline import dreamlike_clue, published_clue, rasta_clue, resolve_clue, study_clue
 from twodown.script import speak_answer, speak_enumeration, speak_parse_tokens, speak_source, write_parts
+
+
+def test_solver_voice_is_clear_libby():
+    assert DEFAULT_VOICE_ALIAS == "libby"
+    assert VOICES["libby"] == "en-GB-LibbyNeural"
+    assert VOICE_RATE == "-8%"
 
 
 def test_study_clue_is_rasta():

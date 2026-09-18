@@ -14,8 +14,8 @@ CRAWL_GAP_SECONDS = 1.0
 
 DAILY_CATEGORY_SLUGS = frozenset({"independent", "ft", "guardian"})
 
-# Sonia is the default; visitors can pick any of these on cryptic.fun.
-DEFAULT_VOICE_ALIAS = "sonia"
+# Libby is the solver: clear, precise British. Sonia stays as the optional softer read.
+DEFAULT_VOICE_ALIAS = "libby"
 VOICES = {
     "sonia": "en-GB-SoniaNeural",
     "libby": "en-GB-LibbyNeural",
@@ -28,9 +28,9 @@ VOICE_LABELS = {
     "ryan": "Ryan",
     "thomas": "Thomas",
 }
-# Sonia is the librarian: measured, a touch low. Ryan stays bright on the intro.
-VOICE_RATE = "-18%"
-VOICE_PITCH = "-5Hz"
+# Measured, not breathy. Ryan stays bright on the intro.
+VOICE_RATE = "-8%"
+VOICE_PITCH = "+0Hz"
 INTRO_LINE = "Here is your daily dose of cryptic fun."
 INTRO_VOICE_ALIAS = "ryan"
 INTRO_RATE = "+12%"

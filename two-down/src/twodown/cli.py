@@ -157,7 +157,7 @@ def main(argv: list[str] | None = None) -> int:
         help=f"Study or published clue slug (default: {STUDY_SLUG}, RASTA)",
     )
     short.add_argument("--out", type=Path, default=DEFAULT_OUTPUT)
-    short.add_argument("--all-voices", action="store_true", help="Speak all four voices. Default: Sonia only.")
+    short.add_argument("--all-voices", action="store_true", help="Speak all four voices. Default: Libby only.")
     short.add_argument("--no-site", action="store_true", help="Write the film under --out only")
 
     voices = sub.add_parser("voices", help="List built-in British voices")
