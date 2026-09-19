@@ -10,6 +10,7 @@ from PIL import Image, ImageDraw, ImageFont
 from dataclasses import dataclass
 
 from twodown.config import (
+    BRAND,
     CREAM,
     CRIMSON,
     FONT_BOLD,
@@ -122,13 +123,18 @@ def _center_text(
     return cursor
 
 
+def _brand_parts() -> tuple[str, str]:
+    head, _, tail = BRAND.partition(".")
+    return head, f".{tail}" if tail else ""
+
+
 def _draw_wordmark(draw: ImageDraw.ImageDraw) -> None:
     brand = _font(FONT_SANS_BOLD, 34)
-    cryptic = "cryptic"
+    cryptic, suffix = _brand_parts()
     w = draw.textlength(cryptic, font=brand)
-    x = (WIDTH - w - draw.textlength(".fun", font=brand)) / 2
+    x = (WIDTH - w - draw.textlength(suffix, font=brand)) / 2
     draw.text((x, 48), cryptic, font=brand, fill=INK)
-    draw.text((x + w, 48), ".fun", font=brand, fill=CRIMSON)
+    draw.text((x + w, 48), suffix, font=brand, fill=CRIMSON)
 
 
 def _draw_kicker(draw: ImageDraw.ImageDraw, clue: Clue) -> None:
@@ -317,9 +323,10 @@ def write_share_card(dest: Path, scene: str | Scene | None = None) -> Path:
     draw.rectangle([0, height - 10, width, height], fill=CRIMSON)
     word = _font(FONT_SANS_BOLD, 74)
     sub = _font(FONT_REGULAR, 34)
-    draw.text((72, 200), "cryptic", font=word, fill=ink)
-    fun_x = 72 + draw.textlength("cryptic", font=word)
-    draw.text((fun_x, 200), ".fun", font=word, fill=CRIMSON)
+    cryptic, suffix = _brand_parts()
+    draw.text((72, 200), cryptic, font=word, fill=ink)
+    fit_x = 72 + draw.textlength(cryptic, font=word)
+    draw.text((fit_x, 200), suffix, font=word, fill=CRIMSON)
     draw.text((72, 300), "Two cryptic clues a day", font=sub, fill=muted)
     draw.text((72, 350), "from Fifteen Squared", font=sub, fill=muted)
     img.save(dest, "WEBP", quality=82)

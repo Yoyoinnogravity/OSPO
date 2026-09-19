@@ -1,8 +1,8 @@
 from pathlib import Path
 import os
 
-BRAND = "cryptic.fun"
-# Aled owns cryptic.fit. The show name stays cryptic.fun.
+BRAND = "cryptic.fit"
+# One name: the site Aled owns. Do not use cryptic.fun — we do not own it.
 SITE_HOST = "cryptic.fit"
 SITE_ORIGIN = f"https://{SITE_HOST}"
 SUGGEST_EMAIL = "aledmorgan@gmail.com"
@@ -60,7 +60,7 @@ INTRO_RATE = "+3%"
 INTRO_PITCH = "+4Hz"
 INTRO_VOLUME = "+8%"
 INTRO_GAP_SECONDS = 0.45
-OUTRO_LINE = "Thanks for thinking with cryptic.fun."
+OUTRO_LINE = "Thanks for thinking with cryptic.fit."
 OUTRO_GAP_SECONDS = 0.4
 # Source credit is not Sonia — Thomas reads the paper and Fifteen Squared.
 SOURCE_VOICE_ALIAS = "thomas"
@@ -103,19 +103,15 @@ FONT_BOLD = "/usr/share/fonts/truetype/liberation/LiberationSerif-Bold.ttf"
 FONT_SANS = "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"
 FONT_SANS_BOLD = "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"
 
-# Public follow URLs. YouTube has a default handle; the others stay off until set.
-# Prefer the brand channel. Personal Aled Morgan / carbonyoyo is upload fallback only.
-YOUTUBE_FOLLOW = os.environ.get("TWODOWN_YOUTUBE_URL", "https://www.youtube.com/@crypticfun").strip()
-YOUTUBE_FALLBACK = os.environ.get(
-    "TWODOWN_YOUTUBE_FALLBACK_URL", "https://www.youtube.com/@carbonyoyo"
-).strip()
+# Public follow URLs. YouTube is @crypticfit. Do not use @crypticfun.
+YOUTUBE_FOLLOW = os.environ.get("TWODOWN_YOUTUBE_URL", "https://www.youtube.com/@crypticfit").strip()
 TIKTOK_FOLLOW = os.environ.get("TWODOWN_TIKTOK_URL", "").strip()
 INSTAGRAM_FOLLOW = os.environ.get("TWODOWN_INSTAGRAM_URL", "").strip()
 FACEBOOK_FOLLOW = os.environ.get("TWODOWN_FACEBOOK_URL", "").strip()
 
 
 def follow_profiles() -> list[tuple[str, str, str]]:
-    """External cryptic.fun profiles: slug, label, url. Empty env values are omitted."""
+    """External cryptic.fit profiles: slug, label, url. Empty env values are omitted."""
     rows: list[tuple[str, str, str]] = []
     for slug, label, url in (
         ("youtube", "YouTube", YOUTUBE_FOLLOW),

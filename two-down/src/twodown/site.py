@@ -475,7 +475,7 @@ def _follow_bar(prefix: str) -> str:
     for _slug, label, url in follow_profiles():
         links.append(f'<a href="{_e(url)}" data-follow-link rel="me noopener" target="_blank">{_e(label)}</a>')
     return (
-        '<div class="follow" role="group" aria-label="Follow cryptic.fun">'
+        f'<div class="follow" role="group" aria-label="Follow {BRAND}">'
         "<span>Follow</span>"
         f'<button type="button" data-follow-toggle data-follow-href="{prefix}follow.html" aria-pressed="true">Following</button>'
         + "".join(links)
@@ -587,7 +587,7 @@ def _page(body: str, seo: PageSeo, depth: int = 0, show_ads: bool = False) -> st
 <body class="scene-photo" data-scene="{_e(default.slug)}" data-default-scene="{_e(default.slug)}" data-scene-prefix="{_e(scene_prefix)}" style="background-image: url('{_e(scene_prefix + background)}');">
   <header>
     <div class="chrome-top">
-      <a class="wordmark" href="{prefix}index.html">cryptic<span>.fun</span></a>
+      <a class="wordmark" href="{prefix}index.html">cryptic<span>.fit</span></a>
       {_nav(prefix)}
     </div>
     {_voice_bar()}
@@ -715,8 +715,8 @@ def publish_site(pair: DailyPair, dest: Path | None = None) -> Path:
     <aside class="teaser">
       <p class="kicker">Follow</p>
       <h2>Keep the pair coming.</h2>
-      <p>Follow is on by default. Email one clue a day, the RSS feed, or cryptic.fun on YouTube. No account on the site.</p>
-      <a class="action" href="follow.html">Follow cryptic.fun</a>
+      <p>Follow is on by default. Email one clue a day, the RSS feed, or {BRAND} on YouTube. No account on the site.</p>
+      <a class="action" href="follow.html">Follow {BRAND}</a>
     </aside>
     {_keep_free_teaser("")}
     <aside class="teaser">
@@ -875,7 +875,7 @@ def publish_site(pair: DailyPair, dest: Path | None = None) -> Path:
     )
     follow_page = f"""
     <p class="kicker">Follow</p>
-    <h1>Follow cryptic.fun.</h1>
+    <h1>Follow {BRAND}.</h1>
     <p class="lede">Following is the default. Stay for the daily pair, or take it with you by email, RSS or YouTube. There is no account to create on the site.</p>
     <div class="suggest-forms">
       <section class="panel" id="email">
@@ -891,7 +891,7 @@ def publish_site(pair: DailyPair, dest: Path | None = None) -> Path:
       </section>
       <section class="panel">
         <h2>RSS and YouTube.</h2>
-        <p>The feed is the pair, not the answers. cryptic.fun Shorts go to YouTube when that channel is connected.</p>
+        <p>The feed is the pair, not the answers. {BRAND} Shorts go to YouTube when that channel is connected.</p>
         <p><a class="action" href="feed.xml" data-follow-link>Subscribe to RSS</a></p>
         {profiles}
       </section>
@@ -902,7 +902,7 @@ def publish_site(pair: DailyPair, dest: Path | None = None) -> Path:
             follow_page,
             PageSeo(
                 title=f"Follow — {BRAND}",
-                description=f"Follow cryptic.fun by email, RSS or YouTube. {BRAND_LINE} {CREDIT_LINE} From Fifteen Squared. No account required.",
+                description=f"Follow {BRAND} by email, RSS or YouTube. {BRAND_LINE} {CREDIT_LINE} From Fifteen Squared. No account required.",
                 path="/follow.html",
             ),
         ),
@@ -913,20 +913,20 @@ def publish_site(pair: DailyPair, dest: Path | None = None) -> Path:
     support = f"""
     <p class="kicker">Money</p>
     <h1>Keep the clues free.</h1>
-    <p class="lede">When people show up, we can pay for cryptic.fun without a paywall. Ads are one way. They are not switched on yet. They will never sit on the answer or talk over the seven-second pause.</p>
+    <p class="lede">When people show up, we can pay for {BRAND} without a paywall. Ads are one way. They are not switched on yet. They will never sit on the answer or talk over the seven-second pause.</p>
     <section class="panel">
       <h2>1. YouTube is the main bet.</h2>
-      <p>The two daily Shorts on the <strong>cryptic.fun</strong> channel are where hits turn into money. YouTube’s Partner Program pays a share of ads in the Shorts feed once the channel has 1,000 subscribers and 10 million Shorts views in 90 days (or 4,000 hours of long-form watch time). Until then YouTube may still run ads — we just don’t get a cut.</p>
+      <p>The two daily Shorts on the <strong>{BRAND}</strong> channel are where hits turn into money. YouTube’s Partner Program pays a share of ads in the Shorts feed once the channel has 1,000 subscribers and 10 million Shorts views in 90 days (or 4,000 hours of long-form watch time). Until then YouTube may still run ads — we just don’t get a cut.</p>
       <p>At 500 subscribers, Super Thanks and memberships can open first. Same Google AdSense account can later cover the website.</p>
     </section>
     <section class="panel">
       <h2>2. A small ad on the site.</h2>
-      <p>Once <a href="{SITE_ORIGIN}/">cryptic.fun</a> is live, Google AdSense can put one labelled display unit <em>under</em> the pair. Manual placement only — no Auto ads, no ads inside Solve, no ads on a single-clue spoiler page. The UK needs a consent banner before any ad cookie is set; ads stay off until that is in place.</p>
+      <p>Once <a href="{SITE_ORIGIN}/">{BRAND}</a> is live, Google AdSense can put one labelled display unit <em>under</em> the pair. Manual placement only — no Auto ads, no ads inside Solve, no ads on a single-clue spoiler page. The UK needs a consent banner before any ad cookie is set; ads stay off until that is in place.</p>
       <p>AdSense can refuse sites that mostly reprint other people’s puzzles. We write original pages (this one, About, how the agent works) and we credit all — the setter, the paper, <a href="{SOURCE_SITE}">Fifteen Squared</a>, and the photograph. Approval is not guaranteed. If Google says no, we skip site ads and lean on YouTube and sponsors.</p>
     </section>
     <section class="panel">
       <h2>3. Sponsor a week.</h2>
-      <p>A crossword dictionary, a pen, a bookshop: one quiet line under the pair for seven days. Better money per reader than a banner, and it stays on-brand. Write to <a href="mailto:{sponsor}?subject=Sponsor%20cryptic.fun">{sponsor}</a>.</p>
+      <p>A crossword dictionary, a pen, a bookshop: one quiet line under the pair for seven days. Better money per reader than a banner, and it stays on-brand. Write to <a href="mailto:{sponsor}?subject=Sponsor%20{BRAND}">{sponsor}</a>.</p>
     </section>
     <h2>Rules.</h2>
     <ul class="rules">
@@ -942,7 +942,7 @@ def publish_site(pair: DailyPair, dest: Path | None = None) -> Path:
             support,
             PageSeo(
                 title=f"Support — {BRAND}",
-                description="How cryptic.fun stays free: YouTube Shorts, a labelled site ad under the pair, and crossword sponsors. Ads never sit on the answer.",
+                description=f"How {BRAND} stays free: YouTube Shorts, a labelled site ad under the pair, and crossword sponsors. Ads never sit on the answer.",
                 path="/support.html",
             ),
             show_ads=True,
@@ -952,7 +952,7 @@ def publish_site(pair: DailyPair, dest: Path | None = None) -> Path:
 
     privacy = f"""
     <h1>Privacy.</h1>
-    <p class="lede">cryptic.fun is a static site. We do not run an account system or a tracker of our own.</p>
+    <p class="lede">{BRAND} is a static site. We do not run an account system or a tracker of our own.</p>
     <section class="panel">
       <h2>What stays in your browser.</h2>
       <p>Voice, place, and “already suggested today” are saved in localStorage on your device so the header remembers your picks. That data does not come to us.</p>
@@ -969,7 +969,7 @@ def publish_site(pair: DailyPair, dest: Path | None = None) -> Path:
             privacy,
             PageSeo(
                 title=f"Privacy — {BRAND}",
-                description="cryptic.fun is a static site. Voice and place stay in your browser. Display ads stay off until a UK consent banner is in place.",
+                description=f"{BRAND} is a static site. Voice and place stay in your browser. Display ads stay off until a UK consent banner is in place.",
                 path="/privacy.html",
             ),
         ),

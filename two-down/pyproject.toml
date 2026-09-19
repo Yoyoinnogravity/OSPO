@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "twodown"
 version = "0.1.0"
-description = "Unique cryptic crossword clues and solutions from Fifteen Squared, for cryptic.fun, YouTube, TikTok, Instagram and Facebook."
+description = "Unique cryptic crossword clues and solutions from Fifteen Squared, for cryptic.fit, YouTube, TikTok, Instagram and Facebook."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [

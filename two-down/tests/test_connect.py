@@ -23,10 +23,10 @@ def test_connect_never_asks_for_a_password():
     assert "never a password" in connect_instructions()
 
 
-def test_connect_youtube_prefers_cryptic_fun_then_personal():
+def test_connect_youtube_is_cryptic_fit_not_fun():
     text = connect_instructions()
     youtube = text[text.index("YOUTUBE") :]
-    assert "youtube.com/@crypticfun" in youtube
-    assert "youtube.com/@carbonyoyo" in youtube
-    assert youtube.index("@crypticfun") < youtube.index("@carbonyoyo")
-    assert "Prefer" in youtube
+    assert "youtube.com/@crypticfit" in youtube
+    assert "Do not use youtube.com/@crypticfun" in youtube
+    assert "cryptic.fit" in youtube
+    assert "Prefer" not in youtube

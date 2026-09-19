@@ -543,7 +543,7 @@ def run_today(
                 already_published=True,
             )
             (dest_root / "already-published.txt").write_text(
-                f"{stamp} already on cryptic.fun. Pass --force to rebuild.\n",
+                f"{stamp} already on cryptic.fit. Pass --force to rebuild.\n",
                 encoding="utf-8",
             )
             return skipped

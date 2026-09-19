@@ -4,7 +4,7 @@ from twodown.config import BRAND, BRAND_PROMISE, CREDIT_LINE, SITE_ORIGIN
 from twodown.models import Clue, SpokenClue
 from twodown.scenes import get_scene
 
-HASHTAGS = "#crypticcrossword #crypticfun #crossword #shorts"
+HASHTAGS = "#crypticcrossword #crypticfit #crossword #shorts"
 SOCIAL_HANDLE = BRAND
 
 
