@@ -34,9 +34,10 @@ def test_registry_unknown_on_timeout():
 def test_go_live_when_name_is_not_registered():
     steps = go_live_next_steps(registry="absent", pages_live=False, domain_live=False)
     assert NAMECHEAP_BUY in steps[0]
-    assert "cryptic.fit" in steps[1]
-    assert PR_URL in steps[2]
-    assert "GitHub Actions" in steps[3]
+    assert "already paid" in steps[1]
+    assert "cryptic.fit" in steps[2]
+    assert PR_URL in steps[3]
+    assert "GitHub Actions" in steps[4]
     assert not any("A records" in step for step in steps)
 
 

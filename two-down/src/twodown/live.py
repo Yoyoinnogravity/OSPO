@@ -9,7 +9,8 @@ from twodown.config import SITE_ORIGIN, SITE_ROOT, SOURCE_SITE
 
 GITHUB_PAGES = "https://yoyoinnogravity.github.io/OSPO/"
 PR_URL = "https://github.com/Yoyoinnogravity/OSPO/pull/42"
-RDAP_URL = "https://rdap.identitydigital.services/rdap/domain/cryptic.fun"
+# .fun is a Radix TLD. Identity Digital RDAP 404s the same way, but this is the registry.
+RDAP_URL = "https://rdap.radix.host/rdap/domain/cryptic.fun"
 NAMECHEAP_BUY = "https://www.namecheap.com/domains/registration/results/?domain=cryptic.fun"
 GITHUB_PAGES_IPS = (
     "185.199.108.153",
@@ -97,6 +98,11 @@ def go_live_next_steps(
     steps: list[str] = []
     if registry == "absent":
         steps.append(f"Buy cryptic.fun at Namecheap (domain only — skip hosting): {NAMECHEAP_BUY}")
+        steps.append(
+            "If you already paid: Namecheap Domain List should show cryptic.fun as Active. "
+            "The .fun registry still lists it as free until that completes. "
+            "Do not send a password."
+        )
         steps.append("Do not use cryptic.fit — that is a different GoDaddy name.")
     if not pages_live:
         steps.append(f"Merge {PR_URL}")
