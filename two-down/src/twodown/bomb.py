@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
+from shutil import copy2
 from zipfile import ZIP_DEFLATED, ZipFile
 
 from twodown.captions import clue_line, tiktok_caption, youtube_drop_description
@@ -19,6 +20,7 @@ WORKERS = 1
 MANIFEST_NAME = "youtube-100.json"
 TITLES_NAME = "YOUTUBE-TITLES.txt"
 HOW_NAME = "HOW.txt"
+TIKTOK_DIR = "tiktok"
 
 
 def collect_bomb_clues(limit: int = PACK_LIMIT, session=None) -> list[Clue]:
@@ -120,6 +122,10 @@ def render_bomb_videos(
             video = existing_video(clue, slot)
         rel = str(video) if video else None
         print(f"bomb {index}/{total} {'ok' if video else 'miss'} {clue.slug}", flush=True)
+        if video:
+            drop = slot / TIKTOK_DIR
+            drop.mkdir(parents=True, exist_ok=True)
+            copy2(video, drop / f"{index:03d}-{clue.slug}.mp4")
         return index, public_record(clue, index=index, total=total, video=rel)
 
     if workers <= 1 or total <= 1:
@@ -148,6 +154,24 @@ def write_bomb_manifest(records: list[dict[str, str | int | None]], root: Path) 
     (root / TITLES_NAME).write_text("\n".join(lines) + "\n", encoding="utf-8")
     (root / HOW_NAME).write_text(how_to_bomb(), encoding="utf-8")
     return path
+
+
+def write_tiktok_dir(records: list[dict[str, str | int | None]], dest: Path) -> Path:
+    """One folder of films only — TikTok's picker wants that."""
+    dest = Path(dest)
+    dest.mkdir(parents=True, exist_ok=True)
+    for leftover in dest.iterdir():
+        if leftover.suffix.lower() != ".mp4":
+            leftover.unlink()
+    for row in records:
+        video = row.get("video")
+        if not video:
+            continue
+        path = Path(str(video))
+        if not path.exists():
+            continue
+        copy2(path, dest / f"{int(row['n']):03d}-{row['slug']}.mp4")
+    return dest
 
 
 def write_bomb_zip(records: list[dict[str, str | int | None]], dest: Path) -> Path:
@@ -185,5 +209,6 @@ def run_bomb(
     slot = Path(dest or (DEFAULT_OUTPUT / "bomb"))
     records = render_bomb_videos(clues, dest=slot, rebuild=rebuild, workers=workers)
     write_bomb_manifest(records, slot)
+    write_tiktok_dir(records, slot / TIKTOK_DIR)
     packed = write_bomb_zip(records, Path(zip_path or (slot / "youtube-100.zip")))
     return packed, records

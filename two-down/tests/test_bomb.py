@@ -5,6 +5,7 @@ from twodown.bomb import (
     public_record,
     render_bomb_videos,
     write_bomb_zip,
+    write_tiktok_dir,
 )
 from twodown.captions import youtube_drop_description
 from twodown.cli import main
@@ -68,6 +69,17 @@ def test_locked_homepage_pair_is_never_recut(tmp_path, monkeypatch):
     assert all(row.get("video") for row in records)
     assert "PIN-UP" not in str(records[0]["title"])
     assert "SELF" not in str(records[1]["title"])
+
+
+def test_tiktok_dir_is_only_mp4s(tmp_path):
+    clue = _clue()
+    film = tmp_path / "film.mp4"
+    film.write_bytes(b"fake-mp4-bytes-here")
+    row = public_record(clue, index=3, total=100, video=str(film))
+    dest = tmp_path / "tiktok"
+    write_tiktok_dir([row], dest)
+    names = sorted(p.name for p in dest.iterdir())
+    assert names == ["003-independent-12458-12a.mp4"]
 
 
 def test_write_bomb_zip_has_titles_no_answers(tmp_path):
