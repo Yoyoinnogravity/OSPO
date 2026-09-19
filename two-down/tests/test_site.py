@@ -69,6 +69,9 @@ def test_publish_site_writes_spoiler_pages(tmp_path):
     assert ">YouTube</a>" in index
     assert ">TikTok</a>" in index
     assert (tmp_path / "youtube.html").exists()
+    assert (tmp_path / "open.html").exists()
+    assert ">Open</a>" in index
+    assert "The clues are here" in (tmp_path / "open.html").read_text(encoding="utf-8")
     youtube_page = (tmp_path / "youtube.html").read_text(encoding="utf-8")
     assert "Get on YouTube" in youtube_page
     assert "You already have a channel" in youtube_page
@@ -111,6 +114,7 @@ def test_publish_site_writes_spoiler_pages(tmp_path):
     assert "https://cryptic.fit/post.html" in sitemap
     assert "https://cryptic.fit/tiktok.html" in sitemap
     assert "https://cryptic.fit/youtube.html" in sitemap
+    assert "https://cryptic.fit/open.html" in sitemap
     assert "How we pay for this" in index
     assert "adsbygoogle" not in index
     assert not (tmp_path / "ads.txt").exists()

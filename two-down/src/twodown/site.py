@@ -8,6 +8,7 @@ from shutil import copy2
 from twodown.ads import ads_enabled, ads_txt, adsense_client, adsense_slot
 from twodown.config import BRAND, BRAND_LINE, CREDIT_LINE, CREDIT_WHO, SITE_HOST, SITE_ORIGIN, SITE_ROOT, SOURCE_SITE, SPONSOR_EMAIL, SUGGEST_EMAIL, VOICE_LABELS, WORDMARK_HEAD, WORDMARK_TAIL, follow_profiles
 from twodown.drop import CREATE, TIKTOK_SIGNUP, TIKTOK_UPLOAD, UPLOAD, YOUTUBE_CREATE, YOUTUBE_STUDIO, YOUTUBE_UPLOAD, collect_drops, write_drop_pack
+from twodown.open_world import open_films
 from twodown.models import DailyPair, SpokenClue
 from twodown.render import write_share_card
 from twodown.scenes import DEFAULT_SCENE, get_scene, list_scenes
@@ -517,6 +518,7 @@ def _nav(prefix: str) -> str:
     return f"""
       <nav>
         <a href="{prefix}index.html">Today</a>
+        <a href="{prefix}open.html">Open</a>
         <a href="{prefix}youtube.html">YouTube</a>
         <a href="{prefix}post.html">Post</a>
         <a href="{prefix}tiktok.html">TikTok</a>
@@ -617,6 +619,27 @@ def _youtube_card(slug: str, clue: str, credit: str, caption: str, media_prefix:
           <textarea readonly rows="6">{_e(caption)}</textarea>
         </label>
       </section>
+    """
+
+
+def _open_body(root: Path) -> str:
+    cards = []
+    for film in open_films(root):
+        cards.append(
+            f"""
+      <section class="panel" data-drop-slug="{_e(film['slug'])}">
+        <h2>{_e(film['clue'])}</h2>
+        <video class="short" controls playsinline preload="metadata" src="{_e(film['video'])}"></video>
+      </section>
+    """
+        )
+    return f"""
+    <p class="kicker">Open world</p>
+    <h1>The clues are here.</h1>
+    <p class="lede">Public Shorts from Fifteen Squared. The parse is in the film. No account.</p>
+    <div class="suggest-forms">
+      {''.join(cards)}
+    </div>
     """
 
 
@@ -1051,6 +1074,17 @@ def publish_site(pair: DailyPair, dest: Path | None = None) -> Path:
                 title=f"YouTube — {BRAND}",
                 description=f"Get {BRAND} on YouTube. Name the channel, take @crypticaiforfun, upload a Short. The agent cannot open that login.",
                 path="/youtube.html",
+            ),
+        ),
+        encoding="utf-8",
+    )
+    (root / "open.html").write_text(
+        _page(
+            _open_body(root),
+            PageSeo(
+                title=f"Open — {BRAND}",
+                description=f"Public {BRAND} cryptic Shorts from Fifteen Squared. Watch in the open. No login.",
+                path="/open.html",
             ),
         ),
         encoding="utf-8",
