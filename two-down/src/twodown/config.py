@@ -43,8 +43,9 @@ LETTERS_RATE = "-8%"
 LETTERS_PITCH = "+0Hz"
 THINK_RATE = "-8%"
 THINK_PITCH = "+1Hz"
-HINT_RATE = "-6%"
-HINT_PITCH = "+0Hz"
+HINT_RATE = "+2%"
+HINT_PITCH = "+3Hz"
+HINT_VOLUME = "+7%"
 ANSWER_RATE = "-2%"
 ANSWER_PITCH = "+1Hz"
 # Parse is the same woman, unhurried, with space around the asides.
@@ -70,8 +71,9 @@ CLUE_LETTERS_GAP_SECONDS = 0.35
 LETTERS_PAUSE_SECONDS = 1.0
 ANSWER_PAUSE_SECONDS = 1.2
 THINK_PROMPT = "Just pause here, and have a think."
-# Linear picture hint after the main think pause. Shorts cannot click mid-film.
-HINT_LINE = "Have a look at this."
+# Ryan offers the picture clue, then we wait before Sonia says the answer.
+HINT_LINE = "You may not need it, but here is a clue."
+HINT_VOICE_ALIAS = "ryan"
 HINT_HOLD_SECONDS = 4.0
 HINT_PAUSE_SECONDS = 2.5
 CLUES_PER_DAY = 2

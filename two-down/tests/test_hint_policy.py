@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from twodown.config import PACKAGE_ROOT, PINUP_SLUG, STUDY_SLUG
+from twodown.config import HINT_LINE, PACKAGE_ROOT, PINUP_SLUG, STUDY_SLUG
 from twodown.hints import AIM, CLOSE_ENOUGH, COLE, DAVIS, FATS, PAPERS, RASTA, SMILES, TRANCE, WELLINGTON, attach_hint, match_hint
 from twodown.models import Clue
 from twodown.pipeline import aimlessly_clue, cole_clue, davis_cup_clue, dreamlike_clue, fats_clue, mass_media_clue, published_clue, rasta_clue, smiles_clue, study_clue, wellington_clue
@@ -13,7 +13,7 @@ def test_study_slug_and_hint_fields_are_mass_media():
     assert clue.answer == "MASS MEDIA"
     assert clue.slug == STUDY_SLUG
     assert clue.definition == "newspapers, the press"
-    assert clue.hint_line == "Have a look at this."
+    assert clue.hint_line == HINT_LINE
     assert clue.hint_image
     assert clue.hint_credit
     # Hint newspapers / the press, not maid / mess.
@@ -134,7 +134,7 @@ def test_ai_matching_is_allowed():
         )
     )
     assert attached.hint_image.endswith("rasta-still.webp")
-    assert attached.hint_line == "Have a look at this."
+    assert attached.hint_line == HINT_LINE
 
 
 def test_published_clues_have_optional_hint_fields():
@@ -159,7 +159,7 @@ def test_published_clues_have_optional_hint_fields():
     assert blank.hint_credit is None
     assert blank.hint_line is None
     attached = attach_hint(blank)
-    assert attached.hint_line == "Have a look at this."
+    assert attached.hint_line == HINT_LINE
     assert attached.hint_image
     assert attached.hint_credit
 

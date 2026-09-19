@@ -20,6 +20,8 @@ from twodown.config import (
     HINT_PAUSE_SECONDS,
     HINT_PITCH,
     HINT_RATE,
+    HINT_VOICE_ALIAS,
+    HINT_VOLUME,
     INTRO_GAP_SECONDS,
     INTRO_PITCH,
     INTRO_RATE,
@@ -191,7 +193,12 @@ def build_short_soundtrack(parts: ScriptParts, dest: Path, voice: str | None = N
             parts.think_speech, work / "think.mp3", voice, rate=THINK_RATE, pitch=THINK_PITCH
         ),
         "hint": synthesise(
-            parts.hint_speech, work / "hint.mp3", voice, rate=HINT_RATE, pitch=HINT_PITCH
+            parts.hint_speech,
+            work / "hint.mp3",
+            HINT_VOICE_ALIAS,
+            rate=HINT_RATE,
+            pitch=HINT_PITCH,
+            volume=HINT_VOLUME,
         ),
         "answer": synthesise(
             parts.answer_speech, work / "answer.mp3", voice, rate=ANSWER_RATE, pitch=ANSWER_PITCH

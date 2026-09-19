@@ -1,4 +1,4 @@
-from twodown.config import DEFAULT_VOICE_ALIAS, PINUP_SLUG, SOURCE_VOICE_ALIAS, STUDY_SLUG, VOICE_RATE, VOICES
+from twodown.config import DEFAULT_VOICE_ALIAS, HINT_LINE, HINT_VOICE_ALIAS, INTRO_VOICE_ALIAS, PINUP_SLUG, SOURCE_VOICE_ALIAS, STUDY_SLUG, VOICE_RATE, VOICES
 from twodown.pipeline import (
     dreamlike_clue,
     fats_clue,
@@ -54,7 +54,8 @@ def test_study_clue_is_mass_media():
     assert clue.direction == "across"
     assert clue.blogger == "Turbolegs"
     assert clue.definition == "newspapers, the press"
-    assert clue.hint_line == "Have a look at this."
+    assert clue.hint_line == HINT_LINE
+    assert clue.hint_line == "You may not need it, but here is a clue."
     assert clue.hint_image == "assets/hints/papers-still.webp"
     assert clue.source_url == (
         "https://fifteensquared.net/2026/09/18/financial-times-18483-by-arrietty/"
@@ -66,7 +67,10 @@ def test_study_clue_is_mass_media():
     assert parts.clue_speech == "Maid struggling with a mess — newspapers etc."
     assert parts.letters_speech == "That's four, five."
     assert parts.think_speech == "Just pause here, and have a think."
-    assert parts.hint_speech == "Have a look at this."
+    assert parts.hint_speech == HINT_LINE
+    assert parts.hint_speech == "You may not need it, but here is a clue."
+    assert HINT_VOICE_ALIAS == "ryan"
+    assert HINT_VOICE_ALIAS == INTRO_VOICE_ALIAS
     assert parts.answer_speech == "It's mass media."
     assert parts.answer_speech == speak_answer(clue.answer)
     assert parts.outro_speech == "Thanks for thinking with cryptic.fun."
