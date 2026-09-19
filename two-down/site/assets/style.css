@@ -215,5 +215,5 @@ aside.ad {
   color: var(--muted);
   margin: 0 0 8px;
 }
-.rules { max-width: 40rem; }
-.rules li { margin: 0 0 8px; }
+.rules, .invade { max-width: 40rem; }
+.rules li, .invade li { margin: 0 0 8px; }

@@ -103,6 +103,10 @@ DNS only works after the name is actually registered (see Go live).
 The **Post** page (`post.html`) is the hand drop: save a film, copy the
 caption (clue only, no answer), and upload it yourself.
 
+```bash
+twodown drop                 # writes site/drop.zip + HOW.txt
+```
+
 Daily agent
 -----------
 

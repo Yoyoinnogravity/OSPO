@@ -50,12 +50,15 @@ def test_publish_site_writes_spoiler_pages(tmp_path):
     assert (tmp_path / "suggest.html").exists()
     assert (tmp_path / "post.html").exists()
     post = (tmp_path / "post.html").read_text(encoding="utf-8")
-    assert "Drop a Short yourself" in post
+    assert "Drop the clues on all four" in post
     assert "youtube.com/upload" in post
+    assert "youtube.com/create_channel" in post
     assert "Save the film" in post
+    assert "data-download-all" in post
     assert "Caption — copy this, no answer" in post
     assert "END RESULT" not in post
     assert "AXES" not in post
+    assert (tmp_path / "drop.zip").exists()
     assert ">Post</a>" in index
     suggest = (tmp_path / "suggest.html").read_text(encoding="utf-8")
     assert "aledmorgan@gmail.com" in suggest

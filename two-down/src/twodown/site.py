@@ -6,8 +6,8 @@ from pathlib import Path
 from shutil import copy2
 
 from twodown.ads import ads_enabled, ads_txt, adsense_client, adsense_slot
-from twodown.captions import HASHTAGS
 from twodown.config import BRAND, BRAND_LINE, CREDIT_LINE, CREDIT_WHO, SITE_HOST, SITE_ORIGIN, SITE_ROOT, SOURCE_SITE, SPONSOR_EMAIL, SUGGEST_EMAIL, VOICE_LABELS, WORDMARK_HEAD, WORDMARK_TAIL, follow_profiles
+from twodown.drop import CREATE, UPLOAD, collect_drops, write_drop_pack
 from twodown.models import DailyPair, SpokenClue
 from twodown.render import write_share_card
 from twodown.scenes import DEFAULT_SCENE, get_scene, list_scenes
@@ -246,8 +246,8 @@ aside.ad {
   color: var(--muted);
   margin: 0 0 8px;
 }
-.rules { max-width: 40rem; }
-.rules li { margin: 0 0 8px; }
+.rules, .invade { max-width: 40rem; }
+.rules li, .invade li { margin: 0 0 8px; }
 """
 
 JS = """
@@ -459,6 +459,15 @@ if (subscribeForm) {
     lockSuggest(subscribeForm, "Thanks. Your email app should open. We’ll send one clue a day.");
   });
 }
+
+const downloadAll = document.querySelector("[data-download-all]");
+if (downloadAll) {
+  downloadAll.addEventListener("click", () => {
+    document.querySelectorAll("[data-drop-slug] a.action[download]").forEach((link, index) => {
+      window.setTimeout(() => link.click(), index * 350);
+    });
+  });
+}
 """
 
 
@@ -517,15 +526,8 @@ def _nav(prefix: str) -> str:
     """
 
 
-def _drop_card(slug: str, clue: str, credit: str, media_prefix: str = "media/") -> str:
+def _drop_card(slug: str, clue: str, credit: str, caption: str, media_prefix: str = "media/") -> str:
     video = f"{media_prefix}{slug}.mp4"
-    caption = (
-        f"{BRAND} · {clue}\n\n"
-        f"Have a think. The parse is in the video.\n"
-        f"{credit}\n"
-        f"{SITE_ORIGIN}/\n"
-        f"{HASHTAGS}"
-    )
     return f"""
       <section class="panel" data-drop-slug="{_e(slug)}">
         <h2>{_e(clue)}</h2>
@@ -540,37 +542,31 @@ def _drop_card(slug: str, clue: str, credit: str, media_prefix: str = "media/") 
 
 
 def _post_body(pair: DailyPair, root: Path) -> str:
-    cards: list[str] = []
-    for item in pair.clues:
-        clue = item.clue
-        enum = f" ({clue.enumeration})" if clue.enumeration else ""
-        cards.append(
-            _drop_card(
-                clue.slug,
-                f"{clue.clue}{enum}",
-                f"{clue.paper} {clue.puzzle_id} · {clue.setter}",
-            )
-        )
-    extras = (
-        ("guardian-30115-23d", "Name of girl making second statement on first birthday (6)", "Guardian 30115 · Brendan"),
-        ("financial-times-18483-26a", "Panicking, Indiana twice grabs snake (2,1,4)", "FT 18483 · Arrietty"),
-        ("financial-times-18483-1a", "Maid struggling with a mess — newspapers etc (4,5)", "FT 18483 · Arrietty"),
+    cards = [
+        _drop_card(film.slug, film.clue, film.credit, film.caption)
+        for film in collect_drops(pair, root)
+    ]
+    create = "".join(
+        f'<a class="action" href="{_e(url)}" rel="noopener" target="_blank">Create {_e(label)}</a>'
+        for label, url in CREATE
     )
-    have = {item.clue.slug for item in pair.clues}
-    for slug, line, credit in extras:
-        if slug in have:
-            continue
-        if (root / "media" / f"{slug}.mp4").exists():
-            cards.append(_drop_card(slug, line, credit))
+    upload = "".join(
+        f'<a class="action" href="{_e(url)}" rel="noopener" target="_blank">{_e(label)}</a>'
+        for label, url in UPLOAD
+    )
     return f"""
-    <p class="kicker">Post</p>
-    <h1>Drop a Short yourself.</h1>
-    <p class="lede">The agent cannot open YouTube, Facebook, Instagram or TikTok. Save a film, then drop it. Name the account <strong>{_e(BRAND)}</strong>. Handle if it is free: <strong>@crypticaiforfun</strong>.</p>
-    <p>
-      <a class="action" href="https://www.youtube.com/upload" rel="noopener" target="_blank">YouTube</a>
-      <a class="action" href="https://www.facebook.com/pages/create" rel="noopener" target="_blank">Facebook</a>
-      <a class="action" href="https://www.instagram.com/" rel="noopener" target="_blank">Instagram</a>
-      <a class="action" href="https://www.tiktok.com/signup" rel="noopener" target="_blank">TikTok</a>
+    <p class="kicker">Invade</p>
+    <h1>Drop the clues on all four.</h1>
+    <p class="lede">This machine cannot log into YouTube, Facebook, Instagram or TikTok. The films are ready. You create <strong>{_e(BRAND)}</strong> on each, handle <strong>@crypticaiforfun</strong> if it is free, then drop the same Shorts. Do not use @crypticfun.</p>
+    <ol class="invade">
+      <li><strong>YouTube</strong> — create a channel named {_e(BRAND)}, then upload each film as a Short.</li>
+      <li><strong>Facebook</strong> — create a Page with that name, then post each film as a Reel.</li>
+      <li><strong>Instagram</strong> — switch to professional, link the Page, drop the same Reels.</li>
+      <li><strong>TikTok</strong> — sign up with that name, upload the same films.</li>
+    </ol>
+    <p>{create}</p>
+    <p>{upload}
+      <button type="button" class="reveal" data-download-all>Save every film</button>
     </p>
     <div class="suggest-forms">
       {''.join(cards)}
@@ -785,6 +781,7 @@ def publish_site(pair: DailyPair, dest: Path | None = None) -> Path:
     elif ads_path.exists():
         ads_path.unlink()
     _copy_media(pair, root)
+    write_drop_pack(pair, root / "drop.zip", root)
 
     pretty = datetime.strptime(pair.date, "%Y-%m-%d").strftime("%A %-d %B %Y")
     articles = "\n".join(_article(item, "media/") for item in pair.clues)
@@ -957,7 +954,7 @@ def publish_site(pair: DailyPair, dest: Path | None = None) -> Path:
             _post_body(pair, root),
             PageSeo(
                 title=f"Post — {BRAND}",
-                description=f"Save a {BRAND} Short and drop it on YouTube, Facebook, Instagram or TikTok. The agent cannot open those logins.",
+                description=f"Save {BRAND} Shorts and drop them on YouTube, Facebook, Instagram and TikTok. The agent cannot open those logins.",
                 path="/post.html",
             ),
         ),

@@ -7,7 +7,8 @@ from datetime import datetime
 from pathlib import Path
 
 from twodown.ads import ads_status
-from twodown.config import DEFAULT_OUTPUT, DEFAULT_VOICE_ALIAS, SITE_HOST, SITE_ORIGIN, SOURCE_SITE, STUDY_SLUG, VOICES
+from twodown.config import DEFAULT_OUTPUT, DEFAULT_VOICE_ALIAS, SITE_HOST, SITE_ORIGIN, SITE_ROOT, SOURCE_SITE, STUDY_SLUG, VOICES
+from twodown.drop import how_to_invade, write_drop_pack
 from twodown.ingest import LONDON
 from twodown.live import (
     PRODUCT_CHECK_NAMES,
@@ -173,6 +174,9 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("status", help="Show which social accounts are connected")
     sub.add_parser("connect", help="Show the token JSON the upload agent needs")
     sub.add_parser("live", help="Check which public URLs actually respond")
+    drop = sub.add_parser("drop", help="Pack Shorts so you can drop them on YouTube, Facebook, Instagram and TikTok by hand")
+    drop.add_argument("--out", type=Path, help="Zip path (default: two-down/site/drop.zip)")
+    drop.add_argument("--date", help="London calendar date YYYY-MM-DD")
 
     args = parser.parse_args(argv)
 
@@ -216,6 +220,14 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "connect":
         print(connect_instructions(), end="")
         _print_status()
+        return 0
+
+    if args.cmd == "drop":
+        pair = _latest_pair(DEFAULT_OUTPUT, args.date)
+        dest = args.out or (SITE_ROOT / "drop.zip")
+        path = write_drop_pack(pair, dest)
+        print(f"drop {path}")
+        print(how_to_invade(), end="")
         return 0
 
     if args.cmd == "live":
