@@ -70,6 +70,12 @@ TIKTOK  ->  TWODOWN_TIKTOK_TOKEN
   Public TikTok posting waits on their review, not on this code.
 
 YOUTUBE  ->  TWODOWN_YOUTUBE_TOKEN
+  Deploy only to the cryptic.fun channel (youtube.com/@crypticfun).
+  Aled Morgan / carbonyoyo is the personal channel. Do not authorise that.
+  Same Google login can own both. When Google asks which channel, pick
+  cryptic.fun. If that Brand Account is not there yet, create it in
+  YouTube Studio (your channel → Switch account → Create a channel),
+  name it cryptic.fun, then claim @crypticfun.
   1. OAuth desktop client at {GOOGLE_CONSOLE}, YouTube Data API v3 enabled.
   2. Authorise the cryptic.fun channel for scope youtube.upload.
   3. Secret value: the authorized-user JSON (token, refresh_token, token_uri,

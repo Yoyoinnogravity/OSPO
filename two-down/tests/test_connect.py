@@ -21,3 +21,10 @@ def test_connect_warns_about_tiktok_audit():
 
 def test_connect_never_asks_for_a_password():
     assert "never a password" in connect_instructions()
+
+
+def test_connect_youtube_is_cryptic_fun_not_personal():
+    text = connect_instructions()
+    assert "youtube.com/@crypticfun" in text
+    assert "carbonyoyo" in text
+    assert "Do not authorise that" in text
