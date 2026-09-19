@@ -41,6 +41,7 @@ jobs:
         env:
           TWODOWN_YOUTUBE_TOKEN: ${{ secrets.TWODOWN_YOUTUBE_TOKEN }}
           TWODOWN_META_TOKEN: ${{ secrets.TWODOWN_META_TOKEN }}
+          TWODOWN_TIKTOK_TOKEN: ${{ secrets.TWODOWN_TIKTOK_TOKEN }}
         run: |
           PRIVACY="${{ github.event.inputs.youtube_privacy }}"
           if [ -z "$PRIVACY" ]; then
@@ -67,4 +68,4 @@ jobs:
           git commit -m "Cryptic AI for Fun · $DATE"
           git push -u origin "$BRANCH"
           gh pr list --head "$BRANCH" --json number --jq '.[0].number' | grep -q . \
-            || gh pr create --base main --head "$BRANCH" --title "Cryptic AI for Fun · $DATE" --body "Daily pair from Fifteen Squared. YouTube / Facebook / Instagram upload ran if the matching repo secrets were set."
+            || gh pr create --base main --head "$BRANCH" --title "Cryptic AI for Fun · $DATE" --body "Daily pair from Fifteen Squared. YouTube / Facebook / Instagram / TikTok upload ran if the matching repo secrets were set."

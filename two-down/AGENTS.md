@@ -13,7 +13,8 @@ the secret exists. It opens a site PR when the pair is new.
 
 1. Create the YouTube channel **Cryptic AI for Fun** and claim `@crypticaiforfun`.
 2. Paste tokens as GitHub Actions secrets on Yoyoinnogravity/OSPO:
-   `TWODOWN_YOUTUBE_TOKEN` and, for Facebook + Instagram, `TWODOWN_META_TOKEN`.
+   `TWODOWN_YOUTUBE_TOKEN`, `TWODOWN_META_TOKEN` (Facebook + Instagram),
+   and `TWODOWN_TIKTOK_TOKEN`.
 3. Merge this workflow onto `main`, then **Actions → Cryptic AI for Fun daily → Run workflow**.
    First manual run can be **unlisted**. The schedule posts **public**.
 
