@@ -24,7 +24,7 @@ def platform_status() -> dict[str, bool]:
 
 def setup_hints() -> dict[str, str]:
     return {
-        "youtube": "Set TWODOWN_YOUTUBE_TOKEN to an authorized YouTube OAuth token JSON for cryptic.fit.",
+        "youtube": "Set TWODOWN_YOUTUBE_TOKEN to an authorized YouTube OAuth token JSON for Cryptic AI for Fun.",
         "tiktok": "Set TWODOWN_TIKTOK_TOKEN to a TikTok user access token JSON with video.publish.",
         "instagram": "Set TWODOWN_META_TOKEN (access_token + ig_user_id) for the Instagram professional account.",
         "facebook": "Set TWODOWN_META_TOKEN (access_token + page_id) for the cryptic.fit Facebook Page.",
@@ -44,12 +44,13 @@ META_PERMISSIONS = (
 def connect_instructions() -> str:
     """Exact steps to get each token. No account passwords are ever needed here."""
     return f"""The upload agent cannot log into YouTube, TikTok, Instagram or Facebook as you.
-Each app gives you a token. Paste the JSON (never a password) as a secret on the
-Cursor Cloud Agent environment: {CURSOR_ENVIRONMENT}
+Each app gives you a token. Paste the JSON (never a password) as a GitHub
+Actions secret on Yoyoinnogravity/OSPO, or on the Cursor Cloud Agent
+environment: {CURSOR_ENVIRONMENT}
 
 INSTAGRAM + FACEBOOK  ->  TWODOWN_META_TOKEN      (quickest; one token does both)
-  1. Make a cryptic.fit Facebook Page. Set Instagram to a professional
-     account and link it to that Page.
+  1. Make a Cryptic AI for Fun Facebook Page (cryptic.fit). Set Instagram
+     to a professional account and link it to that Page.
   2. Create an app at {META_APPS} (type: Business).
   3. Open {GRAPH_EXPLORER}, pick the app, add permissions:
      {META_PERMISSIONS}
@@ -70,16 +71,16 @@ TIKTOK  ->  TWODOWN_TIKTOK_TOKEN
   Public TikTok posting waits on their review, not on this code.
 
 YOUTUBE  ->  TWODOWN_YOUTUBE_TOKEN
-  Deploy only to the cryptic.fit channel (youtube.com/@crypticfit).
-  Do not use youtube.com/@crypticfun — that handle is someone else's
-  channel, and we do not own the .fun name.
+  Deploy only to Cryptic AI for Fun (youtube.com/@crypticaiforfun).
+  The site stays cryptic.fit. Do not use youtube.com/@crypticfun —
+  that handle is someone else's channel, and we do not own the .fun name.
   Same Google login can own Aled Morgan / carbonyoyo as a personal
-  channel. When Google asks which channel, pick cryptic.fit.
+  channel. When Google asks which channel, pick Cryptic AI for Fun.
   If that Brand Account is not there yet, create it in YouTube Studio
   (your channel → Switch account → Create a channel), name it
-  cryptic.fit, then claim @crypticfit.
+  Cryptic AI for Fun, then claim @crypticaiforfun.
   1. OAuth desktop client at {GOOGLE_CONSOLE}, YouTube Data API v3 enabled.
-  2. Authorise the cryptic.fit channel for scope youtube.upload.
+  2. Authorise the Cryptic AI for Fun channel for scope youtube.upload.
   3. Secret value: the authorized-user JSON (token, refresh_token, token_uri,
      client_id, client_secret, scopes).
 

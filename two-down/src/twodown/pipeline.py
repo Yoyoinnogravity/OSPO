@@ -27,7 +27,7 @@ from twodown.scenes import pick_scenes
 from twodown.script import write_parts
 from twodown.select import select_pair
 from twodown.site import publish_site
-from twodown.social import publish_pair, setup_hints
+from twodown.social import attach_site_videos, publish_pair, setup_hints
 from twodown.voice import build_short_soundtrack, resolve_voice, synthesise_parts
 
 _KICKER = re.compile(
@@ -343,6 +343,58 @@ def mass_media_clue() -> Clue:
     )
 
 
+def in_a_spin_clue() -> Clue:
+    """FT 18483 26a IN A SPIN — next study Short. On Fifteen Squared.
+
+    Hint panicking, not Indiana / snake / a spinning top that prints the answer.
+    Do not print IN A SPIN on the hint card.
+    """
+    return attach_hint(
+        Clue(
+            source_url=_MASS_MEDIA_SOURCE,
+            paper="Financial Times",
+            puzzle_id="18483",
+            setter="Arrietty",
+            blogger="Turbolegs",
+            number="26",
+            direction="across",
+            clue="Panicking, Indiana twice grabs snake",
+            enumeration="2,1,4",
+            answer="IN A SPIN",
+            definition="Panicking",
+            parse="IN IN (Indiana, twice) containing ASP (snake)",
+            device="container",
+            enumeration_ok=True,
+        )
+    )
+
+
+def simone_clue() -> Clue:
+    """Guardian 30115 23d SIMONE — random critique Short. On Fifteen Squared.
+
+    Hint a girl's name / a woman, not S / I'm one / a birthday cake that prints SIMONE.
+    Do not print SIMONE on the hint card.
+    """
+    return attach_hint(
+        Clue(
+            source_url=_RASTA_SOURCE,
+            paper="Guardian",
+            puzzle_id="30115",
+            setter="Brendan",
+            blogger="manehi",
+            number="23",
+            direction="down",
+            clue="Name of girl making second statement on first birthday",
+            enumeration="6",
+            answer="SIMONE",
+            definition="Name of girl",
+            parse="S (second) plus I'M ONE (statement on first birthday)",
+            device="charade",
+            enumeration_ok=True,
+        )
+    )
+
+
 def study_clues() -> dict[str, Clue]:
     """MASS MEDIA is the study default. Earlier study clues stay constructable."""
     dreamlike = dreamlike_clue()
@@ -354,6 +406,8 @@ def study_clues() -> dict[str, Clue]:
     davis = davis_cup_clue()
     aimlessly = aimlessly_clue()
     mass_media = mass_media_clue()
+    in_a_spin = in_a_spin_clue()
+    simone = simone_clue()
     return {
         dreamlike.slug: dreamlike,
         "dreamlike": dreamlike,
@@ -394,6 +448,13 @@ def study_clues() -> dict[str, Clue]:
         "study-mass-media-4-5": mass_media,
         mass_media.answer.lower(): mass_media,
         STUDY_SLUG: mass_media,
+        in_a_spin.slug: in_a_spin,
+        "in-a-spin": in_a_spin,
+        "in a spin": in_a_spin,
+        in_a_spin.answer.lower(): in_a_spin,
+        simone.slug: simone,
+        "simone": simone,
+        simone.answer.lower(): simone,
     }
 
 
@@ -472,6 +533,50 @@ def published_date(site_root: Path | None, date: str) -> bool:
     return (root / "d" / date / "index.html").exists()
 
 
+def site_day_page(date: str | None = None, site_root: Path | None = None) -> Path:
+    """Latest (or named) published day page under two-down/site/d/."""
+    root = Path(site_root or SITE_ROOT)
+    if date:
+        page = root / "d" / date / "index.html"
+        if not page.exists():
+            raise FileNotFoundError(f"No published day {date}")
+        return page
+    days = sorted((root / "d").glob("*/index.html"))
+    if not days:
+        raise FileNotFoundError("No published days on the site")
+    return days[-1]
+
+
+def site_pair(date: str | None = None, site_root: Path | None = None) -> DailyPair:
+    """Rebuild a DailyPair from published site HTML and site/media films."""
+    page = site_day_page(date, site_root)
+    stamp = page.parent.name
+    soup = BeautifulSoup(page.read_text(encoding="utf-8"), "lxml")
+    slugs = [tag.get("data-slug") for tag in soup.select("article.clue[data-slug]")]
+    slugs = [slug for slug in slugs if slug]
+    if not slugs:
+        raise FileNotFoundError(f"No clues on {page}")
+    items: list[SpokenClue] = []
+    for slug in slugs:
+        clue = published_clue(slug, site_root)
+        items.append(
+            SpokenClue(
+                clue=clue,
+                script="",
+                voice=resolve_voice(DEFAULT_VOICE_ALIAS),
+                site_path=f"{SITE_ORIGIN}/c/{slug}/",
+            )
+        )
+    pair = DailyPair(
+        date=stamp,
+        voice=resolve_voice(DEFAULT_VOICE_ALIAS),
+        clues=items,
+        site_index=str((site_root or SITE_ROOT) / "index.html"),
+        already_published=True,
+    )
+    return attach_site_videos(pair, site_root)
+
+
 def _load_complete_pair(dest_root: Path) -> DailyPair | None:
     path = dest_root / "pair.json"
     if not path.exists():
@@ -534,18 +639,43 @@ def run_today(
                 (dest_root / "pair.json").write_text(existing.model_dump_json(indent=2), encoding="utf-8")
             return existing
         if published_date(SITE_ROOT, stamp):
-            skipped = DailyPair(
-                date=stamp,
-                voice=resolve_voice(_voice_alias(voice)),
-                source_posts=[p.url for p in todays],
-                source_site=SOURCE_SITE,
-                site_index=str(SITE_ROOT / "index.html"),
-                already_published=True,
-            )
+            try:
+                skipped = site_pair(stamp)
+            except FileNotFoundError:
+                skipped = DailyPair(
+                    date=stamp,
+                    voice=resolve_voice(_voice_alias(voice)),
+                    source_posts=[p.url for p in todays],
+                    source_site=SOURCE_SITE,
+                    site_index=str(SITE_ROOT / "index.html"),
+                    already_published=True,
+                )
+            skipped.source_posts = [p.url for p in todays]
+            skipped.already_published = True
+            if skipped.clues and (youtube or tiktok or instagram or facebook):
+                notes = publish_pair(
+                    skipped,
+                    youtube=youtube,
+                    tiktok=tiktok,
+                    instagram=instagram,
+                    facebook=facebook,
+                    youtube_privacy=youtube_privacy,
+                )
+                lines = []
+                hints = setup_hints()
+                for platform, values in notes.items():
+                    if values == [hints.get(platform)]:
+                        lines.append(f"{platform}: skipped — {values[0]}")
+                    elif values:
+                        lines.append(f"{platform}: {', '.join(values)}")
+                if lines:
+                    (dest_root / "social-status.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
             (dest_root / "already-published.txt").write_text(
                 f"{stamp} already on cryptic.fit. Pass --force to rebuild.\n",
                 encoding="utf-8",
             )
+            if skipped.clues:
+                (dest_root / "pair.json").write_text(skipped.model_dump_json(indent=2), encoding="utf-8")
             return skipped
     alias = _voice_alias(voice)
     resolved_voice = resolve_voice(alias)

@@ -1,22 +1,26 @@
-# Daily cryptic.fit agent
+# Daily Cryptic AI for Fun agent
 
 This package publishes **two** cryptic clues a day from
-[Fifteen Squared](https://fifteensquared.net/). A paid Cursor Automation can
-run it unattended. Never use another crossword blog as the source.
+[Fifteen Squared](https://fifteensquared.net/). GitHub Actions runs it
+unattended once `TWODOWN_YOUTUBE_TOKEN` is a repo secret. Never use
+another crossword blog as the source.
 
-## What to create
+## What is already set up
 
-1. Open [cursor.com/automations](https://cursor.com/automations) (or `/automate` in Cursor).
-2. Trigger: scheduled, every day at **09:00 Europe/London**
-   (`CRON_TZ=Europe/London 0 9 * * *`, or `0 8 * * *` UTC).
-   Add a second trigger at **12:00 London** in case the 15² blogs are late.
-3. Repository: **Yoyoinnogravity/OSPO**, branch `main` (or this feature branch until it merges).
-4. Model: Grok (Cursor Models pool). This is the pick Aled locked. Do not pick Claude / Anthropic.
-5. Tools: pull request creation on. Memories optional.
-6. Paste the prompt below.
-7. Put social tokens on the Cloud Agent environment so uploads actually leave the machine:
-   `TWODOWN_YOUTUBE_TOKEN`, `TWODOWN_TIKTOK_TOKEN`, `TWODOWN_META_TOKEN`.
-   Ads stay off unless `TWODOWN_ADSENSE_CLIENT` and `TWODOWN_ADSENSE_SLOT` are set.
+`.github/workflows/cryptic-ai-daily.yml` runs `twodown today` at 08:00
+and 11:00 UTC (09:00 and 12:00 London in BST). It uploads to YouTube when
+the secret exists. It opens a site PR when the pair is new.
+
+1. Create the YouTube channel **Cryptic AI for Fun** and claim `@crypticaiforfun`.
+2. Paste tokens as GitHub Actions secrets on Yoyoinnogravity/OSPO:
+   `TWODOWN_YOUTUBE_TOKEN`, `TWODOWN_META_TOKEN` (Facebook + Instagram),
+   and `TWODOWN_TIKTOK_TOKEN`.
+3. Merge this workflow onto `main`, then **Actions → Cryptic AI for Fun daily → Run workflow**.
+   First manual run can be **unlisted**. The schedule posts **public**.
+
+A Cursor Automation at [cursor.com/automations](https://cursor.com/automations)
+is optional. If you add one: 09:00 Europe/London, Grok, prompt below,
+and the same token on the Cloud Agent environment.
 
 Automations are billed as Cloud Agent usage on your Cursor plan (Pro and up).
 Private automations bill the person who created them.
@@ -24,7 +28,7 @@ Private automations bill the person who created them.
 ## Prompt (paste this)
 
 ```
-You are the daily cryptic.fit agent.
+You are the daily Cryptic AI for Fun agent. The site is cryptic.fit.
 
 Do exactly two clues from https://fifteensquared.net/ . Never invent an answer.
 Never scrape another crossword site.
@@ -41,7 +45,7 @@ That is good enough. Do not ban AI matching. Do not build a cloud vision pipelin
    Do not invent clues. A later scheduled run can pick them up.
 3. If it built a new pair:
    - Commit only two-down/site/ (HTML, CSS, JS, media, scenes). Do not commit two-down/output/.
-   - Open or update a PR onto main titled like: cryptic.fit · {date}
+   - Open or update a PR onto main titled like: Cryptic AI for Fun · {date}
    - In the PR body list both clues, papers, 15² URLs, scenes, and which social uploads happened or were skipped.
 4. Do not change the world-map / OSPO files. Stay under two-down/.
 ```

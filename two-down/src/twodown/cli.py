@@ -7,7 +7,9 @@ from datetime import datetime
 from pathlib import Path
 
 from twodown.ads import ads_status
-from twodown.config import DEFAULT_OUTPUT, DEFAULT_VOICE_ALIAS, SITE_HOST, SITE_ORIGIN, SOURCE_SITE, STUDY_SLUG, VOICES
+from twodown.config import DEFAULT_OUTPUT, DEFAULT_VOICE_ALIAS, SITE_HOST, SITE_ORIGIN, SITE_ROOT, SOURCE_SITE, STUDY_SLUG, VOICES
+from twodown.bomb import PACK_LIMIT, how_to_bomb, run_bomb
+from twodown.drop import how_to_invade, write_drop_pack
 from twodown.ingest import LONDON
 from twodown.live import (
     PRODUCT_CHECK_NAMES,
@@ -68,16 +70,20 @@ def _print_pair(pair) -> None:
 
 
 def _latest_pair(out: Path, date: str | None) -> DailyPair:
+    from twodown.pipeline import site_pair
+
     if date:
         path = out / date / "pair.json"
-    else:
+        if path.exists():
+            return DailyPair.model_validate_json(path.read_text(encoding="utf-8"))
+        return site_pair(date)
+    if out.exists():
         dates = sorted((p for p in out.iterdir() if p.is_dir()), reverse=True)
-        if not dates:
-            raise FileNotFoundError(f"No daily output in {out}")
-        path = dates[0] / "pair.json"
-    if not path.exists():
-        raise FileNotFoundError(f"No pair.json at {path}. Run twodown today first.")
-    return DailyPair.model_validate_json(path.read_text(encoding="utf-8"))
+        if dates:
+            path = dates[0] / "pair.json"
+            if path.exists():
+                return DailyPair.model_validate_json(path.read_text(encoding="utf-8"))
+    return site_pair(date)
 
 
 def _pair_path(out: Path, date: str | None) -> Path:
@@ -169,6 +175,16 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("status", help="Show which social accounts are connected")
     sub.add_parser("connect", help="Show the token JSON the upload agent needs")
     sub.add_parser("live", help="Check which public URLs actually respond")
+    drop = sub.add_parser("drop", help="Pack Shorts so you can drop them on YouTube, Facebook, Instagram and TikTok by hand")
+    drop.add_argument("--out", type=Path, help="Zip path (default: two-down/site/drop.zip)")
+    drop.add_argument("--date", help="London calendar date YYYY-MM-DD")
+
+    bomb = sub.add_parser("bomb", help="Cut 100 full Shorts so you can drag them onto YouTube")
+    bomb.add_argument("--limit", type=int, default=PACK_LIMIT, help="How many Shorts (default: 100)")
+    bomb.add_argument("--out", type=Path, help="Zip path (default: two-down/output/bomb/youtube-100.zip)")
+    bomb.add_argument("--dest", type=Path, help="Work folder for the cuts")
+    bomb.add_argument("--rebuild", action="store_true", help="Recut films that already exist (never PIN-UP or SELF)")
+    bomb.add_argument("--workers", type=int, default=1)
 
     args = parser.parse_args(argv)
 
@@ -213,6 +229,28 @@ def main(argv: list[str] | None = None) -> int:
         print(connect_instructions(), end="")
         _print_status()
         return 0
+
+    if args.cmd == "drop":
+        pair = _latest_pair(DEFAULT_OUTPUT, args.date)
+        dest = args.out or (SITE_ROOT / "drop.zip")
+        path = write_drop_pack(pair, dest)
+        print(f"drop {path}")
+        print(how_to_invade(), end="")
+        return 0
+
+    if args.cmd == "bomb":
+        packed, records = run_bomb(
+            limit=max(1, args.limit),
+            dest=args.dest,
+            zip_path=args.out,
+            rebuild=args.rebuild,
+            workers=max(1, args.workers),
+        )
+        ready = sum(1 for row in records if row.get("video"))
+        print(f"bomb {packed}")
+        print(f"films {ready}/{len(records)}")
+        print(how_to_bomb(), end="")
+        return 0 if ready else 1
 
     if args.cmd == "live":
         print("Public URLs (live = HTTP 2xx/3xx from here right now)")

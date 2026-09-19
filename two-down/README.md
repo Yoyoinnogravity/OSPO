@@ -1,13 +1,15 @@
-cryptic.fit
-===========
+Cryptic AI for Fun
+==================
 
 We provide unique cryptic crossword clues and solutions.
 We credit all — the setter, the paper, Fifteen Squared, and the photograph.
 The only source is [Fifteen Squared](https://fifteensquared.net/),
 cut as newsprint Shorts. **Ryan** opens and offers the picture clue,
 **Sonia** solves, **Thomas** credits the setter and Fifteen Squared.
-The brand is **cryptic.fit** on the site,
-YouTube, TikTok, Instagram and Facebook.
+The name is **Cryptic AI for Fun**. The site stays **cryptic.fit**.
+YouTube is **@crypticaiforfun**. Ryan opens with
+**Hi I am your AI.** and ends
+**We are here to help then dominate.**
 
 Do not invent answers. Do not scrape other crossword blogs.
 
@@ -54,6 +56,8 @@ Social
 
 `twodown today` and `twodown upload` send the same two vertical videos to
 every platform that has a token. Missing tokens are skipped, not fatal.
+GitHub Actions (`.github/workflows/cryptic-ai-daily.yml`) runs `twodown today`
+every morning once `TWODOWN_YOUTUBE_TOKEN` is a repo secret.
 
 ```bash
 export TWODOWN_YOUTUBE_TOKEN=/path/to/youtube-token.json
@@ -69,9 +73,9 @@ twodown upload --no-youtube          # TikTok + Instagram + Facebook only
 
 Token files:
 
-* **YouTube** — authorized desktop OAuth user JSON for the **cryptic.fit**
-  channel (`youtube.com/@crypticfit`). Do not use `@crypticfun` — that
-  handle is someone else's channel, and we do not own `.fun`.
+* **YouTube** — authorized desktop OAuth user JSON for **Cryptic AI for Fun**
+  (`youtube.com/@crypticaiforfun`). The site stays cryptic.fit. Do not use
+  `@crypticfun` — that handle is someone else's channel, and we do not own `.fun`.
 * **TikTok** — `{"access_token": "..."}` from a TikTok app with `video.publish`
   (Content Posting API, FILE_UPLOAD). Unaudited apps are limited to private /
   self-only until TikTok reviews the app.
@@ -96,6 +100,13 @@ Without tokens the pair still lands in `two-down/site/` for cryptic.fit.
 That folder is a complete static site. Upload its contents to any host
 (`public_html`, Netlify, Cloudflare Pages). The site `CNAME` is `cryptic.fit`.
 DNS only works after the name is actually registered (see Go live).
+The **YouTube** page (`youtube.html`) is the hand drop we are doing now:
+Harry Botter picture, channel name, Short title, film. The **Post** page
+still lists the other platforms.
+
+```bash
+twodown drop                 # writes site/drop.zip + HOW.txt
+```
 
 Daily agent
 -----------
@@ -133,7 +144,7 @@ Do **not** upload with cPanel File Manager, FileZilla, or `scp` to
 
 `twodown live` prints this same order (registry first, then Pages, then DNS).
 
-YouTube still needs `TWODOWN_YOUTUBE_TOKEN` (OAuth for the cryptic.fit channel),
+YouTube still needs `TWODOWN_YOUTUBE_TOKEN` (OAuth for Cryptic AI for Fun),
 not a payment.
 
 Money

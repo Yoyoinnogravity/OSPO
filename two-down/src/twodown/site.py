@@ -6,7 +6,9 @@ from pathlib import Path
 from shutil import copy2
 
 from twodown.ads import ads_enabled, ads_txt, adsense_client, adsense_slot
-from twodown.config import BRAND, BRAND_LINE, CREDIT_LINE, CREDIT_WHO, SITE_HOST, SITE_ORIGIN, SITE_ROOT, SOURCE_SITE, SPONSOR_EMAIL, SUGGEST_EMAIL, VOICE_LABELS, follow_profiles
+from twodown.config import BRAND, BRAND_LINE, CREDIT_LINE, CREDIT_WHO, SITE_HOST, SITE_ORIGIN, SITE_ROOT, SOURCE_SITE, SPONSOR_EMAIL, SUGGEST_EMAIL, VOICE_LABELS, WORDMARK_HEAD, WORDMARK_TAIL, follow_profiles
+from twodown.drop import CREATE, TIKTOK_SIGNUP, TIKTOK_UPLOAD, UPLOAD, YOUTUBE_CREATE, YOUTUBE_STUDIO, YOUTUBE_UPLOAD, collect_drops, write_drop_pack
+from twodown.open_world import open_films
 from twodown.models import DailyPair, SpokenClue
 from twodown.render import write_share_card
 from twodown.scenes import DEFAULT_SCENE, get_scene, list_scenes
@@ -90,7 +92,7 @@ body.scene-photo header .follow a { color: var(--ink); }
 body.scene-photo header .follow a.on { color: var(--cream); }
 nav a:hover { color: var(--crimson); }
 .chrome-top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
-.wordmark { font-family: "Liberation Sans", "Helvetica Neue", sans-serif; font-weight: 700; font-size: 1.6rem; letter-spacing: 0.02em; color: var(--ink); text-decoration: none; }
+.wordmark { font-family: "Liberation Sans", "Helvetica Neue", sans-serif; font-weight: 700; font-size: clamp(1.15rem, 3.8vw, 1.55rem); letter-spacing: 0.01em; color: var(--ink); text-decoration: none; }
 .wordmark span { color: var(--crimson); }
 nav a { margin-left: 18px; font-family: "Liberation Sans", sans-serif; font-size: 0.9rem; text-decoration: none; color: var(--muted); }
 .voices, .places, .follow { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
@@ -167,6 +169,7 @@ footer {
 footer a { color: var(--crimson); }
 .scene-credit { margin-top: 10px; }
 body.scene-photo h2 { text-shadow: 0 2px 18px rgba(0,0,0,0.55); }
+.panel video.short { width: min(100%, 360px); height: auto; display: block; background: #111; }
 .panel, aside.teaser {
   background: rgba(252, 247, 236, 0.94);
   color: var(--ink);
@@ -177,6 +180,25 @@ body.scene-photo h2 { text-shadow: 0 2px 18px rgba(0,0,0,0.55); }
   max-width: 40rem;
 }
 .panel a, aside.teaser a { color: var(--crimson); }
+.panel .action { margin: 0 8px 8px 0; }
+.panel label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-family: "Liberation Sans", sans-serif;
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin-top: 12px;
+}
+.panel textarea {
+  font-family: "Liberation Serif", Georgia, serif;
+  font-size: 1.05rem;
+  color: var(--ink);
+  background: var(--cream);
+  border: 1px solid var(--rule);
+  padding: 8px 10px;
+  width: 100%;
+}
 .suggest-forms { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; margin: 28px 0 64px; }
 @media (max-width: 800px) { .suggest-forms { grid-template-columns: 1fr; } }
 .suggest-form { display: flex; flex-direction: column; gap: 12px; }
@@ -225,8 +247,8 @@ aside.ad {
   color: var(--muted);
   margin: 0 0 8px;
 }
-.rules { max-width: 40rem; }
-.rules li { margin: 0 0 8px; }
+.rules, .invade { max-width: 40rem; }
+.rules li, .invade li { margin: 0 0 8px; }
 """
 
 JS = """
@@ -438,6 +460,15 @@ if (subscribeForm) {
     lockSuggest(subscribeForm, "Thanks. Your email app should open. We’ll send one clue a day.");
   });
 }
+
+const downloadAll = document.querySelector("[data-download-all]");
+if (downloadAll) {
+  downloadAll.addEventListener("click", () => {
+    document.querySelectorAll("[data-drop-slug] a.action[download]").forEach((link, index) => {
+      window.setTimeout(() => link.click(), index * 350);
+    });
+  });
+}
 """
 
 
@@ -487,11 +518,155 @@ def _nav(prefix: str) -> str:
     return f"""
       <nav>
         <a href="{prefix}index.html">Today</a>
+        <a href="{prefix}open.html">Open</a>
+        <a href="{prefix}youtube.html">YouTube</a>
+        <a href="{prefix}post.html">Post</a>
+        <a href="{prefix}tiktok.html">TikTok</a>
         <a href="{prefix}follow.html">Follow</a>
         <a href="{prefix}suggest.html">Suggest</a>
         <a href="{prefix}support.html">Support</a>
         <a href="{prefix}about.html">About</a>
       </nav>
+    """
+
+
+def _youtube_title_line(clue: str) -> str:
+    title = f"{BRAND} · {clue} #Shorts"
+    return title if len(title) <= 100 else title[:99].rstrip() + "…"
+
+
+def _drop_card(slug: str, clue: str, credit: str, caption: str, media_prefix: str = "media/") -> str:
+    video = f"{media_prefix}{slug}.mp4"
+    return f"""
+      <section class="panel" data-drop-slug="{_e(slug)}">
+        <h2>{_e(clue)}</h2>
+        <p>{_e(credit)}</p>
+        <video class="short" controls playsinline preload="metadata" src="{_e(video)}"></video>
+        <p><a class="action" href="{_e(video)}" download="{_e(slug)}.mp4">Save the film</a></p>
+        <label>Caption — copy this, no answer
+          <textarea readonly rows="6">{_e(caption)}</textarea>
+        </label>
+      </section>
+    """
+
+
+def _post_body(pair: DailyPair, root: Path) -> str:
+    cards = [
+        _drop_card(film.slug, film.clue, film.credit, film.caption)
+        for film in collect_drops(pair, root)
+    ]
+    create = "".join(
+        f'<a class="action" href="{_e(url)}" rel="noopener" target="_blank">Create {_e(label)}</a>'
+        for label, url in CREATE
+    )
+    upload = "".join(
+        f'<a class="action" href="{_e(url)}" rel="noopener" target="_blank">{_e(label)}</a>'
+        for label, url in UPLOAD
+    )
+    return f"""
+    <p class="kicker">Invade</p>
+    <h1>Drop the clues on all four.</h1>
+    <p class="lede">This machine cannot log into YouTube, Facebook, Instagram or TikTok. The films are ready. You create <strong>{_e(BRAND)}</strong> on each, handle <strong>@crypticaiforfun</strong> if it is free, then drop the same Shorts. Do not use @crypticfun.</p>
+    <ol class="invade">
+      <li><strong>TikTok</strong> — sign up as {_e(BRAND)}, handle @crypticaiforfun if it is free, upload the films.</li>
+      <li><strong>YouTube</strong> — create a channel with that name, then upload each film as a Short.</li>
+      <li><strong>Facebook</strong> — create a Page with that name, then post each film as a Reel.</li>
+      <li><strong>Instagram</strong> — switch to professional, link the Page, drop the same Reels.</li>
+    </ol>
+    <p>{create}</p>
+    <p>{upload}
+      <button type="button" class="reveal" data-download-all>Save every film</button>
+    </p>
+    <div class="suggest-forms">
+      {''.join(cards)}
+    </div>
+    """
+
+
+def _tiktok_body(pair: DailyPair, root: Path) -> str:
+    cards = [
+        _drop_card(film.slug, film.clue, film.credit, film.caption)
+        for film in collect_drops(pair, root)
+    ]
+    return f"""
+    <p class="kicker">TikTok</p>
+    <h1>Go to TikTok.</h1>
+    <p class="lede">Open TikTok, create <strong>{_e(BRAND)}</strong>, take <strong>@crypticaiforfun</strong> if it is free, then drop these Shorts. Do not use @crypticfun. Captions are clue only.</p>
+    <p>
+      <a class="action" href="{_e(TIKTOK_SIGNUP)}" rel="noopener" target="_blank">Create the account</a>
+      <a class="action" href="{_e(TIKTOK_UPLOAD)}" rel="noopener" target="_blank">Upload a film</a>
+      <button type="button" class="reveal" data-download-all>Save every film</button>
+    </p>
+    <div class="suggest-forms">
+      {''.join(cards)}
+    </div>
+    """
+
+
+def _youtube_card(slug: str, clue: str, credit: str, caption: str, media_prefix: str = "media/") -> str:
+    video = f"{media_prefix}{slug}.mp4"
+    title = _youtube_title_line(clue)
+    return f"""
+      <section class="panel" data-drop-slug="{_e(slug)}">
+        <h2>{_e(clue)}</h2>
+        <p>{_e(credit)}</p>
+        <video class="short" controls playsinline preload="metadata" src="{_e(video)}"></video>
+        <p><a class="action" href="{_e(video)}" download="{_e(slug)}.mp4">Save the film</a></p>
+        <label>YouTube title
+          <textarea readonly rows="2">{_e(title)}</textarea>
+        </label>
+        <label>Description — copy this, no answer
+          <textarea readonly rows="6">{_e(caption)}</textarea>
+        </label>
+      </section>
+    """
+
+
+def _open_body(root: Path) -> str:
+    cards = []
+    for film in open_films(root):
+        cards.append(
+            f"""
+      <section class="panel" data-drop-slug="{_e(film['slug'])}">
+        <h2>{_e(film['clue'])}</h2>
+        <video class="short" controls playsinline preload="metadata" src="{_e(film['video'])}"></video>
+      </section>
+    """
+        )
+    return f"""
+    <p class="kicker">Open world</p>
+    <h1>The clues are here.</h1>
+    <p class="lede">Public Shorts from Fifteen Squared. The parse is in the film. No account.</p>
+    <div class="suggest-forms">
+      {''.join(cards)}
+    </div>
+    """
+
+
+def _youtube_body(pair: DailyPair, root: Path) -> str:
+    cards = [
+        _youtube_card(film.slug, film.clue, film.credit, film.caption)
+        for film in collect_drops(pair, root)
+    ]
+    return f"""
+    <p class="kicker">YouTube</p>
+    <h1>Get on YouTube.</h1>
+    <p class="lede">You already have a channel. Stay signed in, open Studio, drag the Shorts onto it. Rename it <strong>{_e(BRAND)}</strong> when you want, handle <strong>@crypticaiforfun</strong> if it is free, Harry Botter as the picture. Do not use @crypticfun.</p>
+    <ol class="invade">
+      <li>Stay on the channel you already have. Create → Upload videos.</li>
+      <li>Drag every film. Title and description are under each film. No answer in the text.</li>
+      <li>Rename {_e(BRAND)} when you want. Picture: Harry Botter.</li>
+    </ol>
+    <p>
+      <a class="action" href="{_e(YOUTUBE_CREATE)}" rel="noopener" target="_blank">Create the channel</a>
+      <a class="action" href="{_e(YOUTUBE_STUDIO)}" rel="noopener" target="_blank">YouTube Studio</a>
+      <a class="action" href="{_e(YOUTUBE_UPLOAD)}" rel="noopener" target="_blank">Upload a Short</a>
+      <a class="action" href="media/harry-botter.png" download="harry-botter.png">Save Harry Botter</a>
+    </p>
+    <p><img src="media/harry-botter.png" alt="Harry Botter cryptic solver" width="196" height="196" style="border-radius:50%;background:#fcf7ec;border:1px solid rgba(184,28,41,0.35);"></p>
+    <div class="suggest-forms">
+      {''.join(cards)}
+    </div>
     """
 
 
@@ -587,7 +762,7 @@ def _page(body: str, seo: PageSeo, depth: int = 0, show_ads: bool = False) -> st
 <body class="scene-photo" data-scene="{_e(default.slug)}" data-default-scene="{_e(default.slug)}" data-scene-prefix="{_e(scene_prefix)}" style="background-image: url('{_e(scene_prefix + background)}');">
   <header>
     <div class="chrome-top">
-      <a class="wordmark" href="{prefix}index.html">cryptic<span>.fit</span></a>
+      <a class="wordmark" href="{prefix}index.html">{_e(WORDMARK_HEAD)}<span>{_e(WORDMARK_TAIL)}</span></a>
       {_nav(prefix)}
     </div>
     {_voice_bar()}
@@ -702,6 +877,7 @@ def publish_site(pair: DailyPair, dest: Path | None = None) -> Path:
     elif ads_path.exists():
         ads_path.unlink()
     _copy_media(pair, root)
+    write_drop_pack(pair, root / "drop.zip", root)
 
     pretty = datetime.strptime(pair.date, "%Y-%m-%d").strftime("%A %-d %B %Y")
     articles = "\n".join(_article(item, "media/") for item in pair.clues)
@@ -864,6 +1040,51 @@ def publish_site(pair: DailyPair, dest: Path | None = None) -> Path:
                 title=f"Suggest a clue — {BRAND}",
                 description="Send one homemade cryptic a day, or ask for a daily clue by email. Answers stay off the public page.",
                 path="/suggest.html",
+            ),
+        ),
+        encoding="utf-8",
+    )
+
+    (root / "post.html").write_text(
+        _page(
+            _post_body(pair, root),
+            PageSeo(
+                title=f"Post — {BRAND}",
+                description=f"Save {BRAND} Shorts and drop them on YouTube, Facebook, Instagram and TikTok. The agent cannot open those logins.",
+                path="/post.html",
+            ),
+        ),
+        encoding="utf-8",
+    )
+    (root / "tiktok.html").write_text(
+        _page(
+            _tiktok_body(pair, root),
+            PageSeo(
+                title=f"TikTok — {BRAND}",
+                description=f"Save {BRAND} Shorts and drop them on TikTok. Create @crypticaiforfun, then upload.",
+                path="/tiktok.html",
+            ),
+        ),
+        encoding="utf-8",
+    )
+    (root / "youtube.html").write_text(
+        _page(
+            _youtube_body(pair, root),
+            PageSeo(
+                title=f"YouTube — {BRAND}",
+                description=f"Get {BRAND} on YouTube. Name the channel, take @crypticaiforfun, upload a Short. The agent cannot open that login.",
+                path="/youtube.html",
+            ),
+        ),
+        encoding="utf-8",
+    )
+    (root / "open.html").write_text(
+        _page(
+            _open_body(root),
+            PageSeo(
+                title=f"Open — {BRAND}",
+                description=f"Public {BRAND} cryptic Shorts from Fifteen Squared. Watch in the open. No login.",
+                path="/open.html",
             ),
         ),
         encoding="utf-8",

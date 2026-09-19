@@ -4,9 +4,12 @@ import asyncio
 import re
 import shutil
 import subprocess
+import threading
 from pathlib import Path
 
 import edge_tts
+
+_TTS_LOCK = threading.Lock()
 
 from twodown.config import (
     ANSWER_PAUSE_SECONDS,
@@ -90,16 +93,17 @@ def synthesise(
     volume: str | None = None,
 ) -> Path:
     resolved = resolve_voice(voice)
-    asyncio.run(
-        _synth(
-            script,
-            dest,
-            resolved,
-            rate=rate or VOICE_RATE,
-            pitch=pitch or VOICE_PITCH,
-            volume=volume or VOICE_VOLUME,
+    with _TTS_LOCK:
+        asyncio.run(
+            _synth(
+                script,
+                dest,
+                resolved,
+                rate=rate or VOICE_RATE,
+                pitch=pitch or VOICE_PITCH,
+                volume=volume or VOICE_VOLUME,
+            )
         )
-    )
     return dest
 
 
@@ -172,7 +176,7 @@ def synthesise_spoken_paragraph(
 def build_short_soundtrack(parts: ScriptParts, dest: Path, voice: str | None = None) -> ShortTimings:
     """Speak each beat, then stitch the pauses so the picture can follow the voice."""
     dest.parent.mkdir(parents=True, exist_ok=True)
-    work = Path("/tmp/twodown-beats") / dest.stem
+    work = Path("/tmp/twodown-beats") / dest.parent.name / dest.stem
     work.mkdir(parents=True, exist_ok=True)
     clips = {
         "intro": synthesise(

@@ -207,3 +207,12 @@ if (subscribeForm) {
     lockSuggest(subscribeForm, "Thanks. Your email app should open. We’ll send one clue a day.");
   });
 }
+
+const downloadAll = document.querySelector("[data-download-all]");
+if (downloadAll) {
+  downloadAll.addEventListener("click", () => {
+    document.querySelectorAll("[data-drop-slug] a.action[download]").forEach((link, index) => {
+      window.setTimeout(() => link.click(), index * 350);
+    });
+  });
+}

@@ -1,5 +1,6 @@
 from twodown.captions import youtube_description
 from twodown.models import Clue, DailyPair, SpokenClue
+from twodown.pipeline import site_pair
 from twodown.site import publish_site
 from twodown.youtube import YOUTUBE_CHANNEL, video_title
 
@@ -28,7 +29,8 @@ def test_publish_site_writes_spoiler_pages(tmp_path):
     root = publish_site(pair, tmp_path)
     index = (root / "index.html").read_text(encoding="utf-8")
     assert "cryptic.fit" in index
-    assert "cryptic<span>.fit</span>" in index
+    assert "Cryptic AI<span> for Fun</span>" in index
+    assert "cryptic<span>.fit</span>" not in index
     assert "cryptic<span>.fun</span>" not in index
     assert "Rioting led unrest" in index
     assert "Solve" in index
@@ -46,6 +48,37 @@ def test_publish_site_writes_spoiler_pages(tmp_path):
     assert "data-scene-prefix" in index
     assert (tmp_path / "media" / "scenes" / "machu-picchu.webp").exists()
     assert (tmp_path / "suggest.html").exists()
+    assert (tmp_path / "post.html").exists()
+    post = (tmp_path / "post.html").read_text(encoding="utf-8")
+    assert "Drop the clues on all four" in post
+    assert "youtube.com/upload" in post
+    assert "youtube.com/create_channel" in post
+    assert "Save the film" in post
+    assert "data-download-all" in post
+    assert "Caption — copy this, no answer" in post
+    assert "END RESULT" not in post
+    assert "AXES" not in post
+    assert (tmp_path / "drop.zip").exists()
+    assert (tmp_path / "tiktok.html").exists()
+    tiktok = (tmp_path / "tiktok.html").read_text(encoding="utf-8")
+    assert "Go to TikTok" in tiktok
+    assert "tiktok.com/signup" in tiktok
+    assert "tiktok.com/tiktokstudio/upload" in tiktok
+    assert "END RESULT" not in tiktok
+    assert ">Post</a>" in index
+    assert ">YouTube</a>" in index
+    assert ">TikTok</a>" in index
+    assert (tmp_path / "youtube.html").exists()
+    assert (tmp_path / "open.html").exists()
+    assert ">Open</a>" in index
+    assert "The clues are here" in (tmp_path / "open.html").read_text(encoding="utf-8")
+    youtube_page = (tmp_path / "youtube.html").read_text(encoding="utf-8")
+    assert "Get on YouTube" in youtube_page
+    assert "You already have a channel" in youtube_page
+    assert "youtube.com/upload" in youtube_page
+    assert "youtube.com/create_channel" in youtube_page
+    assert "Harry Botter" in youtube_page
+    assert "END RESULT" not in youtube_page
     suggest = (tmp_path / "suggest.html").read_text(encoding="utf-8")
     assert "aledmorgan@gmail.com" in suggest
     assert "data-suggest-form" in suggest
@@ -74,8 +107,14 @@ def test_publish_site_writes_spoiler_pages(tmp_path):
     follow = (tmp_path / "follow.html").read_text(encoding="utf-8")
     assert "data-subscribe-form" in follow
     assert "feed.xml" in follow
-    assert "youtube.com/@crypticfit" in follow
-    assert "https://cryptic.fit/follow.html" in (tmp_path / "sitemap.xml").read_text(encoding="utf-8")
+    assert "youtube.com/@crypticaiforfun" in follow
+    assert "youtube.com/@crypticfun" not in follow
+    sitemap = (tmp_path / "sitemap.xml").read_text(encoding="utf-8")
+    assert "https://cryptic.fit/follow.html" in sitemap
+    assert "https://cryptic.fit/post.html" in sitemap
+    assert "https://cryptic.fit/tiktok.html" in sitemap
+    assert "https://cryptic.fit/youtube.html" in sitemap
+    assert "https://cryptic.fit/open.html" in sitemap
     assert "How we pay for this" in index
     assert "adsbygoogle" not in index
     assert not (tmp_path / "ads.txt").exists()
@@ -88,6 +127,7 @@ def test_publish_site_writes_spoiler_pages(tmp_path):
     assert (tmp_path / "robots.txt").exists()
     css = (tmp_path / "assets" / "style.css").read_text(encoding="utf-8")
     assert "body.scene-photo header a" in css
+    assert ".panel textarea" in css
     assert 'rel="canonical"' in index
     assert 'property="og:title"' in index
     assert "application/ld+json" in index
@@ -97,7 +137,6 @@ def test_publish_site_writes_spoiler_pages(tmp_path):
     assert "Rioting led unrest" in clue_page.split("<h1>", 1)[1].split("</h1>", 1)[0]
     robots = (tmp_path / "robots.txt").read_text(encoding="utf-8")
     assert "Sitemap: https://cryptic.fit/sitemap.xml" in robots
-    sitemap = (tmp_path / "sitemap.xml").read_text(encoding="utf-8")
     assert "https://cryptic.fit/" in sitemap
     assert "https://cryptic.fit/c/independent-12458-12a/" in sitemap
     feed = (tmp_path / "feed.xml").read_text(encoding="utf-8")
@@ -113,9 +152,9 @@ def test_publish_site_writes_spoiler_pages(tmp_path):
 def test_youtube_titles_use_cryptic_fun_channel():
     clue = _item().clue
     title = video_title(clue)
-    assert title.startswith("cryptic.fit · ")
+    assert title.startswith("Cryptic AI for Fun · ")
     assert title.endswith("#Shorts")
-    assert YOUTUBE_CHANNEL == "cryptic.fit"
+    assert YOUTUBE_CHANNEL == "Cryptic AI for Fun"
     assert len(title) <= 100
     assert "https://cryptic.fit/support.html" in youtube_description(_item())
     assert "unique cryptic crossword clues and solutions" in youtube_description(_item())
@@ -138,4 +177,29 @@ def test_ads_on_writes_ads_txt_and_unit(tmp_path, monkeypatch):
     clue_page = (root / "c" / "independent-12458-12a" / "index.html").read_text(encoding="utf-8")
     assert "adsbygoogle" not in clue_page
     assert "pagead2.googlesyndication.com" not in clue_page
+
+
+def test_post_kit_lists_saved_films_without_answers(tmp_path):
+    pair = DailyPair(date="2026-09-11", voice="en-GB-SoniaNeural", clues=[_item(), _item(answer="AXES", number="14")])
+    extra = tmp_path / "media" / "guardian-30115-23d.mp4"
+    extra.parent.mkdir(parents=True, exist_ok=True)
+    extra.write_bytes(b"mp4")
+    root = publish_site(pair, tmp_path)
+    post = (root / "post.html").read_text(encoding="utf-8")
+    assert 'data-drop-slug="guardian-30115-23d"' in post
+    assert "Name of girl making second statement" in post
+    assert "SIMONE" not in post
+    assert "END RESULT" not in post
+    assert "@crypticaiforfun" in post
+    assert "facebook.com/pages/create" in post
+    assert "tiktok.com/signup" in post
+
+
+def test_site_pair_reads_the_published_homepage_pair():
+    pair = site_pair("2026-09-16")
+    slugs = [item.clue.slug for item in pair.clues]
+    assert slugs == ["independent-12462-6a", "guardian-30113-9a"]
+    assert pair.clues[0].clue.answer == "PIN-UP"
+    assert pair.clues[0].video_path.endswith("independent-12462-6a.mp4")
+    assert pair.already_published is True
 

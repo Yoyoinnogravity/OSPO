@@ -29,10 +29,10 @@ def test_json_ld_escapes_script_breakers():
     assert "</script>" not in blob
     assert "\\u003c/script>" in blob
     assert website_ld()["url"] == "https://cryptic.fit/"
-    assert website_ld()["name"] == "cryptic.fit"
-    assert website_ld()["publisher"]["name"] == "cryptic.fit"
-    assert "alternateName" not in website_ld()
-    assert "https://www.youtube.com/@crypticfit" in website_ld()["publisher"]["sameAs"]
+    assert website_ld()["name"] == "Cryptic AI for Fun"
+    assert website_ld()["alternateName"] == "cryptic.fit"
+    assert website_ld()["publisher"]["name"] == "Cryptic AI for Fun"
+    assert "https://www.youtube.com/@crypticaiforfun" in website_ld()["publisher"]["sameAs"]
     assert "unique cryptic crossword clues and solutions" in website_ld()["description"]
     assert "We credit all" in website_ld()["description"]
     assert "Fifteen Squared" in website_ld()["description"]

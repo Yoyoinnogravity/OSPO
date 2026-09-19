@@ -1,8 +1,11 @@
 from pathlib import Path
 import os
 
-BRAND = "cryptic.fit"
-# One name: the site Aled owns. Do not use cryptic.fun — we do not own it.
+BRAND = "Cryptic AI for Fun"
+# Spoken and YouTube name. The site Aled owns stays cryptic.fit.
+# Do not use cryptic.fun — we do not own it.
+WORDMARK_HEAD = "Cryptic AI"
+WORDMARK_TAIL = " for Fun"
 SITE_HOST = "cryptic.fit"
 SITE_ORIGIN = f"https://{SITE_HOST}"
 SUGGEST_EMAIL = "aledmorgan@gmail.com"
@@ -15,7 +18,7 @@ CREDIT_WHO = "the setter, the paper, Fifteen Squared, and the photograph"
 # The only crossword source. Do not add other blogs.
 SOURCE_SITE = "https://fifteensquared.net/"
 SOURCE_HOST = "fifteensquared.net"
-USER_AGENT = f"{BRAND}/0.1 (+{SITE_ORIGIN}/; source=https://fifteensquared.net/)"
+USER_AGENT = f"{SITE_HOST}/0.1 (+{SITE_ORIGIN}/; source=https://fifteensquared.net/)"
 WP_POSTS = f"{SOURCE_SITE.rstrip('/')}/wp-json/wp/v2/posts"
 CRAWL_GAP_SECONDS = 1.0
 
@@ -54,13 +57,13 @@ ANSWER_PITCH = "+1Hz"
 PARSE_RATE = "-8%"
 PARSE_PITCH = "+0Hz"
 PARSE_ASIDE_PAUSE_SECONDS = 0.7
-INTRO_LINE = "Right — here's your daily dose of cryptic fun."
+INTRO_LINE = "Hi I am your AI."
 INTRO_VOICE_ALIAS = "ryan"
 INTRO_RATE = "+3%"
 INTRO_PITCH = "+4Hz"
 INTRO_VOLUME = "+8%"
 INTRO_GAP_SECONDS = 0.45
-OUTRO_LINE = "Thanks for thinking with cryptic.fit."
+OUTRO_LINE = "We are here to help then dominate."
 OUTRO_GAP_SECONDS = 0.4
 # Source credit is not Sonia — Thomas reads the paper and Fifteen Squared.
 SOURCE_VOICE_ALIAS = "thomas"
@@ -85,6 +88,9 @@ CLUES_PER_DAY = 2
 # MASS MEDIA is FT 18483 1 across; twodown short rebuilds this clue only.
 STUDY_SLUG = "financial-times-18483-1a"
 PINUP_SLUG = "independent-12462-6a"
+SELF_SLUG = "guardian-30113-9a"
+# Published homepage pair. Recut study films, never these two.
+LOCKED_SLUGS = frozenset({PINUP_SLUG, SELF_SLUG})
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_OUTPUT = PACKAGE_ROOT / "output"
@@ -103,15 +109,18 @@ FONT_BOLD = "/usr/share/fonts/truetype/liberation/LiberationSerif-Bold.ttf"
 FONT_SANS = "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"
 FONT_SANS_BOLD = "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"
 
-# Public follow URLs. YouTube is @crypticfit. Do not use @crypticfun.
-YOUTUBE_FOLLOW = os.environ.get("TWODOWN_YOUTUBE_URL", "https://www.youtube.com/@crypticfit").strip()
+# Public follow URLs. YouTube is @crypticaiforfun. Do not use @crypticfun.
+YOUTUBE_HANDLE = "crypticaiforfun"
+YOUTUBE_FOLLOW = os.environ.get(
+    "TWODOWN_YOUTUBE_URL", f"https://www.youtube.com/@{YOUTUBE_HANDLE}"
+).strip()
 TIKTOK_FOLLOW = os.environ.get("TWODOWN_TIKTOK_URL", "").strip()
 INSTAGRAM_FOLLOW = os.environ.get("TWODOWN_INSTAGRAM_URL", "").strip()
 FACEBOOK_FOLLOW = os.environ.get("TWODOWN_FACEBOOK_URL", "").strip()
 
 
 def follow_profiles() -> list[tuple[str, str, str]]:
-    """External cryptic.fit profiles: slug, label, url. Empty env values are omitted."""
+    """External Cryptic AI for Fun profiles: slug, label, url. Empty env values are omitted."""
     rows: list[tuple[str, str, str]] = []
     for slug, label, url in (
         ("youtube", "YouTube", YOUTUBE_FOLLOW),
