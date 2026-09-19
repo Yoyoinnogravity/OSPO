@@ -10,6 +10,9 @@ from twodown.models import DailyPair
 
 TIKTOK_SIGNUP = "https://www.tiktok.com/signup"
 TIKTOK_UPLOAD = "https://www.tiktok.com/tiktokstudio/upload"
+YOUTUBE_CREATE = "https://www.youtube.com/create_channel"
+YOUTUBE_STUDIO = "https://studio.youtube.com/"
+YOUTUBE_UPLOAD = "https://www.youtube.com/upload"
 CREATE = (
     ("TikTok", TIKTOK_SIGNUP),
     ("YouTube channel", "https://www.youtube.com/create_channel"),

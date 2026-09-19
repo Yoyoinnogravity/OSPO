@@ -7,7 +7,7 @@ from shutil import copy2
 
 from twodown.ads import ads_enabled, ads_txt, adsense_client, adsense_slot
 from twodown.config import BRAND, BRAND_LINE, CREDIT_LINE, CREDIT_WHO, SITE_HOST, SITE_ORIGIN, SITE_ROOT, SOURCE_SITE, SPONSOR_EMAIL, SUGGEST_EMAIL, VOICE_LABELS, WORDMARK_HEAD, WORDMARK_TAIL, follow_profiles
-from twodown.drop import CREATE, TIKTOK_SIGNUP, TIKTOK_UPLOAD, UPLOAD, collect_drops, write_drop_pack
+from twodown.drop import CREATE, TIKTOK_SIGNUP, TIKTOK_UPLOAD, UPLOAD, YOUTUBE_CREATE, YOUTUBE_STUDIO, YOUTUBE_UPLOAD, collect_drops, write_drop_pack
 from twodown.models import DailyPair, SpokenClue
 from twodown.render import write_share_card
 from twodown.scenes import DEFAULT_SCENE, get_scene, list_scenes
@@ -517,6 +517,7 @@ def _nav(prefix: str) -> str:
     return f"""
       <nav>
         <a href="{prefix}index.html">Today</a>
+        <a href="{prefix}youtube.html">YouTube</a>
         <a href="{prefix}post.html">Post</a>
         <a href="{prefix}tiktok.html">TikTok</a>
         <a href="{prefix}follow.html">Follow</a>
@@ -525,6 +526,11 @@ def _nav(prefix: str) -> str:
         <a href="{prefix}about.html">About</a>
       </nav>
     """
+
+
+def _youtube_title_line(clue: str) -> str:
+    title = f"{BRAND} · {clue} #Shorts"
+    return title if len(title) <= 100 else title[:99].rstrip() + "…"
 
 
 def _drop_card(slug: str, clue: str, credit: str, caption: str, media_prefix: str = "media/") -> str:
@@ -589,6 +595,52 @@ def _tiktok_body(pair: DailyPair, root: Path) -> str:
       <a class="action" href="{_e(TIKTOK_UPLOAD)}" rel="noopener" target="_blank">Upload a film</a>
       <button type="button" class="reveal" data-download-all>Save every film</button>
     </p>
+    <div class="suggest-forms">
+      {''.join(cards)}
+    </div>
+    """
+
+
+def _youtube_card(slug: str, clue: str, credit: str, caption: str, media_prefix: str = "media/") -> str:
+    video = f"{media_prefix}{slug}.mp4"
+    title = _youtube_title_line(clue)
+    return f"""
+      <section class="panel" data-drop-slug="{_e(slug)}">
+        <h2>{_e(clue)}</h2>
+        <p>{_e(credit)}</p>
+        <video class="short" controls playsinline preload="metadata" src="{_e(video)}"></video>
+        <p><a class="action" href="{_e(video)}" download="{_e(slug)}.mp4">Save the film</a></p>
+        <label>YouTube title
+          <textarea readonly rows="2">{_e(title)}</textarea>
+        </label>
+        <label>Description — copy this, no answer
+          <textarea readonly rows="6">{_e(caption)}</textarea>
+        </label>
+      </section>
+    """
+
+
+def _youtube_body(pair: DailyPair, root: Path) -> str:
+    cards = [
+        _youtube_card(film.slug, film.clue, film.credit, film.caption)
+        for film in collect_drops(pair, root)
+    ]
+    return f"""
+    <p class="kicker">YouTube</p>
+    <h1>Get on YouTube.</h1>
+    <p class="lede">This is the only platform we are doing now. On Channel customisation: name <strong>{_e(BRAND)}</strong>, handle <strong>@crypticaiforfun</strong> if it is free, Harry Botter as the picture. Then upload the Short. Do not use @crypticfun.</p>
+    <ol class="invade">
+      <li>Name the channel {_e(BRAND)}. Handle @crypticaiforfun if Google still has it.</li>
+      <li>Picture: Harry Botter. Banner later if you want.</li>
+      <li>Upload the film as a Short. Title and description are under each film. No answer in the text.</li>
+    </ol>
+    <p>
+      <a class="action" href="{_e(YOUTUBE_CREATE)}" rel="noopener" target="_blank">Create the channel</a>
+      <a class="action" href="{_e(YOUTUBE_STUDIO)}" rel="noopener" target="_blank">YouTube Studio</a>
+      <a class="action" href="{_e(YOUTUBE_UPLOAD)}" rel="noopener" target="_blank">Upload a Short</a>
+      <a class="action" href="media/harry-botter.png" download="harry-botter.png">Save Harry Botter</a>
+    </p>
+    <p><img src="media/harry-botter.png" alt="Harry Botter cryptic solver" width="196" height="196" style="border-radius:50%;background:#fcf7ec;border:1px solid rgba(184,28,41,0.35);"></p>
     <div class="suggest-forms">
       {''.join(cards)}
     </div>
@@ -988,6 +1040,17 @@ def publish_site(pair: DailyPair, dest: Path | None = None) -> Path:
                 title=f"TikTok — {BRAND}",
                 description=f"Save {BRAND} Shorts and drop them on TikTok. Create @crypticaiforfun, then upload.",
                 path="/tiktok.html",
+            ),
+        ),
+        encoding="utf-8",
+    )
+    (root / "youtube.html").write_text(
+        _page(
+            _youtube_body(pair, root),
+            PageSeo(
+                title=f"YouTube — {BRAND}",
+                description=f"Get {BRAND} on YouTube. Name the channel, take @crypticaiforfun, upload a Short. The agent cannot open that login.",
+                path="/youtube.html",
             ),
         ),
         encoding="utf-8",

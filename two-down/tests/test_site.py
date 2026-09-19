@@ -66,7 +66,15 @@ def test_publish_site_writes_spoiler_pages(tmp_path):
     assert "tiktok.com/tiktokstudio/upload" in tiktok
     assert "END RESULT" not in tiktok
     assert ">Post</a>" in index
+    assert ">YouTube</a>" in index
     assert ">TikTok</a>" in index
+    assert (tmp_path / "youtube.html").exists()
+    youtube_page = (tmp_path / "youtube.html").read_text(encoding="utf-8")
+    assert "Get on YouTube" in youtube_page
+    assert "youtube.com/upload" in youtube_page
+    assert "youtube.com/create_channel" in youtube_page
+    assert "Harry Botter" in youtube_page
+    assert "END RESULT" not in youtube_page
     suggest = (tmp_path / "suggest.html").read_text(encoding="utf-8")
     assert "aledmorgan@gmail.com" in suggest
     assert "data-suggest-form" in suggest
@@ -101,6 +109,7 @@ def test_publish_site_writes_spoiler_pages(tmp_path):
     assert "https://cryptic.fit/follow.html" in sitemap
     assert "https://cryptic.fit/post.html" in sitemap
     assert "https://cryptic.fit/tiktok.html" in sitemap
+    assert "https://cryptic.fit/youtube.html" in sitemap
     assert "How we pay for this" in index
     assert "adsbygoogle" not in index
     assert not (tmp_path / "ads.txt").exists()
