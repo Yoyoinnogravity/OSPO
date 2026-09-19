@@ -65,7 +65,7 @@ def test_study_clue_is_mass_media():
     assert "struggling" in clue.parse.lower()
     assert "mess" in clue.parse.lower()
     parts = write_parts(clue)
-    assert parts.intro_speech == "Here is your daily dose of AI cryptic."
+    assert parts.intro_speech == "Hi I am your AI."
     assert parts.clue_speech == "Maid struggling with a mess — newspapers etc."
     assert parts.letters_speech == "That's four, five."
     assert parts.think_speech == "Just pause here, and have a think."
