@@ -55,6 +55,8 @@ Social
 
 `twodown today` and `twodown upload` send the same two vertical videos to
 every platform that has a token. Missing tokens are skipped, not fatal.
+GitHub Actions (`.github/workflows/cryptic-ai-daily.yml`) runs `twodown today`
+every morning once `TWODOWN_YOUTUBE_TOKEN` is a repo secret.
 
 ```bash
 export TWODOWN_YOUTUBE_TOKEN=/path/to/youtube-token.json

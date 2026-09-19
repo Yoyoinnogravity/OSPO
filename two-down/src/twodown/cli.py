@@ -68,16 +68,20 @@ def _print_pair(pair) -> None:
 
 
 def _latest_pair(out: Path, date: str | None) -> DailyPair:
+    from twodown.pipeline import site_pair
+
     if date:
         path = out / date / "pair.json"
-    else:
+        if path.exists():
+            return DailyPair.model_validate_json(path.read_text(encoding="utf-8"))
+        return site_pair(date)
+    if out.exists():
         dates = sorted((p for p in out.iterdir() if p.is_dir()), reverse=True)
-        if not dates:
-            raise FileNotFoundError(f"No daily output in {out}")
-        path = dates[0] / "pair.json"
-    if not path.exists():
-        raise FileNotFoundError(f"No pair.json at {path}. Run twodown today first.")
-    return DailyPair.model_validate_json(path.read_text(encoding="utf-8"))
+        if dates:
+            path = dates[0] / "pair.json"
+            if path.exists():
+                return DailyPair.model_validate_json(path.read_text(encoding="utf-8"))
+    return site_pair(date)
 
 
 def _pair_path(out: Path, date: str | None) -> Path:

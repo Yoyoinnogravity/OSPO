@@ -1,5 +1,6 @@
 from twodown.captions import youtube_description
 from twodown.models import Clue, DailyPair, SpokenClue
+from twodown.pipeline import site_pair
 from twodown.site import publish_site
 from twodown.youtube import YOUTUBE_CHANNEL, video_title
 
@@ -140,4 +141,13 @@ def test_ads_on_writes_ads_txt_and_unit(tmp_path, monkeypatch):
     clue_page = (root / "c" / "independent-12458-12a" / "index.html").read_text(encoding="utf-8")
     assert "adsbygoogle" not in clue_page
     assert "pagead2.googlesyndication.com" not in clue_page
+
+
+def test_site_pair_reads_the_published_homepage_pair():
+    pair = site_pair("2026-09-16")
+    slugs = [item.clue.slug for item in pair.clues]
+    assert slugs == ["independent-12462-6a", "guardian-30113-9a"]
+    assert pair.clues[0].clue.answer == "PIN-UP"
+    assert pair.clues[0].video_path.endswith("independent-12462-6a.mp4")
+    assert pair.already_published is True
 
