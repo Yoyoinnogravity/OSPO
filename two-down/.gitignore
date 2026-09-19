@@ -1,0 +1,8 @@
+.venv/
+output/
+cryptic_fun_site.zip
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+site/media/.*-counts/

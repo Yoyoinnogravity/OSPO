@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "twodown"
+version = "0.1.0"
+description = "Unique cryptic crossword clues and solutions from Fifteen Squared, for cryptic.fun, YouTube, TikTok, Instagram and Facebook."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+  "beautifulsoup4>=4.12",
+  "edge-tts>=7.0",
+  "google-api-python-client>=2.0",
+  "google-auth-httplib2>=0.2",
+  "google-auth-oauthlib>=1.2",
+  "lxml>=5.0",
+  "pillow>=10.0",
+  "pydantic>=2.0",
+  "requests>=2.32",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+youtube = [
+  "google-api-python-client>=2.0",
+  "google-auth-oauthlib>=1.2",
+  "google-auth-httplib2>=0.2",
+]
+
+[project.scripts]
+twodown = "twodown.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
