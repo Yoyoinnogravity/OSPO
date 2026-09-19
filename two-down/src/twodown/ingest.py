@@ -138,25 +138,36 @@ def _slug_from_url(url: str) -> str:
     return path.rsplit("/", 1)[-1]
 
 
-def fetch_daily_posts(session: requests.Session | None = None, per_page: int = 20) -> list[PuzzlePost]:
+def fetch_daily_posts(
+    session: requests.Session | None = None, per_page: int = 20, pages: int = 1
+) -> list[PuzzlePost]:
     """Read Independent, FT and Guardian blogs from https://fifteensquared.net/ only."""
     sess = session or requests.Session()
     posts: list[PuzzlePost] = []
     seen: set[str] = set()
 
-    api = sess.get(
-        WP_POSTS,
-        params={"per_page": per_page, "_embed": "1"},
-        headers=_headers(),
-        timeout=30,
-    )
-    api.raise_for_status()
-    time.sleep(CRAWL_GAP_SECONDS)
-    for item in api.json():
-        post = _post_from_wp_item(item)
-        if post and post.url not in seen:
-            seen.add(post.url)
-            posts.append(post)
+    for page in range(1, max(1, pages) + 1):
+        params: dict[str, int | str] = {"per_page": per_page, "_embed": "1"}
+        if pages > 1:
+            params["page"] = page
+        api = sess.get(
+            WP_POSTS,
+            params=params,
+            headers=_headers(),
+            timeout=30,
+        )
+        if api.status_code == 400 and page > 1:
+            break
+        api.raise_for_status()
+        time.sleep(CRAWL_GAP_SECONDS)
+        batch = api.json()
+        if not batch:
+            break
+        for item in batch:
+            post = _post_from_wp_item(item)
+            if post and post.url not in seen:
+                seen.add(post.url)
+                posts.append(post)
 
     extra_urls: list[str] = []
     try:

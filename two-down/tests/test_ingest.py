@@ -125,6 +125,20 @@ class _FakeSession:
                 )
             return _FakeResp(json_data=[])
         if url == WP_POSTS:
+            page = int(params.get("page") or 1)
+            if page == 2:
+                return _FakeResp(
+                    json_data=[
+                        _wp_item(
+                            4,
+                            "https://fifteensquared.net/2026/09/09/independent-12456-by-eimi/",
+                            "Independent 12456 / Eimi",
+                            ["independent"],
+                        )
+                    ]
+                )
+            if page > 2:
+                return _FakeResp(status=400)
             return _FakeResp(
                 json_data=[
                     _wp_item(
@@ -165,3 +179,16 @@ def test_fetch_daily_posts_uses_homepage_and_drops_other_hosts(_sleep):
     assert not any("timesforthetimes" in url for url in urls)
     assert any(call[0] == WP_POSTS and call[1].get("slug") for call in session.calls)
     assert any(call[0] == SOURCE_SITE for call in session.calls)
+    assert not any(call[0] == WP_POSTS and call[1].get("page") for call in session.calls)
+
+
+@patch("twodown.ingest.time.sleep")
+def test_fetch_daily_posts_paginates(_sleep):
+    home = (FIXTURES / "homepage.html").read_text(encoding="utf-8")
+    session = _FakeSession(home)
+    posts = fetch_daily_posts(session=session, pages=3)
+    urls = [p.url for p in posts]
+    assert "https://fifteensquared.net/2026/09/11/independent-12458-phi/" in urls
+    assert "https://fifteensquared.net/2026/09/09/independent-12456-by-eimi/" in urls
+    pages = [call[1].get("page") for call in session.calls if call[0] == WP_POSTS and "slug" not in call[1]]
+    assert pages == [1, 2, 3]

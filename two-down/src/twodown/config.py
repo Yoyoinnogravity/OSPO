@@ -88,6 +88,9 @@ CLUES_PER_DAY = 2
 # MASS MEDIA is FT 18483 1 across; twodown short rebuilds this clue only.
 STUDY_SLUG = "financial-times-18483-1a"
 PINUP_SLUG = "independent-12462-6a"
+SELF_SLUG = "guardian-30113-9a"
+# Published homepage pair. Recut study films, never these two.
+LOCKED_SLUGS = frozenset({PINUP_SLUG, SELF_SLUG})
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_OUTPUT = PACKAGE_ROOT / "output"

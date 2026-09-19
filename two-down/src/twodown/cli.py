@@ -8,6 +8,7 @@ from pathlib import Path
 
 from twodown.ads import ads_status
 from twodown.config import DEFAULT_OUTPUT, DEFAULT_VOICE_ALIAS, SITE_HOST, SITE_ORIGIN, SITE_ROOT, SOURCE_SITE, STUDY_SLUG, VOICES
+from twodown.bomb import PACK_LIMIT, how_to_bomb, run_bomb
 from twodown.drop import how_to_invade, write_drop_pack
 from twodown.ingest import LONDON
 from twodown.live import (
@@ -178,6 +179,13 @@ def main(argv: list[str] | None = None) -> int:
     drop.add_argument("--out", type=Path, help="Zip path (default: two-down/site/drop.zip)")
     drop.add_argument("--date", help="London calendar date YYYY-MM-DD")
 
+    bomb = sub.add_parser("bomb", help="Cut 100 full Shorts so you can drag them onto YouTube")
+    bomb.add_argument("--limit", type=int, default=PACK_LIMIT, help="How many Shorts (default: 100)")
+    bomb.add_argument("--out", type=Path, help="Zip path (default: two-down/output/bomb/youtube-100.zip)")
+    bomb.add_argument("--dest", type=Path, help="Work folder for the cuts")
+    bomb.add_argument("--rebuild", action="store_true", help="Recut films that already exist (never PIN-UP or SELF)")
+    bomb.add_argument("--workers", type=int, default=3)
+
     args = parser.parse_args(argv)
 
     if args.cmd == "voices":
@@ -229,6 +237,20 @@ def main(argv: list[str] | None = None) -> int:
         print(f"drop {path}")
         print(how_to_invade(), end="")
         return 0
+
+    if args.cmd == "bomb":
+        packed, records = run_bomb(
+            limit=max(1, args.limit),
+            dest=args.dest,
+            zip_path=args.out,
+            rebuild=args.rebuild,
+            workers=max(1, args.workers),
+        )
+        ready = sum(1 for row in records if row.get("video"))
+        print(f"bomb {packed}")
+        print(f"films {ready}/{len(records)}")
+        print(how_to_bomb(), end="")
+        return 0 if ready else 1
 
     if args.cmd == "live":
         print("Public URLs (live = HTTP 2xx/3xx from here right now)")

@@ -628,11 +628,11 @@ def _youtube_body(pair: DailyPair, root: Path) -> str:
     return f"""
     <p class="kicker">YouTube</p>
     <h1>Get on YouTube.</h1>
-    <p class="lede">This is the only platform we are doing now. On Channel customisation: name <strong>{_e(BRAND)}</strong>, handle <strong>@crypticaiforfun</strong> if it is free, Harry Botter as the picture. Then upload the Short. Do not use @crypticfun.</p>
+    <p class="lede">You already have a channel. Stay signed in, open Studio, drag the Shorts onto it. Rename it <strong>{_e(BRAND)}</strong> when you want, handle <strong>@crypticaiforfun</strong> if it is free, Harry Botter as the picture. Do not use @crypticfun.</p>
     <ol class="invade">
-      <li>Name the channel {_e(BRAND)}. Handle @crypticaiforfun if Google still has it.</li>
-      <li>Picture: Harry Botter. Banner later if you want.</li>
-      <li>Upload the film as a Short. Title and description are under each film. No answer in the text.</li>
+      <li>Stay on the channel you already have. Create → Upload videos.</li>
+      <li>Drag every film. Title and description are under each film. No answer in the text.</li>
+      <li>Rename {_e(BRAND)} when you want. Picture: Harry Botter.</li>
     </ol>
     <p>
       <a class="action" href="{_e(YOUTUBE_CREATE)}" rel="noopener" target="_blank">Create the channel</a>

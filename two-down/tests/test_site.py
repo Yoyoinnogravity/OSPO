@@ -71,6 +71,7 @@ def test_publish_site_writes_spoiler_pages(tmp_path):
     assert (tmp_path / "youtube.html").exists()
     youtube_page = (tmp_path / "youtube.html").read_text(encoding="utf-8")
     assert "Get on YouTube" in youtube_page
+    assert "You already have a channel" in youtube_page
     assert "youtube.com/upload" in youtube_page
     assert "youtube.com/create_channel" in youtube_page
     assert "Harry Botter" in youtube_page
