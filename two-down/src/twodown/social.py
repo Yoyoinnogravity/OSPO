@@ -44,12 +44,13 @@ META_PERMISSIONS = (
 def connect_instructions() -> str:
     """Exact steps to get each token. No account passwords are ever needed here."""
     return f"""The upload agent cannot log into YouTube, TikTok, Instagram or Facebook as you.
-Each app gives you a token. Paste the JSON (never a password) as a secret on the
-Cursor Cloud Agent environment: {CURSOR_ENVIRONMENT}
+Each app gives you a token. Paste the JSON (never a password) as a GitHub
+Actions secret on Yoyoinnogravity/OSPO, or on the Cursor Cloud Agent
+environment: {CURSOR_ENVIRONMENT}
 
 INSTAGRAM + FACEBOOK  ->  TWODOWN_META_TOKEN      (quickest; one token does both)
-  1. Make a cryptic.fit Facebook Page. Set Instagram to a professional
-     account and link it to that Page.
+  1. Make a Cryptic AI for Fun Facebook Page (cryptic.fit). Set Instagram
+     to a professional account and link it to that Page.
   2. Create an app at {META_APPS} (type: Business).
   3. Open {GRAPH_EXPLORER}, pick the app, add permissions:
      {META_PERMISSIONS}

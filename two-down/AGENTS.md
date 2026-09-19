@@ -12,8 +12,8 @@ and 11:00 UTC (09:00 and 12:00 London in BST). It uploads to YouTube when
 the secret exists. It opens a site PR when the pair is new.
 
 1. Create the YouTube channel **Cryptic AI for Fun** and claim `@crypticaiforfun`.
-2. Paste the authorized-user OAuth JSON as the GitHub Actions secret
-   `TWODOWN_YOUTUBE_TOKEN` on Yoyoinnogravity/OSPO.
+2. Paste tokens as GitHub Actions secrets on Yoyoinnogravity/OSPO:
+   `TWODOWN_YOUTUBE_TOKEN` and, for Facebook + Instagram, `TWODOWN_META_TOKEN`.
 3. Merge this workflow onto `main`, then **Actions → Cryptic AI for Fun daily → Run workflow**.
    First manual run can be **unlisted**. The schedule posts **public**.
 
