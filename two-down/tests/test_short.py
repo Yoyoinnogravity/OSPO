@@ -282,6 +282,8 @@ def test_resolve_clue_renders_constructed_study_without_site_html():
     assert resolve_clue("fats").answer == "FATS"
     assert resolve_clue("rasta").answer == "RASTA"
     assert resolve_clue("dreamlike").answer == "DREAMLIKE"
+    assert resolve_clue("in-a-spin").answer == "IN A SPIN"
+    assert resolve_clue("in-a-spin").slug == "financial-times-18483-26a"
 
 
 def test_pin_up_stays_on_the_published_site():

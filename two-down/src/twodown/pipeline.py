@@ -343,6 +343,32 @@ def mass_media_clue() -> Clue:
     )
 
 
+def in_a_spin_clue() -> Clue:
+    """FT 18483 26a IN A SPIN — next study Short. On Fifteen Squared.
+
+    Hint panicking, not Indiana / snake / a spinning top that prints the answer.
+    Do not print IN A SPIN on the hint card.
+    """
+    return attach_hint(
+        Clue(
+            source_url=_MASS_MEDIA_SOURCE,
+            paper="Financial Times",
+            puzzle_id="18483",
+            setter="Arrietty",
+            blogger="Turbolegs",
+            number="26",
+            direction="across",
+            clue="Panicking, Indiana twice grabs snake",
+            enumeration="2,1,4",
+            answer="IN A SPIN",
+            definition="Panicking",
+            parse="IN IN (Indiana, twice) containing ASP (snake)",
+            device="container",
+            enumeration_ok=True,
+        )
+    )
+
+
 def study_clues() -> dict[str, Clue]:
     """MASS MEDIA is the study default. Earlier study clues stay constructable."""
     dreamlike = dreamlike_clue()
@@ -354,6 +380,7 @@ def study_clues() -> dict[str, Clue]:
     davis = davis_cup_clue()
     aimlessly = aimlessly_clue()
     mass_media = mass_media_clue()
+    in_a_spin = in_a_spin_clue()
     return {
         dreamlike.slug: dreamlike,
         "dreamlike": dreamlike,
@@ -394,6 +421,10 @@ def study_clues() -> dict[str, Clue]:
         "study-mass-media-4-5": mass_media,
         mass_media.answer.lower(): mass_media,
         STUDY_SLUG: mass_media,
+        in_a_spin.slug: in_a_spin,
+        "in-a-spin": in_a_spin,
+        "in a spin": in_a_spin,
+        in_a_spin.answer.lower(): in_a_spin,
     }
 
 
