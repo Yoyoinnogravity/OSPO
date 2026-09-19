@@ -5,20 +5,18 @@ import socket
 
 import requests
 
-from twodown.config import SITE_ORIGIN, SITE_ROOT, SOURCE_SITE
+from twodown.config import SITE_HOST, SITE_ORIGIN, SITE_ROOT, SOURCE_SITE
 
 GITHUB_PAGES = "https://yoyoinnogravity.github.io/OSPO/"
 PR_URL = "https://github.com/Yoyoinnogravity/OSPO/pull/42"
-# .fun is a Radix TLD. Identity Digital RDAP 404s the same way, but this is the registry.
-RDAP_URL = "https://rdap.radix.host/rdap/domain/cryptic.fun"
-NAMECHEAP_BUY = "https://www.namecheap.com/domains/registration/results/?domain=cryptic.fun"
+RDAP_URL = f"https://rdap.nic.fit/domain/{SITE_HOST}"
 GITHUB_PAGES_IPS = (
     "185.199.108.153",
     "185.199.109.153",
     "185.199.110.153",
     "185.199.111.153",
 )
-PRODUCT_CHECK_NAMES = frozenset({"cryptic.fun", "sitemap", "support", "GitHub Pages"})
+PRODUCT_CHECK_NAMES = frozenset({SITE_HOST, "sitemap", "support", "GitHub Pages"})
 
 
 def _fifteen_squared_from_site() -> list[tuple[str, str]]:
@@ -35,7 +33,7 @@ def _fifteen_squared_from_site() -> list[tuple[str, str]]:
 
 def public_checks() -> list[tuple[str, str]]:
     checks = [
-        ("cryptic.fun", f"{SITE_ORIGIN}/"),
+        (SITE_HOST, f"{SITE_ORIGIN}/"),
         ("sitemap", f"{SITE_ORIGIN}/sitemap.xml"),
         ("support", f"{SITE_ORIGIN}/support.html"),
         ("GitHub Pages", GITHUB_PAGES),
@@ -61,23 +59,19 @@ def probe(url: str, timeout: float = 8.0) -> tuple[str, str]:
 
 
 def registry_status(timeout: float = 8.0) -> tuple[str, str]:
-    """Whether cryptic.fun exists in the .fun registry.
-
-    RDAP 404 means the name is not registered. That is stronger than a missing
-    A record: Chrome's DNS_PROBE_FINISHED_NXDOMAIN is the same fact.
-    """
+    """Whether cryptic.fit exists in the .fit registry."""
     try:
         response = requests.get(RDAP_URL, timeout=timeout)
     except requests.RequestException as exc:
         return "unknown", exc.__class__.__name__
     if response.status_code == 404:
-        return "absent", "RDAP 404 — not in the .fun registry"
+        return "absent", "RDAP 404 — not in the .fit registry"
     if response.status_code == 200:
         return "present", "RDAP 200"
     return "unknown", f"RDAP {response.status_code}"
 
 
-def dns_addresses(hostname: str = "cryptic.fun") -> tuple[str, str]:
+def dns_addresses(hostname: str = SITE_HOST) -> tuple[str, str]:
     try:
         infos = socket.getaddrinfo(hostname, None)
     except socket.gaierror as exc:
@@ -94,22 +88,22 @@ def go_live_next_steps(
     pages_live: bool,
     domain_live: bool,
 ) -> list[str]:
-    """Operator steps, in order, for putting cryptic.fun on the public internet."""
+    """Operator steps, in order, for putting cryptic.fit on the public internet."""
     steps: list[str] = []
     if registry == "absent":
-        steps.append(f"Buy cryptic.fun at Namecheap (domain only — skip hosting): {NAMECHEAP_BUY}")
         steps.append(
-            "If you already paid: Namecheap Domain List should show cryptic.fun as Active. "
-            "The .fun registry still lists it as free until that completes. "
-            "Do not send a password."
+            f"Namecheap Domain List should show {SITE_HOST} as Active. Do not send a password."
         )
-        steps.append("Do not use cryptic.fit — that is a different GoDaddy name.")
     if not pages_live:
         steps.append(f"Merge {PR_URL}")
         steps.append("Repo Settings → Pages → Source: GitHub Actions")
     if registry != "absent" and not domain_live:
-        steps.append("Point cryptic.fun A records at " + ", ".join(GITHUB_PAGES_IPS))
-        steps.append("GitHub Pages custom domain: cryptic.fun")
+        steps.append(
+            "Namecheap: switch nameservers from Web Hosting DNS to Namecheap BasicDNS. "
+            "Leave paid hosting unused."
+        )
+        steps.append("Point cryptic.fit A records for @ at " + ", ".join(GITHUB_PAGES_IPS))
+        steps.append("GitHub Pages custom domain: cryptic.fit")
     if not steps and not domain_live:
         steps.append("DNS or TLS is still catching up — wait and run twodown live again.")
     return steps

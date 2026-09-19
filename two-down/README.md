@@ -116,36 +116,21 @@ Yes — pay Cursor to run this every morning.
 
 That is the only thing you pay Cursor for. GitHub Pages and YouTube upload are free.
 
-**Go live for free, no domain**
+**Go live on cryptic.fit**
 
-You do not have to buy anything to put this online.
+Aled owns **cryptic.fit**. The show name stays cryptic.fun. The website
+uses the name we have.
 
-1. Merge the cryptic.fun PR.
-2. Repo **Settings → Pages → Source: GitHub Actions**.
-3. The site publishes at **https://yoyoinnogravity.github.io/OSPO/**.
-
-The deploy drops `CNAME` unless the repo variable `CRYPTIC_FUN_DOMAIN` is set,
-so the free `github.io` address works on its own.
-
-**Later, on the real domain**
-
-`cryptic.fun` is **not in the .fun registry** until you buy it. Chrome’s
-`DNS_PROBE_FINISHED_NXDOMAIN` is that fact, not a typo. `cryptic.fit` is a
-different GoDaddy name — do not point the brand there.
-
-1. Buy **cryptic.fun** at [Namecheap](https://www.namecheap.com/domains/registration/results/?domain=cryptic.fun)
-   (domain only — skip extra hosting).
-2. In Namecheap Advanced DNS, `A` records for `@` to `185.199.108.153`,
+1. In Namecheap, switch nameservers from **Web Hosting DNS** to
+   **Namecheap BasicDNS**. Leave paid hosting unused.
+2. Advanced DNS: `A` records for `@` to `185.199.108.153`,
    `185.199.109.153`, `185.199.110.153`, `185.199.111.153`.
-3. Repo **Settings → Secrets and variables → Actions → Variables**: add
-   `CRYPTIC_FUN_DOMAIN = cryptic.fun`, then re-run the workflow.
-4. GitHub Pages custom domain: `cryptic.fun`.
+3. Merge the cryptic.fun PR.
+4. Repo **Settings → Pages → Source: GitHub Actions**.
+5. GitHub Pages custom domain: `cryptic.fit`.
 
 Do **not** upload with cPanel File Manager, FileZilla, or `scp` to
-`public_html`. That Namecheap article is for their paid web hosting. This
-site is already built in `two-down/site/` and GitHub Actions publishes it.
-Namecheap is only the registrar and DNS. If hosting was added to the cart
-by accident, leave it unused (same trap as `cryptic.fit`).
+`public_html`. GitHub Actions publishes `two-down/site/`.
 
 `twodown live` prints this same order (registry first, then Pages, then DNS).
 
@@ -186,7 +171,7 @@ The public copy is `two-down/site/support.html`.
 SEO
 ---
 
-Every page gets a canonical `https://cryptic.fun/…` URL, a spoiler-safe
+Every page gets a canonical `https://cryptic.fit/…` URL, a spoiler-safe
 description, Open Graph / Twitter cards, and JSON-LD. Answers are kept out of
 titles, descriptions and the RSS feed, and wrapped in `data-nosnippet` so
 Google should not print them in search results.
@@ -196,9 +181,9 @@ Published with the site: `sitemap.xml`, `feed.xml`, `robots.txt`, `media/og.webp
 After the domain resolves:
 
 1. [Google Search Console](https://search.google.com/search-console) — add
-   `https://cryptic.fun`, then either paste the verification code as
+   `https://cryptic.fit`, then either paste the verification code as
    `TWODOWN_GSC_VERIFY` and rebuild, or upload the HTML file Google gives you.
-2. Submit `https://cryptic.fun/sitemap.xml`.
+2. Submit `https://cryptic.fit/sitemap.xml`.
 3. Same sitemap in [Bing Webmaster Tools](https://www.bing.com/webmasters).
 
 ```bash

@@ -2,7 +2,9 @@ from pathlib import Path
 import os
 
 BRAND = "cryptic.fun"
-SITE_ORIGIN = "https://cryptic.fun"
+# Aled owns cryptic.fit. The show name stays cryptic.fun.
+SITE_HOST = "cryptic.fit"
+SITE_ORIGIN = f"https://{SITE_HOST}"
 SUGGEST_EMAIL = "aledmorgan@gmail.com"
 SPONSOR_EMAIL = SUGGEST_EMAIL
 # Product line. We pick clues; we do not write the paper clues.
@@ -13,7 +15,7 @@ CREDIT_WHO = "the setter, the paper, Fifteen Squared, and the photograph"
 # The only crossword source. Do not add other blogs.
 SOURCE_SITE = "https://fifteensquared.net/"
 SOURCE_HOST = "fifteensquared.net"
-USER_AGENT = "cryptic.fun/0.1 (+https://cryptic.fun; source=https://fifteensquared.net/)"
+USER_AGENT = f"{BRAND}/0.1 (+{SITE_ORIGIN}/; source=https://fifteensquared.net/)"
 WP_POSTS = f"{SOURCE_SITE.rstrip('/')}/wp-json/wp/v2/posts"
 CRAWL_GAP_SECONDS = 1.0
 

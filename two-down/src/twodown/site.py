@@ -6,7 +6,7 @@ from pathlib import Path
 from shutil import copy2
 
 from twodown.ads import ads_enabled, ads_txt, adsense_client, adsense_slot
-from twodown.config import BRAND, BRAND_LINE, CREDIT_LINE, CREDIT_WHO, SITE_ORIGIN, SITE_ROOT, SOURCE_SITE, SPONSOR_EMAIL, SUGGEST_EMAIL, VOICE_LABELS, follow_profiles
+from twodown.config import BRAND, BRAND_LINE, CREDIT_LINE, CREDIT_WHO, SITE_HOST, SITE_ORIGIN, SITE_ROOT, SOURCE_SITE, SPONSOR_EMAIL, SUGGEST_EMAIL, VOICE_LABELS, follow_profiles
 from twodown.models import DailyPair, SpokenClue
 from twodown.render import write_share_card
 from twodown.scenes import DEFAULT_SCENE, get_scene, list_scenes
@@ -690,7 +690,7 @@ def publish_site(pair: DailyPair, dest: Path | None = None) -> Path:
     (root / "assets").mkdir(parents=True, exist_ok=True)
     (root / "assets" / "style.css").write_text(CSS, encoding="utf-8")
     (root / "assets" / "app.js").write_text(JS, encoding="utf-8")
-    (root / "CNAME").write_text("cryptic.fun\n", encoding="utf-8")
+    (root / "CNAME").write_text(f"{SITE_HOST}\n", encoding="utf-8")
     (root / ".nojekyll").write_text("", encoding="utf-8")
     (root / "robots.txt").write_text(robots_txt(), encoding="utf-8")
     (root / "assets" / "favicon.svg").write_text(FAVICON_SVG, encoding="utf-8")

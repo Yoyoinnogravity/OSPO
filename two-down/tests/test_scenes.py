@@ -99,7 +99,7 @@ def test_youtube_description_credits_the_photograph():
         script="x",
         voice="en-GB-SoniaNeural",
         scene="kyoto",
-        site_path="https://cryptic.fun/c/independent-12458-11a/",
+        site_path="https://cryptic.fit/c/independent-12458-11a/",
     )
     text = video_description(item)
     scene = get_scene("kyoto")

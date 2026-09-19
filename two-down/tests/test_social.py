@@ -28,7 +28,7 @@ def _item(video: Path | None = None) -> SpokenClue:
         script="x",
         voice="en-GB-SoniaNeural",
         video_path=str(video) if video else None,
-        site_path="https://cryptic.fun/c/independent-12458-11a/",
+        site_path="https://cryptic.fit/c/independent-12458-11a/",
     )
 
 

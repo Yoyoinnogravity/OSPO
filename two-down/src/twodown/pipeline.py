@@ -12,6 +12,7 @@ from twodown.config import (
     CLUES_PER_DAY,
     DEFAULT_OUTPUT,
     DEFAULT_VOICE_ALIAS,
+    SITE_ORIGIN,
     SITE_ROOT,
     SOURCE_SITE,
     STUDY_SLUG,
@@ -601,7 +602,7 @@ def run_today(
     if publish and spoken:
         site = publish_site(result, SITE_ROOT)
         result.site_index = str(site / "index.html")
-        (dest_root / "site-url.txt").write_text("https://cryptic.fun/\n", encoding="utf-8")
+        (dest_root / "site-url.txt").write_text(f"{SITE_ORIGIN}/\n", encoding="utf-8")
     if youtube or tiktok or instagram or facebook:
         notes = publish_pair(
             result,

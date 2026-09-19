@@ -73,7 +73,7 @@ def test_publish_site_writes_spoiler_pages(tmp_path):
     assert "data-subscribe-form" in follow
     assert "feed.xml" in follow
     assert "youtube.com/@crypticfun" in follow
-    assert "https://cryptic.fun/follow.html" in (tmp_path / "sitemap.xml").read_text(encoding="utf-8")
+    assert "https://cryptic.fit/follow.html" in (tmp_path / "sitemap.xml").read_text(encoding="utf-8")
     assert "How we pay for this" in index
     assert "adsbygoogle" not in index
     assert not (tmp_path / "ads.txt").exists()
@@ -94,14 +94,15 @@ def test_publish_site_writes_spoiler_pages(tmp_path):
     assert "END RESULT" not in clue_page.split('name="description"', 1)[1].split(">", 1)[0]
     assert "Rioting led unrest" in clue_page.split("<h1>", 1)[1].split("</h1>", 1)[0]
     robots = (tmp_path / "robots.txt").read_text(encoding="utf-8")
-    assert "Sitemap: https://cryptic.fun/sitemap.xml" in robots
+    assert "Sitemap: https://cryptic.fit/sitemap.xml" in robots
     sitemap = (tmp_path / "sitemap.xml").read_text(encoding="utf-8")
-    assert "https://cryptic.fun/" in sitemap
-    assert "https://cryptic.fun/c/independent-12458-12a/" in sitemap
+    assert "https://cryptic.fit/" in sitemap
+    assert "https://cryptic.fit/c/independent-12458-12a/" in sitemap
     feed = (tmp_path / "feed.xml").read_text(encoding="utf-8")
     assert "END RESULT" not in feed
     assert "Rioting led unrest" in feed
     assert (tmp_path / "media" / "og.webp").exists()
+    assert (tmp_path / "CNAME").read_text(encoding="utf-8") == "cryptic.fit\n"
     assert (tmp_path / ".nojekyll").exists()
     assert (tmp_path / "assets" / "favicon.svg").exists()
     assert "application/rss+xml" in index
@@ -114,7 +115,7 @@ def test_youtube_titles_use_cryptic_fun_channel():
     assert title.endswith("#Shorts")
     assert YOUTUBE_CHANNEL == "cryptic.fun"
     assert len(title) <= 100
-    assert "https://cryptic.fun/support.html" in youtube_description(_item())
+    assert "https://cryptic.fit/support.html" in youtube_description(_item())
     assert "unique cryptic crossword clues and solutions" in youtube_description(_item())
     assert "We credit all" in youtube_description(_item())
     assert "Fifteen Squared" in youtube_description(_item())

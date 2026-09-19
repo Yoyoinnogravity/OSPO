@@ -7,7 +7,7 @@ from datetime import datetime
 from pathlib import Path
 
 from twodown.ads import ads_status
-from twodown.config import DEFAULT_OUTPUT, DEFAULT_VOICE_ALIAS, SITE_ORIGIN, SOURCE_SITE, STUDY_SLUG, VOICES
+from twodown.config import DEFAULT_OUTPUT, DEFAULT_VOICE_ALIAS, SITE_HOST, SITE_ORIGIN, SOURCE_SITE, STUDY_SLUG, VOICES
 from twodown.ingest import LONDON
 from twodown.live import (
     PRODUCT_CHECK_NAMES,
@@ -227,7 +227,7 @@ def main(argv: list[str] | None = None) -> int:
         print()
         print(f"registry  {registry}  ({reg_detail})")
         print(f"dns       {dns_state}  ({dns_detail})")
-        domain_live = seen.get("cryptic.fun") == "live"
+        domain_live = seen.get(SITE_HOST) == "live"
         pages_live = seen.get("GitHub Pages") == "live"
         steps = go_live_next_steps(
             registry=registry,
@@ -236,7 +236,7 @@ def main(argv: list[str] | None = None) -> int:
         )
         if steps:
             print()
-            print("cryptic.fun is not on the public internet yet.")
+            print(f"{SITE_HOST} is not serving Cryptic Fun yet.")
             if registry == "absent":
                 print("Chrome's DNS_PROBE_FINISHED_NXDOMAIN is this: the name is not registered.")
             print("Next:")
@@ -245,7 +245,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"Then: {SITE_ORIGIN}/")
         elif not any(seen.get(name) == "live" for name in PRODUCT_CHECK_NAMES):
             print()
-            print("cryptic.fun is not on the public internet yet.")
+            print(f"{SITE_HOST} is not serving Cryptic Fun yet.")
         return 0
 
     if args.cmd == "short":

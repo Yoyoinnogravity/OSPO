@@ -28,7 +28,7 @@ def test_json_ld_escapes_script_breakers():
     blob = dumps_ld({"name": "</script><p>x"})
     assert "</script>" not in blob
     assert "\\u003c/script>" in blob
-    assert website_ld()["url"] == "https://cryptic.fun/"
+    assert website_ld()["url"] == "https://cryptic.fit/"
     assert website_ld()["name"] == "cryptic.fun"
     assert website_ld()["publisher"]["name"] == "cryptic.fun"
     assert "alternateName" not in website_ld()
