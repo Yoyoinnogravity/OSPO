@@ -7,7 +7,7 @@ from shutil import copy2
 
 from twodown.ads import ads_enabled, ads_txt, adsense_client, adsense_slot
 from twodown.config import BRAND, BRAND_LINE, CREDIT_LINE, CREDIT_WHO, SITE_HOST, SITE_ORIGIN, SITE_ROOT, SOURCE_SITE, SPONSOR_EMAIL, SUGGEST_EMAIL, VOICE_LABELS, WORDMARK_HEAD, WORDMARK_TAIL, follow_profiles
-from twodown.drop import CREATE, UPLOAD, collect_drops, write_drop_pack
+from twodown.drop import CREATE, TIKTOK_SIGNUP, TIKTOK_UPLOAD, UPLOAD, collect_drops, write_drop_pack
 from twodown.models import DailyPair, SpokenClue
 from twodown.render import write_share_card
 from twodown.scenes import DEFAULT_SCENE, get_scene, list_scenes
@@ -518,6 +518,7 @@ def _nav(prefix: str) -> str:
       <nav>
         <a href="{prefix}index.html">Today</a>
         <a href="{prefix}post.html">Post</a>
+        <a href="{prefix}tiktok.html">TikTok</a>
         <a href="{prefix}follow.html">Follow</a>
         <a href="{prefix}suggest.html">Suggest</a>
         <a href="{prefix}support.html">Support</a>
@@ -559,13 +560,33 @@ def _post_body(pair: DailyPair, root: Path) -> str:
     <h1>Drop the clues on all four.</h1>
     <p class="lede">This machine cannot log into YouTube, Facebook, Instagram or TikTok. The films are ready. You create <strong>{_e(BRAND)}</strong> on each, handle <strong>@crypticaiforfun</strong> if it is free, then drop the same Shorts. Do not use @crypticfun.</p>
     <ol class="invade">
-      <li><strong>YouTube</strong> — create a channel named {_e(BRAND)}, then upload each film as a Short.</li>
+      <li><strong>TikTok</strong> — sign up as {_e(BRAND)}, handle @crypticaiforfun if it is free, upload the films.</li>
+      <li><strong>YouTube</strong> — create a channel with that name, then upload each film as a Short.</li>
       <li><strong>Facebook</strong> — create a Page with that name, then post each film as a Reel.</li>
       <li><strong>Instagram</strong> — switch to professional, link the Page, drop the same Reels.</li>
-      <li><strong>TikTok</strong> — sign up with that name, upload the same films.</li>
     </ol>
     <p>{create}</p>
     <p>{upload}
+      <button type="button" class="reveal" data-download-all>Save every film</button>
+    </p>
+    <div class="suggest-forms">
+      {''.join(cards)}
+    </div>
+    """
+
+
+def _tiktok_body(pair: DailyPair, root: Path) -> str:
+    cards = [
+        _drop_card(film.slug, film.clue, film.credit, film.caption)
+        for film in collect_drops(pair, root)
+    ]
+    return f"""
+    <p class="kicker">TikTok</p>
+    <h1>Go to TikTok.</h1>
+    <p class="lede">Open TikTok, create <strong>{_e(BRAND)}</strong>, take <strong>@crypticaiforfun</strong> if it is free, then drop these Shorts. Do not use @crypticfun. Captions are clue only.</p>
+    <p>
+      <a class="action" href="{_e(TIKTOK_SIGNUP)}" rel="noopener" target="_blank">Create the account</a>
+      <a class="action" href="{_e(TIKTOK_UPLOAD)}" rel="noopener" target="_blank">Upload a film</a>
       <button type="button" class="reveal" data-download-all>Save every film</button>
     </p>
     <div class="suggest-forms">
@@ -956,6 +977,17 @@ def publish_site(pair: DailyPair, dest: Path | None = None) -> Path:
                 title=f"Post — {BRAND}",
                 description=f"Save {BRAND} Shorts and drop them on YouTube, Facebook, Instagram and TikTok. The agent cannot open those logins.",
                 path="/post.html",
+            ),
+        ),
+        encoding="utf-8",
+    )
+    (root / "tiktok.html").write_text(
+        _page(
+            _tiktok_body(pair, root),
+            PageSeo(
+                title=f"TikTok — {BRAND}",
+                description=f"Save {BRAND} Shorts and drop them on TikTok. Create @crypticaiforfun, then upload.",
+                path="/tiktok.html",
             ),
         ),
         encoding="utf-8",

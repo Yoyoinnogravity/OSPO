@@ -23,6 +23,7 @@ def test_how_to_invade_names_all_four():
     assert "@crypticaiforfun" in text
     assert "@crypticfun" in text  # the warning
     assert "Do not use @crypticfun" in text
+    assert text.index("tiktok.com/signup") < text.index("youtube.com/create_channel")
 
 
 def test_write_drop_pack_from_published_site(tmp_path):

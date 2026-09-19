@@ -8,17 +8,19 @@ from twodown.captions import HASHTAGS
 from twodown.config import BRAND, SITE_ORIGIN, SITE_ROOT, YOUTUBE_HANDLE
 from twodown.models import DailyPair
 
+TIKTOK_SIGNUP = "https://www.tiktok.com/signup"
+TIKTOK_UPLOAD = "https://www.tiktok.com/tiktokstudio/upload"
 CREATE = (
+    ("TikTok", TIKTOK_SIGNUP),
     ("YouTube channel", "https://www.youtube.com/create_channel"),
     ("Facebook Page", "https://www.facebook.com/pages/create"),
     ("Instagram", "https://www.instagram.com/"),
-    ("TikTok", "https://www.tiktok.com/signup"),
 )
 UPLOAD = (
+    ("TikTok", TIKTOK_UPLOAD),
     ("YouTube Shorts", "https://www.youtube.com/upload"),
     ("Facebook Reels", "https://www.facebook.com/reels/create"),
     ("Instagram", "https://www.instagram.com/"),
-    ("TikTok", "https://www.tiktok.com/tiktokstudio/upload"),
 )
 EXTRAS = (
     ("guardian-30115-23d", "Name of girl making second statement on first birthday (6)", "Guardian 30115 · Brendan"),
@@ -84,7 +86,7 @@ def how_to_invade() -> str:
         f"Name every account {BRAND}.\n"
         f"Handle if it is free: @{YOUTUBE_HANDLE}\n"
         "Do not use @crypticfun.\n\n"
-        "Create the four accounts, then upload each film as a Short or Reel.\n\n"
+        "TikTok first. Create the account, then upload each film.\n\n"
         f"Create:\n{create}\n\n"
         f"Upload:\n{upload}\n\n"
         "Captions are clue only. The answer stays in the film.\n"

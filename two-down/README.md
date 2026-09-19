@@ -101,7 +101,8 @@ That folder is a complete static site. Upload its contents to any host
 (`public_html`, Netlify, Cloudflare Pages). The site `CNAME` is `cryptic.fit`.
 DNS only works after the name is actually registered (see Go live).
 The **Post** page (`post.html`) is the hand drop: save a film, copy the
-caption (clue only, no answer), and upload it yourself.
+caption (clue only, no answer), and upload it yourself. **TikTok** first:
+`tiktok.html` opens signup and TikTok Studio upload.
 
 ```bash
 twodown drop                 # writes site/drop.zip + HOW.txt
