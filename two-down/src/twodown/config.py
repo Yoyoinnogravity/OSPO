@@ -71,8 +71,10 @@ CLUE_LETTERS_GAP_SECONDS = 0.35
 LETTERS_PAUSE_SECONDS = 1.0
 ANSWER_PAUSE_SECONDS = 1.2
 THINK_PROMPT = "Just pause here, and have a think."
-# Ryan offers the picture clue, then we wait before Sonia says the answer.
-HINT_LINE = "You may not need it, but here is a clue."
+# Ryan offers a clue, then points at the picture. Then we wait for the answer.
+HINT_OFFER = "If you need a clue."
+HINT_LOOK = "Have a look at this."
+HINT_LINE = f"{HINT_OFFER} {HINT_LOOK}"
 HINT_VOICE_ALIAS = "ryan"
 HINT_HOLD_SECONDS = 4.0
 HINT_PAUSE_SECONDS = 2.5

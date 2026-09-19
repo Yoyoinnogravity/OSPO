@@ -186,7 +186,7 @@ def test_hint_beat_is_newsprint_with_credited_photo(tmp_path: Path):
     assert photo != NEWS_BG
     assert clue.hint_credit == TRANCE.credit_line
     assert "DREAMLIKE" not in (clue.hint_credit or "")
-    assert HINT_LINE == "You may not need it, but here is a clue."
+    assert HINT_LINE == "If you need a clue. Have a look at this."
     assert DEFAULT_HINT.source == "generated still"
     assert ensure_hint_photo(TRANCE).exists()
     assert ensure_hint_photo(RASTA).exists()

@@ -79,7 +79,7 @@ def test_script_credits_fifteen_squared():
     assert "(" not in parts.clue_speech
     assert parts.letters_speech == speak_enumeration(clue.enumeration)
     assert parts.think_speech == "Just pause here, and have a think."
-    assert parts.hint_speech == "You may not need it, but here is a clue."
+    assert parts.hint_speech == "If you need a clue. Have a look at this."
     assert parts.answer_speech == speak_answer(clue.answer)
     assert parts.answer_speech == "It's end result."
     assert "end result" in parts.breakdown
