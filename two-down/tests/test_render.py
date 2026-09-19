@@ -78,8 +78,11 @@ def test_answer_footer_credits_setter_paper_and_fifteen_squared():
     assert _source_footer(clue) == "Eccles in the Independent · Fifteen Squared"
     guardian = clue.model_copy(update={"setter": "Dice", "paper": "Guardian"})
     assert _source_footer(guardian) == "Dice in the Guardian · Fifteen Squared"
-    from twodown.pipeline import aimlessly_clue, cole_clue, davis_cup_clue, dreamlike_clue, fats_clue, rasta_clue, smiles_clue, study_clue, wellington_clue
+    from twodown.pipeline import aimlessly_clue, cole_clue, davis_cup_clue, dreamlike_clue, fats_clue, mass_media_clue, rasta_clue, smiles_clue, study_clue, wellington_clue
 
+    mass_media = mass_media_clue()
+    assert mass_media.answer == "MASS MEDIA"
+    assert _source_footer(mass_media) == "Arrietty in the Financial Times · Fifteen Squared"
     aimlessly = aimlessly_clue()
     assert aimlessly.answer == "AIMLESSLY"
     assert _source_footer(aimlessly) == "Brendan in the Guardian · Fifteen Squared"
@@ -104,7 +107,7 @@ def test_answer_footer_credits_setter_paper_and_fifteen_squared():
     dreamlike = dreamlike_clue()
     assert dreamlike.answer == "DREAMLIKE"
     assert _source_footer(dreamlike) == "Brendan in the Guardian · Fifteen Squared"
-    assert _source_footer(study_clue()) == "Brendan in the Guardian · Fifteen Squared"
+    assert _source_footer(study_clue()) == "Arrietty in the Financial Times · Fifteen Squared"
 
 
 def test_parse_under_answer_is_very_bold_ink(tmp_path: Path):
@@ -271,6 +274,7 @@ def test_speak_answer_is_a_word_not_letters():
     assert speak_answer("SMILES") == "It's smiles."
     assert speak_answer("DAVIS CUP") == "It's davis cup."
     assert speak_answer("AIMLESSLY") == "It's aimlessly."
+    assert speak_answer("MASS MEDIA") == "It's mass media."
     assert _clue().answer == "PIN-UP"
 
 
@@ -282,7 +286,7 @@ def test_hint_card_keeps_empty_lights(tmp_path: Path):
 
     clue = study_clue()
     assert clue is not None
-    assert clue.answer == "AIMLESSLY"
+    assert clue.answer == "MASS MEDIA"
     hint = draw_beat(clue, tmp_path / "hint.png", "hint")
     answer = draw_beat(clue, tmp_path / "answer.png", "answer")
     hint_img = Image.open(hint)

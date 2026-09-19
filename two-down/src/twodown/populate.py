@@ -16,14 +16,14 @@ CUT = frozenset(
         "WELLINGTON",
         "COLE",
         "SMILES",
+        "AIMLESSLY",
     }
 )
 # Filmed once; Aled said no. Leave on ice.
 ON_ICE = frozenset({"DAVIS CUP"})
 
-# Waiting. Next study default is AIMLESSLY (9 across).
+# Waiting on Guardian 30115. MASS MEDIA is a separate FT film.
 WAITING = (
-    "AIMLESSLY",
     "A GOGO",
     "SALAL",
     "RISINGS",

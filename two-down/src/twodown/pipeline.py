@@ -286,7 +286,7 @@ def davis_cup_clue() -> Clue:
 
 
 def aimlessly_clue() -> Clue:
-    """Guardian 30115 9a AIMLESSLY — current study Short. On Fifteen Squared.
+    """Guardian 30115 9a AIMLESSLY — leftover study construct. On Fifteen Squared.
 
     Hint end as a goal or aim, not sly / e-mails / recycle.
     Do not print AIMLESSLY on the hint card.
@@ -311,8 +311,39 @@ def aimlessly_clue() -> Clue:
     )
 
 
+_MASS_MEDIA_SOURCE = (
+    "https://fifteensquared.net/2026/09/18/financial-times-18483-by-arrietty/"
+)
+
+
+def mass_media_clue() -> Clue:
+    """FT 18483 1a MASS MEDIA — current study Short. On Fifteen Squared.
+
+    Hint newspapers / the press, not maid / mess.
+    Do not print MASS MEDIA on the hint card.
+    """
+    return attach_hint(
+        Clue(
+            source_url=_MASS_MEDIA_SOURCE,
+            paper="Financial Times",
+            puzzle_id="18483",
+            setter="Arrietty",
+            blogger="Turbolegs",
+            number="1",
+            direction="across",
+            clue="Maid struggling with a mess — newspapers etc",
+            enumeration="4,5",
+            answer="MASS MEDIA",
+            definition="newspapers, the press",
+            parse='anagram/"struggling" of (Maid a mess)*',
+            device="anagram",
+            enumeration_ok=True,
+        )
+    )
+
+
 def study_clues() -> dict[str, Clue]:
-    """AIMLESSLY is the study default. Earlier study clues stay constructable."""
+    """MASS MEDIA is the study default. Earlier study clues stay constructable."""
     dreamlike = dreamlike_clue()
     rasta = rasta_clue()
     fats = fats_clue()
@@ -321,6 +352,7 @@ def study_clues() -> dict[str, Clue]:
     smiles = smiles_clue()
     davis = davis_cup_clue()
     aimlessly = aimlessly_clue()
+    mass_media = mass_media_clue()
     return {
         dreamlike.slug: dreamlike,
         "dreamlike": dreamlike,
@@ -355,7 +387,12 @@ def study_clues() -> dict[str, Clue]:
         "aimlessly": aimlessly,
         "study-aimlessly-9": aimlessly,
         aimlessly.answer.lower(): aimlessly,
-        STUDY_SLUG: aimlessly,
+        mass_media.slug: mass_media,
+        "mass-media": mass_media,
+        "mass media": mass_media,
+        "study-mass-media-4-5": mass_media,
+        mass_media.answer.lower(): mass_media,
+        STUDY_SLUG: mass_media,
     }
 
 

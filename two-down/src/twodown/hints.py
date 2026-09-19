@@ -203,6 +203,30 @@ WELLINGTON = HintPhoto(
 )
 
 
+# Definition still for MASS MEDIA: newspapers / the press.
+# Not maid, not mess. Never print MASS MEDIA.
+PAPERS = HintPhoto(
+    slug="papers-still",
+    label="Newspapers",
+    source="generated still",
+    license="generated",
+    filename="papers-still.webp",
+    keywords=frozenset(
+        {
+            "newspaper",
+            "newspapers",
+            "newspap",
+            "paper",
+            "papers",
+            "press",
+            "pres",
+            "news",
+            "media",
+        }
+    ),
+)
+
+
 # Definition still for AIMLESSLY: end as a goal or aim.
 # Not sly, not e-mails, not recycle. Never print AIMLESSLY.
 AIM = HintPhoto(
@@ -321,6 +345,7 @@ PHOTOS: dict[str, HintPhoto] = {
     SMILES.slug: SMILES,
     DAVIS.slug: DAVIS,
     AIM.slug: AIM,
+    PAPERS.slug: PAPERS,
     LION.slug: LION,
     "dreamlike": TRANCE,
     "trance": TRANCE,
@@ -348,13 +373,19 @@ PHOTOS: dict[str, HintPhoto] = {
     "aimlessly": AIM,
     "guardian-30115-9a": AIM,
     "study-aimlessly-9": AIM,
+    "papers": PAPERS,
+    "newspapers": PAPERS,
+    "mass-media": PAPERS,
+    "mass media": PAPERS,
+    "financial-times-18483-1a": PAPERS,
+    "study-mass-media-4-5": PAPERS,
 }
 
 DEFAULT_HINT = TRANCE
 
 
 def _catalog() -> tuple[HintPhoto, ...]:
-    return (TRANCE, MOONLIT, RASTA, FATS, WELLINGTON, COLE, SMILES, DAVIS, AIM, LION)
+    return (TRANCE, MOONLIT, RASTA, FATS, WELLINGTON, COLE, SMILES, DAVIS, AIM, PAPERS, LION)
 
 
 def _tokens(text: str) -> frozenset[str]:
@@ -550,6 +581,21 @@ def _generate_aim_still(dest: Path) -> Path:
     return dest
 
 
+def _generate_papers_still(dest: Path) -> Path:
+    """Last-resort newspaper stack if the file is missing. No answer text."""
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    img = Image.new("RGB", (1280, 720), (92, 78, 64))
+    draw = ImageDraw.Draw(img)
+    draw.rectangle((180, 80, 1040, 220), fill=(228, 216, 188))
+    draw.rectangle((220, 200, 1100, 380), fill=(243, 234, 214))
+    draw.rectangle((160, 340, 1080, 620), fill=(252, 247, 236))
+    draw.rectangle((220, 400, 980, 430), fill=(26, 21, 16))
+    draw.rectangle((220, 460, 860, 480), fill=(26, 21, 16))
+    draw.rectangle((220, 500, 720, 516), fill=(92, 78, 64))
+    img.save(dest, "WEBP", quality=82, method=6)
+    return dest
+
+
 def ensure_hint_photo(photo: HintPhoto | None = None) -> Path:
     resolved = photo or DEFAULT_HINT
     dest = resolved.path
@@ -571,4 +617,6 @@ def ensure_hint_photo(photo: HintPhoto | None = None) -> Path:
         return _generate_davis_still(dest)
     if resolved.slug in {AIM.slug, "aim", "aimlessly"}:
         return _generate_aim_still(dest)
+    if resolved.slug in {PAPERS.slug, "papers", "newspapers", "mass-media"}:
+        return _generate_papers_still(dest)
     return _generate_trance_still(dest)

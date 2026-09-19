@@ -154,7 +154,7 @@ def main(argv: list[str] | None = None) -> int:
         "slug",
         nargs="?",
         default=STUDY_SLUG,
-        help=f"Study or published clue slug (default: {STUDY_SLUG}, AIMLESSLY)",
+        help=f"Study or published clue slug (default: {STUDY_SLUG}, MASS MEDIA)",
     )
     short.add_argument("--out", type=Path, default=DEFAULT_OUTPUT)
     short.add_argument("--all-voices", action="store_true", help="Speak all four voices. Default: Libby only.")

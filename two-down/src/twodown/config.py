@@ -76,8 +76,8 @@ HINT_HOLD_SECONDS = 4.0
 HINT_PAUSE_SECONDS = 2.5
 CLUES_PER_DAY = 2
 # Lock the spoken beat on this constructed study clue before touching the others.
-# AIMLESSLY is Guardian 30115 9 across; twodown short rebuilds this clue only.
-STUDY_SLUG = "guardian-30115-9a"
+# MASS MEDIA is FT 18483 1 across; twodown short rebuilds this clue only.
+STUDY_SLUG = "financial-times-18483-1a"
 PINUP_SLUG = "independent-12462-6a"
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[2]
