@@ -102,7 +102,11 @@ FONT_SANS = "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"
 FONT_SANS_BOLD = "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"
 
 # Public follow URLs. YouTube has a default handle; the others stay off until set.
+# Prefer the brand channel. Personal Aled Morgan / carbonyoyo is upload fallback only.
 YOUTUBE_FOLLOW = os.environ.get("TWODOWN_YOUTUBE_URL", "https://www.youtube.com/@crypticfun").strip()
+YOUTUBE_FALLBACK = os.environ.get(
+    "TWODOWN_YOUTUBE_FALLBACK_URL", "https://www.youtube.com/@carbonyoyo"
+).strip()
 TIKTOK_FOLLOW = os.environ.get("TWODOWN_TIKTOK_URL", "").strip()
 INSTAGRAM_FOLLOW = os.environ.get("TWODOWN_INSTAGRAM_URL", "").strip()
 FACEBOOK_FOLLOW = os.environ.get("TWODOWN_FACEBOOK_URL", "").strip()

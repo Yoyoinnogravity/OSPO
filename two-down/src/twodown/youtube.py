@@ -47,7 +47,12 @@ def video_description(item: SpokenClue) -> str:
 
 
 def upload_short(item: SpokenClue, privacy: str = "public") -> str | None:
-    """Upload one Short as cryptic.fun. Returns the video id, or None if credentials are missing."""
+    """Upload one Short to the authorised channel.
+
+    Prefer cryptic.fun. If that Brand Account is not ready, the token may
+    be Aled Morgan / carbonyoyo. Returns the video id, or None if credentials
+    are missing.
+    """
     if not item.video_path:
         return None
     creds = _credentials()

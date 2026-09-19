@@ -69,9 +69,9 @@ twodown upload --no-youtube          # TikTok + Instagram + Facebook only
 
 Token files:
 
-* **YouTube** — authorized desktop OAuth user JSON for the **cryptic.fun**
-  channel (`youtube.com/@crypticfun`). Not the personal Aled Morgan /
-  carbonyoyo channel. Same Google login is fine; pick cryptic.fun at Allow.
+* **YouTube** — authorized desktop OAuth user JSON. Prefer the **cryptic.fun**
+  channel (`youtube.com/@crypticfun`). If that Brand Account is not ready,
+  authorise Aled Morgan / carbonyoyo (`youtube.com/@carbonyoyo`) instead.
 * **TikTok** — `{"access_token": "..."}` from a TikTok app with `video.publish`
   (Content Posting API, FILE_UPLOAD). Unaudited apps are limited to private /
   self-only until TikTok reviews the app.
