@@ -48,6 +48,15 @@ def test_publish_site_writes_spoiler_pages(tmp_path):
     assert "data-scene-prefix" in index
     assert (tmp_path / "media" / "scenes" / "machu-picchu.webp").exists()
     assert (tmp_path / "suggest.html").exists()
+    assert (tmp_path / "post.html").exists()
+    post = (tmp_path / "post.html").read_text(encoding="utf-8")
+    assert "Drop a Short yourself" in post
+    assert "youtube.com/upload" in post
+    assert "Save the film" in post
+    assert "Caption — copy this, no answer" in post
+    assert "END RESULT" not in post
+    assert "AXES" not in post
+    assert ">Post</a>" in index
     suggest = (tmp_path / "suggest.html").read_text(encoding="utf-8")
     assert "aledmorgan@gmail.com" in suggest
     assert "data-suggest-form" in suggest
@@ -78,7 +87,9 @@ def test_publish_site_writes_spoiler_pages(tmp_path):
     assert "feed.xml" in follow
     assert "youtube.com/@crypticaiforfun" in follow
     assert "youtube.com/@crypticfun" not in follow
-    assert "https://cryptic.fit/follow.html" in (tmp_path / "sitemap.xml").read_text(encoding="utf-8")
+    sitemap = (tmp_path / "sitemap.xml").read_text(encoding="utf-8")
+    assert "https://cryptic.fit/follow.html" in sitemap
+    assert "https://cryptic.fit/post.html" in sitemap
     assert "How we pay for this" in index
     assert "adsbygoogle" not in index
     assert not (tmp_path / "ads.txt").exists()
@@ -91,6 +102,7 @@ def test_publish_site_writes_spoiler_pages(tmp_path):
     assert (tmp_path / "robots.txt").exists()
     css = (tmp_path / "assets" / "style.css").read_text(encoding="utf-8")
     assert "body.scene-photo header a" in css
+    assert ".panel textarea" in css
     assert 'rel="canonical"' in index
     assert 'property="og:title"' in index
     assert "application/ld+json" in index
@@ -100,7 +112,6 @@ def test_publish_site_writes_spoiler_pages(tmp_path):
     assert "Rioting led unrest" in clue_page.split("<h1>", 1)[1].split("</h1>", 1)[0]
     robots = (tmp_path / "robots.txt").read_text(encoding="utf-8")
     assert "Sitemap: https://cryptic.fit/sitemap.xml" in robots
-    sitemap = (tmp_path / "sitemap.xml").read_text(encoding="utf-8")
     assert "https://cryptic.fit/" in sitemap
     assert "https://cryptic.fit/c/independent-12458-12a/" in sitemap
     feed = (tmp_path / "feed.xml").read_text(encoding="utf-8")
@@ -141,6 +152,22 @@ def test_ads_on_writes_ads_txt_and_unit(tmp_path, monkeypatch):
     clue_page = (root / "c" / "independent-12458-12a" / "index.html").read_text(encoding="utf-8")
     assert "adsbygoogle" not in clue_page
     assert "pagead2.googlesyndication.com" not in clue_page
+
+
+def test_post_kit_lists_saved_films_without_answers(tmp_path):
+    pair = DailyPair(date="2026-09-11", voice="en-GB-SoniaNeural", clues=[_item(), _item(answer="AXES", number="14")])
+    extra = tmp_path / "media" / "guardian-30115-23d.mp4"
+    extra.parent.mkdir(parents=True, exist_ok=True)
+    extra.write_bytes(b"mp4")
+    root = publish_site(pair, tmp_path)
+    post = (root / "post.html").read_text(encoding="utf-8")
+    assert 'data-drop-slug="guardian-30115-23d"' in post
+    assert "Name of girl making second statement" in post
+    assert "SIMONE" not in post
+    assert "END RESULT" not in post
+    assert "@crypticaiforfun" in post
+    assert "facebook.com/pages/create" in post
+    assert "tiktok.com/signup" in post
 
 
 def test_site_pair_reads_the_published_homepage_pair():

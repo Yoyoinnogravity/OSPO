@@ -6,6 +6,7 @@ from pathlib import Path
 from shutil import copy2
 
 from twodown.ads import ads_enabled, ads_txt, adsense_client, adsense_slot
+from twodown.captions import HASHTAGS
 from twodown.config import BRAND, BRAND_LINE, CREDIT_LINE, CREDIT_WHO, SITE_HOST, SITE_ORIGIN, SITE_ROOT, SOURCE_SITE, SPONSOR_EMAIL, SUGGEST_EMAIL, VOICE_LABELS, WORDMARK_HEAD, WORDMARK_TAIL, follow_profiles
 from twodown.models import DailyPair, SpokenClue
 from twodown.render import write_share_card
@@ -167,6 +168,7 @@ footer {
 footer a { color: var(--crimson); }
 .scene-credit { margin-top: 10px; }
 body.scene-photo h2 { text-shadow: 0 2px 18px rgba(0,0,0,0.55); }
+.panel video.short { width: min(100%, 360px); height: auto; display: block; background: #111; }
 .panel, aside.teaser {
   background: rgba(252, 247, 236, 0.94);
   color: var(--ink);
@@ -177,6 +179,25 @@ body.scene-photo h2 { text-shadow: 0 2px 18px rgba(0,0,0,0.55); }
   max-width: 40rem;
 }
 .panel a, aside.teaser a { color: var(--crimson); }
+.panel .action { margin: 0 8px 8px 0; }
+.panel label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-family: "Liberation Sans", sans-serif;
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin-top: 12px;
+}
+.panel textarea {
+  font-family: "Liberation Serif", Georgia, serif;
+  font-size: 1.05rem;
+  color: var(--ink);
+  background: var(--cream);
+  border: 1px solid var(--rule);
+  padding: 8px 10px;
+  width: 100%;
+}
 .suggest-forms { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; margin: 28px 0 64px; }
 @media (max-width: 800px) { .suggest-forms { grid-template-columns: 1fr; } }
 .suggest-form { display: flex; flex-direction: column; gap: 12px; }
@@ -487,11 +508,73 @@ def _nav(prefix: str) -> str:
     return f"""
       <nav>
         <a href="{prefix}index.html">Today</a>
+        <a href="{prefix}post.html">Post</a>
         <a href="{prefix}follow.html">Follow</a>
         <a href="{prefix}suggest.html">Suggest</a>
         <a href="{prefix}support.html">Support</a>
         <a href="{prefix}about.html">About</a>
       </nav>
+    """
+
+
+def _drop_card(slug: str, clue: str, credit: str, media_prefix: str = "media/") -> str:
+    video = f"{media_prefix}{slug}.mp4"
+    caption = (
+        f"{BRAND} · {clue}\n\n"
+        f"Have a think. The parse is in the video.\n"
+        f"{credit}\n"
+        f"{SITE_ORIGIN}/\n"
+        f"{HASHTAGS}"
+    )
+    return f"""
+      <section class="panel" data-drop-slug="{_e(slug)}">
+        <h2>{_e(clue)}</h2>
+        <p>{_e(credit)}</p>
+        <video class="short" controls playsinline preload="metadata" src="{_e(video)}"></video>
+        <p><a class="action" href="{_e(video)}" download="{_e(slug)}.mp4">Save the film</a></p>
+        <label>Caption — copy this, no answer
+          <textarea readonly rows="6">{_e(caption)}</textarea>
+        </label>
+      </section>
+    """
+
+
+def _post_body(pair: DailyPair, root: Path) -> str:
+    cards: list[str] = []
+    for item in pair.clues:
+        clue = item.clue
+        enum = f" ({clue.enumeration})" if clue.enumeration else ""
+        cards.append(
+            _drop_card(
+                clue.slug,
+                f"{clue.clue}{enum}",
+                f"{clue.paper} {clue.puzzle_id} · {clue.setter}",
+            )
+        )
+    extras = (
+        ("guardian-30115-23d", "Name of girl making second statement on first birthday (6)", "Guardian 30115 · Brendan"),
+        ("financial-times-18483-26a", "Panicking, Indiana twice grabs snake (2,1,4)", "FT 18483 · Arrietty"),
+        ("financial-times-18483-1a", "Maid struggling with a mess — newspapers etc (4,5)", "FT 18483 · Arrietty"),
+    )
+    have = {item.clue.slug for item in pair.clues}
+    for slug, line, credit in extras:
+        if slug in have:
+            continue
+        if (root / "media" / f"{slug}.mp4").exists():
+            cards.append(_drop_card(slug, line, credit))
+    return f"""
+    <p class="kicker">Post</p>
+    <h1>Drop a Short yourself.</h1>
+    <p class="lede">The agent cannot open YouTube, Facebook, Instagram or TikTok. Save a film, then drop it. Name the account <strong>{_e(BRAND)}</strong>. Handle if it is free: <strong>@crypticaiforfun</strong>.</p>
+    <p>
+      <a class="action" href="https://www.youtube.com/upload" rel="noopener" target="_blank">YouTube</a>
+      <a class="action" href="https://www.facebook.com/pages/create" rel="noopener" target="_blank">Facebook</a>
+      <a class="action" href="https://www.instagram.com/" rel="noopener" target="_blank">Instagram</a>
+      <a class="action" href="https://www.tiktok.com/signup" rel="noopener" target="_blank">TikTok</a>
+    </p>
+    <div class="suggest-forms">
+      {''.join(cards)}
+    </div>
     """
 
 
@@ -864,6 +947,18 @@ def publish_site(pair: DailyPair, dest: Path | None = None) -> Path:
                 title=f"Suggest a clue — {BRAND}",
                 description="Send one homemade cryptic a day, or ask for a daily clue by email. Answers stay off the public page.",
                 path="/suggest.html",
+            ),
+        ),
+        encoding="utf-8",
+    )
+
+    (root / "post.html").write_text(
+        _page(
+            _post_body(pair, root),
+            PageSeo(
+                title=f"Post — {BRAND}",
+                description=f"Save a {BRAND} Short and drop it on YouTube, Facebook, Instagram or TikTok. The agent cannot open those logins.",
+                path="/post.html",
             ),
         ),
         encoding="utf-8",

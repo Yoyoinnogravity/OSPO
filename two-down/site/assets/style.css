@@ -137,6 +137,7 @@ footer {
 footer a { color: var(--crimson); }
 .scene-credit { margin-top: 10px; }
 body.scene-photo h2 { text-shadow: 0 2px 18px rgba(0,0,0,0.55); }
+.panel video.short { width: min(100%, 360px); height: auto; display: block; background: #111; }
 .panel, aside.teaser {
   background: rgba(252, 247, 236, 0.94);
   color: var(--ink);
@@ -147,6 +148,25 @@ body.scene-photo h2 { text-shadow: 0 2px 18px rgba(0,0,0,0.55); }
   max-width: 40rem;
 }
 .panel a, aside.teaser a { color: var(--crimson); }
+.panel .action { margin: 0 8px 8px 0; }
+.panel label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-family: "Liberation Sans", sans-serif;
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin-top: 12px;
+}
+.panel textarea {
+  font-family: "Liberation Serif", Georgia, serif;
+  font-size: 1.05rem;
+  color: var(--ink);
+  background: var(--cream);
+  border: 1px solid var(--rule);
+  padding: 8px 10px;
+  width: 100%;
+}
 .suggest-forms { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; margin: 28px 0 64px; }
 @media (max-width: 800px) { .suggest-forms { grid-template-columns: 1fr; } }
 .suggest-form { display: flex; flex-direction: column; gap: 12px; }
