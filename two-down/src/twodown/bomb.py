@@ -6,15 +6,8 @@ from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile
 
 from twodown.captions import clue_line, tiktok_caption, youtube_drop_description
-from twodown.config import (
-    BRAND,
-    DEFAULT_OUTPUT,
-    LOCKED_SLUGS,
-    SITE_ORIGIN,
-    SITE_ROOT,
-    YOUTUBE_HANDLE,
-)
-from twodown.drop import YOUTUBE_STUDIO, YOUTUBE_UPLOAD
+from twodown.config import DEFAULT_OUTPUT, LOCKED_SLUGS, SITE_ROOT
+from twodown.drop import YOUTUBE_UPLOAD
 from twodown.ingest import fetch_daily_posts
 from twodown.models import Clue
 from twodown.parse import parse_post, usable
@@ -22,7 +15,7 @@ from twodown.pipeline import render_one_short, study_clues
 from twodown.youtube import video_title
 
 PACK_LIMIT = 100
-WORKERS = 3
+WORKERS = 1
 MANIFEST_NAME = "youtube-100.json"
 TITLES_NAME = "YOUTUBE-TITLES.txt"
 HOW_NAME = "HOW.txt"
@@ -144,19 +137,7 @@ def render_bomb_videos(
 
 
 def how_to_bomb() -> str:
-    return (
-        f"{BRAND} — 100 Shorts for YouTube\n"
-        "You already have a channel. Stay signed in.\n"
-        f"Open {YOUTUBE_STUDIO} then Create → Upload videos,\n"
-        f"or go straight to {YOUTUBE_UPLOAD}\n"
-        "Drag every mp4. Paste the title from the matching txt.\n"
-        "The description is under the title. No answer in either.\n"
-        "The parse is in the film.\n"
-        f"Rename the channel {BRAND} when you want.\n"
-        f"Handle @{YOUTUBE_HANDLE} if it is free.\n"
-        "Do not use @crypticfun.\n"
-        "Picture: Harry Botter.\n"
-    )
+    return f"{YOUTUBE_UPLOAD}\n\nDrag every mp4.\n"
 
 
 def write_bomb_manifest(records: list[dict[str, str | int | None]], root: Path) -> Path:

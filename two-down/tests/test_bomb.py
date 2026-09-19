@@ -46,11 +46,7 @@ def test_public_record_and_description_hide_the_answer():
 
 def test_how_to_bomb_is_youtube_drag_drop():
     text = how_to_bomb()
-    assert "You already have a channel" in text
-    assert "youtube.com/upload" in text
-    assert "@crypticaiforfun" in text
-    assert "Do not use @crypticfun" in text
-    assert "Harry Botter" in text
+    assert text == "https://www.youtube.com/upload\n\nDrag every mp4.\n"
     assert "PIN-UP" not in text
     assert "END RESULT" not in text
 

@@ -184,7 +184,7 @@ def main(argv: list[str] | None = None) -> int:
     bomb.add_argument("--out", type=Path, help="Zip path (default: two-down/output/bomb/youtube-100.zip)")
     bomb.add_argument("--dest", type=Path, help="Work folder for the cuts")
     bomb.add_argument("--rebuild", action="store_true", help="Recut films that already exist (never PIN-UP or SELF)")
-    bomb.add_argument("--workers", type=int, default=3)
+    bomb.add_argument("--workers", type=int, default=1)
 
     args = parser.parse_args(argv)
 

@@ -176,7 +176,7 @@ def synthesise_spoken_paragraph(
 def build_short_soundtrack(parts: ScriptParts, dest: Path, voice: str | None = None) -> ShortTimings:
     """Speak each beat, then stitch the pauses so the picture can follow the voice."""
     dest.parent.mkdir(parents=True, exist_ok=True)
-    work = Path("/tmp/twodown-beats") / dest.stem
+    work = Path("/tmp/twodown-beats") / dest.parent.name / dest.stem
     work.mkdir(parents=True, exist_ok=True)
     clips = {
         "intro": synthesise(
