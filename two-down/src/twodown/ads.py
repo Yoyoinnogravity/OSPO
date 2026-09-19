@@ -41,5 +41,5 @@ def ads_status() -> tuple[str, str]:
         return "needs slot", f"Set {ADSENSE_SLOT_ENV} to the AdSense display unit id."
     return (
         "off",
-        f"Set {ADSENSE_CLIENT_ENV}=ca-pub-… and {ADSENSE_SLOT_ENV} after AdSense approves cryptic.fun.",
+        f"Set {ADSENSE_CLIENT_ENV}=ca-pub-… and {ADSENSE_SLOT_ENV} after AdSense approves cryptic.fit.",
     )

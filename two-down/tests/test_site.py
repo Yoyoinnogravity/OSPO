@@ -20,14 +20,16 @@ def _item(answer: str = "END RESULT", number: str = "12") -> SpokenClue:
         device="anagram",
         enumeration_ok=True,
     )
-    return SpokenClue(clue=clue, script="cryptic.fun. The answer is END RESULT.", voice="en-GB-SoniaNeural")
+    return SpokenClue(clue=clue, script="cryptic.fit. The answer is END RESULT.", voice="en-GB-SoniaNeural")
 
 
 def test_publish_site_writes_spoiler_pages(tmp_path):
     pair = DailyPair(date="2026-09-11", voice="en-GB-SoniaNeural", clues=[_item(), _item(answer="AXES", number="14")])
     root = publish_site(pair, tmp_path)
     index = (root / "index.html").read_text(encoding="utf-8")
-    assert "cryptic.fun" in index
+    assert "cryptic.fit" in index
+    assert "cryptic<span>.fit</span>" in index
+    assert "cryptic<span>.fun</span>" not in index
     assert "Rioting led unrest" in index
     assert "Solve" in index
     assert "Fifteen Squared" in index
@@ -72,7 +74,7 @@ def test_publish_site_writes_spoiler_pages(tmp_path):
     follow = (tmp_path / "follow.html").read_text(encoding="utf-8")
     assert "data-subscribe-form" in follow
     assert "feed.xml" in follow
-    assert "youtube.com/@crypticfun" in follow
+    assert "youtube.com/@crypticfit" in follow
     assert "https://cryptic.fit/follow.html" in (tmp_path / "sitemap.xml").read_text(encoding="utf-8")
     assert "How we pay for this" in index
     assert "adsbygoogle" not in index
@@ -111,9 +113,9 @@ def test_publish_site_writes_spoiler_pages(tmp_path):
 def test_youtube_titles_use_cryptic_fun_channel():
     clue = _item().clue
     title = video_title(clue)
-    assert title.startswith("cryptic.fun · ")
+    assert title.startswith("cryptic.fit · ")
     assert title.endswith("#Shorts")
-    assert YOUTUBE_CHANNEL == "cryptic.fun"
+    assert YOUTUBE_CHANNEL == "cryptic.fit"
     assert len(title) <= 100
     assert "https://cryptic.fit/support.html" in youtube_description(_item())
     assert "unique cryptic crossword clues and solutions" in youtube_description(_item())

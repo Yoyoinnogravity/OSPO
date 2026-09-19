@@ -49,9 +49,8 @@ def video_description(item: SpokenClue) -> str:
 def upload_short(item: SpokenClue, privacy: str = "public") -> str | None:
     """Upload one Short to the authorised channel.
 
-    Prefer cryptic.fun. If that Brand Account is not ready, the token may
-    be Aled Morgan / carbonyoyo. Returns the video id, or None if credentials
-    are missing.
+    Upload to the authorised cryptic.fit channel. Returns the video id,
+    or None if credentials are missing.
     """
     if not item.video_path:
         return None
@@ -66,7 +65,7 @@ def upload_short(item: SpokenClue, privacy: str = "public") -> str | None:
         "snippet": {
             "title": video_title(item.clue),
             "description": video_description(item),
-            "tags": ["cryptic.fun", "cryptic crossword", item.clue.device, item.clue.setter],
+            "tags": ["cryptic.fit", "cryptic crossword", item.clue.device, item.clue.setter],
             "categoryId": "27",
         },
         "status": {

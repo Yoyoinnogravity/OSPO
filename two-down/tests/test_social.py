@@ -99,8 +99,8 @@ def test_social_caption_does_not_spoil_the_answer():
     text = social_caption(_item())
     assert "BELLHOP" not in text
     assert "Hotel worker" in text
-    assert "#crypticfun" in text
-    assert "cryptic.fun" in text
+    assert "#crypticfit" in text
+    assert "cryptic.fit" in text
 
 
 def test_platforms_need_tokens_by_default(monkeypatch):
@@ -139,7 +139,7 @@ def test_instagram_and_facebook_reels(tmp_path, monkeypatch):
     item = _item(video)
     session = FakeSession()
     assert upload_instagram(item, social_caption(item), session=session) == "ig_99"
-    assert upload_facebook(item, social_caption(item), "cryptic.fun · test", session=session) == "fb_1"
+    assert upload_facebook(item, social_caption(item), "cryptic.fit · test", session=session) == "fb_1"
     assert item.instagram_id == "ig_99"
     assert item.facebook_id == "fb_1"
 

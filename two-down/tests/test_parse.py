@@ -71,7 +71,7 @@ def test_script_credits_fifteen_squared():
     assert clue.answer == "END RESULT"
     assert "end result" in script
     assert "Phi" in script
-    assert "cryptic.fun" in script
+    assert "cryptic.fit" in script
     parts = write_parts(clue)
     assert parts.intro_speech == "Right — here's your daily dose of cryptic fun."
     assert parts.clue_speech == f"{clue.clue}."
@@ -86,7 +86,7 @@ def test_script_credits_fifteen_squared():
     assert "Fifteen Squared" not in parts.parse_speech
     assert "Fifteen Squared" in parts.source_speech
     assert "Phi" in parts.source_speech
-    assert parts.outro_speech == "Thanks for thinking with cryptic.fun."
+    assert parts.outro_speech == "Thanks for thinking with cryptic.fit."
     assert script.index(parts.intro_speech) < script.index(parts.clue_speech)
     assert script.index(parts.clue_speech) < script.index(parts.letters_speech)
     assert script.index(parts.letters_speech) < script.index("[pause 1s]")

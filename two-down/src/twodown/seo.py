@@ -14,7 +14,7 @@ GSC_ENV = "TWODOWN_GSC_VERIFY"
 SHARE_IMAGE = "/media/og.webp"
 DEFAULT_DESCRIPTION = (
     f"{BRAND_LINE} {CREDIT_LINE} From Fifteen Squared. "
-    "Have a go before you tap solve. Spoken parses on cryptic.fun."
+    "Have a go before you tap solve. Spoken parses on cryptic.fit."
 )
 
 
@@ -86,7 +86,7 @@ def item_list_ld(pair: DailyPair) -> dict:
     return {
         "@context": "https://schema.org",
         "@type": "ItemList",
-        "name": f"cryptic.fun pair {pair.date}",
+        "name": f"{BRAND} pair {pair.date}",
         "itemListElement": elements,
     }
 

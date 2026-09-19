@@ -1,4 +1,4 @@
-cryptic.fun
+cryptic.fit
 ===========
 
 We provide unique cryptic crossword clues and solutions.
@@ -6,7 +6,7 @@ We credit all — the setter, the paper, Fifteen Squared, and the photograph.
 The only source is [Fifteen Squared](https://fifteensquared.net/),
 cut as newsprint Shorts. **Ryan** opens and offers the picture clue,
 **Sonia** solves, **Thomas** credits the setter and Fifteen Squared.
-The brand is **cryptic.fun** on the site,
+The brand is **cryptic.fit** on the site,
 YouTube, TikTok, Instagram and Facebook.
 
 Do not invent answers. Do not scrape other crossword blogs.
@@ -69,9 +69,9 @@ twodown upload --no-youtube          # TikTok + Instagram + Facebook only
 
 Token files:
 
-* **YouTube** — authorized desktop OAuth user JSON. Prefer the **cryptic.fun**
-  channel (`youtube.com/@crypticfun`). If that Brand Account is not ready,
-  authorise Aled Morgan / carbonyoyo (`youtube.com/@carbonyoyo`) instead.
+* **YouTube** — authorized desktop OAuth user JSON for the **cryptic.fit**
+  channel (`youtube.com/@crypticfit`). Do not use `@crypticfun` — that
+  handle is someone else's channel, and we do not own `.fun`.
 * **TikTok** — `{"access_token": "..."}` from a TikTok app with `video.publish`
   (Content Posting API, FILE_UPLOAD). Unaudited apps are limited to private /
   self-only until TikTok reviews the app.
@@ -92,9 +92,9 @@ Token files:
 Defaults if the env vars are unset: `~/.config/twodown/youtube-token.json`,
 `tiktok-token.json`, `meta-token.json`.
 
-Without tokens the pair still lands in `two-down/site/` for cryptic.fun.
+Without tokens the pair still lands in `two-down/site/` for cryptic.fit.
 That folder is a complete static site. Upload its contents to any host
-(`public_html`, Netlify, Cloudflare Pages). The site `CNAME` is `cryptic.fun`.
+(`public_html`, Netlify, Cloudflare Pages). The site `CNAME` is `cryptic.fit`.
 DNS only works after the name is actually registered (see Go live).
 
 Daily agent
@@ -118,14 +118,13 @@ That is the only thing you pay Cursor for. GitHub Pages and YouTube upload are f
 
 **Go live on cryptic.fit**
 
-Aled owns **cryptic.fit**. The show name stays cryptic.fun. The website
-uses the name we have.
+Aled owns **cryptic.fit**. The brand is cryptic.fit on the site and YouTube.
 
 1. In Namecheap, switch nameservers from **Web Hosting DNS** to
    **Namecheap BasicDNS**. Leave paid hosting unused.
 2. Advanced DNS: `A` records for `@` to `185.199.108.153`,
    `185.199.109.153`, `185.199.110.153`, `185.199.111.153`.
-3. Merge the cryptic.fun PR.
+3. Merge the cryptic.fit PR.
 4. Repo **Settings → Pages → Source: GitHub Actions**.
 5. GitHub Pages custom domain: `cryptic.fit`.
 
@@ -134,7 +133,7 @@ Do **not** upload with cPanel File Manager, FileZilla, or `scp` to
 
 `twodown live` prints this same order (registry first, then Pages, then DNS).
 
-YouTube still needs `TWODOWN_YOUTUBE_TOKEN` (OAuth for the cryptic.fun channel),
+YouTube still needs `TWODOWN_YOUTUBE_TOKEN` (OAuth for the cryptic.fit channel),
 not a payment.
 
 Money
@@ -145,10 +144,10 @@ already has a labelled slot **under** today’s pair, never inside Solve.
 
 When hits arrive, the stack is:
 
-1. **YouTube Shorts** — real money once cryptic.fun is in the Partner Program
+1. **YouTube Shorts** — real money once cryptic.fit is in the Partner Program
    (1,000 subscribers and 10 million Shorts views in 90 days, or 4,000
    long-form hours). Same AdSense account can later cover the website.
-2. **One Google display unit on cryptic.fun** — after
+2. **One Google display unit on cryptic.fit** — after
    [adsense.google.com](https://www.google.com/adsense/) approves the custom
    domain. Manual unit only; do not turn on Auto ads (they can cover the
    answer). UK visitors need a consent banner before any ad cookie.
