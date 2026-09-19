@@ -369,6 +369,32 @@ def in_a_spin_clue() -> Clue:
     )
 
 
+def simone_clue() -> Clue:
+    """Guardian 30115 23d SIMONE — random critique Short. On Fifteen Squared.
+
+    Hint a girl's name / a woman, not S / I'm one / a birthday cake that prints SIMONE.
+    Do not print SIMONE on the hint card.
+    """
+    return attach_hint(
+        Clue(
+            source_url=_RASTA_SOURCE,
+            paper="Guardian",
+            puzzle_id="30115",
+            setter="Brendan",
+            blogger="manehi",
+            number="23",
+            direction="down",
+            clue="Name of girl making second statement on first birthday",
+            enumeration="6",
+            answer="SIMONE",
+            definition="Name of girl",
+            parse="S (second) plus I'M ONE (statement on first birthday)",
+            device="charade",
+            enumeration_ok=True,
+        )
+    )
+
+
 def study_clues() -> dict[str, Clue]:
     """MASS MEDIA is the study default. Earlier study clues stay constructable."""
     dreamlike = dreamlike_clue()
@@ -381,6 +407,7 @@ def study_clues() -> dict[str, Clue]:
     aimlessly = aimlessly_clue()
     mass_media = mass_media_clue()
     in_a_spin = in_a_spin_clue()
+    simone = simone_clue()
     return {
         dreamlike.slug: dreamlike,
         "dreamlike": dreamlike,
@@ -425,6 +452,9 @@ def study_clues() -> dict[str, Clue]:
         "in-a-spin": in_a_spin,
         "in a spin": in_a_spin,
         in_a_spin.answer.lower(): in_a_spin,
+        simone.slug: simone,
+        "simone": simone,
+        simone.answer.lower(): simone,
     }
 
 

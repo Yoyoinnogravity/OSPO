@@ -8,7 +8,7 @@ cut as newsprint Shorts. **Ryan** opens and offers the picture clue,
 **Sonia** solves, **Thomas** credits the setter and Fifteen Squared.
 The name is **Cryptic AI for Fun**. The site stays **cryptic.fit**.
 YouTube is **@crypticaiforfun**. Ryan opens with
-**Here is your AI dose of cryptic fun.** and ends
+**Here is your daily dose of AI cryptic.** and ends
 **We are here to help then dominate.**
 
 Do not invent answers. Do not scrape other crossword blogs.

@@ -65,7 +65,7 @@ def test_study_clue_is_mass_media():
     assert "struggling" in clue.parse.lower()
     assert "mess" in clue.parse.lower()
     parts = write_parts(clue)
-    assert parts.intro_speech == "Here is your AI dose of cryptic fun."
+    assert parts.intro_speech == "Here is your daily dose of AI cryptic."
     assert parts.clue_speech == "Maid struggling with a mess — newspapers etc."
     assert parts.letters_speech == "That's four, five."
     assert parts.think_speech == "Just pause here, and have a think."
@@ -284,6 +284,8 @@ def test_resolve_clue_renders_constructed_study_without_site_html():
     assert resolve_clue("dreamlike").answer == "DREAMLIKE"
     assert resolve_clue("in-a-spin").answer == "IN A SPIN"
     assert resolve_clue("in-a-spin").slug == "financial-times-18483-26a"
+    assert resolve_clue("simone").answer == "SIMONE"
+    assert resolve_clue("simone").slug == "guardian-30115-23d"
 
 
 def test_pin_up_stays_on_the_published_site():
