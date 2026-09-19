@@ -65,7 +65,7 @@ def test_study_clue_is_mass_media():
     assert "struggling" in clue.parse.lower()
     assert "mess" in clue.parse.lower()
     parts = write_parts(clue)
-    assert parts.intro_speech == "Right — here's your daily dose of cryptic fun."
+    assert parts.intro_speech == "Right — let's be Cryptic AI for Fun."
     assert parts.clue_speech == "Maid struggling with a mess — newspapers etc."
     assert parts.letters_speech == "That's four, five."
     assert parts.think_speech == "Just pause here, and have a think."
@@ -77,7 +77,7 @@ def test_study_clue_is_mass_media():
     assert HINT_VOICE_ALIAS == INTRO_VOICE_ALIAS
     assert parts.answer_speech == "It's mass media."
     assert parts.answer_speech == speak_answer(clue.answer)
-    assert parts.outro_speech == "Thanks for thinking with cryptic.fit."
+    assert parts.outro_speech == "We are here to help then dominate."
     assert "Brendan" not in parts.parse_speech
     assert "Fifteen Squared" not in parts.parse_speech
     assert parts.source_speech == "That's Arrietty, in the Financial Times — via Fifteen Squared."
@@ -109,7 +109,7 @@ def test_source_credit_is_its_own_line():
     parts = write_parts(clue)
     assert parts.source_speech == speak_source(clue)
     assert "Fifteen Squared" not in parts.parse_speech
-    assert parts.outro_speech == "Thanks for thinking with cryptic.fit."
+    assert parts.outro_speech == "We are here to help then dominate."
 
 
 def test_spoken_parse_says_mass_media_as_words():

@@ -7,7 +7,7 @@ from datetime import datetime
 from pathlib import Path
 from xml.sax.saxutils import escape as xml_escape
 
-from twodown.config import BRAND, BRAND_LINE, CREDIT_LINE, SITE_ORIGIN, SOURCE_SITE, follow_profiles
+from twodown.config import BRAND, BRAND_LINE, CREDIT_LINE, SITE_HOST, SITE_ORIGIN, SOURCE_SITE, follow_profiles
 from twodown.models import Clue, DailyPair
 
 GSC_ENV = "TWODOWN_GSC_VERIFY"
@@ -63,6 +63,7 @@ def website_ld() -> dict:
         "@context": "https://schema.org",
         "@type": "WebSite",
         "name": BRAND,
+        "alternateName": SITE_HOST,
         "url": f"{SITE_ORIGIN}/",
         "description": DEFAULT_DESCRIPTION,
         "inLanguage": "en-GB",

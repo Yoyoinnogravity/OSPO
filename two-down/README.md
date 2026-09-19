@@ -1,13 +1,14 @@
-cryptic.fit
-===========
+Cryptic AI for Fun
+==================
 
 We provide unique cryptic crossword clues and solutions.
 We credit all — the setter, the paper, Fifteen Squared, and the photograph.
 The only source is [Fifteen Squared](https://fifteensquared.net/),
 cut as newsprint Shorts. **Ryan** opens and offers the picture clue,
 **Sonia** solves, **Thomas** credits the setter and Fifteen Squared.
-The brand is **cryptic.fit** on the site,
-YouTube, TikTok, Instagram and Facebook.
+The name is **Cryptic AI for Fun**. The site stays **cryptic.fit**.
+YouTube is **@crypticaiforfun**. Ryan’s last line is
+**We are here to help then dominate.**
 
 Do not invent answers. Do not scrape other crossword blogs.
 
@@ -69,9 +70,9 @@ twodown upload --no-youtube          # TikTok + Instagram + Facebook only
 
 Token files:
 
-* **YouTube** — authorized desktop OAuth user JSON for the **cryptic.fit**
-  channel (`youtube.com/@crypticfit`). Do not use `@crypticfun` — that
-  handle is someone else's channel, and we do not own `.fun`.
+* **YouTube** — authorized desktop OAuth user JSON for **Cryptic AI for Fun**
+  (`youtube.com/@crypticaiforfun`). The site stays cryptic.fit. Do not use
+  `@crypticfun` — that handle is someone else's channel, and we do not own `.fun`.
 * **TikTok** — `{"access_token": "..."}` from a TikTok app with `video.publish`
   (Content Posting API, FILE_UPLOAD). Unaudited apps are limited to private /
   self-only until TikTok reviews the app.
@@ -133,7 +134,7 @@ Do **not** upload with cPanel File Manager, FileZilla, or `scp` to
 
 `twodown live` prints this same order (registry first, then Pages, then DNS).
 
-YouTube still needs `TWODOWN_YOUTUBE_TOKEN` (OAuth for the cryptic.fit channel),
+YouTube still needs `TWODOWN_YOUTUBE_TOKEN` (OAuth for Cryptic AI for Fun),
 not a payment.
 
 Money

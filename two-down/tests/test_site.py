@@ -28,7 +28,8 @@ def test_publish_site_writes_spoiler_pages(tmp_path):
     root = publish_site(pair, tmp_path)
     index = (root / "index.html").read_text(encoding="utf-8")
     assert "cryptic.fit" in index
-    assert "cryptic<span>.fit</span>" in index
+    assert "Cryptic AI<span> for Fun</span>" in index
+    assert "cryptic<span>.fit</span>" not in index
     assert "cryptic<span>.fun</span>" not in index
     assert "Rioting led unrest" in index
     assert "Solve" in index
@@ -74,7 +75,8 @@ def test_publish_site_writes_spoiler_pages(tmp_path):
     follow = (tmp_path / "follow.html").read_text(encoding="utf-8")
     assert "data-subscribe-form" in follow
     assert "feed.xml" in follow
-    assert "youtube.com/@crypticfit" in follow
+    assert "youtube.com/@crypticaiforfun" in follow
+    assert "youtube.com/@crypticfun" not in follow
     assert "https://cryptic.fit/follow.html" in (tmp_path / "sitemap.xml").read_text(encoding="utf-8")
     assert "How we pay for this" in index
     assert "adsbygoogle" not in index
@@ -113,9 +115,9 @@ def test_publish_site_writes_spoiler_pages(tmp_path):
 def test_youtube_titles_use_cryptic_fun_channel():
     clue = _item().clue
     title = video_title(clue)
-    assert title.startswith("cryptic.fit · ")
+    assert title.startswith("Cryptic AI for Fun · ")
     assert title.endswith("#Shorts")
-    assert YOUTUBE_CHANNEL == "cryptic.fit"
+    assert YOUTUBE_CHANNEL == "Cryptic AI for Fun"
     assert len(title) <= 100
     assert "https://cryptic.fit/support.html" in youtube_description(_item())
     assert "unique cryptic crossword clues and solutions" in youtube_description(_item())

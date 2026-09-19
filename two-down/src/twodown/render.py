@@ -10,7 +10,8 @@ from PIL import Image, ImageDraw, ImageFont
 from dataclasses import dataclass
 
 from twodown.config import (
-    BRAND,
+    WORDMARK_HEAD,
+    WORDMARK_TAIL,
     CREAM,
     CRIMSON,
     FONT_BOLD,
@@ -124,8 +125,7 @@ def _center_text(
 
 
 def _brand_parts() -> tuple[str, str]:
-    head, _, tail = BRAND.partition(".")
-    return head, f".{tail}" if tail else ""
+    return WORDMARK_HEAD, WORDMARK_TAIL
 
 
 def _draw_wordmark(draw: ImageDraw.ImageDraw) -> None:

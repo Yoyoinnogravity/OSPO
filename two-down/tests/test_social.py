@@ -99,8 +99,10 @@ def test_social_caption_does_not_spoil_the_answer():
     text = social_caption(_item())
     assert "BELLHOP" not in text
     assert "Hotel worker" in text
+    assert "#crypticaiforfun" in text
     assert "#crypticfit" in text
     assert "cryptic.fit" in text
+    assert "Cryptic AI for Fun" in text
 
 
 def test_platforms_need_tokens_by_default(monkeypatch):

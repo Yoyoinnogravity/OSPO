@@ -26,7 +26,8 @@ def test_connect_never_asks_for_a_password():
 def test_connect_youtube_is_cryptic_fit_not_fun():
     text = connect_instructions()
     youtube = text[text.index("YOUTUBE") :]
-    assert "youtube.com/@crypticfit" in youtube
+    assert "youtube.com/@crypticaiforfun" in youtube
     assert "Do not use youtube.com/@crypticfun" in youtube
     assert "cryptic.fit" in youtube
+    assert "Cryptic AI for Fun" in youtube
     assert "Prefer" not in youtube

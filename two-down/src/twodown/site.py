@@ -6,7 +6,7 @@ from pathlib import Path
 from shutil import copy2
 
 from twodown.ads import ads_enabled, ads_txt, adsense_client, adsense_slot
-from twodown.config import BRAND, BRAND_LINE, CREDIT_LINE, CREDIT_WHO, SITE_HOST, SITE_ORIGIN, SITE_ROOT, SOURCE_SITE, SPONSOR_EMAIL, SUGGEST_EMAIL, VOICE_LABELS, follow_profiles
+from twodown.config import BRAND, BRAND_LINE, CREDIT_LINE, CREDIT_WHO, SITE_HOST, SITE_ORIGIN, SITE_ROOT, SOURCE_SITE, SPONSOR_EMAIL, SUGGEST_EMAIL, VOICE_LABELS, WORDMARK_HEAD, WORDMARK_TAIL, follow_profiles
 from twodown.models import DailyPair, SpokenClue
 from twodown.render import write_share_card
 from twodown.scenes import DEFAULT_SCENE, get_scene, list_scenes
@@ -90,7 +90,7 @@ body.scene-photo header .follow a { color: var(--ink); }
 body.scene-photo header .follow a.on { color: var(--cream); }
 nav a:hover { color: var(--crimson); }
 .chrome-top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
-.wordmark { font-family: "Liberation Sans", "Helvetica Neue", sans-serif; font-weight: 700; font-size: 1.6rem; letter-spacing: 0.02em; color: var(--ink); text-decoration: none; }
+.wordmark { font-family: "Liberation Sans", "Helvetica Neue", sans-serif; font-weight: 700; font-size: clamp(1.15rem, 3.8vw, 1.55rem); letter-spacing: 0.01em; color: var(--ink); text-decoration: none; }
 .wordmark span { color: var(--crimson); }
 nav a { margin-left: 18px; font-family: "Liberation Sans", sans-serif; font-size: 0.9rem; text-decoration: none; color: var(--muted); }
 .voices, .places, .follow { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
@@ -587,7 +587,7 @@ def _page(body: str, seo: PageSeo, depth: int = 0, show_ads: bool = False) -> st
 <body class="scene-photo" data-scene="{_e(default.slug)}" data-default-scene="{_e(default.slug)}" data-scene-prefix="{_e(scene_prefix)}" style="background-image: url('{_e(scene_prefix + background)}');">
   <header>
     <div class="chrome-top">
-      <a class="wordmark" href="{prefix}index.html">cryptic<span>.fit</span></a>
+      <a class="wordmark" href="{prefix}index.html">{_e(WORDMARK_HEAD)}<span>{_e(WORDMARK_TAIL)}</span></a>
       {_nav(prefix)}
     </div>
     {_voice_bar()}

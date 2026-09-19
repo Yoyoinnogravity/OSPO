@@ -65,7 +65,7 @@ def upload_short(item: SpokenClue, privacy: str = "public") -> str | None:
         "snippet": {
             "title": video_title(item.clue),
             "description": video_description(item),
-            "tags": ["cryptic.fit", "cryptic crossword", item.clue.device, item.clue.setter],
+            "tags": [YOUTUBE_CHANNEL, "cryptic.fit", "cryptic crossword", item.clue.device, item.clue.setter],
             "categoryId": "27",
         },
         "status": {
