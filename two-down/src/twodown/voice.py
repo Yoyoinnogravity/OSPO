@@ -4,9 +4,12 @@ import asyncio
 import re
 import shutil
 import subprocess
+import threading
 from pathlib import Path
 
 import edge_tts
+
+_TTS_LOCK = threading.Lock()
 
 from twodown.config import (
     ANSWER_PAUSE_SECONDS,
@@ -90,16 +93,17 @@ def synthesise(
     volume: str | None = None,
 ) -> Path:
     resolved = resolve_voice(voice)
-    asyncio.run(
-        _synth(
-            script,
-            dest,
-            resolved,
-            rate=rate or VOICE_RATE,
-            pitch=pitch or VOICE_PITCH,
-            volume=volume or VOICE_VOLUME,
+    with _TTS_LOCK:
+        asyncio.run(
+            _synth(
+                script,
+                dest,
+                resolved,
+                rate=rate or VOICE_RATE,
+                pitch=pitch or VOICE_PITCH,
+                volume=volume or VOICE_VOLUME,
+            )
         )
-    )
     return dest
 
 

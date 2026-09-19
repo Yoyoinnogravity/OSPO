@@ -120,8 +120,13 @@ def render_bomb_videos(
     records: list[dict[str, str | int | None] | None] = [None] * total
 
     def work(index: int, clue: Clue) -> tuple[int, dict[str, str | int | None]]:
-        video = _cut_one(clue, slot, rebuild)
+        try:
+            video = _cut_one(clue, slot, rebuild)
+        except Exception as exc:
+            print(f"bomb {index}/{total} fail {clue.slug}: {exc}", flush=True)
+            video = existing_video(clue, slot)
         rel = str(video) if video else None
+        print(f"bomb {index}/{total} {'ok' if video else 'miss'} {clue.slug}", flush=True)
         return index, public_record(clue, index=index, total=total, video=rel)
 
     if workers <= 1 or total <= 1:
