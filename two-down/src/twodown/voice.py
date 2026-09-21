@@ -54,9 +54,9 @@ from twodown.render import AUDIO_LOUDNESS, ShortTimings, audio_seconds
 from twodown.script import ScriptParts, to_ssml
 
 BRAND_STING_ASSET = PACKAGE_ROOT / "assets" / "brand-sting.mp3"
-# F major then C major — a small IV–I pair. Same set opens and closes.
-_BRAND_STING_IV = (174.61, 220.00, 261.63, 349.23)
+# C major then F major — a short I pickup into an IV lift. Same pair opens and closes.
 _BRAND_STING_I = (130.81, 164.81, 196.00, 261.63)
+_BRAND_STING_IV = (174.61, 220.00, 261.63, 349.23)
 
 
 def _sine_mix(freqs: tuple[float, ...], label: str, duration: float) -> str:
@@ -82,8 +82,8 @@ def bake_brand_sting(dest: Path | None = None) -> Path:
     ffmpeg = shutil.which("ffmpeg")
     if not ffmpeg:
         raise RuntimeError("ffmpeg is required to build the brand sting")
-    first = _sine_mix(_BRAND_STING_IV, "iv", 0.78)
-    second = _sine_mix(_BRAND_STING_I, "i", 0.88)
+    first = _sine_mix(_BRAND_STING_I, "i", 0.40)
+    second = _sine_mix(_BRAND_STING_IV, "iv", 1.15)
     result = subprocess.run(
         [
             ffmpeg,
@@ -95,7 +95,7 @@ def bake_brand_sting(dest: Path | None = None) -> Path:
             "-filter_complex",
             (
                 f"{first};{second};"
-                "[iv][i]acrossfade=d=0.12:c1=tri:c2=tri,"
+                "[i][iv]acrossfade=d=0.10:c1=tri:c2=tri,"
                 "aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo,"
                 "volume=0.55,alimiter=limit=0.89[a]"
             ),

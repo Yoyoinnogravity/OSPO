@@ -240,6 +240,10 @@ def test_intro_dictionary_is_webster_with_neighbours():
     assert "cryptic" in INTRO_THESAURUS_WORDS
     assert "hidden" in INTRO_THESAURUS_WORDS
     assert "mysterious" in INTRO_THESAURUS_WORDS
+    assert "enigmatic" in INTRO_THESAURUS_WORDS
+    cryptology = next(entry for entry in INTRO_DICTIONARY_ENTRIES if entry.headword.lower() == "cryptology")
+    assert "enigmatic" in " ".join(cryptology.senses).lower()
+    assert "secret" in " ".join(cryptology.senses).lower()
 
 
 def test_intro_beat_is_kaleidoscope_not_the_spoken_line(tmp_path: Path):
@@ -257,14 +261,19 @@ def test_intro_beat_is_kaleidoscope_not_the_spoken_line(tmp_path: Path):
     assert table[0] < 80 and table[1] < 80
     paper = close.getpixel((40, 80))
     assert paper[0] > 160 and paper[1] > 140
-    page, focus, glance = _dictionary_layout()
+    page, focus, cryptogram, cryptology = _dictionary_layout()
     fx, fy = focus
     assert INTRO_DICTIONARY_BOOK.exists()
     assert INTRO_DICTIONARY_PHOTO.exists()
     assert 0 < fx < 1080 and 0 < fy < 1920
-    assert glance[1] > fy
-    sample = page.getpixel((fx, fy))
-    assert sample[0] > 140 and sample[1] > 130
+    assert cryptogram[0] > fx
+    assert cryptology[0] > fx
+    assert cryptology[1] > cryptogram[1]
+    # Focus sits on the cryptic headword; the wash beside it is paper.
+    wash = page.getpixel((min(1070, fx + 90), fy + 36))
+    assert wash[0] > 140 and wash[1] > 130
+    # Cryptology is the enigmatic rest — secret or enigmatical language.
+    assert page.getpixel((min(1070, cryptology[0] + 80), cryptology[1] + 24))[0] > 130
     raw = path.read_bytes()
     assert INTRO_LINE.encode() not in raw
     assert b"daily dose" not in raw.lower()

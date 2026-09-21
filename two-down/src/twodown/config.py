@@ -60,13 +60,14 @@ INTRO_RATE = "+3%"
 INTRO_PITCH = "+4Hz"
 INTRO_VOLUME = "+8%"
 # After Ryan, stay on the dictionary so the glass can be read.
-INTRO_GAP_SECONDS = 2.8
-# After the sting, a beat of page before he speaks.
-INTRO_LOOK_BEFORE_SECONDS = 1.0
+INTRO_GAP_SECONDS = 4.5
+# After the sting, a longer look at the open book before he speaks.
+INTRO_LOOK_BEFORE_SECONDS = 1.6
 OUTRO_LINE = "Thanks for thinking with cryptic.fit."
 OUTRO_GAP_SECONDS = 0.4
-# Same two chords at both ends. They sit before Ryan and after the thank-you,
-# so they name the brand without talking over the introduction.
+# Same two chords at both ends, on an up-beat: a short C pickup into F.
+# They sit before Ryan and after the thank-you, so they name the brand
+# without talking over the introduction.
 BRAND_STING_SECONDS = 1.45
 # Footer credit is not Sonia. Thomas (male) names the setter, paper, and Fifteen Squared.
 SOURCE_VOICE_ALIAS = "thomas"

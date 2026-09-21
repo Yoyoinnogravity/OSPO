@@ -65,18 +65,21 @@ INTRO_DICTIONARY_GUIDE = ("cry", "crystal")
 # Aled's photographed opening — tight on crypt / cryptic / cryptogram.
 INTRO_DICTIONARY_PHOTO = PACKAGE_ROOT / "assets" / "intro-dictionary-page.jpg"
 INTRO_DICTIONARY_BOOK = PACKAGE_ROOT / "assets" / "intro-dictionary-book.jpg"
-# Overhead plate: start wide on the book, land on the two pages.
-INTRO_BOOK_START = (120, 0, 840, 1280)
-INTRO_BOOK_END = (270, 220, 850, 1250)
+# Overhead plate is a portrait still of a landscape book; rotate 90° left
+# so the pages read upright, then push in on the cry- leaf.
+INTRO_BOOK_START = (200, 0, 740, 960)
+INTRO_BOOK_END = (680, 20, 1130, 820)
 INTRO_DICTIONARY_CROP = (500, 240, 820, 1000)
 INTRO_DICTIONARY_SOURCE_FOCUS = (648, 492)
-INTRO_DICTIONARY_SOURCE_GLANCE = (675, 700)
+INTRO_DICTIONARY_SOURCE_CRYPTOGRAM = (680, 720)
+INTRO_DICTIONARY_SOURCE_GLANCE = (680, 760)
 INTRO_THESAURUS_SOURCE = "Roget 1911"
 INTRO_THESAURUS_HEADING = "§ 526  Concealment"
 INTRO_THESAURUS_WORDS = (
     "hidden",
     "occult",
     "secret",
+    "enigmatic",
     "cryptic",
     "recondite",
     "mysterious",
@@ -150,7 +153,7 @@ INTRO_DICTIONARY_ENTRIES: tuple[DictionaryEntry, ...] = (
     DictionaryEntry("Cubic", "a.", ("Having the form or properties of a cube.",)),
 )
 INTRO_DICTIONARY_SENSES = next(entry.senses for entry in INTRO_DICTIONARY_ENTRIES if entry.featured)
-INTRO_KALEIDOSCOPE_HOLD = 8.5
+INTRO_KALEIDOSCOPE_HOLD = 12.0
 INTRO_KALEIDOSCOPE_ASSET = PACKAGE_ROOT / "assets" / "intro-kaleidoscope.mp4"
 INTRO_KALEIDOSCOPE_STILL = PACKAGE_ROOT / "assets" / "intro-kaleidoscope.jpg"
 FONT_ITALIC = "/usr/share/fonts/truetype/liberation/LiberationSerif-Italic.ttf"
@@ -456,6 +459,8 @@ def _smootherstep(t: float) -> float:
 @lru_cache(maxsize=1)
 def _book_plate() -> Image.Image:
     src = Image.open(INTRO_DICTIONARY_BOOK).convert("RGB")
+    # Phone still is 90° clockwise of the pages; turn it left so the book reads.
+    src = src.transpose(Image.Transpose.ROTATE_90)
     src = ImageEnhance.Contrast(src).enhance(1.08)
     src = ImageEnhance.Brightness(src).enhance(1.06)
     return src
@@ -512,11 +517,12 @@ def _photo_point(src_xy: tuple[int, int], box: tuple[int, int, int, int], scale:
     )
 
 
-def _photographed_dictionary_page() -> tuple[Image.Image, tuple[int, int], tuple[int, int]]:
-    """Aled's real page, tight on cryptic, plus the glass start and glance."""
+def _photographed_dictionary_page() -> tuple[Image.Image, tuple[int, int], tuple[int, int], tuple[int, int]]:
+    """Aled's real page, tight on cryptic, plus the glass stops down the column."""
     src = Image.open(INTRO_DICTIONARY_PHOTO).convert("RGB")
     box = INTRO_DICTIONARY_CROP
     left, top, right, bottom = box
+    del left, right, bottom
     crop = src.crop(box)
     scale = WIDTH / crop.size[0]
     resized = crop.resize((WIDTH, max(HEIGHT, int(crop.size[1] * scale))), Image.Resampling.LANCZOS)
@@ -533,21 +539,23 @@ def _photographed_dictionary_page() -> tuple[Image.Image, tuple[int, int], tuple
     page = ImageEnhance.Brightness(page).enhance(1.04)
     page = ImageEnhance.Sharpness(page).enhance(1.55)
     focus = _photo_point(INTRO_DICTIONARY_SOURCE_FOCUS, box, scale, top_trim)
+    mid = _photo_point(INTRO_DICTIONARY_SOURCE_CRYPTOGRAM, box, scale, top_trim)
     glance = _photo_point(INTRO_DICTIONARY_SOURCE_GLANCE, box, scale, top_trim)
-    return page, focus, glance
+    return page, focus, mid, glance
 
 
 @lru_cache(maxsize=1)
-def _dictionary_layout() -> tuple[Image.Image, tuple[int, int], tuple[int, int]]:
-    """Real photographed page when we have one; otherwise the typeset Webster stand-in."""
-    if INTRO_DICTIONARY_PHOTO.exists():
-        return _photographed_dictionary_page()
-    page, focus = _typeset_dictionary_page()
-    return page, focus, (min(WIDTH - 220, focus[0] + 40), min(HEIGHT - 220, focus[1] + 360))
+def _dictionary_layout() -> tuple[Image.Image, tuple[int, int], tuple[int, int], tuple[int, int]]:
+    """Webster column with occult, cryptogram, and cryptology (secret or enigmatic)."""
+    return _typeset_dictionary_page()
 
 
-def _typeset_dictionary_page() -> tuple[Image.Image, tuple[int, int]]:
-    """Two-column Webster page around cryptic, plus the centre of that entry."""
+def _entry_key(entry: DictionaryEntry) -> str:
+    return entry.headword.split(",")[0].strip().lower()
+
+
+def _typeset_dictionary_page() -> tuple[Image.Image, tuple[int, int], tuple[int, int], tuple[int, int]]:
+    """Two-column Webster page: occult on cryptic, then cryptogram, then cryptology."""
     img, draw = _newsprint_canvas()
     header = _font(FONT_SANS, 20)
     guide = _font(FONT_ITALIC, 24)
@@ -579,6 +587,7 @@ def _typeset_dictionary_page() -> tuple[Image.Image, tuple[int, int]]:
     # Cryptic stays mid-left; the rest of the C-R neighbours open the right column.
     split_at = featured_idx + 2
     featured_box: tuple[int, int, int, int] | None = None
+    centers: dict[str, tuple[int, int]] = {}
     for col, chunk in (
         (0, INTRO_DICTIONARY_ENTRIES[:split_at]),
         (1, INTRO_DICTIONARY_ENTRIES[split_at:]),
@@ -596,7 +605,10 @@ def _typeset_dictionary_page() -> tuple[Image.Image, tuple[int, int]]:
                 wash.rectangle([x - 8, y, x + col_w + 4, y + block_h - 4], fill=(252, 236, 196))
                 wash.rectangle([x - 8, y, x - 2, y + block_h - 4], fill=CRIMSON)
                 featured_box = (x, y, x + col_w, y + block_h)
+            y0 = y
             y = _draw_dictionary_entry(draw, entry, x, y, col_w, hfont, pos_font, bfont)
+            # Sit on the headword and first sense, not the empty gutter.
+            centers[_entry_key(entry)] = (x + 140, y0 + 44)
 
     _draw_thesaurus_panel(draw, columns[0], 1388, col_w)
     draw.text(
@@ -606,13 +618,12 @@ def _typeset_dictionary_page() -> tuple[Image.Image, tuple[int, int]]:
         fill=MUTED,
     )
     if featured_box is None:
-        featured_center = (columns[0] + col_w // 2, 640)
+        focus = centers.get("cryptic", (columns[0] + col_w // 2, 640))
     else:
-        featured_center = (
-            (featured_box[0] + featured_box[2]) // 2,
-            (featured_box[1] + featured_box[3]) // 2,
-        )
-    return img, featured_center
+        focus = (featured_box[0] + 160, featured_box[1] + 88)
+    cryptogram = centers.get("cryptogram", (columns[1] + col_w // 2, focus[1] + 180))
+    cryptology = centers.get("cryptology", (columns[1] + col_w // 2, focus[1] + 420))
+    return img, focus, cryptogram, cryptology
 
 
 def _dictionary_page() -> Image.Image:
@@ -658,16 +669,37 @@ def _with_magnifier(page: Image.Image, center: tuple[int, int], radius: int = 26
     return out.convert("RGB")
 
 
-def _close_page_with_glass(progress: float) -> Image.Image:
-    """Tight column: glass on cryptic, then a glance at the neighbours."""
-    t = max(0.0, min(1.0, progress))
-    page, focus, glance = _dictionary_layout()
-    hold = 0.0 if t < 0.28 else min(1.0, (t - 0.28) / 0.72)
-    ease = _smootherstep(hold)
-    glass = (
-        int(focus[0] + (glance[0] - focus[0]) * ease),
-        int(focus[1] + (glance[1] - focus[1]) * ease),
+def _lerp_xy(start: tuple[int, int], end: tuple[int, int], t: float) -> tuple[int, int]:
+    return (
+        int(start[0] + (end[0] - start[0]) * t),
+        int(start[1] + (end[1] - start[1]) * t),
     )
+
+
+def _glass_travel(
+    focus: tuple[int, int],
+    cryptogram: tuple[int, int],
+    cryptology: tuple[int, int],
+    progress: float,
+) -> tuple[int, int]:
+    """Occult on cryptic, across to cryptogram, rest on cryptology (secret or enigmatic)."""
+    t = max(0.0, min(1.0, progress))
+    if t < 0.20:
+        return focus
+    if t < 0.42:
+        return _lerp_xy(focus, cryptogram, _smootherstep((t - 0.20) / 0.22))
+    if t < 0.50:
+        return cryptogram
+    if t < 0.78:
+        return _lerp_xy(cryptogram, cryptology, _smootherstep((t - 0.50) / 0.28))
+    return cryptology
+
+
+def _close_page_with_glass(progress: float) -> Image.Image:
+    """Tight column: occult, then cryptogram, then cryptology."""
+    t = max(0.0, min(1.0, progress))
+    page, focus, cryptogram, cryptology = _dictionary_layout()
+    glass = _glass_travel(focus, cryptogram, cryptology, t)
     frame = _with_magnifier(page, glass, radius=248, zoom=1.55)
     draw = ImageDraw.Draw(frame)
     draw.rectangle([0, 0, WIDTH, 14], fill=HIGHLIGHT)
@@ -679,11 +711,11 @@ def _compose_intro_frame(progress: float) -> Image.Image:
     """Stabilized push from the open book onto the cryptic column."""
     t = max(0.0, min(1.0, progress))
     if INTRO_DICTIONARY_BOOK.exists():
-        wide = _stabilized_book_frame(min(1.0, t / 0.46))
-        if t < 0.40:
+        wide = _stabilized_book_frame(min(1.0, t / 0.50))
+        if t < 0.46:
             return wide
-        close = _close_page_with_glass(max(0.0, (t - 0.46) / 0.54))
-        mix = _smootherstep((t - 0.40) / 0.12) if t < 0.52 else 1.0
+        close = _close_page_with_glass(max(0.0, (t - 0.52) / 0.48))
+        mix = _smootherstep((t - 0.46) / 0.12) if t < 0.58 else 1.0
         return Image.blend(wide.convert("RGB"), close.convert("RGB"), mix)
     return _close_page_with_glass(t)
 
