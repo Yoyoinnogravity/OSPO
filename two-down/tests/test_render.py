@@ -4,8 +4,14 @@ from pathlib import Path
 from twodown.models import Clue
 from twodown.render import (
     AUDIO_LOUDNESS,
+    INTRO_DICTIONARY_ENTRIES,
     INTRO_DICTIONARY_HEADWORD,
+    INTRO_DICTIONARY_SENSES,
+    INTRO_DICTIONARY_SOURCE,
     INTRO_KALEIDOSCOPE_WORDS,
+    INTRO_THESAURUS_HEADING,
+    INTRO_THESAURUS_SOURCE,
+    INTRO_THESAURUS_WORDS,
     ShortTimings,
     THUMB_H,
     THUMB_W,
@@ -199,6 +205,7 @@ def test_intro_kaleidoscope_is_generic_not_per_clue():
     assert words == list(INTRO_KALEIDOSCOPE_WORDS)
     assert "CRYPTIC" in words
     assert INTRO_DICTIONARY_HEADWORD == "cryptic"
+    assert INTRO_DICTIONARY_SOURCE == "Webster 1913"
     assert "FIT" not in words
     assert "MODEL" not in words
     assert "YOUNGSTER" not in words
@@ -209,19 +216,44 @@ def test_intro_kaleidoscope_is_generic_not_per_clue():
     assert intro_kaleidoscope_words(other) == words
 
 
+def test_intro_dictionary_is_webster_with_neighbours():
+    heads = [entry.headword.lower() for entry in INTRO_DICTIONARY_ENTRIES]
+    featured = next(entry for entry in INTRO_DICTIONARY_ENTRIES if entry.featured)
+    assert any("cryptic" in head for head in heads)
+    assert any(head == "crypt" for head in heads)
+    assert any("cryptogram" in head for head in heads)
+    assert any(head == "crystal" for head in heads)
+    assert any(head == "cry" for head in heads)
+    assert featured.headword.lower().startswith("cryptic")
+    senses = " ".join(featured.senses).lower()
+    assert "hidden" in senses
+    assert "secret" in senses
+    assert "crossword" in senses
+    assert INTRO_DICTIONARY_SENSES == featured.senses
+    # Neighbours carry their own definitions, not a single invented blurb.
+    crypt = next(entry for entry in INTRO_DICTIONARY_ENTRIES if entry.headword.lower() == "crypt")
+    assert "vault" in " ".join(crypt.senses).lower()
+    assert INTRO_THESAURUS_SOURCE == "Roget 1911"
+    assert "concealment" in INTRO_THESAURUS_HEADING.lower()
+    assert "cryptic" in INTRO_THESAURUS_WORDS
+    assert "hidden" in INTRO_THESAURUS_WORDS
+    assert "mysterious" in INTRO_THESAURUS_WORDS
+
+
 def test_intro_beat_is_kaleidoscope_not_the_spoken_line(tmp_path: Path):
-    from PIL import Image
-
     from twodown.config import INK, INTRO_LINE
+    from twodown.render import _dictionary_layout
 
-    img = _compose_intro_frame(0.25)
+    img = _compose_intro_frame(0.12)
     path = tmp_path / "intro.png"
     img.save(path)
     assert img.size == (1080, 1920)
     # Lexicon paper, not the old black letter-vortex.
     paper = img.getpixel((40, 80))
     assert paper[0] > 200 and paper[1] > 190
-    head = list(img.crop((80, 230, 720, 350)).get_flattened_data())
+    _, focus = _dictionary_layout()
+    fx, fy = focus
+    head = list(img.crop((max(40, fx - 220), max(140, fy - 140), fx + 220, fy + 90)).get_flattened_data())
     assert head.count(INK) > 400
     raw = path.read_bytes()
     assert INTRO_LINE.encode() not in raw
