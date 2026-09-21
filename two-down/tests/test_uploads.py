@@ -92,15 +92,16 @@ def test_upload_pair_posts_one_new_short_by_default(monkeypatch):
 def test_unpublished_queue_is_oldest_daily_pair_first():
     waiting = unpublished_shorts()
     slugs = [item.clue.slug for _date, item in waiting]
-    assert slugs[0] == "independent-12458-11a"
-    assert len(slugs) == 12
-    assert slugs[1] == "financial-times-18477-14a"
+    assert slugs[0] == "guardian-30112-1a"
+    assert len(slugs) == 4
+    assert "independent-12458-11a" not in slugs
+    assert "financial-times-18478-5a" not in slugs
     assert "independent-12462-6a" in slugs
     assert "smiles-libby" not in slugs
     assert "rasta-study" not in slugs
     queued = load_youtube_queue(limit=1)
     assert queued is not None
-    assert [item.clue.slug for item in queued.clues] == ["independent-12458-11a"]
+    assert [item.clue.slug for item in queued.clues] == ["guardian-30112-1a"]
 
 
 def test_unpublished_queue_skips_ledger(tmp_path, monkeypatch):
@@ -119,5 +120,6 @@ def test_unpublished_queue_skips_ledger(tmp_path, monkeypatch):
 def test_cli_queue_lists_oldest_first(capsys):
     assert main(["queue"]) == 0
     out = capsys.readouterr().out
-    assert "12 unpublished" in out
-    assert out.index("independent-12458-11a") < out.index("independent-12462-6a")
+    assert "4 unpublished" in out
+    assert "independent-12458-11a" not in out
+    assert out.index("guardian-30112-1a") < out.index("independent-12462-6a")

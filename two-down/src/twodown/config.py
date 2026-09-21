@@ -84,6 +84,19 @@ CLUES_PER_DAY = 2
 # YouTube gets one Short a day. The site still publishes the pair.
 # The unpublished queue (oldest first) drains the backlog, then new films.
 YOUTUBE_DAILY_LIMIT = 1
+# First eight pair films were early cuts. Keep them off @crypticfit.
+YOUTUBE_SKIP_SLUGS = frozenset(
+    {
+        "independent-12458-11a",
+        "financial-times-18477-14a",
+        "independent-12459-8a",
+        "independent-12459-12a",
+        "independent-on-sunday-1907-1a",
+        "independent-on-sunday-1907-9a",
+        "financial-times-18478-1a",
+        "financial-times-18478-5a",
+    }
+)
 # Lock the spoken beat on this constructed study clue before touching the others.
 # MASS MEDIA is FT 18483 1 across; twodown short rebuilds this clue only.
 STUDY_SLUG = "financial-times-18483-1a"

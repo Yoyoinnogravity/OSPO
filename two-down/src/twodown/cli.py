@@ -7,7 +7,7 @@ from datetime import datetime
 from pathlib import Path
 
 from twodown.ads import ads_status
-from twodown.config import DEFAULT_OUTPUT, DEFAULT_VOICE_ALIAS, SITE_HOST, SITE_ORIGIN, SOURCE_SITE, STUDY_SLUG, VOICES, YOUTUBE_DAILY_LIMIT
+from twodown.config import DEFAULT_OUTPUT, DEFAULT_VOICE_ALIAS, SITE_HOST, SITE_ORIGIN, SOURCE_SITE, STUDY_SLUG, VOICES, YOUTUBE_DAILY_LIMIT, YOUTUBE_SKIP_SLUGS
 from twodown.ingest import LONDON
 from twodown.live import (
     PRODUCT_CHECK_NAMES,
@@ -115,6 +115,7 @@ def _print_status() -> None:
             print(f"             {hints[name]}")
     waiting = unpublished_shorts()
     print(f"  queue      {len(waiting)} unpublished Shorts, {YOUTUBE_DAILY_LIMIT} per day")
+    print(f"             skip {len(YOUTUBE_SKIP_SLUGS)} early cuts")
     if waiting:
         date, item = waiting[0]
         print(f"             next {date} {item.clue.slug}")

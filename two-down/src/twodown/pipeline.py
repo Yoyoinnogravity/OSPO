@@ -29,7 +29,7 @@ from twodown.script import write_parts
 from twodown.select import select_pair
 from twodown.site import publish_site
 from twodown.social import attach_site_videos, publish_pair, setup_hints
-from twodown.uploads import apply_ledger
+from twodown.uploads import apply_ledger, skipped_slugs
 from twodown.voice import build_short_soundtrack, resolve_voice, synthesise_parts
 
 _KICKER = re.compile(
@@ -189,6 +189,8 @@ def unpublished_shorts(site_root: Path | None = None) -> list[tuple[str, SpokenC
             if slug in seen:
                 continue
             seen.add(slug)
+            if slug in skipped_slugs(site_root):
+                continue
             if item.youtube_id:
                 continue
             if not item.video_path or not Path(item.video_path).exists():

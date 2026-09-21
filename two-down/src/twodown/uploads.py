@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from twodown.config import SITE_ROOT
+from twodown.config import SITE_ROOT, YOUTUBE_SKIP_SLUGS
 from twodown.models import DailyPair
 
 LEDGER_NAME = "uploads.json"
@@ -37,14 +37,39 @@ def save_ledger(ledger: dict[str, dict[str, str]], site_root: Path | None = None
     return path
 
 
+def skipped_slugs(site_root: Path | None = None) -> set[str]:
+    skipped = set(YOUTUBE_SKIP_SLUGS)
+    extra = load_ledger(site_root).get("youtube_skip") or {}
+    skipped.update(extra)
+    return skipped
+
+
 def apply_ledger(pair: DailyPair, site_root: Path | None = None) -> DailyPair:
     """Fill in already-uploaded YouTube ids so a later run does not post twice."""
     youtube = load_ledger(site_root).get("youtube") or {}
+    skip = skipped_slugs(site_root)
     for item in pair.clues:
+        if item.clue.slug in skip:
+            continue
         if not item.youtube_id:
             item.youtube_id = youtube.get(item.clue.slug)
     pair.youtube_ids = [item.youtube_id for item in pair.clues if item.youtube_id]
     return pair
+
+
+def record_skips(slugs: list[str], reason: str = "early-cut", site_root: Path | None = None) -> Path:
+    ledger = load_ledger(site_root)
+    skip = dict(ledger.get("youtube_skip") or {})
+    youtube = dict(ledger.get("youtube") or {})
+    for slug in slugs:
+        skip[slug] = reason
+        youtube.pop(slug, None)
+    ledger["youtube_skip"] = skip
+    if youtube:
+        ledger["youtube"] = youtube
+    else:
+        ledger.pop("youtube", None)
+    return save_ledger(ledger, site_root)
 
 
 def record_youtube(pair: DailyPair, site_root: Path | None = None) -> bool:
@@ -53,6 +78,8 @@ def record_youtube(pair: DailyPair, site_root: Path | None = None) -> bool:
     youtube = dict(ledger.get("youtube") or {})
     changed = False
     for item in pair.clues:
+        if item.clue.slug in skipped_slugs(site_root):
+            continue
         if item.youtube_id and youtube.get(item.clue.slug) != item.youtube_id:
             youtube[item.clue.slug] = item.youtube_id
             changed = True

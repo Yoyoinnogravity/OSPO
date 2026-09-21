@@ -5,12 +5,15 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from twodown.captions import youtube_description
-from twodown.config import BRAND, YOUTUBE_DAILY_LIMIT
+from twodown.config import BRAND, YOUTUBE_DAILY_LIMIT, YOUTUBE_SKIP_SLUGS
 from twodown.models import Clue, DailyPair, SpokenClue
 from twodown.tokens import CONFIG_DIR, secret_text
 
 YOUTUBE_CHANNEL = BRAND
-SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
+SCOPES = [
+    "https://www.googleapis.com/auth/youtube.upload",
+    "https://www.googleapis.com/auth/youtube",
+]
 TOKEN_ENV = "TWODOWN_YOUTUBE_TOKEN"
 CLIENT_ENV = "TWODOWN_YOUTUBE_CLIENT_SECRET"
 TOKEN_FILENAME = "youtube-token.json"
@@ -289,6 +292,8 @@ def upload_short(item: SpokenClue, privacy: str = "public") -> str | None:
     """
     if not item.video_path:
         return None
+    if item.clue.slug in YOUTUBE_SKIP_SLUGS:
+        return None
     creds = _credentials()
     if creds is None:
         return None
@@ -313,6 +318,20 @@ def upload_short(item: SpokenClue, privacy: str = "public") -> str | None:
     video_id = result.get("id")
     item.youtube_id = video_id
     return video_id
+
+
+def delete_video(video_id: str) -> bool:
+    """Remove a Short from the authorised channel. Returns True if YouTube accepted the delete."""
+    if not video_id or video_id in {"skipped", "deleted"}:
+        return False
+    creds = _credentials()
+    if creds is None:
+        return False
+    from googleapiclient.discovery import build
+
+    youtube = build("youtube", "v3", credentials=creds)
+    youtube.videos().delete(id=video_id).execute()
+    return True
 
 
 def upload_pair(pair: DailyPair, privacy: str = "public", limit: int | None = YOUTUBE_DAILY_LIMIT) -> list[str]:
