@@ -28,6 +28,7 @@ from twodown.config import (
     NEWS_BG,
     NEWS_GRID,
     OUTRO_LINE,
+    PACKAGE_ROOT,
     SITE_ROOT,
     THINK_PROMPT,
     THUMBNAIL_ISSUE_FIRST_SLUG,
@@ -55,8 +56,11 @@ AUDIO_LOUDNESS = "loudnorm=I=-16:TP=-1.5:LRA=11,volume=3,alimiter=limit=0.95"
 INTRO_KALEIDOSCOPE_FPS = 24
 INTRO_KALEIDOSCOPE_FOLDS = 8
 INTRO_KALEIDOSCOPE_SIZE = 1920
-# Brand crumbs only. Clue-surface words fill the rest; the answer stays out.
-INTRO_KALEIDOSCOPE_EXTRA = ("CRYPTIC", "FIT", "CLUE")
+# One stock open for every film. Do not bake a new one per clue.
+INTRO_KALEIDOSCOPE_WORDS = ("CRYPTIC", "FIT", "CLUE", "SOLVE", "THINK", "PARSE", "LETTERS")
+INTRO_KALEIDOSCOPE_HOLD = 4.0
+INTRO_KALEIDOSCOPE_ASSET = PACKAGE_ROOT / "assets" / "intro-kaleidoscope.mp4"
+INTRO_KALEIDOSCOPE_STILL = PACKAGE_ROOT / "assets" / "intro-kaleidoscope.jpg"
 
 
 def _font(path: str, size: int) -> ImageFont.FreeTypeFont:
@@ -268,20 +272,10 @@ def _new_card() -> tuple[Image.Image, ImageDraw.ImageDraw]:
     return _newsprint_canvas()
 
 
-def intro_kaleidoscope_words(clue: Clue) -> list[str]:
-    """Words that tumble through the open. Never the answer. Never the spoken title line."""
-    answer = re.sub(r"[^A-Za-z]", "", clue.answer or "").upper()
-    words: list[str] = []
-    for raw in re.findall(r"[A-Za-z]+", clue.clue or ""):
-        token = raw.upper()
-        compact = re.sub(r"[^A-Z]", "", token)
-        if len(compact) < 2 or compact == answer:
-            continue
-        words.append(token)
-    for extra in INTRO_KALEIDOSCOPE_EXTRA:
-        if extra != answer and extra not in words:
-            words.append(extra)
-    return words or list(INTRO_KALEIDOSCOPE_EXTRA)
+def intro_kaleidoscope_words(clue: Clue | None = None) -> list[str]:
+    """Stock brand words. Same list on every film — never the clue, never the answer."""
+    del clue
+    return list(INTRO_KALEIDOSCOPE_WORDS)
 
 
 def _intro_rng(seed: int):
@@ -295,11 +289,11 @@ def _intro_rng(seed: int):
     return nxt
 
 
-def _intro_word_field(clue: Clue, size: int = INTRO_KALEIDOSCOPE_SIZE) -> Image.Image:
+def _intro_word_field(size: int = INTRO_KALEIDOSCOPE_SIZE) -> Image.Image:
     """Scattered display-type words. Cantarell, not the serif used on the clue."""
-    words = intro_kaleidoscope_words(clue)
+    words = intro_kaleidoscope_words()
     field = Image.new("RGB", (size, size), INK)
-    nxt = _intro_rng(sum(ord(c) for c in (clue.slug or clue.clue or "fit")))
+    nxt = _intro_rng(287)
     colors = (YELLOW, CREAM, HIGHLIGHT, (255, 236, 150))
     copies = max(56, len(words) * 8)
     cx = cy = size / 2
@@ -363,24 +357,32 @@ def _intro_frame(field: Image.Image, angle: float) -> Image.Image:
     return frame
 
 
-def draw_intro_kaleidoscope_still(clue: Clue, dest: Path | None = None) -> Image.Image:
-    """One kaleidoscope frame for tests and posters. No spoken title on screen."""
-    frame = _intro_frame(_intro_word_field(clue), angle=16)
+def draw_intro_kaleidoscope_still(clue: Clue | None = None, dest: Path | None = None) -> Image.Image:
+    """One stock kaleidoscope frame. Same still on every film."""
+    del clue
+    if INTRO_KALEIDOSCOPE_STILL.exists():
+        frame = Image.open(INTRO_KALEIDOSCOPE_STILL).convert("RGB")
+        if frame.size != (WIDTH, HEIGHT):
+            frame = frame.resize((WIDTH, HEIGHT), Image.Resampling.LANCZOS)
+    else:
+        frame = _intro_frame(_intro_word_field(), angle=16)
+        INTRO_KALEIDOSCOPE_STILL.parent.mkdir(parents=True, exist_ok=True)
+        frame.save(INTRO_KALEIDOSCOPE_STILL, "JPEG", quality=90)
     if dest is not None:
         dest = Path(dest)
         dest.parent.mkdir(parents=True, exist_ok=True)
-        frame.save(dest, "PNG")
+        frame.save(dest)
     return frame
 
 
-def render_intro_kaleidoscope(clue: Clue, dest: Path, duration: float) -> Path:
-    """Quick word-kaleidoscope open. Ryan still speaks; the card has no title text."""
+def _bake_intro_kaleidoscope(dest: Path) -> Path:
+    """Render the stock open once. Later films reuse this file."""
     dest = Path(dest).with_suffix(".mp4")
     dest.parent.mkdir(parents=True, exist_ok=True)
-    hold = max(0.4, duration)
+    hold = INTRO_KALEIDOSCOPE_HOLD
     fps = INTRO_KALEIDOSCOPE_FPS
     count = max(8, int(round(hold * fps)))
-    field = _intro_word_field(clue)
+    field = _intro_word_field()
     ffmpeg = shutil.which("ffmpeg")
     if not ffmpeg:
         raise RuntimeError("ffmpeg is required to build the Short")
@@ -408,6 +410,56 @@ def render_intro_kaleidoscope(clue: Clue, dest: Path, duration: float) -> Path:
             "20",
             "-t",
             f"{hold:.2f}",
+            str(dest),
+        ],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode:
+        raise RuntimeError(result.stderr[-800:])
+    still = _intro_frame(field, 16)
+    INTRO_KALEIDOSCOPE_STILL.parent.mkdir(parents=True, exist_ok=True)
+    still.save(INTRO_KALEIDOSCOPE_STILL, "JPEG", quality=90)
+    return dest
+
+
+def ensure_intro_kaleidoscope() -> Path:
+    """Return the shared intro clip. Build it once if the asset is missing."""
+    asset = INTRO_KALEIDOSCOPE_ASSET
+    if asset.exists() and asset.stat().st_size > 1000:
+        return asset
+    return _bake_intro_kaleidoscope(asset)
+
+
+def render_intro_kaleidoscope(clue: Clue | None, dest: Path, duration: float) -> Path:
+    """Trim the stock kaleidoscope to this film's spoken open. No per-clue rebuild."""
+    del clue
+    dest = Path(dest).with_suffix(".mp4")
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    source = ensure_intro_kaleidoscope()
+    hold = max(0.4, duration)
+    ffmpeg = shutil.which("ffmpeg")
+    if not ffmpeg:
+        raise RuntimeError("ffmpeg is required to build the Short")
+    result = subprocess.run(
+        [
+            ffmpeg,
+            "-y",
+            "-stream_loop",
+            "-1",
+            "-i",
+            str(source),
+            "-an",
+            "-t",
+            f"{hold:.2f}",
+            "-c:v",
+            "libx264",
+            "-pix_fmt",
+            "yuv420p",
+            "-preset",
+            "veryfast",
+            "-crf",
+            "20",
             str(dest),
         ],
         capture_output=True,

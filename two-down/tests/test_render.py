@@ -4,6 +4,7 @@ from pathlib import Path
 from twodown.models import Clue
 from twodown.render import (
     AUDIO_LOUDNESS,
+    INTRO_KALEIDOSCOPE_WORDS,
     ShortTimings,
     THUMB_H,
     THUMB_W,
@@ -190,17 +191,19 @@ def test_short_timings_include_hint_before_answer():
     assert timings.until_answer == timings.intro + timings.clue + timings.letters + timings.think + timings.hint
 
 
-def test_intro_kaleidoscope_uses_clue_words_not_the_answer():
+def test_intro_kaleidoscope_is_generic_not_per_clue():
     clue = _clue()
     words = intro_kaleidoscope_words(clue)
-    assert "MODEL" in words
-    assert "YOUNGSTER" in words
+    assert words == list(INTRO_KALEIDOSCOPE_WORDS)
     assert "CRYPTIC" in words
     assert "FIT" in words
-    assert "PIN-UP" not in words
-    assert "PINUP" not in words
-    assert "PIN" not in words
+    assert "MODEL" not in words
+    assert "YOUNGSTER" not in words
     assert clue.answer not in words
+    other = clue.model_copy(
+        update={"clue": "Will the author flog incomplete bit of fiction?", "answer": "SELF"}
+    )
+    assert intro_kaleidoscope_words(other) == words
 
 
 def test_intro_beat_is_kaleidoscope_not_the_spoken_line(tmp_path: Path):
