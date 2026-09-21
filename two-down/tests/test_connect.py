@@ -29,4 +29,6 @@ def test_connect_youtube_is_cryptic_fit_not_fun():
     assert "youtube.com/@crypticfit" in youtube
     assert "Do not use youtube.com/@crypticfun" in youtube
     assert "cryptic.fit" in youtube
+    assert "twodown youtube-auth" in youtube
+    assert "TWODOWN_YOUTUBE_CLIENT_SECRET" in youtube
     assert "Prefer" not in youtube

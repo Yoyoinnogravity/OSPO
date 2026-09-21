@@ -7,7 +7,7 @@ from datetime import datetime
 from pathlib import Path
 
 from twodown.ads import ads_status
-from twodown.config import DEFAULT_OUTPUT, DEFAULT_VOICE_ALIAS, SITE_HOST, SITE_ORIGIN, SOURCE_SITE, STUDY_SLUG, VOICES
+from twodown.config import DEFAULT_OUTPUT, DEFAULT_VOICE_ALIAS, SITE_HOST, SITE_ORIGIN, SOURCE_SITE, STUDY_SLUG, VOICES, YOUTUBE_DAILY_LIMIT
 from twodown.ingest import LONDON
 from twodown.live import (
     PRODUCT_CHECK_NAMES,
@@ -18,7 +18,7 @@ from twodown.live import (
     registry_status,
 )
 from twodown.models import DailyPair
-from twodown.pipeline import render_one_short, run_today
+from twodown.pipeline import load_upload_pair, load_youtube_queue, render_one_short, run_today, unpublished_shorts
 from twodown.scenes import DEFAULT_SCENE, list_scenes
 from twodown.social import (
     PLATFORMS,
@@ -28,7 +28,7 @@ from twodown.social import (
     setup_hints,
 )
 from twodown.voice import list_voices, resolve_voice
-from twodown.youtube import YOUTUBE_CHANNEL
+from twodown.youtube import YOUTUBE_CHANNEL, authorize as youtube_authorize, youtube_ready
 
 
 def _print_pair(pair) -> None:
@@ -67,23 +67,11 @@ def _print_pair(pair) -> None:
             print(f"    fb    {item.facebook_id}")
 
 
-def _latest_pair(out: Path, date: str | None) -> DailyPair:
-    if date:
-        path = out / date / "pair.json"
-    else:
-        dates = sorted((p for p in out.iterdir() if p.is_dir()), reverse=True)
-        if not dates:
-            raise FileNotFoundError(f"No daily output in {out}")
-        path = dates[0] / "pair.json"
-    if not path.exists():
-        raise FileNotFoundError(f"No pair.json at {path}. Run twodown today first.")
-    return DailyPair.model_validate_json(path.read_text(encoding="utf-8"))
-
-
-def _pair_path(out: Path, date: str | None) -> Path:
-    if date:
-        return out / date / "pair.json"
-    return sorted((p for p in out.iterdir() if p.is_dir()), reverse=True)[0] / "pair.json"
+def _pair_path(out: Path, pair: DailyPair, date: str | None) -> Path:
+    stamp = date or pair.date
+    dest = out / stamp
+    dest.mkdir(parents=True, exist_ok=True)
+    return dest / "pair.json"
 
 
 def _add_social_flags(parser: argparse.ArgumentParser) -> None:
@@ -118,6 +106,11 @@ def _print_status() -> None:
         print(f"  {name:10} {state}")
         if not status[name]:
             print(f"             {hints[name]}")
+    waiting = unpublished_shorts()
+    print(f"  queue      {len(waiting)} unpublished Shorts, {YOUTUBE_DAILY_LIMIT} per day")
+    if waiting:
+        date, item = waiting[0]
+        print(f"             next {date} {item.clue.slug}")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -143,11 +136,28 @@ def main(argv: list[str] | None = None) -> int:
     today.add_argument("--youtube-privacy", default="public", choices=["unlisted", "private", "public"])
     _add_social_flags(today)
 
-    upload = sub.add_parser("upload", help="Upload today's two Shorts to YouTube, TikTok, Instagram and Facebook")
+    upload = sub.add_parser("upload", help="Upload the next unpublished Short to YouTube (one a day)")
     upload.add_argument("--out", type=Path, default=DEFAULT_OUTPUT)
     upload.add_argument("--date", help="London calendar date YYYY-MM-DD")
     upload.add_argument("--youtube-privacy", default="public", choices=["unlisted", "private", "public"])
+    upload.add_argument(
+        "--limit",
+        type=int,
+        default=YOUTUBE_DAILY_LIMIT,
+        help=f"How many new YouTube Shorts this run (default {YOUTUBE_DAILY_LIMIT})",
+    )
+    upload.add_argument(
+        "--all-site",
+        action="store_true",
+        help="Upload the whole unpublished backlog (YouTube quota is about 6 Shorts/day)",
+    )
     _add_social_flags(upload)
+
+    queue = sub.add_parser("queue", help="List published Shorts not yet on YouTube")
+    queue.add_argument("--json", action="store_true")
+
+    auth = sub.add_parser("youtube-auth", help="One-time Google login for the cryptic.fit YouTube channel")
+    auth.add_argument("--console", action="store_true", help="Print a URL and paste the code (no local browser)")
 
     short = sub.add_parser("short", help="Rebuild one Short while we lock the beat")
     short.add_argument(
@@ -209,10 +219,44 @@ def main(argv: list[str] | None = None) -> int:
         _print_status()
         return 0
 
+    if args.cmd == "queue":
+        waiting = unpublished_shorts()
+        if args.json:
+            print(
+                json.dumps(
+                    [
+                        {
+                            "date": date,
+                            "slug": item.clue.slug,
+                            "clue": item.clue.clue,
+                            "video": item.video_path,
+                        }
+                        for date, item in waiting
+                    ],
+                    indent=2,
+                )
+            )
+            return 0
+        print(f"{len(waiting)} unpublished Shorts for {YOUTUBE_CHANNEL} ({YOUTUBE_DAILY_LIMIT} per day)")
+        for date, item in waiting:
+            print(f"  {date}  {item.clue.slug}  {item.clue.clue}")
+        return 0
+
     if args.cmd == "connect":
         print(connect_instructions(), end="")
         _print_status()
         return 0
+
+    if args.cmd == "youtube-auth":
+        try:
+            dest = youtube_authorize(console=args.console)
+        except (FileNotFoundError, RuntimeError, ValueError) as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
+        print(f"wrote {dest}")
+        print("Paste that JSON as GitHub Actions secret TWODOWN_YOUTUBE_TOKEN.")
+        print("Channel must be youtube.com/@crypticfit — not @crypticfun.")
+        return 0 if youtube_ready() else 1
 
     if args.cmd == "live":
         print("Public URLs (live = HTTP 2xx/3xx from here right now)")
@@ -273,27 +317,38 @@ def main(argv: list[str] | None = None) -> int:
             print("No connected social accounts for the requested platforms.", file=sys.stderr)
             _print_status()
             return 2
+        youtube_limit = None if args.all_site else args.limit
         try:
-            pair = _latest_pair(args.out, args.date)
+            if args.date:
+                pairs = [load_upload_pair(args.out, args.date)]
+            else:
+                queued = load_youtube_queue(limit=youtube_limit)
+                pairs = [queued] if queued else []
         except FileNotFoundError as exc:
             print(str(exc), file=sys.stderr)
             return 1
-        notes = publish_pair(
-            pair,
-            youtube=wanted["youtube"],
-            tiktok=wanted["tiktok"],
-            instagram=wanted["instagram"],
-            facebook=wanted["facebook"],
-            youtube_privacy=args.youtube_privacy,
-        )
-        dest = _pair_path(args.out, args.date)
-        dest.write_text(pair.model_dump_json(indent=2), encoding="utf-8")
+        if not pairs:
+            print("YouTube queue is empty — every published Short is already logged.")
+            return 0
         uploaded = False
-        for name in ready:
-            values = [v for v in notes.get(name, []) if not str(v).startswith("error:")]
-            if values:
-                uploaded = True
-            print(f"{name}: {', '.join(notes.get(name, []) or ['nothing uploaded'])}")
+        for pair in pairs:
+            notes = publish_pair(
+                pair,
+                youtube=wanted["youtube"],
+                tiktok=wanted["tiktok"],
+                instagram=wanted["instagram"],
+                facebook=wanted["facebook"],
+                youtube_privacy=args.youtube_privacy,
+                youtube_limit=youtube_limit,
+            )
+            dest = _pair_path(args.out, pair, args.date)
+            dest.write_text(pair.model_dump_json(indent=2), encoding="utf-8")
+            print(f"date  {pair.date}")
+            for name in ready:
+                values = [v for v in notes.get(name, []) if not str(v).startswith("error:")]
+                if values:
+                    uploaded = True
+                print(f"{name}: {', '.join(notes.get(name, []) or ['nothing uploaded'])}")
         if not uploaded:
             print("Upload returned no video ids.", file=sys.stderr)
             return 1
