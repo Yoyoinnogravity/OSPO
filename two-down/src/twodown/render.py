@@ -73,9 +73,11 @@ INTRO_DICTIONARY_GUIDE = ("cry", "crystal")
 INTRO_DICTIONARY_PHOTO = PACKAGE_ROOT / "assets" / "intro-dictionary-page.jpg"
 INTRO_DICTIONARY_BOOK = PACKAGE_ROOT / "assets" / "intro-dictionary-book.jpg"
 # Overhead plate is a portrait still of a landscape book; rotate 90° left
-# so the pages read upright, then push in on the cry- leaf.
-INTRO_BOOK_START = (200, 0, 740, 960)
-INTRO_BOOK_END = (680, 20, 1130, 820)
+# so the pages read upright, trim the lamp, then push in on the cry- leaf.
+# Coordinates are on the trimmed plate (top band with the switch removed).
+INTRO_BOOK_START = (160, 0, 700, 792)
+INTRO_BOOK_END = (710, 8, 1050, 580)
+INTRO_BOOK_TRIM_TOP = 168
 INTRO_DICTIONARY_CROP = (500, 240, 820, 1000)
 INTRO_DICTIONARY_SOURCE_FOCUS = (648, 492)
 INTRO_DICTIONARY_SOURCE_CRYPTOGRAM = (680, 720)
@@ -524,11 +526,23 @@ def _smootherstep(t: float) -> float:
     return t * t * t * (t * (t * 6.0 - 15.0) + 10.0)
 
 
+def _paint_out_switch(src: Image.Image) -> Image.Image:
+    """Cover the modern 10A switch with table from the same plate."""
+    # After the 90° left turn the adapter sits above the book head.
+    table = src.crop((36, 16, 300, 170))
+    cover = table.resize((540, 210), Image.Resampling.LANCZOS)
+    out = src.copy()
+    out.paste(cover, (460, 0))
+    return out
+
+
 @lru_cache(maxsize=1)
 def _book_plate() -> Image.Image:
     src = Image.open(INTRO_DICTIONARY_BOOK).convert("RGB")
     # Phone still is 90° clockwise of the pages; turn it left so the book reads.
     src = src.transpose(Image.Transpose.ROTATE_90)
+    src = _paint_out_switch(src)
+    src = src.crop((0, INTRO_BOOK_TRIM_TOP, src.size[0], src.size[1]))
     src = ImageEnhance.Contrast(src).enhance(1.08)
     src = ImageEnhance.Brightness(src).enhance(1.06)
     return src
@@ -614,7 +628,9 @@ def _photographed_dictionary_page() -> tuple[Image.Image, tuple[int, int], tuple
 
 @lru_cache(maxsize=1)
 def _dictionary_layout() -> tuple[Image.Image, tuple[int, int], tuple[int, int], tuple[int, int]]:
-    """Webster column: living cryptic sense, enigmatic synonym, then cryptology."""
+    """Same photographed volume as the overhead; typeset only if that plate is missing."""
+    if INTRO_DICTIONARY_PHOTO.exists():
+        return _photographed_dictionary_page()
     return _typeset_dictionary_page()
 
 
@@ -767,28 +783,41 @@ def _glass_travel(
     return cryptology
 
 
-def _close_page_with_glass(progress: float) -> Image.Image:
-    """Tight column: occult, then cryptogram, then cryptology."""
+def _close_page(progress: float, *, glass: bool) -> Image.Image:
+    """Tight column of the same photographed book. Glass is optional so it can fade on."""
     t = max(0.0, min(1.0, progress))
     page, focus, cryptogram, cryptology = _dictionary_layout()
-    glass = _glass_travel(focus, cryptogram, cryptology, t)
-    frame = _with_magnifier(page, glass, radius=248, zoom=1.55)
+    if not glass:
+        frame = page.convert("RGB")
+    else:
+        center = _glass_travel(focus, cryptogram, cryptology, t)
+        frame = _with_magnifier(page, center, radius=248, zoom=1.55)
     draw = ImageDraw.Draw(frame)
     draw.rectangle([0, 0, WIDTH, 14], fill=HIGHLIGHT)
     draw.rectangle([0, HEIGHT - 14, WIDTH, HEIGHT], fill=HIGHLIGHT)
     return frame
 
 
+def _close_page_with_glass(progress: float) -> Image.Image:
+    """Tight column: occult, then cryptogram, then the neighbours."""
+    return _close_page(progress, glass=True)
+
+
 def _compose_intro_frame(progress: float) -> Image.Image:
-    """Stabilized push from the open book onto the cryptic column."""
+    """Push in on the real book, dissolve onto that same page, then fade the glass on."""
     t = max(0.0, min(1.0, progress))
     if INTRO_DICTIONARY_BOOK.exists():
-        wide = _stabilized_book_frame(min(1.0, t / 0.56))
-        if t < 0.50:
+        wide = _stabilized_book_frame(min(1.0, t / 0.52))
+        if t < 0.52:
             return wide
-        close = _close_page_with_glass(max(0.0, (t - 0.54) / 0.46))
-        mix = _smootherstep((t - 0.50) / 0.12) if t < 0.62 else 1.0
-        return Image.blend(wide.convert("RGB"), close.convert("RGB"), mix)
+        page = _close_page(0.0, glass=False)
+        page_mix = _smootherstep((t - 0.52) / 0.20) if t < 0.72 else 1.0
+        base = Image.blend(wide.convert("RGB"), page.convert("RGB"), page_mix)
+        if t < 0.70:
+            return base
+        close = _close_page(max(0.0, (t - 0.70) / 0.30), glass=True)
+        glass_mix = _smootherstep((t - 0.70) / 0.12) if t < 0.82 else 1.0
+        return Image.blend(base, close.convert("RGB"), glass_mix)
     return _close_page_with_glass(t)
 
 

@@ -265,20 +265,23 @@ def test_intro_beat_is_kaleidoscope_not_the_spoken_line(tmp_path: Path):
     # Overhead plate starts on the dark table; the close landing is paper.
     table = wide.getpixel((40, 80))
     assert table[0] < 80 and table[1] < 80
+    # The modern switch is trimmed off the plate; the top of the wide frame is page or table, not a white button on a black box.
+    from twodown.render import _book_plate
+
+    plate = _book_plate()
+    assert plate.size[1] <= 800
     paper = close.getpixel((40, 80))
     assert paper[0] > 160 and paper[1] > 140
-    page, focus, enigmatic, cryptology = _dictionary_layout()
+    page, focus, mid, end = _dictionary_layout()
     fx, fy = focus
     assert INTRO_DICTIONARY_BOOK.exists()
     assert INTRO_DICTIONARY_PHOTO.exists()
     assert 0 < fx < 1080 and 0 < fy < 1920
-    assert enigmatic[1] > fy
-    assert cryptology[0] > fx
-    # Focus sits on the living definition; the wash beside it is paper.
+    assert mid[1] > fy
+    assert end[1] >= mid[1]
+    # Focus sits on the photographed cryptic line.
     wash = page.getpixel((min(1070, fx + 90), fy + 36))
-    assert wash[0] > 140 and wash[1] > 130
-    # Cryptology still carries secret or enigmatical.
-    assert page.getpixel((min(1070, cryptology[0] + 80), cryptology[1] + 24))[0] > 130
+    assert wash[0] > 130 and wash[1] > 110
     raw = path.read_bytes()
     assert INTRO_LINE.encode() not in raw
     assert b"daily dose" not in raw.lower()
