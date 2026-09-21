@@ -22,7 +22,7 @@ from twodown.hints import attach_hint
 from twodown.ingest import LONDON, fetch_daily_posts, posts_for_london_date
 from twodown.models import Clue, DailyPair, SpokenClue
 from twodown.parse import parse_post
-from twodown.render import draw_beat, draw_clue_card, draw_reveal_card, render_video
+from twodown.render import draw_beat, draw_clue_card, draw_reveal_card, render_video, write_spoiler_free_stills
 from twodown.scenes import pick_scenes
 from twodown.script import write_parts
 from twodown.select import select_pair
@@ -457,10 +457,15 @@ def render_one_short(
         timings=timings,
     )
     item.video_path = str(movie)
+    thumb, poster = write_spoiler_free_stills(clue, slot)
+    item.thumbnail_path = str(thumb)
+    item.poster_path = str(poster)
     if publish:
         media = SITE_ROOT / "media"
         media.mkdir(parents=True, exist_ok=True)
         copy2(movie, media / f"{clue.slug}.mp4")
+        copy2(thumb, media / f"{clue.slug}-thumb.jpg")
+        copy2(poster, media / f"{clue.slug}-poster.jpg")
         for alias, path in paths.items():
             copy2(path, media / f"{clue.slug}-{alias}.mp3")
     return item

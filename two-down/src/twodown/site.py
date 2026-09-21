@@ -8,7 +8,7 @@ from shutil import copy2
 from twodown.ads import ads_enabled, ads_txt, adsense_client, adsense_slot
 from twodown.config import BRAND, BRAND_LINE, CREDIT_LINE, CREDIT_WHO, SITE_HOST, SITE_ORIGIN, SITE_ROOT, SOURCE_SITE, SPONSOR_EMAIL, SUGGEST_EMAIL, VOICE_LABELS, follow_profiles
 from twodown.models import DailyPair, SpokenClue
-from twodown.render import write_share_card
+from twodown.render import write_share_card, write_spoiler_free_stills
 from twodown.scenes import DEFAULT_SCENE, get_scene, list_scenes
 from twodown.seo import (
     FAVICON_SVG,
@@ -618,9 +618,10 @@ def _article(item: SpokenClue, media_prefix: str, open_by_default: bool = False,
     opened = " is-open" if open_by_default else ""
     video = ""
     if item.video_path:
+        poster = f' poster="{_e(media_prefix + clue.slug + "-poster.jpg")}"'
         video = (
-            f'<video class="short" controls playsinline preload="metadata" '
-            f'src="{_e(media_prefix + clue.slug + ".mp4")}"></video>'
+            f'<video class="short" controls playsinline preload="metadata"'
+            f'{poster} src="{_e(media_prefix + clue.slug + ".mp4")}"></video>'
         )
     audio = (
         f'<audio class="parse-voice" controls preload="none" data-prefix="{_e(media_prefix)}" '
@@ -668,6 +669,9 @@ def _copy_media(pair: DailyPair, dest: Path) -> None:
     for item in pair.clues:
         if item.video_path:
             _copy_file(item.video_path, media / f"{item.clue.slug}.mp4")
+        thumb, poster = write_spoiler_free_stills(item.clue, media)
+        item.thumbnail_path = str(thumb)
+        item.poster_path = str(poster)
         for alias, path in item.voice_paths.items():
             _copy_file(path, media / f"{item.clue.slug}-{alias}.mp3")
     _copy_scenes(dest)

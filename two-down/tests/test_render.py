@@ -5,12 +5,16 @@ from twodown.models import Clue
 from twodown.render import (
     AUDIO_LOUDNESS,
     ShortTimings,
+    THUMB_H,
+    THUMB_W,
     _encode_clips,
     _source_footer,
     draw_beat,
     draw_clue_card,
     draw_reveal_card,
+    draw_thumbnail,
     render_video,
+    write_spoiler_free_stills,
 )
 from twodown.script import _spoken_parse, speak_answer, speak_enumeration
 
@@ -411,3 +415,40 @@ def test_encode_maps_loud_audio(tmp_path: Path):
     mean_line = next(line for line in measure.stderr.splitlines() if "mean_volume" in line)
     mean_db = float(mean_line.rsplit(":", 1)[-1].strip().split()[0])
     assert mean_db > -20.0
+
+
+def test_youtube_thumbnail_does_not_show_the_answer(tmp_path: Path):
+    from PIL import Image
+
+    from twodown.config import CREAM, CRIMSON
+
+    clue = _clue()
+    path = draw_thumbnail(clue, tmp_path / "thumb.jpg")
+    thumb = Image.open(path)
+    assert path.suffix == ".jpg"
+    assert thumb.size == (THUMB_W, THUMB_H)
+    answer = Image.open(draw_beat(clue, tmp_path / "answer.png", "answer"))
+
+    def reddish(img: Image.Image) -> int:
+        return sum(1 for r, g, b in img.get_flattened_data() if r > 140 and g < 80 and b < 90)
+
+    # Answer card prints PIN-UP in crimson. The thumbnail must stay clue-only.
+    answer_head = reddish(answer.crop((80, 730, 1000, 880)))
+    thumb_mid = reddish(thumb.crop((80, 200, 1200, 520)))
+    assert answer_head > 200
+    assert thumb_mid < answer_head
+    assert CRIMSON[0] > 140
+    assert CREAM[0] > 240
+    raw = path.read_bytes()
+    assert b"PIN-UP" not in raw
+    assert b"PINUP" not in raw
+
+
+def test_spoiler_free_stills_write_thumb_and_poster(tmp_path: Path):
+    from PIL import Image
+
+    thumb, poster = write_spoiler_free_stills(_clue(), tmp_path)
+    assert thumb.name == "independent-12462-6a-thumb.jpg"
+    assert poster.name == "independent-12462-6a-poster.jpg"
+    assert Image.open(thumb).size == (THUMB_W, THUMB_H)
+    assert Image.open(poster).size == (1080, 1920)

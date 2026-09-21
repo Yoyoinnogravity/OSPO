@@ -32,6 +32,7 @@ from twodown.scenes import DEFAULT_SCENE, Scene, get_scene
 from twodown.script import _spoken_parse
 
 WIDTH, HEIGHT = 1080, 1920
+THUMB_W, THUMB_H = 1280, 720
 PHOTO_INK = (252, 247, 236)
 PHOTO_MUTED = (220, 208, 190)
 MARGIN = 72
@@ -105,6 +106,25 @@ def _cell_letters(clue: Clue, groups: list[int]) -> list[str]:
     return list(compact)
 
 
+def _center_on(
+    draw: ImageDraw.ImageDraw,
+    y: int,
+    text: str,
+    font: ImageFont.FreeTypeFont,
+    fill: tuple[int, int, int],
+    canvas_w: int,
+    *,
+    spacing: int = 10,
+) -> int:
+    cursor = y
+    for line in text.split("\n"):
+        width = draw.textlength(line, font=font)
+        draw.text(((canvas_w - width) / 2, cursor), line, font=font, fill=fill)
+        box = draw.textbbox((0, 0), line or " ", font=font)
+        cursor += (box[3] - box[1]) + spacing
+    return cursor
+
+
 def _center_text(
     draw: ImageDraw.ImageDraw,
     y: int,
@@ -114,13 +134,7 @@ def _center_text(
     *,
     spacing: int = 10,
 ) -> int:
-    cursor = y
-    for line in text.split("\n"):
-        width = draw.textlength(line, font=font)
-        draw.text(((WIDTH - width) / 2, cursor), line, font=font, fill=fill)
-        box = draw.textbbox((0, 0), line or " ", font=font)
-        cursor += (box[3] - box[1]) + spacing
-    return cursor
+    return _center_on(draw, y, text, font, fill, WIDTH, spacing=spacing)
 
 
 def _brand_parts() -> tuple[str, str]:
@@ -302,6 +316,81 @@ def draw_clue_card(clue: Clue, dest: Path, scene: str | Scene | None = None, **_
 
 def draw_reveal_card(clue: Clue, dest: Path, scene: str | Scene | None = None) -> Path:
     return draw_beat(clue, dest, beat="parse")
+
+
+def _draw_empty_lights(
+    draw: ImageDraw.ImageDraw,
+    clue: Clue,
+    y: int,
+    canvas_w: int,
+    *,
+    max_cell: int = 72,
+) -> int:
+    """Crossword lights with no letters. Used on thumbnails so the answer stays hidden."""
+    groups = _enum_groups(clue)
+    total = sum(groups)
+    gap = 6
+    hyphen_w = 22
+    cell = min(
+        max_cell,
+        int((canvas_w - 160 - (total - 1) * gap - max(0, len(groups) - 1) * hyphen_w) / max(total, 1)),
+    )
+    cell = max(36, cell)
+    row_w = total * cell + max(0, total - 1) * gap + max(0, len(groups) - 1) * hyphen_w
+    x = (canvas_w - row_w) // 2
+    for g, size in enumerate(groups):
+        if g:
+            mid_y = y + cell // 2
+            draw.rectangle([x + 3, mid_y - 2, x + hyphen_w - 3, mid_y + 2], fill=INK)
+            x += hyphen_w
+        for _ in range(size):
+            draw.rounded_rectangle((x, y, x + cell, y + cell), radius=5, fill=CREAM, outline=INK, width=3)
+            x += cell + gap
+    return y + cell
+
+
+def draw_thumbnail(clue: Clue, dest: Path) -> Path:
+    """16:9 YouTube / social thumbnail. Clue and empty lights only — never the answer."""
+    dest = dest.with_suffix(".jpg")
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    img = Image.new("RGB", (THUMB_W, THUMB_H), NEWS_BG)
+    draw = ImageDraw.Draw(img)
+    for x in range(0, THUMB_W, 54):
+        draw.line([(x, 0), (x, THUMB_H)], fill=NEWS_GRID, width=1)
+    for y in range(0, THUMB_H, 54):
+        draw.line([(0, y), (THUMB_W, y)], fill=NEWS_GRID, width=1)
+    draw.rectangle([0, 0, THUMB_W, 10], fill=CRIMSON)
+    draw.rectangle([0, THUMB_H - 10, THUMB_W, THUMB_H], fill=CRIMSON)
+
+    brand = _font(FONT_SANS_BOLD, 36)
+    cryptic, suffix = _brand_parts()
+    brand_w = draw.textlength(cryptic, font=brand)
+    x = (THUMB_W - brand_w - draw.textlength(suffix, font=brand)) / 2
+    draw.text((x, 28), cryptic, font=brand, fill=INK)
+    draw.text((x + brand_w, 28), suffix, font=brand, fill=CRIMSON)
+
+    clue_font = _font(FONT_REGULAR, 48)
+    wrapped = _wrap(draw, clue.clue, clue_font, THUMB_W - 120)
+    next_y = _center_on(draw, 120, wrapped, clue_font, INK, THUMB_W, spacing=12)
+    lights_y = min(next_y + 28, 360)
+    lights_bottom = _draw_empty_lights(draw, clue, lights_y, THUMB_W)
+    prompt = _font(FONT_SANS, 32)
+    prompt_text = _wrap(draw, THINK_PROMPT, prompt, THUMB_W - 160)
+    _center_on(draw, min(lights_bottom + 28, 600), prompt_text, prompt, CRIMSON, THUMB_W, spacing=6)
+    img.save(dest, "JPEG", quality=88)
+    return dest
+
+
+def write_spoiler_free_stills(clue: Clue, dest_dir: Path) -> tuple[Path, Path]:
+    """YouTube 16:9 thumb plus a 9:16 video poster. Neither shows the answer."""
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    thumb = draw_thumbnail(clue, dest_dir / f"{clue.slug}-thumb.jpg")
+    work = dest_dir / f".{clue.slug}-think.png"
+    draw_beat(clue, work, "think")
+    poster = dest_dir / f"{clue.slug}-poster.jpg"
+    Image.open(work).convert("RGB").save(poster, "JPEG", quality=88)
+    work.unlink(missing_ok=True)
+    return thumb, poster
 
 
 def write_share_card(dest: Path, scene: str | Scene | None = None) -> Path:
