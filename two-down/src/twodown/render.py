@@ -14,17 +14,23 @@ from twodown.config import (
     CREAM,
     CRIMSON,
     FONT_BOLD,
+    FONT_DISPLAY,
     FONT_REGULAR,
     FONT_SANS,
     FONT_SANS_BOLD,
+    HIGHLIGHT,
     HINT_LINE,
     INK,
     INTRO_LINE,
     MUTED,
-    OUTRO_LINE,
     NEWS_BG,
     NEWS_GRID,
+    OUTRO_LINE,
+    SITE_ROOT,
     THINK_PROMPT,
+    THUMBNAIL_ISSUE_FIRST_SLUG,
+    THUMBNAIL_ISSUE_START,
+    YELLOW,
 )
 from twodown.hints import ensure_hint_photo, hint_for_clue
 from twodown.models import Clue
@@ -349,35 +355,149 @@ def _draw_empty_lights(
     return y + cell
 
 
+def published_pair_slugs(site_root: Path | None = None) -> list[str]:
+    """Oldest-first pair slugs from the published archive."""
+    days = Path(site_root or SITE_ROOT) / "d"
+    if not days.is_dir():
+        return []
+    slugs: list[str] = []
+    for page in sorted(days.glob("*/index.html")):
+        slugs.extend(re.findall(r'data-slug="([^"]+)"', page.read_text(encoding="utf-8")))
+    return slugs
+
+
+def thumbnail_issue(clue: Clue, slugs: list[str] | None = None) -> int:
+    """Running Cryptic Fit issue. The first film on the channel is #287."""
+    catalog = published_pair_slugs() if slugs is None else list(slugs)
+    if THUMBNAIL_ISSUE_FIRST_SLUG in catalog:
+        catalog = catalog[catalog.index(THUMBNAIL_ISSUE_FIRST_SLUG) :]
+    try:
+        return THUMBNAIL_ISSUE_START + catalog.index(clue.slug)
+    except ValueError:
+        return THUMBNAIL_ISSUE_START
+
+
+def _display_font(size: int) -> ImageFont.FreeTypeFont:
+    path = FONT_DISPLAY if Path(FONT_DISPLAY).exists() else FONT_SANS_BOLD
+    return _font(path, size)
+
+
+def _circle_offsets(width: int) -> list[tuple[int, int]]:
+    return [
+        (dx, dy)
+        for dx in range(-width, width + 1)
+        for dy in range(-width, width + 1)
+        if dx * dx + dy * dy <= width * width
+    ]
+
+
+def _stroke_text(
+    draw: ImageDraw.ImageDraw,
+    xy: tuple[float, float],
+    text: str,
+    font: ImageFont.FreeTypeFont,
+    fill: tuple[int, int, int],
+    outline: tuple[int, int, int],
+    width: int,
+) -> None:
+    x, y = xy
+    for dx, dy in _circle_offsets(width):
+        draw.text((x + dx, y + dy), text, font=font, fill=outline)
+    draw.text((x, y), text, font=font, fill=fill)
+
+
+def _issue_lockup(clue: Clue, size: tuple[int, int], *, brand_size: int, number_size: int) -> Image.Image:
+    """Tilted CRYPTIC FIT #N — bold yellow letters on a red highlighter. Never the answer."""
+    width, height = size
+    issue = thumbnail_issue(clue)
+    brand = "CRYPTIC FIT"
+    number = f"#{issue}"
+    tilt = -8 + (issue % 3) * 4
+    layer = Image.new("RGBA", (width + 160, height + 160), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(layer)
+    brand_font = _display_font(brand_size)
+    number_font = _display_font(number_size)
+    brand_w = draw.textlength(brand, font=brand_font)
+    number_w = draw.textlength(number, font=number_font)
+    brand_box = draw.textbbox((0, 0), brand, font=brand_font)
+    number_box = draw.textbbox((0, 0), number, font=number_font)
+    brand_h = brand_box[3] - brand_box[1]
+    number_h = number_box[3] - number_box[1]
+    gap = max(12, int(brand_size * 0.12))
+    block_w = max(brand_w, number_w)
+    block_h = brand_h + gap + number_h
+    left = (layer.size[0] - block_w) / 2
+    top = (layer.size[1] - block_h) / 2 - 10
+    pad_x, pad_y = 36, 22
+    highlight = [
+        left - pad_x + 18,
+        top - pad_y + 8,
+        left + block_w + pad_x + 10,
+        top + block_h + pad_y,
+    ]
+    draw.rounded_rectangle(highlight, radius=28, fill=(*HIGHLIGHT, 255))
+    # Marker swipe: a second, slightly offset highlight so it feels hand-drawn.
+    draw.rounded_rectangle(
+        [highlight[0] - 14, highlight[1] + 10, highlight[2] + 8, highlight[3] - 6],
+        radius=24,
+        fill=(*CRIMSON, 255),
+    )
+    draw.rounded_rectangle(highlight, radius=28, fill=(*HIGHLIGHT, 255))
+    brand_x = left + (block_w - brand_w) / 2
+    number_x = left + (block_w - number_w) / 2
+    stroke = max(6, brand_size // 16)
+    _stroke_text(draw, (brand_x, top), brand, brand_font, YELLOW, INK, stroke)
+    _stroke_text(
+        draw,
+        (number_x, top + brand_h + gap),
+        number,
+        number_font,
+        YELLOW,
+        INK,
+        max(8, number_size // 14),
+    )
+    return layer.rotate(tilt, resample=Image.Resampling.BICUBIC, expand=False)
+
+
+def _paste_centered(base: Image.Image, overlay: Image.Image, *, dy: int = 0) -> None:
+    x = (base.size[0] - overlay.size[0]) // 2
+    y = (base.size[1] - overlay.size[1]) // 2 + dy
+    base.paste(overlay, (x, y), overlay)
+
+
+def _dark_canvas(size: tuple[int, int]) -> Image.Image:
+    img = Image.new("RGB", size, INK)
+    draw = ImageDraw.Draw(img)
+    draw.rectangle([0, 0, size[0], 14], fill=HIGHLIGHT)
+    draw.rectangle([0, size[1] - 14, size[0], size[1]], fill=HIGHLIGHT)
+    return img
+
+
 def draw_thumbnail(clue: Clue, dest: Path) -> Path:
-    """16:9 YouTube / social thumbnail. Clue and empty lights only — never the answer."""
+    """16:9 YouTube thumbnail. Yellow CRYPTIC FIT #N on red. Never the answer."""
     dest = dest.with_suffix(".jpg")
     dest.parent.mkdir(parents=True, exist_ok=True)
-    img = Image.new("RGB", (THUMB_W, THUMB_H), NEWS_BG)
-    draw = ImageDraw.Draw(img)
-    for x in range(0, THUMB_W, 54):
-        draw.line([(x, 0), (x, THUMB_H)], fill=NEWS_GRID, width=1)
-    for y in range(0, THUMB_H, 54):
-        draw.line([(0, y), (THUMB_W, y)], fill=NEWS_GRID, width=1)
-    draw.rectangle([0, 0, THUMB_W, 10], fill=CRIMSON)
-    draw.rectangle([0, THUMB_H - 10, THUMB_W, THUMB_H], fill=CRIMSON)
+    img = _dark_canvas((THUMB_W, THUMB_H))
+    _paste_centered(
+        img,
+        _issue_lockup(clue, (THUMB_W, THUMB_H), brand_size=108, number_size=220),
+        dy=-18,
+    )
+    img.save(dest, "JPEG", quality=90)
+    return dest
 
-    brand = _font(FONT_SANS_BOLD, 36)
-    cryptic, suffix = _brand_parts()
-    brand_w = draw.textlength(cryptic, font=brand)
-    x = (THUMB_W - brand_w - draw.textlength(suffix, font=brand)) / 2
-    draw.text((x, 28), cryptic, font=brand, fill=INK)
-    draw.text((x + brand_w, 28), suffix, font=brand, fill=CRIMSON)
 
-    clue_font = _font(FONT_REGULAR, 48)
-    wrapped = _wrap(draw, clue.clue, clue_font, THUMB_W - 120)
-    next_y = _center_on(draw, 120, wrapped, clue_font, INK, THUMB_W, spacing=12)
-    lights_y = min(next_y + 28, 360)
-    lights_bottom = _draw_empty_lights(draw, clue, lights_y, THUMB_W)
-    prompt = _font(FONT_SANS, 32)
-    prompt_text = _wrap(draw, THINK_PROMPT, prompt, THUMB_W - 160)
-    _center_on(draw, min(lights_bottom + 28, 600), prompt_text, prompt, CRIMSON, THUMB_W, spacing=6)
-    img.save(dest, "JPEG", quality=88)
+def draw_poster(clue: Clue, dest: Path) -> Path:
+    """9:16 video poster. Same yellow-on-red lockup. Never the answer."""
+    dest = dest.with_suffix(".jpg")
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    img = _dark_canvas((WIDTH, HEIGHT))
+    _paste_centered(
+        img,
+        _issue_lockup(clue, (WIDTH, HEIGHT), brand_size=130, number_size=280),
+        dy=-40,
+    )
+    img.save(dest, "JPEG", quality=90)
     return dest
 
 
@@ -385,11 +505,7 @@ def write_spoiler_free_stills(clue: Clue, dest_dir: Path) -> tuple[Path, Path]:
     """YouTube 16:9 thumb plus a 9:16 video poster. Neither shows the answer."""
     dest_dir.mkdir(parents=True, exist_ok=True)
     thumb = draw_thumbnail(clue, dest_dir / f"{clue.slug}-thumb.jpg")
-    work = dest_dir / f".{clue.slug}-think.png"
-    draw_beat(clue, work, "think")
-    poster = dest_dir / f"{clue.slug}-poster.jpg"
-    Image.open(work).convert("RGB").save(poster, "JPEG", quality=88)
-    work.unlink(missing_ok=True)
+    poster = draw_poster(clue, dest_dir / f"{clue.slug}-poster.jpg")
     return thumb, poster
 
 

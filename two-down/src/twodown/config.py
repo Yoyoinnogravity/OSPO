@@ -97,11 +97,18 @@ INK = (26, 21, 16)
 CRIMSON = (184, 28, 41)
 CREAM = (252, 247, 236)
 MUTED = (92, 78, 64)
+# YouTube lockup: yellow letters on a red highlighter.
+YELLOW = (255, 214, 0)
+HIGHLIGHT = (196, 16, 36)
+# First Cryptic Fit Short on the channel is #287. Earlier pair films were early cuts.
+THUMBNAIL_ISSUE_START = 287
+THUMBNAIL_ISSUE_FIRST_SLUG = "guardian-30112-1a"
 
 FONT_REGULAR = "/usr/share/fonts/truetype/liberation/LiberationSerif-Regular.ttf"
 FONT_BOLD = "/usr/share/fonts/truetype/liberation/LiberationSerif-Bold.ttf"
 FONT_SANS = "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"
 FONT_SANS_BOLD = "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"
+FONT_DISPLAY = "/usr/share/fonts/opentype/cantarell/Cantarell-ExtraBold.otf"
 
 # Public follow URLs. YouTube is @crypticfit. Do not use @crypticfun.
 YOUTUBE_FOLLOW = os.environ.get("TWODOWN_YOUTUBE_URL", "https://www.youtube.com/@crypticfit").strip()

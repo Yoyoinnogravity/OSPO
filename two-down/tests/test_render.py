@@ -12,8 +12,10 @@ from twodown.render import (
     draw_beat,
     draw_clue_card,
     draw_reveal_card,
+    draw_poster,
     draw_thumbnail,
     render_video,
+    thumbnail_issue,
     write_spoiler_free_stills,
 )
 from twodown.script import _spoken_parse, speak_answer, speak_enumeration
@@ -420,25 +422,28 @@ def test_encode_maps_loud_audio(tmp_path: Path):
 def test_youtube_thumbnail_does_not_show_the_answer(tmp_path: Path):
     from PIL import Image
 
-    from twodown.config import CREAM, CRIMSON
+    from twodown.config import HIGHLIGHT, THUMBNAIL_ISSUE_START, YELLOW
 
     clue = _clue()
     path = draw_thumbnail(clue, tmp_path / "thumb.jpg")
     thumb = Image.open(path)
     assert path.suffix == ".jpg"
     assert thumb.size == (THUMB_W, THUMB_H)
-    answer = Image.open(draw_beat(clue, tmp_path / "answer.png", "answer"))
+    assert thumbnail_issue(clue, slugs=["independent-12462-6a"]) == THUMBNAIL_ISSUE_START
+    assert thumbnail_issue(clue, slugs=["other", clue.slug]) == THUMBNAIL_ISSUE_START + 1
+    kept = ["guardian-30112-1a", "guardian-30112-5a", "independent-12462-6a", "guardian-30113-9a"]
+    assert thumbnail_issue(clue, slugs=["early-cut", *kept]) == THUMBNAIL_ISSUE_START + 2
 
-    def reddish(img: Image.Image) -> int:
-        return sum(1 for r, g, b in img.get_flattened_data() if r > 140 and g < 80 and b < 90)
+    def yellow(img: Image.Image) -> int:
+        return sum(1 for r, g, b in img.get_flattened_data() if r > 200 and g > 170 and b < 90)
 
-    # Answer card prints PIN-UP in crimson. The thumbnail must stay clue-only.
-    answer_head = reddish(answer.crop((80, 730, 1000, 880)))
-    thumb_mid = reddish(thumb.crop((80, 200, 1200, 520)))
-    assert answer_head > 200
-    assert thumb_mid < answer_head
-    assert CRIMSON[0] > 140
-    assert CREAM[0] > 240
+    def red(img: Image.Image) -> int:
+        return sum(1 for r, g, b in img.get_flattened_data() if r > 150 and g < 90 and b < 90)
+
+    assert yellow(thumb) > 1500
+    assert red(thumb) > 1500
+    assert YELLOW[0] > 240
+    assert HIGHLIGHT[0] > 180
     raw = path.read_bytes()
     assert b"PIN-UP" not in raw
     assert b"PINUP" not in raw
@@ -452,3 +457,4 @@ def test_spoiler_free_stills_write_thumb_and_poster(tmp_path: Path):
     assert poster.name == "independent-12462-6a-poster.jpg"
     assert Image.open(thumb).size == (THUMB_W, THUMB_H)
     assert Image.open(poster).size == (1080, 1920)
+    assert Image.open(draw_poster(_clue(), tmp_path / "poster.jpg")).size == (1080, 1920)
