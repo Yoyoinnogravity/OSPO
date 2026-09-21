@@ -156,11 +156,15 @@ def test_finish_authorization_writes_token(tmp_path, monkeypatch):
                 }
             )
 
-    def fake_fetch(self, code=None):
-        assert code == "from-browser"
-        self.credentials = FakeCreds()
+    class FakeFlow:
+        redirect_uri = None
+        code_verifier = None
+        credentials = FakeCreds()
 
-    monkeypatch.setattr("google_auth_oauthlib.flow.InstalledAppFlow.fetch_token", fake_fetch)
+        def fetch_token(self, code=None):
+            assert code == "from-browser"
+
+    monkeypatch.setattr("twodown.youtube._installed_flow", lambda _text: FakeFlow())
     dest = finish_authorization("http://localhost/?code=from-browser")
     assert dest == tmp_path / "youtube-token.json"
     assert json.loads(dest.read_text(encoding="utf-8"))["refresh_token"] == "r"
