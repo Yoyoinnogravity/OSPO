@@ -379,7 +379,8 @@ def thumbnail_issue(clue: Clue, slugs: list[str] | None = None) -> int:
     try:
         return THUMBNAIL_ISSUE_START + catalog.index(clue.slug)
     except ValueError:
-        return THUMBNAIL_ISSUE_START
+        # Next issue after the published Cryptic Fit films.
+        return THUMBNAIL_ISSUE_START + len(catalog)
 
 
 def _display_font(size: int) -> ImageFont.FreeTypeFont:

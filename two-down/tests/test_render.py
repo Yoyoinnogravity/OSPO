@@ -447,6 +447,9 @@ def test_youtube_thumbnail_does_not_show_the_answer(tmp_path: Path):
     assert thumbnail_issue(clue, slugs=["other", clue.slug]) == THUMBNAIL_ISSUE_START + 1
     kept = ["guardian-30112-1a", "guardian-30112-5a", "independent-12462-6a", "guardian-30113-9a"]
     assert thumbnail_issue(clue, slugs=["early-cut", *kept]) == THUMBNAIL_ISSUE_START + 2
+    fresh = clue.model_copy(update={"paper": "Guardian", "puzzle_id": "30117", "number": "1"})
+    assert fresh.slug == "guardian-30117-1a"
+    assert thumbnail_issue(fresh, slugs=kept) == THUMBNAIL_ISSUE_START + 4
 
     def yellow(img: Image.Image) -> int:
         return sum(1 for r, g, b in img.get_flattened_data() if r > 200 and g > 170 and b < 90)
