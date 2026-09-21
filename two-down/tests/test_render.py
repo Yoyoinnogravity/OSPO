@@ -7,6 +7,7 @@ from twodown.render import (
     INTRO_DICTIONARY_ENTRIES,
     INTRO_DICTIONARY_HEADWORD,
     INTRO_DICTIONARY_SENSES,
+    INTRO_DICTIONARY_BOOK,
     INTRO_DICTIONARY_PHOTO,
     INTRO_DICTIONARY_SOURCE,
     INTRO_KALEIDOSCOPE_WORDS,
@@ -245,15 +246,20 @@ def test_intro_beat_is_kaleidoscope_not_the_spoken_line(tmp_path: Path):
     from twodown.config import INTRO_LINE
     from twodown.render import _dictionary_layout
 
-    img = _compose_intro_frame(0.12)
+    wide = _compose_intro_frame(0.08)
+    close = _compose_intro_frame(0.72)
     path = tmp_path / "intro.png"
-    img.save(path)
-    assert img.size == (1080, 1920)
-    # Lexicon paper, not the old black letter-vortex.
-    paper = img.getpixel((40, 80))
+    close.save(path)
+    assert wide.size == (1080, 1920)
+    assert close.size == (1080, 1920)
+    # Overhead plate starts on the dark table; the close landing is paper.
+    table = wide.getpixel((40, 80))
+    assert table[0] < 80 and table[1] < 80
+    paper = close.getpixel((40, 80))
     assert paper[0] > 160 and paper[1] > 140
     page, focus, glance = _dictionary_layout()
     fx, fy = focus
+    assert INTRO_DICTIONARY_BOOK.exists()
     assert INTRO_DICTIONARY_PHOTO.exists()
     assert 0 < fx < 1080 and 0 < fy < 1920
     assert glance[1] > fy

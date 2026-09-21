@@ -64,6 +64,10 @@ INTRO_DICTIONARY_SOURCE = "Webster 1913"
 INTRO_DICTIONARY_GUIDE = ("cry", "crystal")
 # Aled's photographed opening — tight on crypt / cryptic / cryptogram.
 INTRO_DICTIONARY_PHOTO = PACKAGE_ROOT / "assets" / "intro-dictionary-page.jpg"
+INTRO_DICTIONARY_BOOK = PACKAGE_ROOT / "assets" / "intro-dictionary-book.jpg"
+# Overhead plate: start wide on the book, land on the two pages.
+INTRO_BOOK_START = (120, 0, 840, 1280)
+INTRO_BOOK_END = (270, 220, 850, 1250)
 INTRO_DICTIONARY_CROP = (500, 240, 820, 1000)
 INTRO_DICTIONARY_SOURCE_FOCUS = (648, 492)
 INTRO_DICTIONARY_SOURCE_GLANCE = (675, 700)
@@ -444,6 +448,62 @@ def _draw_thesaurus_panel(draw: ImageDraw.ImageDraw, x: int, y: int, width: int)
     draw.text((x + pad, y + box_h - 28), "see also  § 519 Enigma", font=heading, fill=CRIMSON)
 
 
+def _smootherstep(t: float) -> float:
+    t = max(0.0, min(1.0, t))
+    return t * t * t * (t * (t * 6.0 - 15.0) + 10.0)
+
+
+@lru_cache(maxsize=1)
+def _book_plate() -> Image.Image:
+    src = Image.open(INTRO_DICTIONARY_BOOK).convert("RGB")
+    src = ImageEnhance.Contrast(src).enhance(1.08)
+    src = ImageEnhance.Brightness(src).enhance(1.06)
+    return src
+
+
+def _window_crop(src: Image.Image, box: tuple[float, float, float, float]) -> Image.Image:
+    """Crop a (possibly fractional) window and scale it to the Short frame."""
+    left, top, right, bottom = box
+    # Oversample via a pixel-aligned crop, then resize — no shake, just a gimbal ease.
+    pad = 2
+    raw = src.crop(
+        (
+            max(0, int(left) - pad),
+            max(0, int(top) - pad),
+            min(src.size[0], int(right) + pad),
+            min(src.size[1], int(bottom) + pad),
+        )
+    )
+    raw = raw.resize(
+        (
+            int((right - left + 2 * pad) * (WIDTH / (right - left))),
+            int((bottom - top + 2 * pad) * (HEIGHT / (bottom - top))),
+        ),
+        Image.Resampling.LANCZOS,
+    )
+    inset_x = int(pad * (WIDTH / (right - left)))
+    inset_y = int(pad * (HEIGHT / (bottom - top)))
+    frame = raw.crop((inset_x, inset_y, inset_x + WIDTH, inset_y + HEIGHT))
+    if frame.size != (WIDTH, HEIGHT):
+        frame = frame.resize((WIDTH, HEIGHT), Image.Resampling.LANCZOS)
+    return frame
+
+
+def _stabilized_book_frame(progress: float) -> Image.Image:
+    """Locked-off overhead plate, pushed in as if the camera were on a gimbal."""
+    src = _book_plate()
+    t = _smootherstep(progress)
+    sl, st, sr, sb = INTRO_BOOK_START
+    el, et, er, eb = INTRO_BOOK_END
+    box = (
+        sl + (el - sl) * t,
+        st + (et - st) * t,
+        sr + (er - sr) * t,
+        sb + (eb - sb) * t,
+    )
+    return _window_crop(src, box)
+
+
 def _photo_point(src_xy: tuple[int, int], box: tuple[int, int, int, int], scale: float, top_trim: int) -> tuple[int, int]:
     left, top, _, _ = box
     return (
@@ -598,13 +658,12 @@ def _with_magnifier(page: Image.Image, center: tuple[int, int], radius: int = 26
     return out.convert("RGB")
 
 
-def _compose_intro_frame(progress: float) -> Image.Image:
-    """Real dictionary page: hold on cryptic, then read the neighbours."""
+def _close_page_with_glass(progress: float) -> Image.Image:
+    """Tight column: glass on cryptic, then a glance at the neighbours."""
     t = max(0.0, min(1.0, progress))
     page, focus, glance = _dictionary_layout()
-    # First half of the open is for the definition. Then a slow glance down the column.
-    hold = 0.0 if t < 0.42 else min(1.0, (t - 0.42) / 0.58)
-    ease = hold * hold * (3 - 2 * hold)
+    hold = 0.0 if t < 0.28 else min(1.0, (t - 0.28) / 0.72)
+    ease = _smootherstep(hold)
     glass = (
         int(focus[0] + (glance[0] - focus[0]) * ease),
         int(focus[1] + (glance[1] - focus[1]) * ease),
@@ -614,6 +673,19 @@ def _compose_intro_frame(progress: float) -> Image.Image:
     draw.rectangle([0, 0, WIDTH, 14], fill=HIGHLIGHT)
     draw.rectangle([0, HEIGHT - 14, WIDTH, HEIGHT], fill=HIGHLIGHT)
     return frame
+
+
+def _compose_intro_frame(progress: float) -> Image.Image:
+    """Stabilized push from the open book onto the cryptic column."""
+    t = max(0.0, min(1.0, progress))
+    if INTRO_DICTIONARY_BOOK.exists():
+        wide = _stabilized_book_frame(min(1.0, t / 0.46))
+        if t < 0.40:
+            return wide
+        close = _close_page_with_glass(max(0.0, (t - 0.46) / 0.54))
+        mix = _smootherstep((t - 0.40) / 0.12) if t < 0.52 else 1.0
+        return Image.blend(wide.convert("RGB"), close.convert("RGB"), mix)
+    return _close_page_with_glass(t)
 
 
 def draw_intro_kaleidoscope_still(clue: Clue | None = None, dest: Path | None = None) -> Image.Image:
