@@ -709,9 +709,12 @@ def publish_site(pair: DailyPair, dest: Path | None = None) -> Path:
 
     pretty = datetime.strptime(pair.date, "%Y-%m-%d").strftime("%A %-d %B %Y")
     articles = "\n".join(_article(item, "media/") for item in pair.clues)
+    one = len(pair.clues) == 1
+    kicker = "One clue · premiere" if one else "Two clues"
+    heading = "Today’s premiere." if one else "Today’s pair."
     index_body = f"""
-    <p class="kicker">Two clues · {_e(pretty)}</p>
-    <h1>Today’s pair.</h1>
+    <p class="kicker">{kicker} · {_e(pretty)}</p>
+    <h1>{heading}</h1>
     <p class="lede">Have a go before you tap solve. Parses follow Fifteen Squared — we speak them, we don’t nick the grid. Pick a place from the header if you’d rather solve against the Matterhorn than newsprint.</p>
     <section class="pair">
       {articles}
