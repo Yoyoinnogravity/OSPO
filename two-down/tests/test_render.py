@@ -10,6 +10,7 @@ from twodown.render import (
     INTRO_DICTIONARY_BOOK,
     INTRO_DICTIONARY_PHOTO,
     INTRO_DICTIONARY_SOURCE,
+    INTRO_KALEIDOSCOPE_HOLD,
     INTRO_KALEIDOSCOPE_WORDS,
     INTRO_THESAURUS_HEADING,
     INTRO_THESAURUS_SOURCE,
@@ -250,6 +251,7 @@ def test_intro_beat_is_kaleidoscope_not_the_spoken_line(tmp_path: Path):
     from twodown.config import INTRO_LINE
     from twodown.render import _dictionary_layout
 
+    assert INTRO_KALEIDOSCOPE_HOLD >= 14.0
     wide = _compose_intro_frame(0.08)
     close = _compose_intro_frame(0.72)
     path = tmp_path / "intro.png"

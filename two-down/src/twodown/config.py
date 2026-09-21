@@ -60,9 +60,9 @@ INTRO_RATE = "+3%"
 INTRO_PITCH = "+4Hz"
 INTRO_VOLUME = "+8%"
 # After Ryan, stay on the dictionary so the glass can be read.
-INTRO_GAP_SECONDS = 4.5
-# After the sting, a longer look at the open book before he speaks.
-INTRO_LOOK_BEFORE_SECONDS = 1.6
+INTRO_GAP_SECONDS = 6.5
+# After the sting, sit on the open book before he speaks.
+INTRO_LOOK_BEFORE_SECONDS = 2.4
 OUTRO_LINE = "Thanks for thinking with cryptic.fit."
 OUTRO_GAP_SECONDS = 0.4
 # Same two chords at both ends, on an up-beat: a short C pickup into F.

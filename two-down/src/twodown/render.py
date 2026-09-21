@@ -153,7 +153,7 @@ INTRO_DICTIONARY_ENTRIES: tuple[DictionaryEntry, ...] = (
     DictionaryEntry("Cubic", "a.", ("Having the form or properties of a cube.",)),
 )
 INTRO_DICTIONARY_SENSES = next(entry.senses for entry in INTRO_DICTIONARY_ENTRIES if entry.featured)
-INTRO_KALEIDOSCOPE_HOLD = 12.0
+INTRO_KALEIDOSCOPE_HOLD = 15.0
 INTRO_KALEIDOSCOPE_ASSET = PACKAGE_ROOT / "assets" / "intro-kaleidoscope.mp4"
 INTRO_KALEIDOSCOPE_STILL = PACKAGE_ROOT / "assets" / "intro-kaleidoscope.jpg"
 FONT_ITALIC = "/usr/share/fonts/truetype/liberation/LiberationSerif-Italic.ttf"
@@ -684,14 +684,14 @@ def _glass_travel(
 ) -> tuple[int, int]:
     """Occult on cryptic, across to cryptogram, rest on cryptology (secret or enigmatic)."""
     t = max(0.0, min(1.0, progress))
-    if t < 0.20:
+    if t < 0.28:
         return focus
-    if t < 0.42:
-        return _lerp_xy(focus, cryptogram, _smootherstep((t - 0.20) / 0.22))
-    if t < 0.50:
+    if t < 0.48:
+        return _lerp_xy(focus, cryptogram, _smootherstep((t - 0.28) / 0.20))
+    if t < 0.60:
         return cryptogram
-    if t < 0.78:
-        return _lerp_xy(cryptogram, cryptology, _smootherstep((t - 0.50) / 0.28))
+    if t < 0.82:
+        return _lerp_xy(cryptogram, cryptology, _smootherstep((t - 0.60) / 0.22))
     return cryptology
 
 
@@ -711,11 +711,11 @@ def _compose_intro_frame(progress: float) -> Image.Image:
     """Stabilized push from the open book onto the cryptic column."""
     t = max(0.0, min(1.0, progress))
     if INTRO_DICTIONARY_BOOK.exists():
-        wide = _stabilized_book_frame(min(1.0, t / 0.50))
-        if t < 0.46:
+        wide = _stabilized_book_frame(min(1.0, t / 0.56))
+        if t < 0.50:
             return wide
-        close = _close_page_with_glass(max(0.0, (t - 0.52) / 0.48))
-        mix = _smootherstep((t - 0.46) / 0.12) if t < 0.58 else 1.0
+        close = _close_page_with_glass(max(0.0, (t - 0.54) / 0.46))
+        mix = _smootherstep((t - 0.50) / 0.12) if t < 0.62 else 1.0
         return Image.blend(wide.convert("RGB"), close.convert("RGB"), mix)
     return _close_page_with_glass(t)
 
