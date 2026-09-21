@@ -7,7 +7,7 @@ from datetime import datetime
 from pathlib import Path
 
 from twodown.ads import ads_status
-from twodown.config import DEFAULT_OUTPUT, DEFAULT_VOICE_ALIAS, SITE_HOST, SITE_ORIGIN, SOURCE_SITE, STUDY_SLUG, VOICES
+from twodown.config import DEFAULT_OUTPUT, DEFAULT_VOICE_ALIAS, SITE_HOST, SITE_ORIGIN, SOURCE_SITE, STUDY_SLUG, VOICES, YOUTUBE_DAILY_LIMIT
 from twodown.ingest import LONDON
 from twodown.live import (
     PRODUCT_CHECK_NAMES,
@@ -18,7 +18,7 @@ from twodown.live import (
     registry_status,
 )
 from twodown.models import DailyPair
-from twodown.pipeline import load_all_published_pairs, load_upload_pair, render_one_short, run_today
+from twodown.pipeline import load_upload_pair, load_youtube_queue, render_one_short, run_today, unpublished_shorts
 from twodown.scenes import DEFAULT_SCENE, list_scenes
 from twodown.social import (
     PLATFORMS,
@@ -106,6 +106,11 @@ def _print_status() -> None:
         print(f"  {name:10} {state}")
         if not status[name]:
             print(f"             {hints[name]}")
+    waiting = unpublished_shorts()
+    print(f"  queue      {len(waiting)} unpublished Shorts, {YOUTUBE_DAILY_LIMIT} per day")
+    if waiting:
+        date, item = waiting[0]
+        print(f"             next {date} {item.clue.slug}")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -131,16 +136,25 @@ def main(argv: list[str] | None = None) -> int:
     today.add_argument("--youtube-privacy", default="public", choices=["unlisted", "private", "public"])
     _add_social_flags(today)
 
-    upload = sub.add_parser("upload", help="Upload today's two Shorts to YouTube, TikTok, Instagram and Facebook")
+    upload = sub.add_parser("upload", help="Upload the next unpublished Short to YouTube (one a day)")
     upload.add_argument("--out", type=Path, default=DEFAULT_OUTPUT)
     upload.add_argument("--date", help="London calendar date YYYY-MM-DD")
     upload.add_argument("--youtube-privacy", default="public", choices=["unlisted", "private", "public"])
     upload.add_argument(
+        "--limit",
+        type=int,
+        default=YOUTUBE_DAILY_LIMIT,
+        help=f"How many new YouTube Shorts this run (default {YOUTUBE_DAILY_LIMIT})",
+    )
+    upload.add_argument(
         "--all-site",
         action="store_true",
-        help="Upload every unpublished pair on two-down/site (quota: ~6 Shorts/day)",
+        help="Upload the whole unpublished backlog (YouTube quota is about 6 Shorts/day)",
     )
     _add_social_flags(upload)
+
+    queue = sub.add_parser("queue", help="List published Shorts not yet on YouTube")
+    queue.add_argument("--json", action="store_true")
 
     auth = sub.add_parser("youtube-auth", help="One-time Google login for the cryptic.fit YouTube channel")
     auth.add_argument("--console", action="store_true", help="Print a URL and paste the code (no local browser)")
@@ -203,6 +217,29 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.cmd == "status":
         _print_status()
+        return 0
+
+    if args.cmd == "queue":
+        waiting = unpublished_shorts()
+        if args.json:
+            print(
+                json.dumps(
+                    [
+                        {
+                            "date": date,
+                            "slug": item.clue.slug,
+                            "clue": item.clue.clue,
+                            "video": item.video_path,
+                        }
+                        for date, item in waiting
+                    ],
+                    indent=2,
+                )
+            )
+            return 0
+        print(f"{len(waiting)} unpublished Shorts for {YOUTUBE_CHANNEL} ({YOUTUBE_DAILY_LIMIT} per day)")
+        for date, item in waiting:
+            print(f"  {date}  {item.clue.slug}  {item.clue.clue}")
         return 0
 
     if args.cmd == "connect":
@@ -280,11 +317,19 @@ def main(argv: list[str] | None = None) -> int:
             print("No connected social accounts for the requested platforms.", file=sys.stderr)
             _print_status()
             return 2
+        youtube_limit = None if args.all_site else args.limit
         try:
-            pairs = load_all_published_pairs() if args.all_site else [load_upload_pair(args.out, args.date)]
+            if args.date:
+                pairs = [load_upload_pair(args.out, args.date)]
+            else:
+                queued = load_youtube_queue(limit=youtube_limit)
+                pairs = [queued] if queued else []
         except FileNotFoundError as exc:
             print(str(exc), file=sys.stderr)
             return 1
+        if not pairs:
+            print("YouTube queue is empty — every published Short is already logged.")
+            return 0
         uploaded = False
         for pair in pairs:
             notes = publish_pair(
@@ -294,6 +339,7 @@ def main(argv: list[str] | None = None) -> int:
                 instagram=wanted["instagram"],
                 facebook=wanted["facebook"],
                 youtube_privacy=args.youtube_privacy,
+                youtube_limit=youtube_limit,
             )
             dest = _pair_path(args.out, pair, args.date)
             dest.write_text(pair.model_dump_json(indent=2), encoding="utf-8")

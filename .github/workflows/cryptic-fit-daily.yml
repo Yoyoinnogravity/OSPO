@@ -16,6 +16,11 @@ on:
         description: Skip cutting a new pair; upload existing site films only
         type: boolean
         default: false
+      youtube_limit:
+        description: How many unpublished Shorts to post this run (1 a day once the backlog is gone)
+        type: choice
+        options: ["1", "6"]
+        default: "1"
 
 permissions:
   contents: write
@@ -53,7 +58,7 @@ jobs:
           if [ -z "$PRIVACY" ]; then
             PRIVACY=public
           fi
-          python3 -m twodown today --youtube-privacy "$PRIVACY" || true
+          python3 -m twodown today --no-youtube --youtube-privacy "$PRIVACY" || true
 
       - name: Upload Shorts to YouTube
         id: youtube
@@ -68,8 +73,13 @@ jobs:
           if [ -z "$PRIVACY" ]; then
             PRIVACY=public
           fi
+          LIMIT="${{ github.event.inputs.youtube_limit }}"
+          if [ -z "$LIMIT" ]; then
+            LIMIT=1
+          fi
+          python3 -m twodown queue
           python3 -m twodown status
-          python3 -m twodown upload --youtube-privacy "$PRIVACY"
+          python3 -m twodown upload --limit "$LIMIT" --youtube-privacy "$PRIVACY"
 
       - name: Open a site PR when the pair or upload ledger changed
         if: github.ref == 'refs/heads/main'

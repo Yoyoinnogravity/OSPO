@@ -5,7 +5,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from twodown.captions import youtube_description
-from twodown.config import BRAND, CLUES_PER_DAY
+from twodown.config import BRAND, YOUTUBE_DAILY_LIMIT
 from twodown.models import Clue, DailyPair, SpokenClue
 from twodown.tokens import CONFIG_DIR, secret_text
 
@@ -196,14 +196,19 @@ def upload_short(item: SpokenClue, privacy: str = "public") -> str | None:
     return video_id
 
 
-def upload_pair(pair: DailyPair, privacy: str = "public") -> list[str]:
+def upload_pair(pair: DailyPair, privacy: str = "public", limit: int | None = YOUTUBE_DAILY_LIMIT) -> list[str]:
+    """Upload unpublished Shorts on this pair. limit=None means the whole pair."""
     ids: list[str] = []
-    for item in pair.clues[:CLUES_PER_DAY]:
+    uploaded = 0
+    for item in pair.clues:
         if item.youtube_id:
             ids.append(item.youtube_id)
+            continue
+        if limit is not None and uploaded >= limit:
             continue
         video_id = upload_short(item, privacy=privacy)
         if video_id:
             ids.append(video_id)
-    pair.youtube_ids = ids
+            uploaded += 1
+    pair.youtube_ids = [item.youtube_id for item in pair.clues if item.youtube_id]
     return ids

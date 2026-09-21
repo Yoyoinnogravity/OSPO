@@ -52,11 +52,21 @@ answer in the video, not the caption.
 Social
 ------
 
-`twodown today` and `twodown upload` send the same two vertical videos to
-every platform that has a token. Missing tokens are skipped, not fatal.
+The site still publishes **two** clues a day. YouTube gets **one Short a
+day** on `youtube.com/@crypticfit`. The daily job posts the oldest
+unpublished film first, so the twelve finished pair Shorts go up before
+new ones. Study takes (the extra SMILES / RASTA / Cole cuts) stay off
+the channel.
+
 GitHub Actions (`.github/workflows/cryptic-fit-daily.yml`) cuts the pair
-each morning and uploads to YouTube once `TWODOWN_YOUTUBE_TOKEN` is a
-repo secret.
+each morning and uploads one Short once `TWODOWN_YOUTUBE_TOKEN` is a
+repo secret. `twodown queue` lists what is waiting.
+
+```bash
+twodown queue                  # unpublished daily Shorts, oldest first
+twodown upload                 # next one Short
+twodown upload --limit 6       # catch-up (YouTube quota is about 6/day)
+```
 
 One-time YouTube login (laptop with a browser):
 

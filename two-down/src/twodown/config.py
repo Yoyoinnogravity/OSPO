@@ -81,6 +81,9 @@ HINT_VOICE_ALIAS = "ryan"
 HINT_HOLD_SECONDS = 4.0
 HINT_PAUSE_SECONDS = 2.5
 CLUES_PER_DAY = 2
+# YouTube gets one Short a day. The site still publishes the pair.
+# The unpublished queue (oldest first) drains the backlog, then new films.
+YOUTUBE_DAILY_LIMIT = 1
 # Lock the spoken beat on this constructed study clue before touching the others.
 # MASS MEDIA is FT 18483 1 across; twodown short rebuilds this clue only.
 STUDY_SLUG = "financial-times-18483-1a"

@@ -17,6 +17,7 @@ from twodown.config import (
     SOURCE_SITE,
     STUDY_SLUG,
     VOICES,
+    YOUTUBE_DAILY_LIMIT,
 )
 from twodown.hints import attach_hint
 from twodown.ingest import LONDON, fetch_daily_posts, posts_for_london_date
@@ -167,14 +168,51 @@ def load_upload_pair(out_dir: Path | None = None, date: str | None = None) -> Da
     raise FileNotFoundError(f"No daily output in {out} and no published site pair. Run twodown today first.")
 
 
-def load_all_published_pairs(site_root: Path | None = None) -> list[DailyPair]:
+def load_all_published_pairs(site_root: Path | None = None, *, newest_first: bool = True) -> list[DailyPair]:
     root = Path(site_root or SITE_ROOT)
+    dates = sorted((path.name for path in (root / "d").iterdir() if path.is_dir()), reverse=newest_first)
     pairs: list[DailyPair] = []
-    for date in sorted((path.name for path in (root / "d").iterdir() if path.is_dir()), reverse=True):
+    for date in dates:
         pair = load_published_pair(date, root)
         if pair:
             pairs.append(pair)
     return pairs
+
+
+def unpublished_shorts(site_root: Path | None = None) -> list[tuple[str, SpokenClue]]:
+    """Published daily films not yet on YouTube, oldest pair first. Study takes stay off the channel."""
+    waiting: list[tuple[str, SpokenClue]] = []
+    seen: set[str] = set()
+    for pair in load_all_published_pairs(site_root, newest_first=False):
+        for item in pair.clues:
+            slug = item.clue.slug
+            if slug in seen:
+                continue
+            seen.add(slug)
+            if item.youtube_id:
+                continue
+            if not item.video_path or not Path(item.video_path).exists():
+                continue
+            waiting.append((pair.date, item))
+    return waiting
+
+
+def load_youtube_queue(limit: int | None = YOUTUBE_DAILY_LIMIT, site_root: Path | None = None) -> DailyPair | None:
+    """Next Shorts to post. limit=None means the whole unpublished backlog."""
+    waiting = unpublished_shorts(site_root)
+    if not waiting:
+        return None
+    chosen = waiting if limit is None else waiting[: max(0, limit)]
+    if not chosen:
+        return None
+    return DailyPair(
+        date=chosen[0][0],
+        voice=chosen[0][1].voice,
+        clues=[item for _date, item in chosen],
+        source_site=SOURCE_SITE,
+        site_index=str(Path(site_root or SITE_ROOT) / "index.html"),
+        already_published=True,
+    )
 
 
 # Guardian 30115 — Aled's study clues. Metadata from Fifteen Squared
@@ -599,6 +637,7 @@ def _maybe_publish_social(
     instagram: bool,
     facebook: bool,
     youtube_privacy: str,
+    youtube_limit: int | None = YOUTUBE_DAILY_LIMIT,
 ) -> None:
     if not (youtube or tiktok or instagram or facebook):
         return
@@ -609,6 +648,7 @@ def _maybe_publish_social(
         instagram=instagram,
         facebook=facebook,
         youtube_privacy=youtube_privacy,
+        youtube_limit=youtube_limit,
     )
     _write_social(dest_root, pair, notes)
 

@@ -15,6 +15,7 @@ run it unattended. Never use another crossword blog as the source.
 5. Tools: pull request creation on. Memories optional.
 6. Paste the prompt below.
 7. YouTube auto-upload is the GitHub Action `.github/workflows/cryptic-fit-daily.yml`.
+   It posts **one Short a day** (oldest unpublished first) to @crypticfit.
    Aled generates the token once on a laptop with `twodown youtube-auth`, then
    pastes that JSON as repo secret `TWODOWN_YOUTUBE_TOKEN`.
    Optional: the same secret on the Cloud Agent environment so this prompt

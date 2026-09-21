@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from twodown.captions import facebook_title, social_caption
-from twodown.config import CLUES_PER_DAY, SITE_ROOT
+from twodown.config import CLUES_PER_DAY, SITE_ROOT, YOUTUBE_DAILY_LIMIT
 from twodown.meta import facebook_ready, instagram_ready, upload_facebook, upload_instagram
 from twodown.models import DailyPair
 from twodown.tiktok import tiktok_ready, upload_short as upload_tiktok
@@ -128,9 +128,10 @@ def publish_pair(
     instagram: bool = True,
     facebook: bool = True,
     youtube_privacy: str = "public",
+    youtube_limit: int | None = YOUTUBE_DAILY_LIMIT,
     site_root: Path | None = None,
 ) -> dict[str, list[str]]:
-    """Upload today's two Shorts to every connected platform. One failure does not stop the rest."""
+    """Upload Shorts to every connected platform. YouTube posts at most youtube_limit new films."""
     attach_site_videos(pair, site_root)
     apply_ledger(pair, site_root)
     notes: dict[str, list[str]] = {name: [] for name in PLATFORMS}
@@ -142,7 +143,7 @@ def publish_pair(
             notes["youtube"] = [hints["youtube"]]
         else:
             try:
-                notes["youtube"] = upload_youtube(pair, privacy=youtube_privacy)
+                notes["youtube"] = upload_youtube(pair, privacy=youtube_privacy, limit=youtube_limit)
             except Exception as exc:  # noqa: BLE001 — one platform must not block the others
                 notes["youtube"] = [f"error: {exc}"]
 
