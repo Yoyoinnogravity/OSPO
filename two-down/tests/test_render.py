@@ -4,6 +4,7 @@ from pathlib import Path
 from twodown.models import Clue
 from twodown.render import (
     AUDIO_LOUDNESS,
+    INTRO_DICTIONARY_HEADWORD,
     INTRO_KALEIDOSCOPE_WORDS,
     ShortTimings,
     THUMB_H,
@@ -17,6 +18,7 @@ from twodown.render import (
     draw_poster,
     _thumbnail_clue,
     draw_thumbnail,
+    _compose_intro_frame,
     intro_kaleidoscope_words,
     issue_catalog,
     render_intro_kaleidoscope,
@@ -196,7 +198,8 @@ def test_intro_kaleidoscope_is_generic_not_per_clue():
     words = intro_kaleidoscope_words(clue)
     assert words == list(INTRO_KALEIDOSCOPE_WORDS)
     assert "CRYPTIC" in words
-    assert "FIT" in words
+    assert INTRO_DICTIONARY_HEADWORD == "cryptic"
+    assert "FIT" not in words
     assert "MODEL" not in words
     assert "YOUNGSTER" not in words
     assert clue.answer not in words
@@ -209,14 +212,17 @@ def test_intro_kaleidoscope_is_generic_not_per_clue():
 def test_intro_beat_is_kaleidoscope_not_the_spoken_line(tmp_path: Path):
     from PIL import Image
 
-    from twodown.config import INTRO_LINE, NEWS_BG
+    from twodown.config import INK, INTRO_LINE
 
-    path = draw_beat(_clue(), tmp_path / "intro.png", "intro")
-    img = Image.open(path)
+    img = _compose_intro_frame(0.25)
+    path = tmp_path / "intro.png"
+    img.save(path)
     assert img.size == (1080, 1920)
-    # Old open was a newsprint title card of the spoken line. This is the animation still.
-    assert img.getpixel((24, 40)) != NEWS_BG
-    assert img.getpixel((540, 40)) != NEWS_BG
+    # Lexicon paper, not the old black letter-vortex.
+    paper = img.getpixel((40, 80))
+    assert paper[0] > 200 and paper[1] > 190
+    head = list(img.crop((80, 230, 720, 350)).get_flattened_data())
+    assert head.count(INK) > 400
     raw = path.read_bytes()
     assert INTRO_LINE.encode() not in raw
     assert b"daily dose" not in raw.lower()

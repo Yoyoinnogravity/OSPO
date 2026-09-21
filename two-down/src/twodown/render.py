@@ -7,7 +7,9 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageFont
+from functools import lru_cache
+
+from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 from dataclasses import dataclass
 
@@ -54,13 +56,23 @@ PARSE_SPACING = 20
 # Map speech into the Short and make it unmistakable (widgets often play quiet).
 AUDIO_LOUDNESS = "loudnorm=I=-16:TP=-1.5:LRA=11,volume=3,alimiter=limit=0.95"
 INTRO_KALEIDOSCOPE_FPS = 24
-INTRO_KALEIDOSCOPE_FOLDS = 8
-INTRO_KALEIDOSCOPE_SIZE = 1920
-# One stock open for every film. Do not bake a new one per clue.
-INTRO_KALEIDOSCOPE_WORDS = ("CRYPTIC", "FIT", "CLUE", "SOLVE", "THINK", "PARSE", "LETTERS")
+INTRO_KALEIDOSCOPE_FOLDS = 6
+INTRO_KALEIDOSCOPE_SIZE = 720
+# One stock open for every film. Dictionary of "cryptic", not a per-clue graphic.
+INTRO_KALEIDOSCOPE_WORDS = ("CRYPTIC",)
+INTRO_DICTIONARY_HEADWORD = "cryptic"
+INTRO_DICTIONARY_PRONUNCIATION = "/KRIP-tik/"
+INTRO_DICTIONARY_POS = "adjective"
+INTRO_DICTIONARY_SENSES = (
+    "mysterious or obscure in meaning",
+    "of a crossword: clues that use wordplay",
+)
 INTRO_KALEIDOSCOPE_HOLD = 4.0
 INTRO_KALEIDOSCOPE_ASSET = PACKAGE_ROOT / "assets" / "intro-kaleidoscope.mp4"
 INTRO_KALEIDOSCOPE_STILL = PACKAGE_ROOT / "assets" / "intro-kaleidoscope.jpg"
+FONT_ITALIC = "/usr/share/fonts/truetype/liberation/LiberationSerif-Italic.ttf"
+BRASS = (176, 132, 48)
+BRASS_LIGHT = (228, 196, 110)
 
 
 def _font(path: str, size: int) -> ImageFont.FreeTypeFont:
@@ -273,44 +285,15 @@ def _new_card() -> tuple[Image.Image, ImageDraw.ImageDraw]:
 
 
 def intro_kaleidoscope_words(clue: Clue | None = None) -> list[str]:
-    """Stock brand words. Same list on every film — never the clue, never the answer."""
+    """The lexicon headword only. Same on every film — never the clue, never the answer."""
     del clue
     return list(INTRO_KALEIDOSCOPE_WORDS)
 
 
-def _intro_rng(seed: int):
-    state = seed % 9973 or 1
-
-    def nxt() -> int:
-        nonlocal state
-        state = (state * 1103515245 + 12345) & 0x7FFFFFFF
-        return state
-
-    return nxt
-
-
-def _intro_word_field(size: int = INTRO_KALEIDOSCOPE_SIZE) -> Image.Image:
-    """Scattered display-type words. Cantarell, not the serif used on the clue."""
-    words = intro_kaleidoscope_words()
-    field = Image.new("RGB", (size, size), INK)
-    nxt = _intro_rng(287)
-    colors = (YELLOW, CREAM, HIGHLIGHT, (255, 236, 150))
-    copies = max(56, len(words) * 8)
-    cx = cy = size / 2
-    for i in range(copies):
-        word = words[i % len(words)]
-        size_pt = 44 + (nxt() % 96)
-        angle = (nxt() % 180) - 90
-        font = _font(FONT_DISPLAY, size_pt)
-        layer = Image.new("RGBA", (980, 280), (0, 0, 0, 0))
-        ImageDraw.Draw(layer).text((20, 20), word, font=font, fill=(*colors[i % len(colors)], 255))
-        rotated = layer.rotate(angle, resample=Image.Resampling.BILINEAR, expand=True)
-        radius = 70 + (nxt() % (size // 2 - 90))
-        theta = (nxt() % 3600) / 10 * math.pi / 180
-        x = int(cx + radius * math.cos(theta) - rotated.size[0] / 2)
-        y = int(cy + radius * math.sin(theta) - rotated.size[1] / 2)
-        field.paste(rotated, (x, y), rotated)
-    return field
+def _circle_mask(size: int, inset: int = 2) -> Image.Image:
+    mask = Image.new("L", (size, size), 0)
+    ImageDraw.Draw(mask).ellipse((inset, inset, size - 1 - inset, size - 1 - inset), fill=255)
+    return mask
 
 
 def _sector_mask(size: int, folds: int = INTRO_KALEIDOSCOPE_FOLDS) -> Image.Image:
@@ -327,17 +310,14 @@ def _sector_mask(size: int, folds: int = INTRO_KALEIDOSCOPE_FOLDS) -> Image.Imag
     return mask
 
 
-_SECTOR_MASK = _sector_mask(INTRO_KALEIDOSCOPE_SIZE, INTRO_KALEIDOSCOPE_FOLDS)
-
-
 def _kaleidoscope_tile(field: Image.Image, angle: float, folds: int = INTRO_KALEIDOSCOPE_FOLDS) -> Image.Image:
     size = field.size[0]
     rotated = field.rotate(angle, resample=Image.Resampling.BILINEAR)
-    blank = Image.new("RGB", field.size, INK)
-    mask = _SECTOR_MASK if size == INTRO_KALEIDOSCOPE_SIZE else _sector_mask(size, folds)
+    blank = Image.new("RGB", field.size, NEWS_BG)
+    mask = _sector_mask(size, folds)
     wedge = Image.composite(rotated, blank, mask)
     mirrored = Image.composite(rotated.transpose(Image.Transpose.FLIP_TOP_BOTTOM), blank, mask)
-    out = Image.new("RGB", field.size, INK)
+    out = Image.new("RGB", field.size, NEWS_BG)
     step = 360.0 / folds
     for i in range(folds):
         piece = wedge if i % 2 == 0 else mirrored
@@ -347,25 +327,123 @@ def _kaleidoscope_tile(field: Image.Image, angle: float, folds: int = INTRO_KALE
     return out
 
 
-def _intro_frame(field: Image.Image, angle: float) -> Image.Image:
+def _cryptic_kaleidoscope_disc(angle: float, size: int = INTRO_KALEIDOSCOPE_SIZE) -> Image.Image:
+    """A kaleidoscope plate of the headword, sitting on the dictionary page."""
+    field = Image.new("RGB", (size, size), HIGHLIGHT)
+    draw = ImageDraw.Draw(field)
+    big = _font(FONT_BOLD, 118)
+    word = "CRYPTIC"
+    width = draw.textlength(word, font=big)
+    draw.text(((size - width) / 2, size / 2 - 70), word, font=big, fill=YELLOW)
+    for rot, fill, xy in (
+        (38, CREAM, (20, 80)),
+        (-42, INK, (160, 300)),
+        (12, YELLOW, (40, 400)),
+    ):
+        layer = Image.new("RGBA", (700, 180), (0, 0, 0, 0))
+        ImageDraw.Draw(layer).text((8, 16), word, font=big, fill=(*fill, 255))
+        rotated = layer.rotate(rot, resample=Image.Resampling.BILINEAR, expand=True)
+        field.paste(rotated, xy, rotated)
     tile = _kaleidoscope_tile(field, angle)
-    left = (tile.size[0] - WIDTH) // 2
-    frame = tile.crop((left, 0, left + WIDTH, HEIGHT))
-    draw = ImageDraw.Draw(frame)
-    draw.rectangle([0, 0, WIDTH, 14], fill=HIGHLIGHT)
-    draw.rectangle([0, HEIGHT - 14, WIDTH, HEIGHT], fill=HIGHLIGHT)
+    circle = Image.new("RGB", (size, size), HIGHLIGHT)
+    circle.paste(tile, (0, 0), _circle_mask(size))
+    return circle
+
+
+@lru_cache(maxsize=1)
+def _dictionary_page() -> Image.Image:
+    """Open lexicon: the word cryptic and its crossword sense. Same on every film."""
+    img, draw = _newsprint_canvas()
+    header = _font(FONT_SANS, 22)
+    draw.text((72, 56), "CRYPTIC.FIT  ·  LEXICON", font=header, fill=MUTED)
+    draw.text((WIDTH - 160, 56), "C", font=_font(FONT_SANS_BOLD, 22), fill=CRIMSON)
+    draw.line([(72, 96), (WIDTH - 72, 96)], fill=CRIMSON, width=3)
+    draw.text((80, 130), "crossword  ·  cryptogram  ·  crux", font=_font(FONT_ITALIC, 26), fill=(168, 150, 128))
+    draw.line([(72, 190), (WIDTH - 72, 190)], fill=INK, width=2)
+    head = _font(FONT_BOLD, 100)
+    draw.text((80, 230), INTRO_DICTIONARY_HEADWORD, font=head, fill=INK)
+    meta = _font(FONT_ITALIC, 30)
+    draw.text(
+        (80, 360),
+        f"{INTRO_DICTIONARY_PRONUNCIATION}   {INTRO_DICTIONARY_POS}",
+        font=meta,
+        fill=MUTED,
+    )
+    sense = _font(FONT_REGULAR, 36)
+    draw.text((80, 440), f"1.  {INTRO_DICTIONARY_SENSES[0]}", font=sense, fill=INK)
+    sense_two = _wrap(draw, f"2.  {INTRO_DICTIONARY_SENSES[1]}", sense, WIDTH - 200)
+    draw.multiline_text((80, 520), sense_two, font=sense, fill=INK, spacing=10)
+    draw.text((80, 1788), "Fig. 1  kaleidoscope on the entry", font=_font(FONT_ITALIC, 24), fill=MUTED)
+    return img
+
+
+def _paste_disc(page: Image.Image, angle: float) -> Image.Image:
+    frame = page.copy()
+    disc = _cryptic_kaleidoscope_disc(angle)
+    size = disc.size[0]
+    x, y = (WIDTH - size) // 2, 860
+    rim = ImageDraw.Draw(frame)
+    rim.ellipse((x - 12, y - 12, x + size + 12, y + size + 12), outline=INK, width=5)
+    rim.ellipse((x - 22, y - 22, x + size + 22, y + size + 22), outline=BRASS, width=8)
+    frame.paste(disc, (x, y), _circle_mask(size))
     return frame
 
 
+def _with_magnifier(page: Image.Image, center: tuple[int, int], radius: int = 268, zoom: float = 1.7) -> Image.Image:
+    """Brass glass over the headword and the kaleidoscope plate."""
+    cx, cy = center
+    src_r = int(radius / zoom)
+    box = (cx - src_r, cy - src_r, cx + src_r, cy + src_r)
+    crop = page.crop(box).resize((radius * 2, radius * 2), Image.Resampling.LANCZOS)
+    lens = Image.new("RGBA", page.size, (0, 0, 0, 0))
+    left, top = cx - radius, cy - radius
+    lens.paste(crop.convert("RGBA"), (left, top), _circle_mask(radius * 2))
+    overlay = ImageDraw.Draw(lens)
+    ring = [left, top, left + radius * 2, top + radius * 2]
+    overlay.ellipse(ring, outline=(*BRASS, 255), width=22)
+    overlay.ellipse(
+        (left + 8, top + 8, left + radius * 2 - 8, top + radius * 2 - 8),
+        outline=(*BRASS_LIGHT, 255),
+        width=6,
+    )
+    overlay.arc(
+        (left + 36, top + 28, left + radius - 10, top + radius - 20),
+        start=200,
+        end=300,
+        fill=(255, 255, 255, 92),
+        width=10,
+    )
+    hx, hy = cx + int(radius * 0.72), cy + int(radius * 0.72)
+    overlay.line((hx, hy, hx + 210, hy + 250), fill=(*BRASS, 255), width=42)
+    overlay.line((hx, hy, hx + 210, hy + 250), fill=(*INK, 255), width=8)
+    overlay.ellipse((hx + 186, hy + 230, hx + 248, hy + 292), fill=(*BRASS, 255), outline=(*INK, 255), width=4)
+    out = page.convert("RGBA")
+    out = Image.alpha_composite(out, lens)
+    return out.convert("RGB")
+
+
+def _compose_intro_frame(progress: float) -> Image.Image:
+    """Dictionary page, kaleidoscope plate, glass moving from the word onto the disc."""
+    t = max(0.0, min(1.0, progress))
+    page = _paste_disc(_dictionary_page(), angle=6 + t * 40)
+    # Glass stays on the kaleidoscope plate, not over the readable entry.
+    glass = (int(WIDTH / 2 - 30 + t * 60), int(1220 + t * 40))
+    frame = _with_magnifier(page, glass, radius=250, zoom=1.55)
+    draw = ImageDraw.Draw(frame)
+    draw.rectangle([0, 0, WIDTH, 14], fill=HIGHLIGHT)
+    draw.rectangle([0, HEIGHT - 14, WIDTH, HEIGHT], fill=HIGHLIGHT)
+    return frame.filter(ImageFilter.SMOOTH)
+
+
 def draw_intro_kaleidoscope_still(clue: Clue | None = None, dest: Path | None = None) -> Image.Image:
-    """One stock kaleidoscope frame. Same still on every film."""
+    """One stock lexicon frame. Same still on every film."""
     del clue
     if INTRO_KALEIDOSCOPE_STILL.exists():
         frame = Image.open(INTRO_KALEIDOSCOPE_STILL).convert("RGB")
         if frame.size != (WIDTH, HEIGHT):
             frame = frame.resize((WIDTH, HEIGHT), Image.Resampling.LANCZOS)
     else:
-        frame = _intro_frame(_intro_word_field(), angle=16)
+        frame = _compose_intro_frame(0.28)
         INTRO_KALEIDOSCOPE_STILL.parent.mkdir(parents=True, exist_ok=True)
         frame.save(INTRO_KALEIDOSCOPE_STILL, "JPEG", quality=90)
     if dest is not None:
@@ -382,15 +460,14 @@ def _bake_intro_kaleidoscope(dest: Path) -> Path:
     hold = INTRO_KALEIDOSCOPE_HOLD
     fps = INTRO_KALEIDOSCOPE_FPS
     count = max(8, int(round(hold * fps)))
-    field = _intro_word_field()
     ffmpeg = shutil.which("ffmpeg")
     if not ffmpeg:
         raise RuntimeError("ffmpeg is required to build the Short")
     frames = dest.parent / f"{dest.stem}-frames"
     frames.mkdir(parents=True, exist_ok=True)
     for i in range(count):
-        angle = 8 + i * (52 / max(count - 1, 1))
-        _intro_frame(field, angle).save(frames / f"{i:04d}.jpg", "JPEG", quality=86)
+        progress = i / max(count - 1, 1)
+        _compose_intro_frame(progress).save(frames / f"{i:04d}.jpg", "JPEG", quality=86)
     result = subprocess.run(
         [
             ffmpeg,
@@ -417,7 +494,7 @@ def _bake_intro_kaleidoscope(dest: Path) -> Path:
     )
     if result.returncode:
         raise RuntimeError(result.stderr[-800:])
-    still = _intro_frame(field, 16)
+    still = _compose_intro_frame(0.28)
     INTRO_KALEIDOSCOPE_STILL.parent.mkdir(parents=True, exist_ok=True)
     still.save(INTRO_KALEIDOSCOPE_STILL, "JPEG", quality=90)
     return dest
