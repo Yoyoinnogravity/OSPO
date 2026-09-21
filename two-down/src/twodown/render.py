@@ -60,6 +60,13 @@ INTRO_KALEIDOSCOPE_WORDS = ("CRYPTIC",)
 INTRO_DICTIONARY_HEADWORD = "cryptic"
 INTRO_DICTIONARY_PRONUNCIATION = "/KRIP-tik/"
 INTRO_DICTIONARY_POS = "adjective"
+INTRO_DICTIONARY_SYNONYMS = (
+    "enigmatic",
+    "mysterious",
+    "confusing",
+    "mystifying",
+    "perplexing",
+)
 INTRO_DICTIONARY_SOURCE = "Webster 1913"
 INTRO_DICTIONARY_GUIDE = ("cry", "crystal")
 # Aled's photographed opening — tight on crypt / cryptic / cryptogram.
@@ -118,8 +125,8 @@ INTRO_DICTIONARY_ENTRIES: tuple[DictionaryEntry, ...] = (
         "Cryptic, Cryptical",
         "a.",
         (
-            "Hidden; secret; occult. “Her more cryptic ways of working.” Glanvill.",
-            "Of a crossword: clues that use wordplay rather than a plain definition.",
+            "Having a meaning that is mysterious or obscure.",
+            "(Of a crossword) having difficult clues which indicate the solutions indirectly.",
         ),
         featured=True,
     ),
@@ -398,6 +405,8 @@ def _entry_block_height(
     for i, sense in enumerate(entry.senses, start=1):
         wrapped = _wrap(draw, f"{i}.  {sense}", body_font, col_w - 8)
         height += (wrapped.count("\n") + 1) * (body_font.size + 6) + 4
+    if entry.featured and INTRO_DICTIONARY_SYNONYMS:
+        height += _synonym_pills_height(draw, col_w - 8)
     return height + gap
 
 
@@ -410,11 +419,12 @@ def _draw_dictionary_entry(
     head_font: ImageFont.FreeTypeFont,
     pos_font: ImageFont.FreeTypeFont,
     body_font: ImageFont.FreeTypeFont,
-) -> int:
-    """Typeset one column entry. Returns the y under it."""
+) -> tuple[int, tuple[int, int] | None]:
+    """Typeset one column entry. Returns the y under it, plus enigmatic if featured."""
     cursor = y + (6 if entry.featured else 2)
     head = entry.headword
     draw.text((x, cursor), head, font=head_font, fill=INK)
+    enigmatic: tuple[int, int] | None = None
     if entry.featured:
         cursor += head_font.size + 2
         draw.text(
@@ -432,7 +442,65 @@ def _draw_dictionary_entry(
         wrapped = _wrap(draw, f"{i}.  {sense}", body_font, col_w - 8)
         draw.multiline_text((x, cursor), wrapped, font=body_font, fill=INK, spacing=4)
         cursor += (wrapped.count("\n") + 1) * (body_font.size + 6) + 4
-    return cursor + (14 if entry.featured else 10)
+    if entry.featured and INTRO_DICTIONARY_SYNONYMS:
+        cursor, enigmatic = _draw_synonym_pills(draw, x, cursor, col_w - 8)
+    return cursor + (14 if entry.featured else 10), enigmatic
+
+
+def _synonym_pill_font() -> ImageFont.FreeTypeFont:
+    return _font(FONT_SANS, 20)
+
+
+def _synonym_pills_height(draw: ImageDraw.ImageDraw, width: int) -> int:
+    """Space for the living-sense synonym chips under cryptic."""
+    font = _synonym_pill_font()
+    x = 0
+    rows = 1
+    pad_x, gap, pill_h = 16, 10, 36
+    for word in INTRO_DICTIONARY_SYNONYMS:
+        w = int(draw.textlength(word, font=font)) + pad_x * 2
+        if x and x + w > width:
+            rows += 1
+            x = 0
+        x += w + gap
+    return 28 + rows * (pill_h + 8)
+
+
+def _draw_synonym_pills(
+    draw: ImageDraw.ImageDraw, x: int, y: int, width: int
+) -> tuple[int, tuple[int, int]]:
+    """Oxford-style synonym chips. Returns (next y, centre of enigmatic)."""
+    font = _synonym_pill_font()
+    label = _font(FONT_SANS, 16)
+    draw.text((x, y), "synonyms", font=label, fill=MUTED)
+    cursor_y = y + 22
+    cursor_x = x
+    pad_x, gap, pill_h = 16, 10, 36
+    enigmatic = (x + 80, cursor_y + pill_h // 2)
+    for word in INTRO_DICTIONARY_SYNONYMS:
+        w = int(draw.textlength(word, font=font)) + pad_x * 2
+        if cursor_x > x and cursor_x + w > x + width:
+            cursor_x = x
+            cursor_y += pill_h + 8
+        box = (cursor_x, cursor_y, cursor_x + w, cursor_y + pill_h)
+        featured = word == "enigmatic"
+        draw.rounded_rectangle(
+            box,
+            radius=18,
+            fill=(36, 32, 28) if featured else (252, 247, 236),
+            outline=INK,
+            width=2,
+        )
+        draw.text(
+            (cursor_x + pad_x, cursor_y + 7),
+            word,
+            font=font,
+            fill=CREAM if featured else INK,
+        )
+        if featured:
+            enigmatic = ((box[0] + box[2]) // 2, (box[1] + box[3]) // 2)
+        cursor_x += w + gap
+    return cursor_y + pill_h + 8, enigmatic
 
 
 def _draw_thesaurus_panel(draw: ImageDraw.ImageDraw, x: int, y: int, width: int) -> None:
@@ -546,7 +614,7 @@ def _photographed_dictionary_page() -> tuple[Image.Image, tuple[int, int], tuple
 
 @lru_cache(maxsize=1)
 def _dictionary_layout() -> tuple[Image.Image, tuple[int, int], tuple[int, int], tuple[int, int]]:
-    """Webster column with occult, cryptogram, and cryptology (secret or enigmatic)."""
+    """Webster column: living cryptic sense, enigmatic synonym, then cryptology."""
     return _typeset_dictionary_page()
 
 
@@ -555,7 +623,7 @@ def _entry_key(entry: DictionaryEntry) -> str:
 
 
 def _typeset_dictionary_page() -> tuple[Image.Image, tuple[int, int], tuple[int, int], tuple[int, int]]:
-    """Two-column Webster page: occult on cryptic, then cryptogram, then cryptology."""
+    """Two-column Webster page: living cryptic sense, enigmatic, then cryptology."""
     img, draw = _newsprint_canvas()
     header = _font(FONT_SANS, 20)
     guide = _font(FONT_ITALIC, 24)
@@ -606,24 +674,28 @@ def _typeset_dictionary_page() -> tuple[Image.Image, tuple[int, int], tuple[int,
                 wash.rectangle([x - 8, y, x - 2, y + block_h - 4], fill=CRIMSON)
                 featured_box = (x, y, x + col_w, y + block_h)
             y0 = y
-            y = _draw_dictionary_entry(draw, entry, x, y, col_w, hfont, pos_font, bfont)
+            y, pill = _draw_dictionary_entry(draw, entry, x, y, col_w, hfont, pos_font, bfont)
             # Sit on the headword and first sense, not the empty gutter.
             centers[_entry_key(entry)] = (x + 140, y0 + 44)
+            if pill is not None:
+                # Bias right so the glass keeps the chip in frame, not the margin.
+                centers["enigmatic"] = (pill[0] + 90, pill[1])
 
-    _draw_thesaurus_panel(draw, columns[0], 1388, col_w)
+    _draw_thesaurus_panel(draw, columns[0], 1488, col_w)
     draw.text(
         (56, 1864),
-        "Webster’s Unabridged, 1913  ·  Roget 1911  ·  crossword sense via Wiktionary",
+        "Webster’s Unabridged, 1913  ·  living sense  ·  Roget 1911",
         font=_font(FONT_ITALIC, 18),
         fill=MUTED,
     )
     if featured_box is None:
         focus = centers.get("cryptic", (columns[0] + col_w // 2, 640))
     else:
-        focus = (featured_box[0] + 160, featured_box[1] + 88)
-    cryptogram = centers.get("cryptogram", (columns[1] + col_w // 2, focus[1] + 180))
+        # First sense: mysterious or obscure.
+        focus = (featured_box[0] + 160, featured_box[1] + 150)
+    enigmatic = centers.get("enigmatic", (focus[0], focus[1] + 80))
     cryptology = centers.get("cryptology", (columns[1] + col_w // 2, focus[1] + 420))
-    return img, focus, cryptogram, cryptology
+    return img, focus, enigmatic, cryptology
 
 
 def _dictionary_page() -> Image.Image:
@@ -682,16 +754,16 @@ def _glass_travel(
     cryptology: tuple[int, int],
     progress: float,
 ) -> tuple[int, int]:
-    """Occult on cryptic, across to cryptogram, rest on cryptology (secret or enigmatic)."""
+    """Mysterious/obscure, rest on enigmatic, then cryptology."""
     t = max(0.0, min(1.0, progress))
     if t < 0.28:
         return focus
     if t < 0.48:
         return _lerp_xy(focus, cryptogram, _smootherstep((t - 0.28) / 0.20))
-    if t < 0.60:
+    if t < 0.62:
         return cryptogram
-    if t < 0.82:
-        return _lerp_xy(cryptogram, cryptology, _smootherstep((t - 0.60) / 0.22))
+    if t < 0.84:
+        return _lerp_xy(cryptogram, cryptology, _smootherstep((t - 0.62) / 0.22))
     return cryptology
 
 

@@ -10,6 +10,7 @@ from twodown.render import (
     INTRO_DICTIONARY_BOOK,
     INTRO_DICTIONARY_PHOTO,
     INTRO_DICTIONARY_SOURCE,
+    INTRO_DICTIONARY_SYNONYMS,
     INTRO_KALEIDOSCOPE_HOLD,
     INTRO_KALEIDOSCOPE_WORDS,
     INTRO_THESAURUS_HEADING,
@@ -229,10 +230,13 @@ def test_intro_dictionary_is_webster_with_neighbours():
     assert any(head == "cry" for head in heads)
     assert featured.headword.lower().startswith("cryptic")
     senses = " ".join(featured.senses).lower()
-    assert "hidden" in senses
-    assert "secret" in senses
+    assert "mysterious" in senses
+    assert "obscure" in senses
     assert "crossword" in senses
     assert INTRO_DICTIONARY_SENSES == featured.senses
+    assert INTRO_DICTIONARY_SYNONYMS[0] == "enigmatic"
+    assert "enigmatic" in INTRO_DICTIONARY_SYNONYMS
+    assert "mysterious" in INTRO_DICTIONARY_SYNONYMS
     # Neighbours carry their own definitions, not a single invented blurb.
     crypt = next(entry for entry in INTRO_DICTIONARY_ENTRIES if entry.headword.lower() == "crypt")
     assert "vault" in " ".join(crypt.senses).lower()
@@ -263,18 +267,17 @@ def test_intro_beat_is_kaleidoscope_not_the_spoken_line(tmp_path: Path):
     assert table[0] < 80 and table[1] < 80
     paper = close.getpixel((40, 80))
     assert paper[0] > 160 and paper[1] > 140
-    page, focus, cryptogram, cryptology = _dictionary_layout()
+    page, focus, enigmatic, cryptology = _dictionary_layout()
     fx, fy = focus
     assert INTRO_DICTIONARY_BOOK.exists()
     assert INTRO_DICTIONARY_PHOTO.exists()
     assert 0 < fx < 1080 and 0 < fy < 1920
-    assert cryptogram[0] > fx
+    assert enigmatic[1] > fy
     assert cryptology[0] > fx
-    assert cryptology[1] > cryptogram[1]
-    # Focus sits on the cryptic headword; the wash beside it is paper.
+    # Focus sits on the living definition; the wash beside it is paper.
     wash = page.getpixel((min(1070, fx + 90), fy + 36))
     assert wash[0] > 140 and wash[1] > 130
-    # Cryptology is the enigmatic rest — secret or enigmatical language.
+    # Cryptology still carries secret or enigmatical.
     assert page.getpixel((min(1070, cryptology[0] + 80), cryptology[1] + 24))[0] > 130
     raw = path.read_bytes()
     assert INTRO_LINE.encode() not in raw
