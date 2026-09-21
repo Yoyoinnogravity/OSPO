@@ -1,4 +1,4 @@
-from twodown.config import DEFAULT_VOICE_ALIAS, HINT_LINE, HINT_LOOK, HINT_OFFER, HINT_VOICE_ALIAS, INTRO_VOICE_ALIAS, PINUP_SLUG, SOURCE_VOICE_ALIAS, STUDY_SLUG, VOICE_RATE, VOICES
+from twodown.config import DEFAULT_VOICE_ALIAS, HINT_LINE, HINT_LOOK, HINT_OFFER, HINT_VOICE_ALIAS, INTRO_VOICE_ALIAS, PINUP_SLUG, SOURCE_VOICE_ALIAS, STUDY_SLUG, THINK_PROMPT, THINK_RATE, VOICE_RATE, VOICES
 from twodown.pipeline import (
     dreamlike_clue,
     fats_clue,
@@ -69,6 +69,8 @@ def test_study_clue_is_mass_media():
     assert parts.clue_speech == "Maid struggling with a mess — newspapers etc."
     assert parts.letters_speech == "That's four, five."
     assert parts.think_speech == "Just pause here, and have a think."
+    assert parts.think_speech == THINK_PROMPT
+    assert THINK_RATE == "+2%"
     assert parts.hint_speech == HINT_LINE
     assert parts.hint_speech.startswith(HINT_OFFER)
     assert parts.hint_speech.endswith(HINT_LOOK)
