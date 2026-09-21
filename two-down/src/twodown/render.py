@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 import shutil
 import subprocess
@@ -13,6 +14,7 @@ from twodown.config import (
     BRAND,
     CREAM,
     CRIMSON,
+    DEFAULT_OUTPUT,
     FONT_BOLD,
     FONT_DISPLAY,
     FONT_REGULAR,
@@ -371,16 +373,61 @@ def published_pair_slugs(site_root: Path | None = None) -> list[str]:
     return slugs
 
 
-def thumbnail_issue(clue: Clue, slugs: list[str] | None = None) -> int:
-    """Running Cryptic Fit issue. The first film on the channel is #287."""
-    catalog = published_pair_slugs() if slugs is None else list(slugs)
+THUMBNAIL_ISSUE_LEDGER = SITE_ROOT / "media" / "thumbnail-issues.json"
+
+
+def _unique_slugs(slugs: list[str]) -> list[str]:
+    seen: list[str] = []
+    for slug in slugs:
+        if slug and slug not in seen:
+            seen.append(slug)
+    return seen
+
+
+def _study_slugs(out_dir: Path | None = None) -> list[str]:
+    root = Path(out_dir or DEFAULT_OUTPUT) / "study"
+    if not root.is_dir():
+        return []
+    return sorted(path.name for path in root.iterdir() if path.is_dir())
+
+
+def _load_issue_ledger(path: Path | None = None) -> list[str]:
+    ledger = Path(path or THUMBNAIL_ISSUE_LEDGER)
+    if not ledger.exists():
+        return []
+    raw = json.loads(ledger.read_text(encoding="utf-8"))
+    if isinstance(raw, list):
+        return [str(slug) for slug in raw]
+    if isinstance(raw, dict):
+        return [str(slug) for slug, _num in sorted(raw.items(), key=lambda item: item[1])]
+    return []
+
+
+def _save_issue_ledger(slugs: list[str], path: Path | None = None) -> None:
+    ledger = Path(path or THUMBNAIL_ISSUE_LEDGER)
+    ledger.parent.mkdir(parents=True, exist_ok=True)
+    ledger.write_text(json.dumps(slugs, indent=2) + "\n", encoding="utf-8")
+
+
+def issue_catalog(slugs: list[str] | None = None) -> list[str]:
+    """One slug, one issue. Published films first, then review cuts, then the ledger."""
+    if slugs is not None:
+        catalog = _unique_slugs(list(slugs))
+    else:
+        catalog = _unique_slugs(published_pair_slugs() + _load_issue_ledger() + _study_slugs())
     if THUMBNAIL_ISSUE_FIRST_SLUG in catalog:
         catalog = catalog[catalog.index(THUMBNAIL_ISSUE_FIRST_SLUG) :]
-    try:
-        return THUMBNAIL_ISSUE_START + catalog.index(clue.slug)
-    except ValueError:
-        # Next issue after the published Cryptic Fit films.
-        return THUMBNAIL_ISSUE_START + len(catalog)
+    return catalog
+
+
+def thumbnail_issue(clue: Clue, slugs: list[str] | None = None, *, persist: bool = False) -> int:
+    """Running Cryptic Fit issue. Each slug gets its own number. #287 is first on the channel."""
+    catalog = issue_catalog(slugs)
+    if clue.slug not in catalog:
+        catalog.append(clue.slug)
+        if persist and slugs is None:
+            _save_issue_ledger(catalog)
+    return THUMBNAIL_ISSUE_START + catalog.index(clue.slug)
 
 
 def _display_font(size: int) -> ImageFont.FreeTypeFont:
@@ -415,7 +462,7 @@ def _stroke_text(
 def _issue_lockup(clue: Clue, size: tuple[int, int], *, brand_size: int, number_size: int) -> Image.Image:
     """Tilted CRYPTIC FIT #N — bold yellow letters on a red highlighter. Never the answer."""
     width, height = size
-    issue = thumbnail_issue(clue)
+    issue = thumbnail_issue(clue, persist=True)
     brand = "CRYPTIC FIT"
     number = f"#{issue}"
     tilt = -8 + (issue % 3) * 4

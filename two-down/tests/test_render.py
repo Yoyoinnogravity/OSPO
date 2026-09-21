@@ -16,6 +16,7 @@ from twodown.render import (
     draw_poster,
     _thumbnail_clue,
     draw_thumbnail,
+    issue_catalog,
     render_video,
     thumbnail_issue,
     write_spoiler_free_stills,
@@ -450,6 +451,21 @@ def test_youtube_thumbnail_does_not_show_the_answer(tmp_path: Path):
     fresh = clue.model_copy(update={"paper": "Guardian", "puzzle_id": "30117", "number": "1"})
     assert fresh.slug == "guardian-30117-1a"
     assert thumbnail_issue(fresh, slugs=kept) == THUMBNAIL_ISSUE_START + 4
+    raft = clue.model_copy(update={"paper": "Guardian", "puzzle_id": "30117", "number": "6", "direction": "down"})
+    assert raft.slug == "guardian-30117-6d"
+    shared = kept + [fresh.slug, raft.slug]
+    assert thumbnail_issue(fresh, slugs=shared) == THUMBNAIL_ISSUE_START + 4
+    assert thumbnail_issue(raft, slugs=shared) == THUMBNAIL_ISSUE_START + 5
+    assert thumbnail_issue(fresh, slugs=shared) != thumbnail_issue(raft, slugs=shared)
+    assert len({thumbnail_issue(item, slugs=shared) for item in (
+        clue.model_copy(update={"paper": "Guardian", "puzzle_id": "30112", "number": "1"}),
+        clue.model_copy(update={"paper": "Guardian", "puzzle_id": "30112", "number": "5"}),
+        clue,
+        clue.model_copy(update={"paper": "Guardian", "puzzle_id": "30113", "number": "9"}),
+        fresh,
+        raft,
+    )}) == 6
+    assert issue_catalog(shared) == shared
 
     def yellow(img: Image.Image) -> int:
         return sum(1 for r, g, b in img.get_flattened_data() if r > 200 and g > 170 and b < 90)
