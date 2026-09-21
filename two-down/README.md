@@ -54,6 +54,27 @@ Social
 
 `twodown today` and `twodown upload` send the same two vertical videos to
 every platform that has a token. Missing tokens are skipped, not fatal.
+GitHub Actions (`.github/workflows/cryptic-fit-daily.yml`) cuts the pair
+each morning and uploads to YouTube once `TWODOWN_YOUTUBE_TOKEN` is a
+repo secret.
+
+One-time YouTube login (laptop with a browser):
+
+```bash
+# 1. Google Cloud → APIs & Services → Credentials → Desktop OAuth client
+#    Enable YouTube Data API v3. Download the client JSON.
+mkdir -p ~/.config/twodown
+cp ~/Downloads/client_secret*.json ~/.config/twodown/youtube-client-secret.json
+twodown youtube-auth
+# 2. When Google asks which channel, pick cryptic.fit (@crypticfit).
+# 3. Paste ~/.config/twodown/youtube-token.json as the GitHub Actions
+#    secret TWODOWN_YOUTUBE_TOKEN (and the same secret on the Cursor
+#    Cloud Agent environment if the daily agent should upload too).
+```
+
+`twodown upload` can run without `two-down/output/` — it reads the films
+already on `two-down/site/`. Already-uploaded slugs are stored in
+`two-down/site/uploads.json` so a later run does not post twice.
 
 ```bash
 export TWODOWN_YOUTUBE_TOKEN=/path/to/youtube-token.json
@@ -72,6 +93,8 @@ Token files:
 * **YouTube** — authorized desktop OAuth user JSON for the **cryptic.fit**
   channel (`youtube.com/@crypticfit`). Do not use `@crypticfun` — that
   handle is someone else's channel, and we do not own `.fun`.
+  Create it with `twodown youtube-auth`. The JSON must include a
+  `refresh_token` so the daily job can stay signed in.
 * **TikTok** — `{"access_token": "..."}` from a TikTok app with `video.publish`
   (Content Posting API, FILE_UPLOAD). Unaudited apps are limited to private /
   self-only until TikTok reviews the app.
@@ -134,7 +157,9 @@ Do **not** upload with cPanel File Manager, FileZilla, or `scp` to
 `twodown live` prints this same order (registry first, then Pages, then DNS).
 
 YouTube still needs `TWODOWN_YOUTUBE_TOKEN` (OAuth for the cryptic.fit channel),
-not a payment.
+not a payment. Generate it with `twodown youtube-auth`, then add it as the
+GitHub Actions secret so `.github/workflows/cryptic-fit-daily.yml` can upload
+every morning.
 
 Money
 -----

@@ -1,35 +1,151 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
+from urllib.parse import parse_qs, urlparse
 
 from twodown.captions import youtube_description
 from twodown.config import BRAND, CLUES_PER_DAY
 from twodown.models import Clue, DailyPair, SpokenClue
-from twodown.tokens import secret_text
+from twodown.tokens import CONFIG_DIR, secret_text
 
 YOUTUBE_CHANNEL = BRAND
 SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
 TOKEN_ENV = "TWODOWN_YOUTUBE_TOKEN"
 CLIENT_ENV = "TWODOWN_YOUTUBE_CLIENT_SECRET"
+TOKEN_FILENAME = "youtube-token.json"
+CLIENT_FILENAME = "youtube-client-secret.json"
 
 
 def youtube_ready() -> bool:
-    return _credentials() is not None
+    info = _token_info()
+    return bool(
+        info
+        and info.get("refresh_token")
+        and info.get("client_id")
+        and info.get("client_secret")
+    )
+
+
+def youtube_hint() -> str:
+    text = secret_text(TOKEN_ENV, TOKEN_FILENAME)
+    if not text:
+        return (
+            "Set TWODOWN_YOUTUBE_TOKEN to the authorized-user JSON from "
+            "`twodown youtube-auth` (GitHub Actions secret or ~/.config/twodown/youtube-token.json)."
+        )
+    info = _token_info()
+    if info is None:
+        return "TWODOWN_YOUTUBE_TOKEN is not valid OAuth JSON. Re-run `twodown youtube-auth`."
+    if not info.get("refresh_token"):
+        return "YouTube token has no refresh_token. Re-run `twodown youtube-auth` so daily upload stays signed in."
+    if not info.get("client_id") or not info.get("client_secret"):
+        return (
+            f"Set {CLIENT_ENV} to the Google OAuth desktop client JSON "
+            f"(or put client_id and client_secret inside TWODOWN_YOUTUBE_TOKEN)."
+        )
+    return "YouTube is ready for unattended Shorts upload."
+
+
+def _client_info() -> dict | None:
+    text = secret_text(CLIENT_ENV, CLIENT_FILENAME)
+    if not text or not text.startswith("{"):
+        return None
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(data, dict):
+        return None
+    block = data.get("installed") or data.get("web")
+    if isinstance(block, dict):
+        return block
+    if data.get("client_id"):
+        return data
+    return None
+
+
+def _token_info() -> dict | None:
+    text = secret_text(TOKEN_ENV, TOKEN_FILENAME)
+    if not text or not text.startswith("{"):
+        return None
+    try:
+        info = json.loads(text)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(info, dict):
+        return None
+    client = _client_info() or {}
+    merged = dict(info)
+    for key in ("client_id", "client_secret", "token_uri"):
+        if not merged.get(key) and client.get(key):
+            merged[key] = client[key]
+    merged.setdefault("token_uri", "https://oauth2.googleapis.com/token")
+    if not merged.get("refresh_token") and not merged.get("token"):
+        return None
+    return merged
 
 
 def _credentials():
-    text = secret_text(TOKEN_ENV, "youtube-token.json")
-    if not text or not text.startswith("{"):
+    info = _token_info()
+    if not info:
         return None
     try:
         from google.oauth2.credentials import Credentials
     except ImportError:
         return None
     try:
-        info = json.loads(text)
         return Credentials.from_authorized_user_info(info, scopes=SCOPES)
-    except (json.JSONDecodeError, ValueError, TypeError):
+    except (ValueError, TypeError):
         return None
+
+
+def token_path() -> Path:
+    return CONFIG_DIR / TOKEN_FILENAME
+
+
+def authorize(*, console: bool = False) -> Path:
+    """One-time Google login for the cryptic.fit channel. Writes a refresh token."""
+    client_text = secret_text(CLIENT_ENV, CLIENT_FILENAME)
+    if not client_text or not client_text.startswith("{"):
+        raise FileNotFoundError(
+            f"Need the Google OAuth desktop client JSON as {CLIENT_ENV} "
+            f"or ~/.config/twodown/{CLIENT_FILENAME}"
+        )
+    try:
+        from google_auth_oauthlib.flow import InstalledAppFlow
+    except ImportError as exc:
+        raise RuntimeError("google-auth-oauthlib is required for twodown youtube-auth") from exc
+
+    flow = InstalledAppFlow.from_client_config(json.loads(client_text), scopes=SCOPES)
+    if console:
+        creds = _run_console_flow(flow)
+    else:
+        creds = flow.run_local_server(port=0, access_type="offline", prompt="consent")
+    dest = token_path()
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_text(creds.to_json(), encoding="utf-8")
+    return dest
+
+
+def _run_console_flow(flow):
+    """Headless helper: print the Google URL, then accept a pasted redirect or code."""
+    flow.redirect_uri = flow.redirect_uri or "http://localhost"
+    auth_url, _ = flow.authorization_url(access_type="offline", prompt="consent", include_granted_scopes="true")
+    print("Open this URL, pick the cryptic.fit channel, then paste the redirect URL or the code:")
+    print(auth_url)
+    pasted = input("Redirect URL or code: ").strip()
+    if not pasted:
+        raise ValueError("No authorization code pasted")
+    if pasted.startswith("http"):
+        query = parse_qs(urlparse(pasted).query)
+        code = (query.get("code") or [""])[0]
+    else:
+        code = pasted
+    if not code:
+        raise ValueError("Could not find ?code= in that redirect URL")
+    flow.fetch_token(code=code)
+    return flow.credentials
 
 
 def video_title(clue: Clue) -> str:

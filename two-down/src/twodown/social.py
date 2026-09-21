@@ -7,7 +7,8 @@ from twodown.config import CLUES_PER_DAY, SITE_ROOT
 from twodown.meta import facebook_ready, instagram_ready, upload_facebook, upload_instagram
 from twodown.models import DailyPair
 from twodown.tiktok import tiktok_ready, upload_short as upload_tiktok
-from twodown.youtube import upload_pair as upload_youtube, youtube_ready
+from twodown.uploads import apply_ledger, record_youtube
+from twodown.youtube import upload_pair as upload_youtube, youtube_hint, youtube_ready
 
 PLATFORMS = ("youtube", "tiktok", "instagram", "facebook")
 CURSOR_ENVIRONMENT = "https://cursor.com/dashboard/cloud-agents/environments"
@@ -24,7 +25,7 @@ def platform_status() -> dict[str, bool]:
 
 def setup_hints() -> dict[str, str]:
     return {
-        "youtube": "Set TWODOWN_YOUTUBE_TOKEN to an authorized YouTube OAuth token JSON for cryptic.fit.",
+        "youtube": youtube_hint(),
         "tiktok": "Set TWODOWN_TIKTOK_TOKEN to a TikTok user access token JSON with video.publish.",
         "instagram": "Set TWODOWN_META_TOKEN (access_token + ig_user_id) for the Instagram professional account.",
         "facebook": "Set TWODOWN_META_TOKEN (access_token + page_id) for the cryptic.fit Facebook Page.",
@@ -44,8 +45,9 @@ META_PERMISSIONS = (
 def connect_instructions() -> str:
     """Exact steps to get each token. No account passwords are ever needed here."""
     return f"""The upload agent cannot log into YouTube, TikTok, Instagram or Facebook as you.
-Each app gives you a token. Paste the JSON (never a password) as a secret on the
-Cursor Cloud Agent environment: {CURSOR_ENVIRONMENT}
+Each app gives you a token. Paste the JSON (never a password) as a GitHub Actions
+secret so the daily workflow can upload, and optionally on the Cursor Cloud Agent
+environment: {CURSOR_ENVIRONMENT}
 
 INSTAGRAM + FACEBOOK  ->  TWODOWN_META_TOKEN      (quickest; one token does both)
   1. Make a cryptic.fit Facebook Page. Set Instagram to a professional
@@ -69,7 +71,7 @@ TIKTOK  ->  TWODOWN_TIKTOK_TOKEN
   Note: until TikTok audits the app, posts are limited to private / self-only.
   Public TikTok posting waits on their review, not on this code.
 
-YOUTUBE  ->  TWODOWN_YOUTUBE_TOKEN
+YOUTUBE  ->  TWODOWN_YOUTUBE_TOKEN   (this is the one that makes auto-upload work)
   Deploy only to the cryptic.fit channel (youtube.com/@crypticfit).
   Do not use youtube.com/@crypticfun — that handle is someone else's
   channel, and we do not own the .fun name.
@@ -79,11 +81,17 @@ YOUTUBE  ->  TWODOWN_YOUTUBE_TOKEN
   (your channel → Switch account → Create a channel), name it
   cryptic.fit, then claim @crypticfit.
   1. OAuth desktop client at {GOOGLE_CONSOLE}, YouTube Data API v3 enabled.
-  2. Authorise the cryptic.fit channel for scope youtube.upload.
-  3. Secret value: the authorized-user JSON (token, refresh_token, token_uri,
-     client_id, client_secret, scopes).
+  2. Download the client JSON. Save it as ~/.config/twodown/youtube-client-secret.json
+     or as secret TWODOWN_YOUTUBE_CLIENT_SECRET.
+  3. On a laptop with a browser:  twodown youtube-auth
+     That writes ~/.config/twodown/youtube-token.json (must include refresh_token).
+  4. Paste that token JSON as repo secret TWODOWN_YOUTUBE_TOKEN
+     (GitHub → Settings → Secrets and variables → Actions).
+     The daily workflow then uploads without a human.
+     The same JSON can also sit on the Cursor Cloud Agent environment.
 
-Then a Cloud Agent runs:  twodown upload            (all four)
+Then GitHub Actions runs: twodown today / twodown upload
+or a Cloud Agent runs:    twodown upload            (all four)
                           twodown upload --no-youtube  (TikTok + IG + FB only)
 """
 
@@ -120,9 +128,11 @@ def publish_pair(
     instagram: bool = True,
     facebook: bool = True,
     youtube_privacy: str = "public",
+    site_root: Path | None = None,
 ) -> dict[str, list[str]]:
     """Upload today's two Shorts to every connected platform. One failure does not stop the rest."""
-    attach_site_videos(pair)
+    attach_site_videos(pair, site_root)
+    apply_ledger(pair, site_root)
     notes: dict[str, list[str]] = {name: [] for name in PLATFORMS}
     status = platform_status()
     hints = setup_hints()
@@ -131,7 +141,10 @@ def publish_pair(
         if not status["youtube"]:
             notes["youtube"] = [hints["youtube"]]
         else:
-            notes["youtube"] = upload_youtube(pair, privacy=youtube_privacy)
+            try:
+                notes["youtube"] = upload_youtube(pair, privacy=youtube_privacy)
+            except Exception as exc:  # noqa: BLE001 — one platform must not block the others
+                notes["youtube"] = [f"error: {exc}"]
 
     if tiktok and not status["tiktok"]:
         notes["tiktok"] = [hints["tiktok"]]
@@ -162,4 +175,5 @@ def publish_pair(
     pair.tiktok_ids = [c.tiktok_id for c in pair.clues if c.tiktok_id]
     pair.instagram_ids = [c.instagram_id for c in pair.clues if c.instagram_id]
     pair.facebook_ids = [c.facebook_id for c in pair.clues if c.facebook_id]
+    record_youtube(pair, site_root)
     return notes

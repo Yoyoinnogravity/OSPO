@@ -1,0 +1,98 @@
+name: cryptic.fit daily
+
+on:
+  schedule:
+    # 09:00 and 12:00 Europe/London while BST (UTC+1). Close enough in winter.
+    - cron: "0 8 * * *"
+    - cron: "0 11 * * *"
+  workflow_dispatch:
+    inputs:
+      youtube_privacy:
+        description: YouTube privacy for this run
+        type: choice
+        options: [unlisted, public, private]
+        default: unlisted
+      upload_only:
+        description: Skip cutting a new pair; upload existing site films only
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: cryptic-fit-daily
+  cancel-in-progress: false
+
+jobs:
+  today:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install ffmpeg, fonts, and twodown
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg fonts-liberation
+          python3 -m pip install -e "./two-down"
+
+      - name: Cut today's pair
+        if: ${{ github.event.inputs.upload_only != 'true' }}
+        env:
+          TWODOWN_YOUTUBE_TOKEN: ${{ secrets.TWODOWN_YOUTUBE_TOKEN }}
+          TWODOWN_YOUTUBE_CLIENT_SECRET: ${{ secrets.TWODOWN_YOUTUBE_CLIENT_SECRET }}
+          TWODOWN_META_TOKEN: ${{ secrets.TWODOWN_META_TOKEN }}
+          TWODOWN_TIKTOK_TOKEN: ${{ secrets.TWODOWN_TIKTOK_TOKEN }}
+        run: |
+          PRIVACY="${{ github.event.inputs.youtube_privacy }}"
+          if [ -z "$PRIVACY" ]; then
+            PRIVACY=public
+          fi
+          python3 -m twodown today --youtube-privacy "$PRIVACY" || true
+
+      - name: Upload Shorts to YouTube
+        id: youtube
+        continue-on-error: true
+        env:
+          TWODOWN_YOUTUBE_TOKEN: ${{ secrets.TWODOWN_YOUTUBE_TOKEN }}
+          TWODOWN_YOUTUBE_CLIENT_SECRET: ${{ secrets.TWODOWN_YOUTUBE_CLIENT_SECRET }}
+          TWODOWN_META_TOKEN: ${{ secrets.TWODOWN_META_TOKEN }}
+          TWODOWN_TIKTOK_TOKEN: ${{ secrets.TWODOWN_TIKTOK_TOKEN }}
+        run: |
+          PRIVACY="${{ github.event.inputs.youtube_privacy }}"
+          if [ -z "$PRIVACY" ]; then
+            PRIVACY=public
+          fi
+          python3 -m twodown status
+          python3 -m twodown upload --youtube-privacy "$PRIVACY"
+
+      - name: Open a site PR when the pair or upload ledger changed
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if git diff --quiet -- two-down/site; then
+            echo "Site unchanged."
+            exit 0
+          fi
+          DATE=$(date -u +%F)
+          BRANCH="cryptic-fit-daily-$DATE"
+          git config user.name "cryptic-fit-daily"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B "$BRANCH"
+          git add two-down/site
+          git commit -m "cryptic.fit · $DATE"
+          git push -u origin "$BRANCH"
+          gh pr list --head "$BRANCH" --json number --jq '.[0].number' | grep -q . \
+            || gh pr create --base main --head "$BRANCH" --title "cryptic.fit · $DATE" --body "Daily pair from Fifteen Squared. YouTube upload ran in this workflow if TWODOWN_YOUTUBE_TOKEN was set."
+
+      - name: Fail when YouTube upload did not run
+        if: steps.youtube.outcome == 'failure'
+        run: |
+          echo "YouTube upload failed. Add repo secret TWODOWN_YOUTUBE_TOKEN from \`twodown youtube-auth\`."
+          exit 1

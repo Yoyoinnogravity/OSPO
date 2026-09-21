@@ -18,7 +18,7 @@ from twodown.live import (
     registry_status,
 )
 from twodown.models import DailyPair
-from twodown.pipeline import render_one_short, run_today
+from twodown.pipeline import load_all_published_pairs, load_upload_pair, render_one_short, run_today
 from twodown.scenes import DEFAULT_SCENE, list_scenes
 from twodown.social import (
     PLATFORMS,
@@ -28,7 +28,7 @@ from twodown.social import (
     setup_hints,
 )
 from twodown.voice import list_voices, resolve_voice
-from twodown.youtube import YOUTUBE_CHANNEL
+from twodown.youtube import YOUTUBE_CHANNEL, authorize as youtube_authorize, youtube_ready
 
 
 def _print_pair(pair) -> None:
@@ -67,23 +67,11 @@ def _print_pair(pair) -> None:
             print(f"    fb    {item.facebook_id}")
 
 
-def _latest_pair(out: Path, date: str | None) -> DailyPair:
-    if date:
-        path = out / date / "pair.json"
-    else:
-        dates = sorted((p for p in out.iterdir() if p.is_dir()), reverse=True)
-        if not dates:
-            raise FileNotFoundError(f"No daily output in {out}")
-        path = dates[0] / "pair.json"
-    if not path.exists():
-        raise FileNotFoundError(f"No pair.json at {path}. Run twodown today first.")
-    return DailyPair.model_validate_json(path.read_text(encoding="utf-8"))
-
-
-def _pair_path(out: Path, date: str | None) -> Path:
-    if date:
-        return out / date / "pair.json"
-    return sorted((p for p in out.iterdir() if p.is_dir()), reverse=True)[0] / "pair.json"
+def _pair_path(out: Path, pair: DailyPair, date: str | None) -> Path:
+    stamp = date or pair.date
+    dest = out / stamp
+    dest.mkdir(parents=True, exist_ok=True)
+    return dest / "pair.json"
 
 
 def _add_social_flags(parser: argparse.ArgumentParser) -> None:
@@ -147,7 +135,15 @@ def main(argv: list[str] | None = None) -> int:
     upload.add_argument("--out", type=Path, default=DEFAULT_OUTPUT)
     upload.add_argument("--date", help="London calendar date YYYY-MM-DD")
     upload.add_argument("--youtube-privacy", default="public", choices=["unlisted", "private", "public"])
+    upload.add_argument(
+        "--all-site",
+        action="store_true",
+        help="Upload every unpublished pair on two-down/site (quota: ~6 Shorts/day)",
+    )
     _add_social_flags(upload)
+
+    auth = sub.add_parser("youtube-auth", help="One-time Google login for the cryptic.fit YouTube channel")
+    auth.add_argument("--console", action="store_true", help="Print a URL and paste the code (no local browser)")
 
     short = sub.add_parser("short", help="Rebuild one Short while we lock the beat")
     short.add_argument(
@@ -214,6 +210,17 @@ def main(argv: list[str] | None = None) -> int:
         _print_status()
         return 0
 
+    if args.cmd == "youtube-auth":
+        try:
+            dest = youtube_authorize(console=args.console)
+        except (FileNotFoundError, RuntimeError, ValueError) as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
+        print(f"wrote {dest}")
+        print("Paste that JSON as GitHub Actions secret TWODOWN_YOUTUBE_TOKEN.")
+        print("Channel must be youtube.com/@crypticfit — not @crypticfun.")
+        return 0 if youtube_ready() else 1
+
     if args.cmd == "live":
         print("Public URLs (live = HTTP 2xx/3xx from here right now)")
         seen: dict[str, str] = {}
@@ -274,26 +281,28 @@ def main(argv: list[str] | None = None) -> int:
             _print_status()
             return 2
         try:
-            pair = _latest_pair(args.out, args.date)
+            pairs = load_all_published_pairs() if args.all_site else [load_upload_pair(args.out, args.date)]
         except FileNotFoundError as exc:
             print(str(exc), file=sys.stderr)
             return 1
-        notes = publish_pair(
-            pair,
-            youtube=wanted["youtube"],
-            tiktok=wanted["tiktok"],
-            instagram=wanted["instagram"],
-            facebook=wanted["facebook"],
-            youtube_privacy=args.youtube_privacy,
-        )
-        dest = _pair_path(args.out, args.date)
-        dest.write_text(pair.model_dump_json(indent=2), encoding="utf-8")
         uploaded = False
-        for name in ready:
-            values = [v for v in notes.get(name, []) if not str(v).startswith("error:")]
-            if values:
-                uploaded = True
-            print(f"{name}: {', '.join(notes.get(name, []) or ['nothing uploaded'])}")
+        for pair in pairs:
+            notes = publish_pair(
+                pair,
+                youtube=wanted["youtube"],
+                tiktok=wanted["tiktok"],
+                instagram=wanted["instagram"],
+                facebook=wanted["facebook"],
+                youtube_privacy=args.youtube_privacy,
+            )
+            dest = _pair_path(args.out, pair, args.date)
+            dest.write_text(pair.model_dump_json(indent=2), encoding="utf-8")
+            print(f"date  {pair.date}")
+            for name in ready:
+                values = [v for v in notes.get(name, []) if not str(v).startswith("error:")]
+                if values:
+                    uploaded = True
+                print(f"{name}: {', '.join(notes.get(name, []) or ['nothing uploaded'])}")
         if not uploaded:
             print("Upload returned no video ids.", file=sys.stderr)
             return 1
