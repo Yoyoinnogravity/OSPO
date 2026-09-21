@@ -111,6 +111,7 @@ def test_platforms_need_tokens_by_default(monkeypatch):
     monkeypatch.delenv("TWODOWN_META_ACCESS_TOKEN", raising=False)
     monkeypatch.delenv("TWODOWN_YOUTUBE_TOKEN", raising=False)
     status = platform_status()
+    assert status["youtube"] is False
     assert status["tiktok"] is False
     assert status["instagram"] is False
     assert status["facebook"] is False

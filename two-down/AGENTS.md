@@ -14,9 +14,15 @@ run it unattended. Never use another crossword blog as the source.
 4. Model: Grok (Cursor Models pool). This is the pick Aled locked. Do not pick Claude / Anthropic.
 5. Tools: pull request creation on. Memories optional.
 6. Paste the prompt below.
-7. Put social tokens on the Cloud Agent environment so uploads actually leave the machine:
-   `TWODOWN_YOUTUBE_TOKEN`, `TWODOWN_TIKTOK_TOKEN`, `TWODOWN_META_TOKEN`.
-   Ads stay off unless `TWODOWN_ADSENSE_CLIENT` and `TWODOWN_ADSENSE_SLOT` are set.
+7. YouTube auto-upload is the GitHub Action `.github/workflows/cryptic-fit-daily.yml`.
+   It posts **one Short a day** (oldest unpublished first) to @crypticfit.
+   Aled finishes login with `twodown youtube-auth --start` then `--finish`
+   (Cloud Agent can do this). Paste the token JSON as repo secret
+   `TWODOWN_YOUTUBE_TOKEN`. Do not send him to Command Prompt.
+   Optional: the same secret on the Cloud Agent environment so this prompt
+   can upload too. `TWODOWN_TIKTOK_TOKEN` and `TWODOWN_META_TOKEN` are the
+   other platforms. Ads stay off unless `TWODOWN_ADSENSE_CLIENT` and
+   `TWODOWN_ADSENSE_SLOT` are set.
 
 Automations are billed as Cloud Agent usage on your Cursor plan (Pro and up).
 Private automations bill the person who created them.
@@ -32,7 +38,9 @@ Hint pictures may be auto / AI matched to the definition at about 80% closeness.
 That is good enough. Do not ban AI matching. Do not build a cloud vision pipeline.
 
 1. Check two-down/site/d/{today's London date}/index.html.
-   If that page already exists, today's pair is done. Do not regenerate, do not open a PR, stop.
+   If that page already exists, do not regenerate. YouTube upload is the
+   GitHub Action (cryptic.fit daily). You may still run `twodown upload`
+   if TWODOWN_YOUTUBE_TOKEN is present. Then stop — no extra site PR.
 2. From two-down/, run:
      python3 -m twodown today
    A fresh machine has nothing installed, so if that fails with

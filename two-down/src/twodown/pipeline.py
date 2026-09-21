@@ -17,6 +17,7 @@ from twodown.config import (
     SOURCE_SITE,
     STUDY_SLUG,
     VOICES,
+    YOUTUBE_DAILY_LIMIT,
 )
 from twodown.hints import attach_hint
 from twodown.ingest import LONDON, fetch_daily_posts, posts_for_london_date
@@ -27,7 +28,8 @@ from twodown.scenes import pick_scenes
 from twodown.script import write_parts
 from twodown.select import select_pair
 from twodown.site import publish_site
-from twodown.social import publish_pair, setup_hints
+from twodown.social import attach_site_videos, publish_pair, setup_hints
+from twodown.uploads import apply_ledger, skipped_slugs
 from twodown.voice import build_short_soundtrack, resolve_voice, synthesise_parts
 
 _KICKER = re.compile(
@@ -49,6 +51,37 @@ def _voice_alias(name: str | None) -> str:
     return key if key in VOICES else DEFAULT_VOICE_ALIAS
 
 
+def _clue_from_article(article, page: Path) -> Clue:
+    slug = article.get("data-slug") or "unknown"
+    kicker = article.select_one("p.kicker")
+    line = article.select_one("p.clue-text")
+    answer = article.select_one("p.answer")
+    parse = article.select_one("p.parse")
+    credit = article.select_one("p.credit a")
+    if not all([kicker, line, answer, parse, credit]):
+        raise ValueError(f"Incomplete published clue {slug} on {page}")
+    match = _KICKER.match(kicker.get_text(" ", strip=True))
+    clue_match = _CLUE_LINE.match(line.get_text(" ", strip=True))
+    if not match or not clue_match:
+        raise ValueError(f"Could not parse published clue {slug}")
+    blogger = credit.get_text(" ", strip=True).split("·", 1)[-1].strip()
+    return Clue(
+        source_url=str(credit["href"]),
+        paper=match["paper"],
+        puzzle_id=match["puzzle_id"],
+        setter=match["setter"],
+        blogger=blogger,
+        number=match["number"],
+        direction=match["direction"],
+        clue=clue_match["clue"],
+        enumeration=clue_match["enum"],
+        answer=answer.get_text(" ", strip=True),
+        parse=htmlmod.unescape(parse.get_text(" ", strip=True)),
+        device=match["device"],
+        enumeration_ok=True,
+    )
+
+
 def published_clue(slug: str, site_root: Path | None = None) -> Clue:
     """Read one already-published clue back from the static site."""
     root = Path(site_root or SITE_ROOT)
@@ -57,34 +90,131 @@ def published_clue(slug: str, site_root: Path | None = None) -> Clue:
         article = soup.select_one(f'article.clue[data-slug="{slug}"]')
         if article is None:
             continue
-        kicker = article.select_one("p.kicker")
-        line = article.select_one("p.clue-text")
-        answer = article.select_one("p.answer")
-        parse = article.select_one("p.parse")
-        credit = article.select_one("p.credit a")
-        if not all([kicker, line, answer, parse, credit]):
-            raise ValueError(f"Incomplete published clue {slug} on {page}")
-        match = _KICKER.match(kicker.get_text(" ", strip=True))
-        clue_match = _CLUE_LINE.match(line.get_text(" ", strip=True))
-        if not match or not clue_match:
-            raise ValueError(f"Could not parse published clue {slug}")
-        blogger = credit.get_text(" ", strip=True).split("·", 1)[-1].strip()
-        return Clue(
-            source_url=str(credit["href"]),
-            paper=match["paper"],
-            puzzle_id=match["puzzle_id"],
-            setter=match["setter"],
-            blogger=blogger,
-            number=match["number"],
-            direction=match["direction"],
-            clue=clue_match["clue"],
-            enumeration=clue_match["enum"],
-            answer=answer.get_text(" ", strip=True),
-            parse=htmlmod.unescape(parse.get_text(" ", strip=True)),
-            device=match["device"],
-            enumeration_ok=True,
-        )
+        return _clue_from_article(article, page)
     raise FileNotFoundError(f"No published clue {slug}")
+
+
+def latest_published_date(site_root: Path | None = None) -> str | None:
+    root = Path(site_root or SITE_ROOT)
+    days = sorted(
+        (path.name for path in (root / "d").iterdir() if path.is_dir() and (path / "index.html").exists()),
+        reverse=True,
+    )
+    return days[0] if days else None
+
+
+def load_published_pair(date: str, site_root: Path | None = None) -> DailyPair | None:
+    """Rebuild a DailyPair from two-down/site/d/{date} so upload does not need output/."""
+    root = Path(site_root or SITE_ROOT)
+    page = root / "d" / date / "index.html"
+    if not page.exists():
+        return None
+    soup = BeautifulSoup(page.read_text(encoding="utf-8"), "lxml")
+    spoken: list[SpokenClue] = []
+    for article in soup.select("article.clue[data-slug]"):
+        clue = _clue_from_article(article, page)
+        spoken.append(
+            SpokenClue(
+                clue=clue,
+                script="",
+                voice=resolve_voice(DEFAULT_VOICE_ALIAS),
+                site_path=f"{SITE_ORIGIN}/c/{clue.slug}/",
+            )
+        )
+    if not spoken:
+        return None
+    pair = DailyPair(
+        date=date,
+        voice=resolve_voice(DEFAULT_VOICE_ALIAS),
+        clues=spoken,
+        source_site=SOURCE_SITE,
+        site_index=str(root / "index.html"),
+        already_published=True,
+    )
+    attach_site_videos(pair, root)
+    apply_ledger(pair, root)
+    return pair
+
+
+def load_upload_pair(out_dir: Path | None = None, date: str | None = None) -> DailyPair:
+    """Prefer output/{date}/pair.json, otherwise the published site pair."""
+    out = Path(out_dir or DEFAULT_OUTPUT)
+    if date:
+        path = out / date / "pair.json"
+        if path.exists():
+            pair = DailyPair.model_validate_json(path.read_text(encoding="utf-8"))
+            attach_site_videos(pair)
+            apply_ledger(pair)
+            return pair
+        pair = load_published_pair(date)
+        if pair:
+            return pair
+        raise FileNotFoundError(f"No pair.json at {path} and no published site pair for {date}.")
+    dated = (
+        sorted((path for path in out.iterdir() if path.is_dir() and (path / "pair.json").exists()), reverse=True)
+        if out.exists()
+        else []
+    )
+    if dated:
+        pair = DailyPair.model_validate_json((dated[0] / "pair.json").read_text(encoding="utf-8"))
+        attach_site_videos(pair)
+        apply_ledger(pair)
+        return pair
+    latest = latest_published_date()
+    if latest:
+        pair = load_published_pair(latest)
+        if pair:
+            return pair
+    raise FileNotFoundError(f"No daily output in {out} and no published site pair. Run twodown today first.")
+
+
+def load_all_published_pairs(site_root: Path | None = None, *, newest_first: bool = True) -> list[DailyPair]:
+    root = Path(site_root or SITE_ROOT)
+    dates = sorted((path.name for path in (root / "d").iterdir() if path.is_dir()), reverse=newest_first)
+    pairs: list[DailyPair] = []
+    for date in dates:
+        pair = load_published_pair(date, root)
+        if pair:
+            pairs.append(pair)
+    return pairs
+
+
+def unpublished_shorts(site_root: Path | None = None) -> list[tuple[str, SpokenClue]]:
+    """Published daily films not yet on YouTube, oldest pair first. Study takes stay off the channel."""
+    waiting: list[tuple[str, SpokenClue]] = []
+    seen: set[str] = set()
+    for pair in load_all_published_pairs(site_root, newest_first=False):
+        for item in pair.clues:
+            slug = item.clue.slug
+            if slug in seen:
+                continue
+            seen.add(slug)
+            if slug in skipped_slugs(site_root):
+                continue
+            if item.youtube_id:
+                continue
+            if not item.video_path or not Path(item.video_path).exists():
+                continue
+            waiting.append((pair.date, item))
+    return waiting
+
+
+def load_youtube_queue(limit: int | None = YOUTUBE_DAILY_LIMIT, site_root: Path | None = None) -> DailyPair | None:
+    """Next Shorts to post. limit=None means the whole unpublished backlog."""
+    waiting = unpublished_shorts(site_root)
+    if not waiting:
+        return None
+    chosen = waiting if limit is None else waiting[: max(0, limit)]
+    if not chosen:
+        return None
+    return DailyPair(
+        date=chosen[0][0],
+        voice=chosen[0][1].voice,
+        clues=[item for _date, item in chosen],
+        source_site=SOURCE_SITE,
+        site_index=str(Path(site_root or SITE_ROOT) / "index.html"),
+        already_published=True,
+    )
 
 
 # Guardian 30115 — Aled's study clues. Metadata from Fifteen Squared
@@ -479,10 +609,50 @@ def _load_complete_pair(dest_root: Path) -> DailyPair | None:
     pair = DailyPair.model_validate_json(path.read_text(encoding="utf-8"))
     if len(pair.clues) < CLUES_PER_DAY:
         return None
+    attach_site_videos(pair)
+    apply_ledger(pair)
     for item in pair.clues:
         if not item.video_path or not Path(item.video_path).exists():
             return None
     return pair
+
+
+def _write_social(dest_root: Path, pair: DailyPair, notes: dict[str, list[str]]) -> None:
+    hints = setup_hints()
+    lines: list[str] = []
+    for platform, values in notes.items():
+        if values == [hints.get(platform)]:
+            lines.append(f"{platform}: skipped — {values[0]}")
+        elif values:
+            lines.append(f"{platform}: {', '.join(values)}")
+    if lines:
+        (dest_root / "social-status.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    (dest_root / "pair.json").write_text(pair.model_dump_json(indent=2), encoding="utf-8")
+
+
+def _maybe_publish_social(
+    pair: DailyPair,
+    dest_root: Path,
+    *,
+    youtube: bool,
+    tiktok: bool,
+    instagram: bool,
+    facebook: bool,
+    youtube_privacy: str,
+    youtube_limit: int | None = YOUTUBE_DAILY_LIMIT,
+) -> None:
+    if not (youtube or tiktok or instagram or facebook):
+        return
+    notes = publish_pair(
+        pair,
+        youtube=youtube,
+        tiktok=tiktok,
+        instagram=instagram,
+        facebook=facebook,
+        youtube_privacy=youtube_privacy,
+        youtube_limit=youtube_limit,
+    )
+    _write_social(dest_root, pair, notes)
 
 
 def run_today(
@@ -513,27 +683,35 @@ def run_today(
         existing = _load_complete_pair(dest_root)
         if existing:
             existing.already_published = True
-            if youtube or tiktok or instagram or facebook:
-                notes = publish_pair(
+            _maybe_publish_social(
+                existing,
+                dest_root,
+                youtube=youtube,
+                tiktok=tiktok,
+                instagram=instagram,
+                facebook=facebook,
+                youtube_privacy=youtube_privacy,
+            )
+            return existing
+        if published_date(SITE_ROOT, stamp):
+            existing = load_published_pair(stamp)
+            if existing:
+                existing.already_published = True
+                existing.source_posts = [p.url for p in todays]
+                (dest_root / "already-published.txt").write_text(
+                    f"{stamp} already on cryptic.fit. Uploading existing films if a token is set.\n",
+                    encoding="utf-8",
+                )
+                _maybe_publish_social(
                     existing,
+                    dest_root,
                     youtube=youtube,
                     tiktok=tiktok,
                     instagram=instagram,
                     facebook=facebook,
                     youtube_privacy=youtube_privacy,
                 )
-                lines: list[str] = []
-                hints = setup_hints()
-                for platform, values in notes.items():
-                    if values == [hints.get(platform)]:
-                        lines.append(f"{platform}: skipped — {values[0]}")
-                    elif values:
-                        lines.append(f"{platform}: {', '.join(values)}")
-                if lines:
-                    (dest_root / "social-status.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
-                (dest_root / "pair.json").write_text(existing.model_dump_json(indent=2), encoding="utf-8")
-            return existing
-        if published_date(SITE_ROOT, stamp):
+                return existing
             skipped = DailyPair(
                 date=stamp,
                 voice=resolve_voice(_voice_alias(voice)),
@@ -603,23 +781,15 @@ def run_today(
         site = publish_site(result, SITE_ROOT)
         result.site_index = str(site / "index.html")
         (dest_root / "site-url.txt").write_text(f"{SITE_ORIGIN}/\n", encoding="utf-8")
-    if youtube or tiktok or instagram or facebook:
-        notes = publish_pair(
-            result,
-            youtube=youtube,
-            tiktok=tiktok,
-            instagram=instagram,
-            facebook=facebook,
-            youtube_privacy=youtube_privacy,
-        )
-        lines: list[str] = []
-        hints = setup_hints()
-        for platform, values in notes.items():
-            if values == [hints.get(platform)]:
-                lines.append(f"{platform}: skipped — {values[0]}")
-            elif values:
-                lines.append(f"{platform}: {', '.join(values)}")
-        if lines:
-            (dest_root / "social-status.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
-    (dest_root / "pair.json").write_text(result.model_dump_json(indent=2), encoding="utf-8")
+    _maybe_publish_social(
+        result,
+        dest_root,
+        youtube=youtube,
+        tiktok=tiktok,
+        instagram=instagram,
+        facebook=facebook,
+        youtube_privacy=youtube_privacy,
+    )
+    if not (dest_root / "pair.json").exists():
+        (dest_root / "pair.json").write_text(result.model_dump_json(indent=2), encoding="utf-8")
     return result
