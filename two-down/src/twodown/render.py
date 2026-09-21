@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 import re
 import shutil
 import subprocess
@@ -23,7 +24,6 @@ from twodown.config import (
     HIGHLIGHT,
     HINT_LINE,
     INK,
-    INTRO_LINE,
     MUTED,
     NEWS_BG,
     NEWS_GRID,
@@ -52,6 +52,11 @@ PARSE_MAX_LINES = 5
 PARSE_SPACING = 20
 # Map speech into the Short and make it unmistakable (widgets often play quiet).
 AUDIO_LOUDNESS = "loudnorm=I=-16:TP=-1.5:LRA=11,volume=3,alimiter=limit=0.95"
+INTRO_KALEIDOSCOPE_FPS = 24
+INTRO_KALEIDOSCOPE_FOLDS = 8
+INTRO_KALEIDOSCOPE_SIZE = 1920
+# Brand crumbs only. Clue-surface words fill the rest; the answer stays out.
+INTRO_KALEIDOSCOPE_EXTRA = ("CRYPTIC", "FIT", "CLUE")
 
 
 def _font(path: str, size: int) -> ImageFont.FreeTypeFont:
@@ -263,15 +268,167 @@ def _new_card() -> tuple[Image.Image, ImageDraw.ImageDraw]:
     return _newsprint_canvas()
 
 
+def intro_kaleidoscope_words(clue: Clue) -> list[str]:
+    """Words that tumble through the open. Never the answer. Never the spoken title line."""
+    answer = re.sub(r"[^A-Za-z]", "", clue.answer or "").upper()
+    words: list[str] = []
+    for raw in re.findall(r"[A-Za-z]+", clue.clue or ""):
+        token = raw.upper()
+        compact = re.sub(r"[^A-Z]", "", token)
+        if len(compact) < 2 or compact == answer:
+            continue
+        words.append(token)
+    for extra in INTRO_KALEIDOSCOPE_EXTRA:
+        if extra != answer and extra not in words:
+            words.append(extra)
+    return words or list(INTRO_KALEIDOSCOPE_EXTRA)
+
+
+def _intro_rng(seed: int):
+    state = seed % 9973 or 1
+
+    def nxt() -> int:
+        nonlocal state
+        state = (state * 1103515245 + 12345) & 0x7FFFFFFF
+        return state
+
+    return nxt
+
+
+def _intro_word_field(clue: Clue, size: int = INTRO_KALEIDOSCOPE_SIZE) -> Image.Image:
+    """Scattered display-type words. Cantarell, not the serif used on the clue."""
+    words = intro_kaleidoscope_words(clue)
+    field = Image.new("RGB", (size, size), INK)
+    nxt = _intro_rng(sum(ord(c) for c in (clue.slug or clue.clue or "fit")))
+    colors = (YELLOW, CREAM, HIGHLIGHT, (255, 236, 150))
+    copies = max(56, len(words) * 8)
+    cx = cy = size / 2
+    for i in range(copies):
+        word = words[i % len(words)]
+        size_pt = 44 + (nxt() % 96)
+        angle = (nxt() % 180) - 90
+        font = _font(FONT_DISPLAY, size_pt)
+        layer = Image.new("RGBA", (980, 280), (0, 0, 0, 0))
+        ImageDraw.Draw(layer).text((20, 20), word, font=font, fill=(*colors[i % len(colors)], 255))
+        rotated = layer.rotate(angle, resample=Image.Resampling.BILINEAR, expand=True)
+        radius = 70 + (nxt() % (size // 2 - 90))
+        theta = (nxt() % 3600) / 10 * math.pi / 180
+        x = int(cx + radius * math.cos(theta) - rotated.size[0] / 2)
+        y = int(cy + radius * math.sin(theta) - rotated.size[1] / 2)
+        field.paste(rotated, (x, y), rotated)
+    return field
+
+
+def _sector_mask(size: int, folds: int = INTRO_KALEIDOSCOPE_FOLDS) -> Image.Image:
+    mask = Image.new("L", (size, size), 0)
+    draw = ImageDraw.Draw(mask)
+    cx = cy = size / 2
+    span = 360.0 / folds
+    radius = size
+    points = [(cx, cy)]
+    for i in range(33):
+        angle = math.radians(-span / 2 + span * i / 32)
+        points.append((cx + radius * math.cos(angle), cy + radius * math.sin(angle)))
+    draw.polygon(points, fill=255)
+    return mask
+
+
+_SECTOR_MASK = _sector_mask(INTRO_KALEIDOSCOPE_SIZE, INTRO_KALEIDOSCOPE_FOLDS)
+
+
+def _kaleidoscope_tile(field: Image.Image, angle: float, folds: int = INTRO_KALEIDOSCOPE_FOLDS) -> Image.Image:
+    size = field.size[0]
+    rotated = field.rotate(angle, resample=Image.Resampling.BILINEAR)
+    blank = Image.new("RGB", field.size, INK)
+    mask = _SECTOR_MASK if size == INTRO_KALEIDOSCOPE_SIZE else _sector_mask(size, folds)
+    wedge = Image.composite(rotated, blank, mask)
+    mirrored = Image.composite(rotated.transpose(Image.Transpose.FLIP_TOP_BOTTOM), blank, mask)
+    out = Image.new("RGB", field.size, INK)
+    step = 360.0 / folds
+    for i in range(folds):
+        piece = wedge if i % 2 == 0 else mirrored
+        spun = piece.rotate(-i * step, resample=Image.Resampling.BILINEAR)
+        spun_mask = mask.rotate(-i * step, resample=Image.Resampling.NEAREST)
+        out = Image.composite(spun, out, spun_mask)
+    return out
+
+
+def _intro_frame(field: Image.Image, angle: float) -> Image.Image:
+    tile = _kaleidoscope_tile(field, angle)
+    left = (tile.size[0] - WIDTH) // 2
+    frame = tile.crop((left, 0, left + WIDTH, HEIGHT))
+    draw = ImageDraw.Draw(frame)
+    draw.rectangle([0, 0, WIDTH, 14], fill=HIGHLIGHT)
+    draw.rectangle([0, HEIGHT - 14, WIDTH, HEIGHT], fill=HIGHLIGHT)
+    return frame
+
+
+def draw_intro_kaleidoscope_still(clue: Clue, dest: Path | None = None) -> Image.Image:
+    """One kaleidoscope frame for tests and posters. No spoken title on screen."""
+    frame = _intro_frame(_intro_word_field(clue), angle=16)
+    if dest is not None:
+        dest = Path(dest)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        frame.save(dest, "PNG")
+    return frame
+
+
+def render_intro_kaleidoscope(clue: Clue, dest: Path, duration: float) -> Path:
+    """Quick word-kaleidoscope open. Ryan still speaks; the card has no title text."""
+    dest = Path(dest).with_suffix(".mp4")
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    hold = max(0.4, duration)
+    fps = INTRO_KALEIDOSCOPE_FPS
+    count = max(8, int(round(hold * fps)))
+    field = _intro_word_field(clue)
+    ffmpeg = shutil.which("ffmpeg")
+    if not ffmpeg:
+        raise RuntimeError("ffmpeg is required to build the Short")
+    frames = dest.parent / f"{dest.stem}-frames"
+    frames.mkdir(parents=True, exist_ok=True)
+    for i in range(count):
+        angle = 8 + i * (52 / max(count - 1, 1))
+        _intro_frame(field, angle).save(frames / f"{i:04d}.jpg", "JPEG", quality=86)
+    result = subprocess.run(
+        [
+            ffmpeg,
+            "-y",
+            "-framerate",
+            str(fps),
+            "-i",
+            str(frames / "%04d.jpg"),
+            "-an",
+            "-c:v",
+            "libx264",
+            "-pix_fmt",
+            "yuv420p",
+            "-preset",
+            "veryfast",
+            "-crf",
+            "20",
+            "-t",
+            f"{hold:.2f}",
+            str(dest),
+        ],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode:
+        raise RuntimeError(result.stderr[-800:])
+    return dest
+
+
 def draw_beat(clue: Clue, dest: Path, beat: str = "think") -> Path:
     """One visual beat of the Short. Scene never appears — the clue is the picture."""
     dest.parent.mkdir(parents=True, exist_ok=True)
+    if beat == "intro":
+        draw_intro_kaleidoscope_still(clue, dest)
+        return dest
     img, draw = _new_card()
     _draw_wordmark(draw)
-    if beat in {"intro", "outro"}:
-        line = INTRO_LINE if beat == "intro" else OUTRO_LINE
+    if beat == "outro":
         line_font = _font(FONT_REGULAR, 72)
-        wrapped = _wrap(draw, line.rstrip("."), line_font, WIDTH - 160)
+        wrapped = _wrap(draw, OUTRO_LINE.rstrip("."), line_font, WIDTH - 160)
         _center_text(draw, 760, wrapped, line_font, INK, spacing=18)
         _footer(draw, "")
         img.save(dest, "PNG")
@@ -664,6 +821,10 @@ class ShortTimings:
         return self.intro + self.clue + self.letters + self.think + self.hint
 
 
+def _is_video_clip(path: Path) -> bool:
+    return Path(path).suffix.lower() in {".mp4", ".mov", ".webm", ".m4v"}
+
+
 def _encode_clips(clips: list[tuple[Path, float]], audio: Path, dest: Path) -> Path:
     ffmpeg = shutil.which("ffmpeg")
     if not ffmpeg:
@@ -671,8 +832,17 @@ def _encode_clips(clips: list[tuple[Path, float]], audio: Path, dest: Path) -> P
     cmd: list[str] = [ffmpeg, "-y"]
     filters: list[str] = []
     for i, (path, hold) in enumerate(clips):
-        cmd.extend(["-loop", "1", "-t", f"{max(hold, 0.2):.2f}", "-i", str(path)])
-        filters.append(f"[{i}:v]fps=30,scale=1080:1920,setsar=1,format=yuv420p[v{i}]")
+        seconds = max(hold, 0.2)
+        if _is_video_clip(path):
+            cmd.extend(["-i", str(path)])
+            filters.append(
+                f"[{i}:v]fps=30,scale=1080:1920:force_original_aspect_ratio=increase,"
+                f"crop=1080:1920,setsar=1,format=yuv420p,trim=duration={seconds:.2f},"
+                f"setpts=PTS-STARTPTS[v{i}]"
+            )
+        else:
+            cmd.extend(["-loop", "1", "-t", f"{seconds:.2f}", "-i", str(path)])
+            filters.append(f"[{i}:v]fps=30,scale=1080:1920,setsar=1,format=yuv420p[v{i}]")
     audio_i = len(clips)
     cmd.extend(["-i", str(audio)])
     concat = "".join(f"[v{i}]" for i in range(len(clips))) + f"concat=n={len(clips)}:v=1:a=0[v]"
@@ -739,7 +909,7 @@ def render_video(
                 slice_, slice_, slice_, slice_, slice_, slice_, slice_, slice_, slice_
             )
         clips = [
-            (draw_beat(clue, work / "intro.png", "intro"), timings.intro),
+            (render_intro_kaleidoscope(clue, work / "intro.mp4", timings.intro), timings.intro),
             (draw_beat(clue, work / "clue.png", "clue"), timings.clue),
             (draw_beat(clue, work / "letters.png", "letters"), timings.letters),
             (draw_beat(clue, work / "think.png", "think"), timings.think),

@@ -16,7 +16,9 @@ from twodown.render import (
     draw_poster,
     _thumbnail_clue,
     draw_thumbnail,
+    intro_kaleidoscope_words,
     issue_catalog,
+    render_intro_kaleidoscope,
     render_video,
     thumbnail_issue,
     write_spoiler_free_stills,
@@ -71,7 +73,8 @@ def test_clue_card_is_a_solve_along(tmp_path: Path):
     assert img.size == (1080, 1920)
     # Travel photos stay off the Short — the clue is the picture.
     assert img.getpixel((24, 40)) == NEWS_BG
-    assert draw_beat(_clue(), tmp_path / "intro.png", "intro").exists()
+    intro = draw_beat(_clue(), tmp_path / "intro.png", "intro")
+    assert intro.exists()
     assert draw_beat(_clue(), tmp_path / "outro.png", "outro").exists()
     assert draw_beat(_clue(), tmp_path / "source.png", "source").exists()
     assert draw_beat(_clue(), tmp_path / "only-clue.png", "clue").exists()
@@ -185,6 +188,44 @@ def test_short_timings_include_hint_before_answer():
     )
     assert timings.until_answer == 20.0
     assert timings.until_answer == timings.intro + timings.clue + timings.letters + timings.think + timings.hint
+
+
+def test_intro_kaleidoscope_uses_clue_words_not_the_answer():
+    clue = _clue()
+    words = intro_kaleidoscope_words(clue)
+    assert "MODEL" in words
+    assert "YOUNGSTER" in words
+    assert "CRYPTIC" in words
+    assert "FIT" in words
+    assert "PIN-UP" not in words
+    assert "PINUP" not in words
+    assert "PIN" not in words
+    assert clue.answer not in words
+
+
+def test_intro_beat_is_kaleidoscope_not_the_spoken_line(tmp_path: Path):
+    from PIL import Image
+
+    from twodown.config import INTRO_LINE, NEWS_BG
+
+    path = draw_beat(_clue(), tmp_path / "intro.png", "intro")
+    img = Image.open(path)
+    assert img.size == (1080, 1920)
+    # Old open was a newsprint title card of the spoken line. This is the animation still.
+    assert img.getpixel((24, 40)) != NEWS_BG
+    assert img.getpixel((540, 40)) != NEWS_BG
+    raw = path.read_bytes()
+    assert INTRO_LINE.encode() not in raw
+    assert b"daily dose" not in raw.lower()
+
+
+def test_intro_kaleidoscope_renders_an_animated_open(tmp_path: Path):
+    dest = tmp_path / "intro.mp4"
+    path = render_intro_kaleidoscope(_clue(), dest, 0.6)
+    assert path.exists()
+    frames = _probe(path, "stream=nb_frames")
+    assert int(frames.splitlines()[0]) >= 8
+    assert _probe(path, "stream=width,height").splitlines()[0] == "1080"
 
 
 def test_hint_beat_is_newsprint_with_credited_photo(tmp_path: Path):
