@@ -62,6 +62,9 @@ INTRO_VOLUME = "+8%"
 INTRO_GAP_SECONDS = 0.45
 OUTRO_LINE = "Thanks for thinking with cryptic.fit."
 OUTRO_GAP_SECONDS = 0.4
+# Same two chords at both ends. They sit before Ryan and after the thank-you,
+# so they name the brand without talking over the introduction.
+BRAND_STING_SECONDS = 1.45
 # Footer credit is not Sonia. Thomas (male) names the setter, paper, and Fifteen Squared.
 SOURCE_VOICE_ALIAS = "thomas"
 SOURCE_RATE = "-4%"

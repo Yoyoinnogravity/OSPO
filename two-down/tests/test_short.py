@@ -1,4 +1,4 @@
-from twodown.config import DEFAULT_VOICE_ALIAS, HINT_LINE, HINT_LOOK, HINT_OFFER, HINT_VOICE_ALIAS, INTRO_VOICE_ALIAS, PINUP_SLUG, SOURCE_VOICE_ALIAS, STUDY_SLUG, THINK_PROMPT, THINK_RATE, VOICE_RATE, VOICES
+from twodown.config import BRAND_STING_SECONDS, DEFAULT_VOICE_ALIAS, HINT_LINE, HINT_LOOK, HINT_OFFER, HINT_VOICE_ALIAS, INTRO_GAP_SECONDS, INTRO_VOICE_ALIAS, PINUP_SLUG, SOURCE_VOICE_ALIAS, STUDY_SLUG, THINK_PROMPT, THINK_RATE, VOICE_RATE, VOICES
 from twodown.pipeline import (
     dreamlike_clue,
     fats_clue,
@@ -139,17 +139,36 @@ def test_soundtrack_speaks_source_credit_as_thomas(monkeypatch, tmp_path):
 
     monkeypatch.setattr(voice_mod, "synthesise", fake_synth)
     monkeypatch.setattr(voice_mod, "synthesise_spoken_paragraph", fake_synth)
-    monkeypatch.setattr(voice_mod, "audio_seconds", lambda _path: 1.0)
+    def fake_seconds(path):
+        return 1.4 if "sting" in str(path) else 1.0
+
+    monkeypatch.setattr(voice_mod, "audio_seconds", fake_seconds)
+    monkeypatch.setattr(voice_mod, "ensure_brand_sting", lambda: tmp_path / "brand-sting.mp3")
+    (tmp_path / "brand-sting.mp3").write_bytes(b"xx")
     monkeypatch.setattr(voice_mod.shutil, "which", lambda _name: "/usr/bin/ffmpeg")
     monkeypatch.setattr(voice_mod.subprocess, "run", lambda *_args, **_kwargs: None)
 
     parts = write_parts(published_clue("guardian-30113-9a"))
-    voice_mod.build_short_soundtrack(parts, tmp_path / "mix.mp3", DEFAULT_VOICE_ALIAS)
+    timings = voice_mod.build_short_soundtrack(parts, tmp_path / "mix.mp3", DEFAULT_VOICE_ALIAS)
+    assert timings.intro == 1.4 + 1.0 + INTRO_GAP_SECONDS
+    assert timings.outro == 1.0 + 1.4 + 0.35
     assert seen["source"] == "thomas"
     assert seen["source"] != seen["answer"]
     assert seen["answer"] == DEFAULT_VOICE_ALIAS
     assert seen["intro"] == INTRO_VOICE_ALIAS
     assert seen["outro"] == INTRO_VOICE_ALIAS
+
+
+def test_brand_sting_is_one_shared_pair():
+    from twodown.voice import BRAND_STING_ASSET, ensure_brand_sting
+    from twodown.render import audio_seconds
+
+    path = ensure_brand_sting()
+    assert path == BRAND_STING_ASSET
+    assert path.exists()
+    duration = audio_seconds(path)
+    assert 1.1 <= duration <= 1.7
+    assert abs(duration - BRAND_STING_SECONDS) < 0.3
 
 
 def test_spoken_parse_says_mass_media_as_words():
