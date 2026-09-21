@@ -7,6 +7,7 @@ from twodown.render import (
     INTRO_DICTIONARY_ENTRIES,
     INTRO_DICTIONARY_HEADWORD,
     INTRO_DICTIONARY_SENSES,
+    INTRO_DICTIONARY_PHOTO,
     INTRO_DICTIONARY_SOURCE,
     INTRO_KALEIDOSCOPE_WORDS,
     INTRO_THESAURUS_HEADING,
@@ -241,7 +242,7 @@ def test_intro_dictionary_is_webster_with_neighbours():
 
 
 def test_intro_beat_is_kaleidoscope_not_the_spoken_line(tmp_path: Path):
-    from twodown.config import INK, INTRO_LINE
+    from twodown.config import INTRO_LINE
     from twodown.render import _dictionary_layout
 
     img = _compose_intro_frame(0.12)
@@ -250,12 +251,14 @@ def test_intro_beat_is_kaleidoscope_not_the_spoken_line(tmp_path: Path):
     assert img.size == (1080, 1920)
     # Lexicon paper, not the old black letter-vortex.
     paper = img.getpixel((40, 80))
-    assert paper[0] > 200 and paper[1] > 190
-    page, focus = _dictionary_layout()
+    assert paper[0] > 160 and paper[1] > 140
+    page, focus, glance = _dictionary_layout()
     fx, fy = focus
-    # Count ink on the typeset page — the glass interpolates the magnified crop.
-    head = list(page.crop((max(40, fx - 220), max(140, fy - 140), fx + 220, fy + 90)).get_flattened_data())
-    assert head.count(INK) > 400
+    assert INTRO_DICTIONARY_PHOTO.exists()
+    assert 0 < fx < 1080 and 0 < fy < 1920
+    assert glance[1] > fy
+    sample = page.getpixel((fx, fy))
+    assert sample[0] > 140 and sample[1] > 130
     raw = path.read_bytes()
     assert INTRO_LINE.encode() not in raw
     assert b"daily dose" not in raw.lower()

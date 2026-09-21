@@ -8,7 +8,7 @@ from pathlib import Path
 
 from functools import lru_cache
 
-from PIL import Image, ImageDraw, ImageFilter, ImageFont
+from PIL import Image, ImageDraw, ImageEnhance, ImageFont
 
 from dataclasses import dataclass
 
@@ -62,6 +62,11 @@ INTRO_DICTIONARY_PRONUNCIATION = "/KRIP-tik/"
 INTRO_DICTIONARY_POS = "adjective"
 INTRO_DICTIONARY_SOURCE = "Webster 1913"
 INTRO_DICTIONARY_GUIDE = ("cry", "crystal")
+# Aled's photographed opening — tight on crypt / cryptic / cryptogram.
+INTRO_DICTIONARY_PHOTO = PACKAGE_ROOT / "assets" / "intro-dictionary-page.jpg"
+INTRO_DICTIONARY_CROP = (500, 240, 820, 1000)
+INTRO_DICTIONARY_SOURCE_FOCUS = (648, 492)
+INTRO_DICTIONARY_SOURCE_GLANCE = (675, 700)
 INTRO_THESAURUS_SOURCE = "Roget 1911"
 INTRO_THESAURUS_HEADING = "§ 526  Concealment"
 INTRO_THESAURUS_WORDS = (
@@ -141,7 +146,7 @@ INTRO_DICTIONARY_ENTRIES: tuple[DictionaryEntry, ...] = (
     DictionaryEntry("Cubic", "a.", ("Having the form or properties of a cube.",)),
 )
 INTRO_DICTIONARY_SENSES = next(entry.senses for entry in INTRO_DICTIONARY_ENTRIES if entry.featured)
-INTRO_KALEIDOSCOPE_HOLD = 4.0
+INTRO_KALEIDOSCOPE_HOLD = 8.5
 INTRO_KALEIDOSCOPE_ASSET = PACKAGE_ROOT / "assets" / "intro-kaleidoscope.mp4"
 INTRO_KALEIDOSCOPE_STILL = PACKAGE_ROOT / "assets" / "intro-kaleidoscope.jpg"
 FONT_ITALIC = "/usr/share/fonts/truetype/liberation/LiberationSerif-Italic.ttf"
@@ -439,8 +444,49 @@ def _draw_thesaurus_panel(draw: ImageDraw.ImageDraw, x: int, y: int, width: int)
     draw.text((x + pad, y + box_h - 28), "see also  § 519 Enigma", font=heading, fill=CRIMSON)
 
 
+def _photo_point(src_xy: tuple[int, int], box: tuple[int, int, int, int], scale: float, top_trim: int) -> tuple[int, int]:
+    left, top, _, _ = box
+    return (
+        int((src_xy[0] - left) * scale),
+        int((src_xy[1] - top) * scale) - top_trim,
+    )
+
+
+def _photographed_dictionary_page() -> tuple[Image.Image, tuple[int, int], tuple[int, int]]:
+    """Aled's real page, tight on cryptic, plus the glass start and glance."""
+    src = Image.open(INTRO_DICTIONARY_PHOTO).convert("RGB")
+    box = INTRO_DICTIONARY_CROP
+    left, top, right, bottom = box
+    crop = src.crop(box)
+    scale = WIDTH / crop.size[0]
+    resized = crop.resize((WIDTH, max(HEIGHT, int(crop.size[1] * scale))), Image.Resampling.LANCZOS)
+    top_trim = 0
+    if resized.size[1] > HEIGHT:
+        focus_y = int((INTRO_DICTIONARY_SOURCE_FOCUS[1] - top) * scale)
+        top_trim = max(0, min(resized.size[1] - HEIGHT, focus_y - int(HEIGHT * 0.38)))
+        resized = resized.crop((0, top_trim, WIDTH, top_trim + HEIGHT))
+    elif resized.size[1] < HEIGHT:
+        canvas = Image.new("RGB", (WIDTH, HEIGHT), (248, 243, 230))
+        canvas.paste(resized, (0, (HEIGHT - resized.size[1]) // 2))
+        resized = canvas
+    page = ImageEnhance.Contrast(resized).enhance(1.2)
+    page = ImageEnhance.Brightness(page).enhance(1.04)
+    page = ImageEnhance.Sharpness(page).enhance(1.55)
+    focus = _photo_point(INTRO_DICTIONARY_SOURCE_FOCUS, box, scale, top_trim)
+    glance = _photo_point(INTRO_DICTIONARY_SOURCE_GLANCE, box, scale, top_trim)
+    return page, focus, glance
+
+
 @lru_cache(maxsize=1)
-def _dictionary_layout() -> tuple[Image.Image, tuple[int, int]]:
+def _dictionary_layout() -> tuple[Image.Image, tuple[int, int], tuple[int, int]]:
+    """Real photographed page when we have one; otherwise the typeset Webster stand-in."""
+    if INTRO_DICTIONARY_PHOTO.exists():
+        return _photographed_dictionary_page()
+    page, focus = _typeset_dictionary_page()
+    return page, focus, (min(WIDTH - 220, focus[0] + 40), min(HEIGHT - 220, focus[1] + 360))
+
+
+def _typeset_dictionary_page() -> tuple[Image.Image, tuple[int, int]]:
     """Two-column Webster page around cryptic, plus the centre of that entry."""
     img, draw = _newsprint_canvas()
     header = _font(FONT_SANS, 20)
@@ -518,7 +564,12 @@ def _with_magnifier(page: Image.Image, center: tuple[int, int], radius: int = 26
     """Brass glass over the dictionary page."""
     cx, cy = center
     src_r = int(radius / zoom)
-    box = (cx - src_r, cy - src_r, cx + src_r, cy + src_r)
+    box = (
+        max(0, cx - src_r),
+        max(0, cy - src_r),
+        min(page.size[0], cx + src_r),
+        min(page.size[1], cy + src_r),
+    )
     crop = page.crop(box).resize((radius * 2, radius * 2), Image.Resampling.LANCZOS)
     lens = Image.new("RGBA", page.size, (0, 0, 0, 0))
     left, top = cx - radius, cy - radius
@@ -548,22 +599,21 @@ def _with_magnifier(page: Image.Image, center: tuple[int, int], radius: int = 26
 
 
 def _compose_intro_frame(progress: float) -> Image.Image:
-    """Webster page with a glass that reads cryptic, then the words around it."""
+    """Real dictionary page: hold on cryptic, then read the neighbours."""
     t = max(0.0, min(1.0, progress))
-    page, focus = _dictionary_layout()
-    # Hold on the definition, then glance across at the neighbouring column.
-    end = (min(WIDTH - 220, focus[0] + 360), focus[1] + 70)
-    hold = 0.0 if t < 0.22 else min(1.0, (t - 0.22) / 0.78)
+    page, focus, glance = _dictionary_layout()
+    # First half of the open is for the definition. Then a slow glance down the column.
+    hold = 0.0 if t < 0.42 else min(1.0, (t - 0.42) / 0.58)
     ease = hold * hold * (3 - 2 * hold)
     glass = (
-        int(focus[0] + (end[0] - focus[0]) * ease),
-        int(focus[1] + (end[1] - focus[1]) * ease),
+        int(focus[0] + (glance[0] - focus[0]) * ease),
+        int(focus[1] + (glance[1] - focus[1]) * ease),
     )
-    frame = _with_magnifier(page, glass, radius=214, zoom=1.95)
+    frame = _with_magnifier(page, glass, radius=248, zoom=1.55)
     draw = ImageDraw.Draw(frame)
     draw.rectangle([0, 0, WIDTH, 14], fill=HIGHLIGHT)
     draw.rectangle([0, HEIGHT - 14, WIDTH, HEIGHT], fill=HIGHLIGHT)
-    return frame.filter(ImageFilter.SMOOTH)
+    return frame
 
 
 def draw_intro_kaleidoscope_still(clue: Clue | None = None, dest: Path | None = None) -> Image.Image:

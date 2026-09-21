@@ -59,7 +59,10 @@ INTRO_VOICE_ALIAS = "ryan"
 INTRO_RATE = "+3%"
 INTRO_PITCH = "+4Hz"
 INTRO_VOLUME = "+8%"
-INTRO_GAP_SECONDS = 0.45
+# After Ryan, stay on the dictionary so the glass can be read.
+INTRO_GAP_SECONDS = 2.8
+# After the sting, a beat of page before he speaks.
+INTRO_LOOK_BEFORE_SECONDS = 1.0
 OUTRO_LINE = "Thanks for thinking with cryptic.fit."
 OUTRO_GAP_SECONDS = 0.4
 # Same two chords at both ends. They sit before Ryan and after the thank-you,

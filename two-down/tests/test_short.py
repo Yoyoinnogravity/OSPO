@@ -1,4 +1,4 @@
-from twodown.config import BRAND_STING_SECONDS, DEFAULT_VOICE_ALIAS, HINT_LINE, HINT_LOOK, HINT_OFFER, HINT_VOICE_ALIAS, INTRO_GAP_SECONDS, INTRO_VOICE_ALIAS, PINUP_SLUG, SOURCE_VOICE_ALIAS, STUDY_SLUG, THINK_PROMPT, THINK_RATE, VOICE_RATE, VOICES
+from twodown.config import BRAND_STING_SECONDS, DEFAULT_VOICE_ALIAS, HINT_LINE, HINT_LOOK, HINT_OFFER, HINT_VOICE_ALIAS, INTRO_GAP_SECONDS, INTRO_LOOK_BEFORE_SECONDS, INTRO_VOICE_ALIAS, PINUP_SLUG, SOURCE_VOICE_ALIAS, STUDY_SLUG, THINK_PROMPT, THINK_RATE, VOICE_RATE, VOICES
 from twodown.pipeline import (
     dreamlike_clue,
     fats_clue,
@@ -150,7 +150,9 @@ def test_soundtrack_speaks_source_credit_as_thomas(monkeypatch, tmp_path):
 
     parts = write_parts(published_clue("guardian-30113-9a"))
     timings = voice_mod.build_short_soundtrack(parts, tmp_path / "mix.mp3", DEFAULT_VOICE_ALIAS)
-    assert timings.intro == 1.4 + 1.0 + INTRO_GAP_SECONDS
+    assert timings.intro == 1.4 + INTRO_LOOK_BEFORE_SECONDS + 1.0 + INTRO_GAP_SECONDS
+    assert INTRO_LOOK_BEFORE_SECONDS >= 0.8
+    assert INTRO_GAP_SECONDS >= 2.0
     assert timings.outro == 1.0 + 1.4 + 0.35
     assert seen["source"] == "thomas"
     assert seen["source"] != seen["answer"]
