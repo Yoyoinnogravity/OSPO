@@ -106,10 +106,48 @@ def test_source_credit_is_its_own_line():
     clue = rasta_clue()
     assert speak_source(clue) == "That's Brendan, in the Guardian — via Fifteen Squared."
     assert SOURCE_VOICE_ALIAS == "thomas"
+    assert SOURCE_VOICE_ALIAS != DEFAULT_VOICE_ALIAS
+    assert VOICES[SOURCE_VOICE_ALIAS] == "en-GB-ThomasNeural"
     parts = write_parts(clue)
     assert parts.source_speech == speak_source(clue)
     assert "Fifteen Squared" not in parts.parse_speech
     assert parts.outro_speech == "Thanks for thinking with cryptic.fit."
+
+
+def test_self_footer_credit_is_the_male_voice():
+    clue = published_clue("guardian-30113-9a")
+    parts = write_parts(clue)
+    assert clue.setter == "Dice"
+    assert clue.paper == "Guardian"
+    assert parts.source_speech == "That's Dice, in the Guardian — via Fifteen Squared."
+    assert SOURCE_VOICE_ALIAS == "thomas"
+    assert SOURCE_VOICE_ALIAS != DEFAULT_VOICE_ALIAS
+
+
+def test_soundtrack_speaks_source_credit_as_thomas(monkeypatch, tmp_path):
+    from twodown import voice as voice_mod
+
+    seen: dict[str, str | None] = {}
+
+    def fake_synth(script, dest, voice=None, **_kwargs):
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(b"xx")
+        seen[dest.stem] = voice
+        return dest
+
+    monkeypatch.setattr(voice_mod, "synthesise", fake_synth)
+    monkeypatch.setattr(voice_mod, "synthesise_spoken_paragraph", fake_synth)
+    monkeypatch.setattr(voice_mod, "audio_seconds", lambda _path: 1.0)
+    monkeypatch.setattr(voice_mod.shutil, "which", lambda _name: "/usr/bin/ffmpeg")
+    monkeypatch.setattr(voice_mod.subprocess, "run", lambda *_args, **_kwargs: None)
+
+    parts = write_parts(published_clue("guardian-30113-9a"))
+    voice_mod.build_short_soundtrack(parts, tmp_path / "mix.mp3", DEFAULT_VOICE_ALIAS)
+    assert seen["source"] == "thomas"
+    assert seen["source"] != seen["answer"]
+    assert seen["answer"] == DEFAULT_VOICE_ALIAS
+    assert seen["intro"] == INTRO_VOICE_ALIAS
+    assert seen["outro"] == INTRO_VOICE_ALIAS
 
 
 def test_spoken_parse_says_mass_media_as_words():

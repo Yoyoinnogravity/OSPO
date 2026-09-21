@@ -217,6 +217,15 @@ def _source_footer(clue: Clue) -> str:
     return "Parse via Fifteen Squared"
 
 
+def _beat_footer(clue: Clue, beat: str) -> str:
+    """Setter and paper only land on the source beat, when Thomas speaks."""
+    if beat == "source":
+        return _source_footer(clue)
+    if beat == "letters":
+        return "How many letters"
+    return ""
+
+
 def _footer(draw: ImageDraw.ImageDraw, text: str) -> None:
     foot = _font(FONT_SANS, 22)
     _center_text(draw, HEIGHT - 88, text, foot, MUTED, spacing=0)
@@ -290,7 +299,7 @@ def draw_beat(clue: Clue, dest: Path, beat: str = "think") -> Path:
         wrapped = _wrap(draw, line, prompt, WIDTH - 160)
         next_y = _center_text(draw, prompt_y, wrapped, prompt, CRIMSON, spacing=8)
         _draw_hint_photo(img, draw, min(next_y + 18, 1040), clue)
-        _footer(draw, _source_footer(clue))
+        _footer(draw, _beat_footer(clue, beat))
         img.save(dest, "PNG")
         return dest
     if show_answer:
@@ -303,15 +312,11 @@ def draw_beat(clue: Clue, dest: Path, beat: str = "think") -> Path:
             if parse.count("\n") >= PARSE_MAX_LINES:
                 parse = "\n".join(parse.split("\n")[:PARSE_MAX_LINES])
             _center_text(draw, answer_y + 118, parse, parse_font, PARSE_FILL, spacing=PARSE_SPACING)
-            _footer(draw, _source_footer(clue))
-        else:
-            _footer(draw, "")
+        _footer(draw, _beat_footer(clue, beat))
     elif beat == "clue":
         _footer(draw, "")
-    elif beat == "letters":
-        _footer(draw, "How many letters")
     else:
-        _footer(draw, "")
+        _footer(draw, _beat_footer(clue, beat))
     img.save(dest, "PNG")
     return dest
 

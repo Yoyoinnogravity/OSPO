@@ -8,6 +8,7 @@ from twodown.render import (
     THUMB_H,
     THUMB_W,
     _encode_clips,
+    _beat_footer,
     _source_footer,
     draw_beat,
     draw_clue_card,
@@ -114,6 +115,18 @@ def test_answer_footer_credits_setter_paper_and_fifteen_squared():
     assert dreamlike.answer == "DREAMLIKE"
     assert _source_footer(dreamlike) == "Brendan in the Guardian · Fifteen Squared"
     assert _source_footer(study_clue()) == "Arrietty in the Financial Times · Fifteen Squared"
+
+
+def test_setter_paper_footer_only_on_source_beat():
+    clue = _clue()
+    assert _beat_footer(clue, "source") == "Eccles in the Independent · Fifteen Squared"
+    assert _beat_footer(clue, "parse") == ""
+    assert _beat_footer(clue, "answer") == ""
+    assert _beat_footer(clue, "hint") == ""
+    assert _beat_footer(clue, "think") == ""
+    assert _beat_footer(clue, "letters") == "How many letters"
+    guardian = clue.model_copy(update={"setter": "Dice", "paper": "Guardian"})
+    assert _beat_footer(guardian, "source") == "Dice in the Guardian · Fifteen Squared"
 
 
 def test_parse_under_answer_is_very_bold_ink(tmp_path: Path):

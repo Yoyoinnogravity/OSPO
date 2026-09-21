@@ -62,7 +62,7 @@ INTRO_VOLUME = "+8%"
 INTRO_GAP_SECONDS = 0.45
 OUTRO_LINE = "Thanks for thinking with cryptic.fit."
 OUTRO_GAP_SECONDS = 0.4
-# Source credit is not Sonia — Thomas reads the paper and Fifteen Squared.
+# Footer credit is not Sonia. Thomas (male) names the setter, paper, and Fifteen Squared.
 SOURCE_VOICE_ALIAS = "thomas"
 SOURCE_RATE = "-4%"
 SOURCE_PITCH = "+0Hz"
