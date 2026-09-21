@@ -810,16 +810,16 @@ def _compose_intro_frame(progress: float) -> Image.Image:
     """Push in on the real book, dissolve onto that same page, then fade the glass on."""
     t = max(0.0, min(1.0, progress))
     if INTRO_DICTIONARY_BOOK.exists():
-        wide = _stabilized_book_frame(min(1.0, t / 0.52))
-        if t < 0.52:
+        wide = _stabilized_book_frame(min(1.0, t / 0.40))
+        if t < 0.40:
             return wide
         page = _close_page(0.0, glass=False)
-        page_mix = _smootherstep((t - 0.52) / 0.20) if t < 0.72 else 1.0
+        page_mix = _smootherstep((t - 0.40) / 0.22) if t < 0.62 else 1.0
         base = Image.blend(wide.convert("RGB"), page.convert("RGB"), page_mix)
-        if t < 0.70:
+        if t < 0.60:
             return base
-        close = _close_page(max(0.0, (t - 0.70) / 0.30), glass=True)
-        glass_mix = _smootherstep((t - 0.70) / 0.12) if t < 0.82 else 1.0
+        close = _close_page(max(0.0, (t - 0.60) / 0.40), glass=True)
+        glass_mix = _smootherstep((t - 0.60) / 0.14) if t < 0.74 else 1.0
         return Image.blend(base, close.convert("RGB"), glass_mix)
     return _close_page_with_glass(t)
 
