@@ -68,15 +68,17 @@ twodown upload                 # next one Short
 twodown upload --limit 6       # catch-up (YouTube quota is about 6/day)
 ```
 
-One-time YouTube login (laptop with a browser):
+One-time YouTube login. Do not use Command Prompt scripts. The Cloud
+Agent can finish this from chat:
 
 ```bash
-# 1. Google Cloud → APIs & Services → Credentials → Desktop OAuth client
-#    Enable YouTube Data API v3. Download the client JSON.
-mkdir -p ~/.config/twodown
-cp ~/Downloads/client_secret*.json ~/.config/twodown/youtube-client-secret.json
-twodown youtube-auth
-# 2. When Google asks which channel, pick cryptic.fit (@crypticfit).
+# Google Cloud project cryptic-fit already has the desktop OAuth client.
+# The JSON is in Downloads as client_secret*.json.
+twodown youtube-auth --save-client ~/Downloads/client_secret*.json
+twodown youtube-auth --start
+# Open the URL. Pick Cryptic Fit, not carbonyoyo.
+# The next page fails to load — that is expected. Copy the address bar.
+twodown youtube-auth --finish 'http://localhost/?code=...' --upload
 # 3. Paste ~/.config/twodown/youtube-token.json as the GitHub Actions
 #    secret TWODOWN_YOUTUBE_TOKEN (and the same secret on the Cursor
 #    Cloud Agent environment if the daily agent should upload too).

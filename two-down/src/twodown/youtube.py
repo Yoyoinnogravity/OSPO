@@ -15,6 +15,8 @@ TOKEN_ENV = "TWODOWN_YOUTUBE_TOKEN"
 CLIENT_ENV = "TWODOWN_YOUTUBE_CLIENT_SECRET"
 TOKEN_FILENAME = "youtube-token.json"
 CLIENT_FILENAME = "youtube-client-secret.json"
+PENDING_FILENAME = "youtube-auth-pending.json"
+REDIRECT_URI = "http://localhost"
 
 
 def youtube_ready() -> bool:
@@ -31,8 +33,9 @@ def youtube_hint() -> str:
     text = secret_text(TOKEN_ENV, TOKEN_FILENAME)
     if not text:
         return (
-            "Set TWODOWN_YOUTUBE_TOKEN to the authorized-user JSON from "
-            "`twodown youtube-auth` (GitHub Actions secret or ~/.config/twodown/youtube-token.json)."
+            "Set TWODOWN_YOUTUBE_TOKEN from `twodown youtube-auth --start` then "
+            "`twodown youtube-auth --finish URL` (or a laptop `twodown youtube-auth`). "
+            "Do not use Command Prompt scripts."
         )
     info = _token_info()
     if info is None:
@@ -104,48 +107,164 @@ def token_path() -> Path:
     return CONFIG_DIR / TOKEN_FILENAME
 
 
-def authorize(*, console: bool = False) -> Path:
-    """One-time Google login for the cryptic.fit channel. Writes a refresh token."""
-    client_text = secret_text(CLIENT_ENV, CLIENT_FILENAME)
-    if not client_text or not client_text.startswith("{"):
-        raise FileNotFoundError(
-            f"Need the Google OAuth desktop client JSON as {CLIENT_ENV} "
-            f"or ~/.config/twodown/{CLIENT_FILENAME}"
-        )
-    try:
-        from google_auth_oauthlib.flow import InstalledAppFlow
-    except ImportError as exc:
-        raise RuntimeError("google-auth-oauthlib is required for twodown youtube-auth") from exc
-
-    flow = InstalledAppFlow.from_client_config(json.loads(client_text), scopes=SCOPES)
-    if console:
-        creds = _run_console_flow(flow)
-    else:
-        creds = flow.run_local_server(port=0, access_type="offline", prompt="consent")
-    dest = token_path()
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    dest.write_text(creds.to_json(), encoding="utf-8")
-    return dest
+def pending_path() -> Path:
+    return CONFIG_DIR / PENDING_FILENAME
 
 
-def _run_console_flow(flow):
-    """Headless helper: print the Google URL, then accept a pasted redirect or code."""
-    flow.redirect_uri = flow.redirect_uri or "http://localhost"
-    auth_url, _ = flow.authorization_url(access_type="offline", prompt="consent", include_granted_scopes="true")
-    print("Open this URL, pick the cryptic.fit channel, then paste the redirect URL or the code:")
-    print(auth_url)
-    pasted = input("Redirect URL or code: ").strip()
+def client_path() -> Path:
+    return CONFIG_DIR / CLIENT_FILENAME
+
+
+def authorization_code(pasted: str) -> str:
+    """Accept either a localhost redirect URL or the bare ?code= value."""
+    pasted = pasted.strip().strip("'\"")
     if not pasted:
         raise ValueError("No authorization code pasted")
     if pasted.startswith("http"):
         query = parse_qs(urlparse(pasted).query)
         code = (query.get("code") or [""])[0]
-    else:
-        code = pasted
-    if not code:
-        raise ValueError("Could not find ?code= in that redirect URL")
-    flow.fetch_token(code=code)
-    return flow.credentials
+        if not code:
+            raise ValueError("Could not find ?code= in that redirect URL")
+        return code
+    return pasted
+
+
+def _client_json_ok(data: object) -> bool:
+    if not isinstance(data, dict):
+        return False
+    block = data.get("installed") or data.get("web")
+    if isinstance(block, dict) and block.get("client_id"):
+        return True
+    return bool(data.get("client_id"))
+
+
+def discover_client_text() -> str | None:
+    """Find the desktop OAuth client JSON. Downloads/ is the usual Windows location."""
+    text = secret_text(CLIENT_ENV, CLIENT_FILENAME)
+    if text and text.startswith("{"):
+        return text
+    downloads = Path.home() / "Downloads"
+    if not downloads.is_dir():
+        return None
+    matches = sorted(downloads.glob("client_secret*.json"), key=lambda path: path.stat().st_mtime, reverse=True)
+    for match in matches:
+        try:
+            candidate = match.read_text(encoding="utf-8").strip()
+        except OSError:
+            continue
+        if not candidate.startswith("{"):
+            continue
+        try:
+            data = json.loads(candidate)
+        except json.JSONDecodeError:
+            continue
+        if _client_json_ok(data):
+            return candidate
+    return None
+
+
+def save_client_secret(raw: str) -> Path:
+    """Store a pasted or downloaded Google desktop client JSON for youtube-auth."""
+    raw = raw.strip()
+    if not raw:
+        raise ValueError("No OAuth client JSON provided")
+    path = Path(raw).expanduser()
+    if len(raw) < 512 and path.exists() and path.is_file():
+        raw = path.read_text(encoding="utf-8").strip()
+    if not raw.startswith("{"):
+        raise ValueError("OAuth client must be a JSON object from Google Cloud credentials.")
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"OAuth client JSON is invalid: {exc}") from exc
+    if not _client_json_ok(data):
+        raise ValueError("OAuth client JSON is missing client_id")
+    dest = client_path()
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    return dest
+
+
+def _require_client_text() -> str:
+    client_text = discover_client_text()
+    if not client_text or not client_text.startswith("{"):
+        raise FileNotFoundError(
+            f"Need the Google OAuth desktop client JSON as {CLIENT_ENV}, "
+            f"~/.config/twodown/{CLIENT_FILENAME}, or Downloads/client_secret*.json. "
+            "Paste that file into `twodown youtube-auth --save-client`."
+        )
+    return client_text
+
+
+def _installed_flow(client_text: str):
+    try:
+        from google_auth_oauthlib.flow import InstalledAppFlow
+    except ImportError as exc:
+        raise RuntimeError("google-auth-oauthlib is required for twodown youtube-auth") from exc
+    flow = InstalledAppFlow.from_client_config(json.loads(client_text), scopes=SCOPES)
+    return flow
+
+
+def start_authorization() -> str:
+    """Printable Google URL for Cloud Agents. Aled opens it and pastes the redirect back."""
+    client_text = _require_client_text()
+    save_client_secret(client_text)
+    flow = _installed_flow(client_text)
+    flow.redirect_uri = REDIRECT_URI
+    auth_url, state = flow.authorization_url(
+        access_type="offline",
+        prompt="consent",
+        include_granted_scopes="true",
+    )
+    pending = {
+        "client_config": json.loads(client_text),
+        "state": state,
+        "code_verifier": getattr(flow, "code_verifier", None),
+        "redirect_uri": flow.redirect_uri,
+        "scopes": SCOPES,
+    }
+    dest = pending_path()
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_text(json.dumps(pending), encoding="utf-8")
+    return auth_url
+
+
+def finish_authorization(pasted: str) -> Path:
+    """Exchange the pasted localhost redirect (or code) for a refresh token."""
+    dest = pending_path()
+    if not dest.exists():
+        raise FileNotFoundError("No pending YouTube login. Run `twodown youtube-auth --start` first.")
+    pending = json.loads(dest.read_text(encoding="utf-8"))
+    flow = _installed_flow(json.dumps(pending["client_config"]))
+    flow.redirect_uri = pending.get("redirect_uri") or REDIRECT_URI
+    if pending.get("code_verifier"):
+        flow.code_verifier = pending["code_verifier"]
+    flow.fetch_token(code=authorization_code(pasted))
+    token = token_path()
+    token.parent.mkdir(parents=True, exist_ok=True)
+    token.write_text(flow.credentials.to_json(), encoding="utf-8")
+    dest.unlink(missing_ok=True)
+    return token
+
+
+def authorize(*, console: bool = False) -> Path:
+    """One-time Google login for the cryptic.fit channel. Writes a refresh token."""
+    client_text = _require_client_text()
+    save_client_secret(client_text)
+    if console:
+        url = start_authorization()
+        print("Open this URL, pick Cryptic Fit (not carbonyoyo).")
+        print("The next page will fail to load. That is expected.")
+        print("Copy the whole address bar and paste it here.")
+        print(url)
+        pasted = input("Redirect URL or code: ").strip()
+        return finish_authorization(pasted)
+    flow = _installed_flow(client_text)
+    creds = flow.run_local_server(port=0, access_type="offline", prompt="consent")
+    dest = token_path()
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_text(creds.to_json(), encoding="utf-8")
+    return dest
 
 
 def video_title(clue: Clue) -> str:

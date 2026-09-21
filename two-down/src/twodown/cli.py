@@ -28,7 +28,14 @@ from twodown.social import (
     setup_hints,
 )
 from twodown.voice import list_voices, resolve_voice
-from twodown.youtube import YOUTUBE_CHANNEL, authorize as youtube_authorize, youtube_ready
+from twodown.youtube import (
+    YOUTUBE_CHANNEL,
+    authorize as youtube_authorize,
+    finish_authorization,
+    save_client_secret,
+    start_authorization,
+    youtube_ready,
+)
 
 
 def _print_pair(pair) -> None:
@@ -158,6 +165,16 @@ def main(argv: list[str] | None = None) -> int:
 
     auth = sub.add_parser("youtube-auth", help="One-time Google login for the cryptic.fit YouTube channel")
     auth.add_argument("--console", action="store_true", help="Print a URL and paste the code (no local browser)")
+    auth.add_argument(
+        "--save-client",
+        nargs="?",
+        const="-",
+        metavar="FILE",
+        help="Store the Google desktop client JSON (path, raw JSON, or stdin)",
+    )
+    auth.add_argument("--start", action="store_true", help="Print a Google URL. Open it, then --finish the redirect.")
+    auth.add_argument("--finish", metavar="CODE_OR_URL", help="Paste the localhost redirect URL after --start")
+    auth.add_argument("--upload", action="store_true", help="After --finish, post the next Short unlisted")
 
     short = sub.add_parser("short", help="Rebuild one Short while we lock the beat")
     short.add_argument(
@@ -248,6 +265,43 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.cmd == "youtube-auth":
+        if args.save_client is not None:
+            raw = sys.stdin.read() if args.save_client == "-" else args.save_client
+            try:
+                saved = save_client_secret(raw)
+            except ValueError as exc:
+                print(str(exc), file=sys.stderr)
+                return 1
+            print(f"wrote {saved}")
+            if not args.start and args.finish is None and not args.console:
+                return 0
+        if args.start:
+            try:
+                url = start_authorization()
+            except (FileNotFoundError, RuntimeError, ValueError) as exc:
+                print(str(exc), file=sys.stderr)
+                return 1
+            print("Open this URL. Pick Cryptic Fit, not carbonyoyo.")
+            print("The next page will fail to load. That is expected.")
+            print("Copy the whole address bar, then run:")
+            print("  twodown youtube-auth --finish 'PASTE_THE_URL'")
+            print()
+            print(url)
+            return 0
+        if args.finish is not None:
+            try:
+                dest = finish_authorization(args.finish)
+            except (FileNotFoundError, RuntimeError, ValueError) as exc:
+                print(str(exc), file=sys.stderr)
+                return 1
+            print(f"wrote {dest}")
+            print("Paste that JSON as GitHub Actions secret TWODOWN_YOUTUBE_TOKEN.")
+            print("Channel must be youtube.com/@crypticfit — not @crypticfun.")
+            if not youtube_ready():
+                return 1
+            if args.upload:
+                return main(["upload", "--limit", "1", "--youtube-privacy", "unlisted"])
+            return 0
         try:
             dest = youtube_authorize(console=args.console)
         except (FileNotFoundError, RuntimeError, ValueError) as exc:
@@ -256,6 +310,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"wrote {dest}")
         print("Paste that JSON as GitHub Actions secret TWODOWN_YOUTUBE_TOKEN.")
         print("Channel must be youtube.com/@crypticfit — not @crypticfun.")
+        if youtube_ready() and args.upload:
+            return main(["upload", "--limit", "1", "--youtube-privacy", "unlisted"])
         return 0 if youtube_ready() else 1
 
     if args.cmd == "live":

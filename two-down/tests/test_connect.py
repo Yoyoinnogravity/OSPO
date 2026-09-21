@@ -31,4 +31,7 @@ def test_connect_youtube_is_cryptic_fit_not_fun():
     assert "cryptic.fit" in youtube
     assert "twodown youtube-auth" in youtube
     assert "TWODOWN_YOUTUBE_CLIENT_SECRET" in youtube
+    assert "--start" in youtube
+    assert "--finish" in youtube
+    assert "Command Prompt" in youtube
     assert "Prefer" not in youtube

@@ -16,8 +16,9 @@ run it unattended. Never use another crossword blog as the source.
 6. Paste the prompt below.
 7. YouTube auto-upload is the GitHub Action `.github/workflows/cryptic-fit-daily.yml`.
    It posts **one Short a day** (oldest unpublished first) to @crypticfit.
-   Aled generates the token once on a laptop with `twodown youtube-auth`, then
-   pastes that JSON as repo secret `TWODOWN_YOUTUBE_TOKEN`.
+   Aled finishes login with `twodown youtube-auth --start` then `--finish`
+   (Cloud Agent can do this). Paste the token JSON as repo secret
+   `TWODOWN_YOUTUBE_TOKEN`. Do not send him to Command Prompt.
    Optional: the same secret on the Cloud Agent environment so this prompt
    can upload too. `TWODOWN_TIKTOK_TOKEN` and `TWODOWN_META_TOKEN` are the
    other platforms. Ads stay off unless `TWODOWN_ADSENSE_CLIENT` and

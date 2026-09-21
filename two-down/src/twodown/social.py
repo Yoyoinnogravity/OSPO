@@ -76,18 +76,24 @@ YOUTUBE  ->  TWODOWN_YOUTUBE_TOKEN   (this is the one that makes auto-upload wor
   Do not use youtube.com/@crypticfun — that handle is someone else's
   channel, and we do not own the .fun name.
   Same Google login can own Aled Morgan / carbonyoyo as a personal
-  channel. When Google asks which channel, pick cryptic.fit.
-  If that Brand Account is not there yet, create it in YouTube Studio
-  (your channel → Switch account → Create a channel), name it
-  cryptic.fit, then claim @crypticfit.
-  1. OAuth desktop client at {GOOGLE_CONSOLE}, YouTube Data API v3 enabled.
-  2. Download the client JSON. Save it as ~/.config/twodown/youtube-client-secret.json
-     or as secret TWODOWN_YOUTUBE_CLIENT_SECRET.
-  3. On a laptop with a browser:  twodown youtube-auth
-     That writes ~/.config/twodown/youtube-token.json (must include refresh_token).
-  4. Paste that token JSON as repo secret TWODOWN_YOUTUBE_TOKEN
-     (GitHub → Settings → Secrets and variables → Actions).
-     The daily workflow then uploads without a human.
+  channel. When Google asks which channel, pick Cryptic Fit.
+  Channel already exists: youtube.com/@crypticfit. Do not recreate it.
+  Do not run Command Prompt scripts. The Cloud Agent can finish login:
+
+  1. OAuth desktop client at {GOOGLE_CONSOLE} is already made (project
+     cryptic-fit, YouTube Data API v3). The JSON is in Downloads as
+     client_secret*.json.
+  2. twodown youtube-auth --save-client ~/Downloads/client_secret*.json
+     or paste that JSON as TWODOWN_YOUTUBE_CLIENT_SECRET.
+  3. twodown youtube-auth --start
+     Open the printed URL. Pick Cryptic Fit, not carbonyoyo. The next
+     page fails to load — copy the whole address bar.
+  4. twodown youtube-auth --finish 'PASTE_THE_URL' --upload
+     That writes ~/.config/twodown/youtube-token.json (must include
+     refresh_token) and posts the next Short unlisted.
+  5. Paste that token JSON as repo secret TWODOWN_YOUTUBE_TOKEN
+     (GitHub → Settings → Secrets and variables → Actions) so the
+     daily workflow can upload without a human.
      The same JSON can also sit on the Cursor Cloud Agent environment.
 
 Then GitHub Actions runs: twodown today / twodown upload
