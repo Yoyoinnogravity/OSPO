@@ -42,6 +42,10 @@ _STOP = frozenset(
         "be",
         "another",
         "such",
+        "this",
+        "that",
+        "these",
+        "those",
     }
 )
 
@@ -324,6 +328,43 @@ COLE = HintPhoto(
 )
 
 
+# Daily pair films. Hint the definition, never print the answer.
+MAKEUP = HintPhoto(
+    slug="makeup-still",
+    label="Make-up",
+    source="generated still",
+    license="generated",
+    filename="makeup-still.webp",
+    keywords=frozenset({"make", "makeup", "cosmetic", "cosmetics", "lipstick", "powder"}),
+)
+
+CRASH = HintPhoto(
+    slug="crash-still",
+    label="A car crash",
+    source="generated still",
+    license="generated",
+    filename="crash-still.webp",
+    keywords=frozenset({"car", "crash", "wreck", "collision", "accident"}),
+)
+
+PHOTO = HintPhoto(
+    slug="photo-still",
+    label="A photograph",
+    source="generated still",
+    license="generated",
+    filename="photo-still.webp",
+    keywords=frozenset({"photo", "photos", "photograph", "attractive", "person", "appearing", "model", "portrait"}),
+)
+
+AUTHOR = HintPhoto(
+    slug="author-still",
+    label="The author",
+    source="generated still",
+    license="generated",
+    filename="author-still.webp",
+    keywords=frozenset({"author", "writer", "novelist", "book"}),
+)
+
 # Commons alternate: imperial Ethiopian / Rastafari Lion of Judah flag.
 LION = HintPhoto(
     slug="lion-of-judah",
@@ -346,7 +387,22 @@ PHOTOS: dict[str, HintPhoto] = {
     DAVIS.slug: DAVIS,
     AIM.slug: AIM,
     PAPERS.slug: PAPERS,
+    MAKEUP.slug: MAKEUP,
+    CRASH.slug: CRASH,
+    PHOTO.slug: PHOTO,
+    AUTHOR.slug: AUTHOR,
     LION.slug: LION,
+    "makeup": MAKEUP,
+    "make-up": MAKEUP,
+    "guardian-30112-1a": MAKEUP,
+    "crash": CRASH,
+    "car-crash": CRASH,
+    "guardian-30112-5a": CRASH,
+    "photo": PHOTO,
+    "photograph": PHOTO,
+    "independent-12462-6a": PHOTO,
+    "author": AUTHOR,
+    "guardian-30113-9a": AUTHOR,
     "dreamlike": TRANCE,
     "trance": TRANCE,
     "rasta": RASTA,
@@ -385,7 +441,23 @@ DEFAULT_HINT = TRANCE
 
 
 def _catalog() -> tuple[HintPhoto, ...]:
-    return (TRANCE, MOONLIT, RASTA, FATS, WELLINGTON, COLE, SMILES, DAVIS, AIM, PAPERS, LION)
+    return (
+        TRANCE,
+        MOONLIT,
+        RASTA,
+        FATS,
+        WELLINGTON,
+        COLE,
+        SMILES,
+        DAVIS,
+        AIM,
+        PAPERS,
+        MAKEUP,
+        CRASH,
+        PHOTO,
+        AUTHOR,
+        LION,
+    )
 
 
 def _tokens(text: str) -> frozenset[str]:
@@ -428,6 +500,22 @@ def get_hint_photo(slug: str | None = None) -> HintPhoto:
     return match_hint(slug).photo
 
 
+def infer_definition(clue: Clue) -> str:
+    """Definition text for the picture clue. Prefer the stored gloss, then the parse."""
+    if clue.definition:
+        return clue.definition
+    mapped = PHOTOS.get(clue.slug)
+    if mapped is not None:
+        return mapped.label
+    parse = (clue.parse or "").replace("–", ".").replace("—", ".")
+    parts = [part.strip() for part in re.split(r"[.]", parse) if part.strip()]
+    if parts:
+        last = parts[-1]
+        if not re.search(r"\b(anagram|charade|container|reversal|homophone)\b", last, re.I):
+            return last
+    return clue.clue
+
+
 def hint_for_clue(clue: Clue) -> HintPhoto:
     if clue.hint_image:
         found = PHOTOS.get(clue.hint_image)
@@ -437,14 +525,22 @@ def hint_for_clue(clue: Clue) -> HintPhoto:
         for photo in _catalog():
             if photo.filename == name or photo.slug == clue.hint_image:
                 return photo
-    return match_hint(clue.definition or "").photo
+    if clue.slug in PHOTOS:
+        return PHOTOS[clue.slug]
+    return match_hint(infer_definition(clue)).photo
 
 
 def attach_hint(clue: Clue) -> Clue:
-    """Study helper: carry hint_image + hint_line matched to the definition (~80%)."""
-    matched = match_hint(clue.definition or "")
-    photo = matched.photo
+    """Carry hint_image + hint_line matched to the definition (~80%)."""
+    definition = infer_definition(clue)
+    matched = match_hint(definition)
+    if clue.slug in PHOTOS:
+        photo = PHOTOS[clue.slug]
+    else:
+        photo = matched.photo
     updates: dict[str, str] = {}
+    if not clue.definition:
+        updates["definition"] = definition
     if not clue.hint_image:
         updates["hint_image"] = f"assets/hints/{photo.filename}"
     if not clue.hint_credit:
@@ -581,6 +677,58 @@ def _generate_aim_still(dest: Path) -> Path:
     return dest
 
 
+def _generate_makeup_still(dest: Path) -> Path:
+    """Last-resort compact / lipstick colours. No MASCARA text."""
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    img = Image.new("RGB", (1280, 720), (248, 228, 220))
+    draw = ImageDraw.Draw(img)
+    draw.ellipse((160, 80, 620, 540), fill=(196, 48, 72))
+    draw.ellipse((210, 130, 570, 490), fill=(232, 140, 150))
+    draw.rectangle((720, 120, 1120, 620), fill=(36, 28, 26))
+    draw.rectangle((760, 180, 1080, 560), fill=(184, 28, 41))
+    img.save(dest, "WEBP", quality=82, method=6)
+    return dest
+
+
+def _generate_crash_still(dest: Path) -> Path:
+    """Last-resort wreck colours. No SMASH-UP text."""
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    img = Image.new("RGB", (1280, 720), (72, 76, 80))
+    draw = ImageDraw.Draw(img)
+    draw.polygon([(80, 420), (420, 180), (980, 220), (1200, 480), (160, 620)], fill=(140, 36, 36))
+    draw.polygon([(200, 260), (560, 140), (900, 280), (640, 400)], fill=(196, 196, 200))
+    draw.ellipse((860, 360, 1180, 680), fill=(28, 28, 30))
+    img.save(dest, "WEBP", quality=82, method=6)
+    return dest
+
+
+def _generate_photo_still(dest: Path) -> Path:
+    """Last-resort camera / portrait colours. No PIN-UP text."""
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    img = Image.new("RGB", (1280, 720), (32, 32, 34))
+    draw = ImageDraw.Draw(img)
+    draw.rounded_rectangle((180, 80, 1100, 640), radius=28, fill=(244, 236, 220))
+    draw.ellipse((430, 140, 850, 560), fill=(212, 176, 140))
+    draw.ellipse((520, 240, 600, 320), fill=(40, 32, 28))
+    draw.ellipse((680, 240, 760, 320), fill=(40, 32, 28))
+    img.save(dest, "WEBP", quality=82, method=6)
+    return dest
+
+
+def _generate_author_still(dest: Path) -> Path:
+    """Last-resort desk / book colours. No SELF text."""
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    img = Image.new("RGB", (1280, 720), (48, 36, 28))
+    draw = ImageDraw.Draw(img)
+    draw.rectangle((160, 80, 620, 640), fill=(232, 220, 196))
+    draw.rectangle((220, 140, 560, 180), fill=(26, 21, 16))
+    draw.rectangle((220, 210, 500, 230), fill=(26, 21, 16))
+    draw.rectangle((700, 200, 1160, 640), fill=(184, 28, 41))
+    draw.rectangle((760, 260, 1100, 580), fill=(243, 234, 214))
+    img.save(dest, "WEBP", quality=82, method=6)
+    return dest
+
+
 def _generate_papers_still(dest: Path) -> Path:
     """Last-resort newspaper stack if the file is missing. No answer text."""
     dest.parent.mkdir(parents=True, exist_ok=True)
@@ -619,4 +767,12 @@ def ensure_hint_photo(photo: HintPhoto | None = None) -> Path:
         return _generate_aim_still(dest)
     if resolved.slug in {PAPERS.slug, "papers", "newspapers", "mass-media"}:
         return _generate_papers_still(dest)
+    if resolved.slug in {MAKEUP.slug, "makeup", "make-up"}:
+        return _generate_makeup_still(dest)
+    if resolved.slug in {CRASH.slug, "crash", "car-crash"}:
+        return _generate_crash_still(dest)
+    if resolved.slug in {PHOTO.slug, "photo", "photograph"}:
+        return _generate_photo_still(dest)
+    if resolved.slug in {AUTHOR.slug, "author"}:
+        return _generate_author_still(dest)
     return _generate_trance_still(dest)

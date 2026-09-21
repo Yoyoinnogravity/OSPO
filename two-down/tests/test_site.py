@@ -1,7 +1,7 @@
 from twodown.captions import youtube_description
 from twodown.models import Clue, DailyPair, SpokenClue
 from twodown.site import publish_site
-from twodown.youtube import YOUTUBE_CHANNEL, video_title
+from twodown.youtube import YOUTUBE_CHANNEL, set_thumbnail, video_title
 
 
 def _item(answer: str = "END RESULT", number: str = "12") -> SpokenClue:
@@ -21,6 +21,18 @@ def _item(answer: str = "END RESULT", number: str = "12") -> SpokenClue:
         enumeration_ok=True,
     )
     return SpokenClue(clue=clue, script="cryptic.fit. The answer is END RESULT.", voice="en-GB-SoniaNeural")
+
+
+def test_publish_site_video_poster_hides_the_answer(tmp_path):
+    item = _item()
+    item.video_path = str(tmp_path / "missing.mp4")
+    pair = DailyPair(date="2026-09-11", voice="en-GB-SoniaNeural", clues=[item])
+    root = publish_site(pair, tmp_path)
+    index = (root / "index.html").read_text(encoding="utf-8")
+    assert 'poster="media/independent-12458-12a-poster.jpg"' in index
+    assert (root / "media" / "independent-12458-12a-poster.jpg").exists()
+    assert (root / "media" / "independent-12458-12a-thumb.jpg").exists()
+    assert b"END RESULT" not in (root / "media" / "independent-12458-12a-thumb.jpg").read_bytes()
 
 
 def test_publish_site_writes_spoiler_pages(tmp_path):
@@ -108,6 +120,14 @@ def test_publish_site_writes_spoiler_pages(tmp_path):
     assert (tmp_path / ".nojekyll").exists()
     assert (tmp_path / "assets" / "favicon.svg").exists()
     assert "application/rss+xml" in index
+
+
+def test_set_thumbnail_does_nothing_without_a_token(tmp_path, monkeypatch):
+    monkeypatch.delenv("TWODOWN_YOUTUBE_TOKEN", raising=False)
+    image = tmp_path / "thumb.jpg"
+    image.write_bytes(b"not-a-real-jpeg")
+    assert set_thumbnail("FThLadr0ULA", image) is False
+    assert set_thumbnail("", image) is False
 
 
 def test_youtube_titles_use_cryptic_fun_channel():

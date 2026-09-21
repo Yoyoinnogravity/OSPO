@@ -1,4 +1,4 @@
-from twodown.config import DEFAULT_VOICE_ALIAS, HINT_LINE, HINT_LOOK, HINT_OFFER, HINT_VOICE_ALIAS, INTRO_VOICE_ALIAS, PINUP_SLUG, SOURCE_VOICE_ALIAS, STUDY_SLUG, VOICE_RATE, VOICES
+from twodown.config import BRAND_STING_SECONDS, DEFAULT_VOICE_ALIAS, HINT_LINE, HINT_LOOK, HINT_OFFER, HINT_VOICE_ALIAS, INTRO_GAP_SECONDS, INTRO_VOICE_ALIAS, PINUP_SLUG, SOURCE_VOICE_ALIAS, STUDY_SLUG, THINK_PROMPT, THINK_RATE, VOICE_RATE, VOICES
 from twodown.pipeline import (
     dreamlike_clue,
     fats_clue,
@@ -69,6 +69,8 @@ def test_study_clue_is_mass_media():
     assert parts.clue_speech == "Maid struggling with a mess — newspapers etc."
     assert parts.letters_speech == "That's four, five."
     assert parts.think_speech == "Just pause here, and have a think."
+    assert parts.think_speech == THINK_PROMPT
+    assert THINK_RATE == "+2%"
     assert parts.hint_speech == HINT_LINE
     assert parts.hint_speech.startswith(HINT_OFFER)
     assert parts.hint_speech.endswith(HINT_LOOK)
@@ -106,10 +108,67 @@ def test_source_credit_is_its_own_line():
     clue = rasta_clue()
     assert speak_source(clue) == "That's Brendan, in the Guardian — via Fifteen Squared."
     assert SOURCE_VOICE_ALIAS == "thomas"
+    assert SOURCE_VOICE_ALIAS != DEFAULT_VOICE_ALIAS
+    assert VOICES[SOURCE_VOICE_ALIAS] == "en-GB-ThomasNeural"
     parts = write_parts(clue)
     assert parts.source_speech == speak_source(clue)
     assert "Fifteen Squared" not in parts.parse_speech
     assert parts.outro_speech == "Thanks for thinking with cryptic.fit."
+
+
+def test_self_footer_credit_is_the_male_voice():
+    clue = published_clue("guardian-30113-9a")
+    parts = write_parts(clue)
+    assert clue.setter == "Dice"
+    assert clue.paper == "Guardian"
+    assert parts.source_speech == "That's Dice, in the Guardian — via Fifteen Squared."
+    assert SOURCE_VOICE_ALIAS == "thomas"
+    assert SOURCE_VOICE_ALIAS != DEFAULT_VOICE_ALIAS
+
+
+def test_soundtrack_speaks_source_credit_as_thomas(monkeypatch, tmp_path):
+    from twodown import voice as voice_mod
+
+    seen: dict[str, str | None] = {}
+
+    def fake_synth(script, dest, voice=None, **_kwargs):
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(b"xx")
+        seen[dest.stem] = voice
+        return dest
+
+    monkeypatch.setattr(voice_mod, "synthesise", fake_synth)
+    monkeypatch.setattr(voice_mod, "synthesise_spoken_paragraph", fake_synth)
+    def fake_seconds(path):
+        return 1.4 if "sting" in str(path) else 1.0
+
+    monkeypatch.setattr(voice_mod, "audio_seconds", fake_seconds)
+    monkeypatch.setattr(voice_mod, "ensure_brand_sting", lambda: tmp_path / "brand-sting.mp3")
+    (tmp_path / "brand-sting.mp3").write_bytes(b"xx")
+    monkeypatch.setattr(voice_mod.shutil, "which", lambda _name: "/usr/bin/ffmpeg")
+    monkeypatch.setattr(voice_mod.subprocess, "run", lambda *_args, **_kwargs: None)
+
+    parts = write_parts(published_clue("guardian-30113-9a"))
+    timings = voice_mod.build_short_soundtrack(parts, tmp_path / "mix.mp3", DEFAULT_VOICE_ALIAS)
+    assert timings.intro == 1.4 + 1.0 + INTRO_GAP_SECONDS
+    assert timings.outro == 1.0 + 1.4 + 0.35
+    assert seen["source"] == "thomas"
+    assert seen["source"] != seen["answer"]
+    assert seen["answer"] == DEFAULT_VOICE_ALIAS
+    assert seen["intro"] == INTRO_VOICE_ALIAS
+    assert seen["outro"] == INTRO_VOICE_ALIAS
+
+
+def test_brand_sting_is_one_shared_pair():
+    from twodown.voice import BRAND_STING_ASSET, ensure_brand_sting
+    from twodown.render import audio_seconds
+
+    path = ensure_brand_sting()
+    assert path == BRAND_STING_ASSET
+    assert path.exists()
+    duration = audio_seconds(path)
+    assert 1.1 <= duration <= 1.7
+    assert abs(duration - BRAND_STING_SECONDS) < 0.3
 
 
 def test_spoken_parse_says_mass_media_as_words():

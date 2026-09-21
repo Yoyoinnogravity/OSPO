@@ -4,13 +4,27 @@ from pathlib import Path
 from twodown.models import Clue
 from twodown.render import (
     AUDIO_LOUDNESS,
+    INTRO_DICTIONARY_HEADWORD,
+    INTRO_KALEIDOSCOPE_WORDS,
     ShortTimings,
+    THUMB_H,
+    THUMB_W,
     _encode_clips,
+    _beat_footer,
     _source_footer,
     draw_beat,
     draw_clue_card,
     draw_reveal_card,
+    draw_poster,
+    _thumbnail_clue,
+    draw_thumbnail,
+    _compose_intro_frame,
+    intro_kaleidoscope_words,
+    issue_catalog,
+    render_intro_kaleidoscope,
     render_video,
+    thumbnail_issue,
+    write_spoiler_free_stills,
 )
 from twodown.script import _spoken_parse, speak_answer, speak_enumeration
 
@@ -62,7 +76,8 @@ def test_clue_card_is_a_solve_along(tmp_path: Path):
     assert img.size == (1080, 1920)
     # Travel photos stay off the Short — the clue is the picture.
     assert img.getpixel((24, 40)) == NEWS_BG
-    assert draw_beat(_clue(), tmp_path / "intro.png", "intro").exists()
+    intro = draw_beat(_clue(), tmp_path / "intro.png", "intro")
+    assert intro.exists()
     assert draw_beat(_clue(), tmp_path / "outro.png", "outro").exists()
     assert draw_beat(_clue(), tmp_path / "source.png", "source").exists()
     assert draw_beat(_clue(), tmp_path / "only-clue.png", "clue").exists()
@@ -108,6 +123,18 @@ def test_answer_footer_credits_setter_paper_and_fifteen_squared():
     assert dreamlike.answer == "DREAMLIKE"
     assert _source_footer(dreamlike) == "Brendan in the Guardian · Fifteen Squared"
     assert _source_footer(study_clue()) == "Arrietty in the Financial Times · Fifteen Squared"
+
+
+def test_setter_paper_footer_only_on_source_beat():
+    clue = _clue()
+    assert _beat_footer(clue, "source") == "Eccles in the Independent · Fifteen Squared"
+    assert _beat_footer(clue, "parse") == ""
+    assert _beat_footer(clue, "answer") == ""
+    assert _beat_footer(clue, "hint") == ""
+    assert _beat_footer(clue, "think") == ""
+    assert _beat_footer(clue, "letters") == "How many letters"
+    guardian = clue.model_copy(update={"setter": "Dice", "paper": "Guardian"})
+    assert _beat_footer(guardian, "source") == "Dice in the Guardian · Fifteen Squared"
 
 
 def test_parse_under_answer_is_very_bold_ink(tmp_path: Path):
@@ -164,6 +191,50 @@ def test_short_timings_include_hint_before_answer():
     )
     assert timings.until_answer == 20.0
     assert timings.until_answer == timings.intro + timings.clue + timings.letters + timings.think + timings.hint
+
+
+def test_intro_kaleidoscope_is_generic_not_per_clue():
+    clue = _clue()
+    words = intro_kaleidoscope_words(clue)
+    assert words == list(INTRO_KALEIDOSCOPE_WORDS)
+    assert "CRYPTIC" in words
+    assert INTRO_DICTIONARY_HEADWORD == "cryptic"
+    assert "FIT" not in words
+    assert "MODEL" not in words
+    assert "YOUNGSTER" not in words
+    assert clue.answer not in words
+    other = clue.model_copy(
+        update={"clue": "Will the author flog incomplete bit of fiction?", "answer": "SELF"}
+    )
+    assert intro_kaleidoscope_words(other) == words
+
+
+def test_intro_beat_is_kaleidoscope_not_the_spoken_line(tmp_path: Path):
+    from PIL import Image
+
+    from twodown.config import INK, INTRO_LINE
+
+    img = _compose_intro_frame(0.25)
+    path = tmp_path / "intro.png"
+    img.save(path)
+    assert img.size == (1080, 1920)
+    # Lexicon paper, not the old black letter-vortex.
+    paper = img.getpixel((40, 80))
+    assert paper[0] > 200 and paper[1] > 190
+    head = list(img.crop((80, 230, 720, 350)).get_flattened_data())
+    assert head.count(INK) > 400
+    raw = path.read_bytes()
+    assert INTRO_LINE.encode() not in raw
+    assert b"daily dose" not in raw.lower()
+
+
+def test_intro_kaleidoscope_renders_an_animated_open(tmp_path: Path):
+    dest = tmp_path / "intro.mp4"
+    path = render_intro_kaleidoscope(_clue(), dest, 0.6)
+    assert path.exists()
+    frames = _probe(path, "stream=nb_frames")
+    assert int(frames.splitlines()[0]) >= 8
+    assert _probe(path, "stream=width,height").splitlines()[0] == "1080"
 
 
 def test_hint_beat_is_newsprint_with_credited_photo(tmp_path: Path):
@@ -411,3 +482,77 @@ def test_encode_maps_loud_audio(tmp_path: Path):
     mean_line = next(line for line in measure.stderr.splitlines() if "mean_volume" in line)
     mean_db = float(mean_line.rsplit(":", 1)[-1].strip().split()[0])
     assert mean_db > -20.0
+
+
+def test_youtube_thumbnail_does_not_show_the_answer(tmp_path: Path):
+    from PIL import Image
+
+    from twodown.config import HIGHLIGHT, THUMBNAIL_ISSUE_START, YELLOW
+
+    clue = _clue()
+    path = draw_thumbnail(clue, tmp_path / "thumb.jpg")
+    thumb = Image.open(path)
+    assert path.suffix == ".jpg"
+    assert thumb.size == (THUMB_W, THUMB_H)
+    assert thumbnail_issue(clue, slugs=["independent-12462-6a"]) == THUMBNAIL_ISSUE_START
+    assert thumbnail_issue(clue, slugs=["other", clue.slug]) == THUMBNAIL_ISSUE_START + 1
+    kept = ["guardian-30112-1a", "guardian-30112-5a", "independent-12462-6a", "guardian-30113-9a"]
+    assert thumbnail_issue(clue, slugs=["early-cut", *kept]) == THUMBNAIL_ISSUE_START + 2
+    fresh = clue.model_copy(update={"paper": "Guardian", "puzzle_id": "30117", "number": "1"})
+    assert fresh.slug == "guardian-30117-1a"
+    assert thumbnail_issue(fresh, slugs=kept) == THUMBNAIL_ISSUE_START + 4
+    raft = clue.model_copy(update={"paper": "Guardian", "puzzle_id": "30117", "number": "6", "direction": "down"})
+    assert raft.slug == "guardian-30117-6d"
+    shared = kept + [fresh.slug, raft.slug]
+    assert thumbnail_issue(fresh, slugs=shared) == THUMBNAIL_ISSUE_START + 4
+    assert thumbnail_issue(raft, slugs=shared) == THUMBNAIL_ISSUE_START + 5
+    assert thumbnail_issue(fresh, slugs=shared) != thumbnail_issue(raft, slugs=shared)
+    assert len({thumbnail_issue(item, slugs=shared) for item in (
+        clue.model_copy(update={"paper": "Guardian", "puzzle_id": "30112", "number": "1"}),
+        clue.model_copy(update={"paper": "Guardian", "puzzle_id": "30112", "number": "5"}),
+        clue,
+        clue.model_copy(update={"paper": "Guardian", "puzzle_id": "30113", "number": "9"}),
+        fresh,
+        raft,
+    )}) == 6
+    assert issue_catalog(shared) == shared
+
+    def yellow(img: Image.Image) -> int:
+        return sum(1 for r, g, b in img.get_flattened_data() if r > 200 and g > 170 and b < 90)
+
+    def red(img: Image.Image) -> int:
+        return sum(1 for r, g, b in img.get_flattened_data() if r > 150 and g < 90 and b < 90)
+
+    assert yellow(thumb) > 1500
+    assert red(thumb) > 1500
+    assert YELLOW[0] > 240
+    assert HIGHLIGHT[0] > 180
+    raw = path.read_bytes()
+    assert b"PIN-UP" not in raw
+    assert b"PINUP" not in raw
+    assert _thumbnail_clue(clue) == "Model youngster eating in (3-2)"
+    assert clue.answer not in _thumbnail_clue(clue)
+    # Clue sits in the lower third as cream newsprint, not as the answer.
+    cream = 0
+    for y in range((THUMB_H * 2) // 3, THUMB_H - 16):
+        for x in range(0, THUMB_W, 3):
+            r, g, b = thumb.getpixel((x, y))
+            if r > 230 and g > 220 and b > 200:
+                cream += 1
+    assert cream > 80
+    from twodown.pipeline import published_clue
+
+    self_clue = published_clue("guardian-30113-9a")
+    assert _thumbnail_clue(self_clue) == "Will the author flog incomplete bit of fiction? (4)"
+    assert self_clue.answer not in _thumbnail_clue(self_clue)
+
+
+def test_spoiler_free_stills_write_thumb_and_poster(tmp_path: Path):
+    from PIL import Image
+
+    thumb, poster = write_spoiler_free_stills(_clue(), tmp_path)
+    assert thumb.name == "independent-12462-6a-thumb.jpg"
+    assert poster.name == "independent-12462-6a-poster.jpg"
+    assert Image.open(thumb).size == (THUMB_W, THUMB_H)
+    assert Image.open(poster).size == (1080, 1920)
+    assert Image.open(draw_poster(_clue(), tmp_path / "poster.jpg")).size == (1080, 1920)

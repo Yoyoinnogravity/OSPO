@@ -68,6 +68,8 @@ class SpokenClue(BaseModel):
     card_path: str | None = None
     clue_card_path: str | None = None
     video_path: str | None = None
+    thumbnail_path: str | None = None
+    poster_path: str | None = None
     youtube_id: str | None = None
     tiktok_id: str | None = None
     instagram_id: str | None = None

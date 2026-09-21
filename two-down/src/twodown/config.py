@@ -43,7 +43,7 @@ CLUE_RATE = "-12%"
 CLUE_PITCH = "-1Hz"
 LETTERS_RATE = "-8%"
 LETTERS_PITCH = "+0Hz"
-THINK_RATE = "-8%"
+THINK_RATE = "+2%"
 THINK_PITCH = "+1Hz"
 HINT_RATE = "+2%"
 HINT_PITCH = "+3Hz"
@@ -62,7 +62,10 @@ INTRO_VOLUME = "+8%"
 INTRO_GAP_SECONDS = 0.45
 OUTRO_LINE = "Thanks for thinking with cryptic.fit."
 OUTRO_GAP_SECONDS = 0.4
-# Source credit is not Sonia — Thomas reads the paper and Fifteen Squared.
+# Same two chords at both ends. They sit before Ryan and after the thank-you,
+# so they name the brand without talking over the introduction.
+BRAND_STING_SECONDS = 1.45
+# Footer credit is not Sonia. Thomas (male) names the setter, paper, and Fifteen Squared.
 SOURCE_VOICE_ALIAS = "thomas"
 SOURCE_RATE = "-4%"
 SOURCE_PITCH = "+0Hz"
@@ -97,11 +100,18 @@ INK = (26, 21, 16)
 CRIMSON = (184, 28, 41)
 CREAM = (252, 247, 236)
 MUTED = (92, 78, 64)
+# YouTube lockup: yellow letters on a red highlighter.
+YELLOW = (255, 214, 0)
+HIGHLIGHT = (196, 16, 36)
+# First Cryptic Fit Short on the channel is #287. Earlier pair films were early cuts.
+THUMBNAIL_ISSUE_START = 287
+THUMBNAIL_ISSUE_FIRST_SLUG = "guardian-30112-1a"
 
 FONT_REGULAR = "/usr/share/fonts/truetype/liberation/LiberationSerif-Regular.ttf"
 FONT_BOLD = "/usr/share/fonts/truetype/liberation/LiberationSerif-Bold.ttf"
 FONT_SANS = "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"
 FONT_SANS_BOLD = "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"
+FONT_DISPLAY = "/usr/share/fonts/opentype/cantarell/Cantarell-ExtraBold.otf"
 
 # Public follow URLs. YouTube is @crypticfit. Do not use @crypticfun.
 YOUTUBE_FOLLOW = os.environ.get("TWODOWN_YOUTUBE_URL", "https://www.youtube.com/@crypticfit").strip()

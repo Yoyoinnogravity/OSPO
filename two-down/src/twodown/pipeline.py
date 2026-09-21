@@ -22,7 +22,7 @@ from twodown.hints import attach_hint
 from twodown.ingest import LONDON, fetch_daily_posts, posts_for_london_date
 from twodown.models import Clue, DailyPair, SpokenClue
 from twodown.parse import parse_post
-from twodown.render import draw_beat, draw_clue_card, draw_reveal_card, render_video
+from twodown.render import draw_beat, draw_clue_card, draw_reveal_card, render_video, write_spoiler_free_stills
 from twodown.scenes import pick_scenes
 from twodown.script import write_parts
 from twodown.select import select_pair
@@ -69,20 +69,22 @@ def published_clue(slug: str, site_root: Path | None = None) -> Clue:
         if not match or not clue_match:
             raise ValueError(f"Could not parse published clue {slug}")
         blogger = credit.get_text(" ", strip=True).split("·", 1)[-1].strip()
-        return Clue(
-            source_url=str(credit["href"]),
-            paper=match["paper"],
-            puzzle_id=match["puzzle_id"],
-            setter=match["setter"],
-            blogger=blogger,
-            number=match["number"],
-            direction=match["direction"],
-            clue=clue_match["clue"],
-            enumeration=clue_match["enum"],
-            answer=answer.get_text(" ", strip=True),
-            parse=htmlmod.unescape(parse.get_text(" ", strip=True)),
-            device=match["device"],
-            enumeration_ok=True,
+        return attach_hint(
+            Clue(
+                source_url=str(credit["href"]),
+                paper=match["paper"],
+                puzzle_id=match["puzzle_id"],
+                setter=match["setter"],
+                blogger=blogger,
+                number=match["number"],
+                direction=match["direction"],
+                clue=clue_match["clue"],
+                enumeration=clue_match["enum"],
+                answer=answer.get_text(" ", strip=True),
+                parse=htmlmod.unescape(parse.get_text(" ", strip=True)),
+                device=match["device"],
+                enumeration_ok=True,
+            )
         )
     raise FileNotFoundError(f"No published clue {slug}")
 
@@ -457,10 +459,15 @@ def render_one_short(
         timings=timings,
     )
     item.video_path = str(movie)
+    thumb, poster = write_spoiler_free_stills(clue, slot)
+    item.thumbnail_path = str(thumb)
+    item.poster_path = str(poster)
     if publish:
         media = SITE_ROOT / "media"
         media.mkdir(parents=True, exist_ok=True)
         copy2(movie, media / f"{clue.slug}.mp4")
+        copy2(thumb, media / f"{clue.slug}-thumb.jpg")
+        copy2(poster, media / f"{clue.slug}-poster.jpg")
         for alias, path in paths.items():
             copy2(path, media / f"{clue.slug}-{alias}.mp3")
     return item
@@ -552,6 +559,7 @@ def run_today(
     scene_slugs = pick_scenes(stamp, len(pair_clues), scene)
     spoken: list[SpokenClue] = []
     for clue, scene_slug in zip(pair_clues, scene_slugs, strict=True):
+        clue = attach_hint(clue)
         parts = write_parts(clue)
         item = SpokenClue(clue=clue, script=parts.full, voice=resolved_voice, scene=scene_slug)
         slot = dest_root / clue.slug

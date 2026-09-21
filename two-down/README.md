@@ -106,13 +106,13 @@ Yes — pay Cursor to run this every morning.
 
 1. Sign in as Aled at [cursor.com/dashboard/billing](https://cursor.com/dashboard/billing).
 2. You need a **paid plan**. Pro+ ($60/month) is the sensible budget for one
-   Grok-run Short a day. Click **Adjust plan** if you are still on Hobby or Pro.
+   Claude-run Short a day. Click **Adjust plan** if you are still on Hobby or Pro.
 3. Click **Manage Subscription** to add or update a card in Stripe.
 4. On the **Spending** tab, turn on **on-demand usage** and set a monthly cap
    around $40 (Cloud Agents and Automations bill from this after included usage).
 5. Create the daily job at [cursor.com/automations](https://cursor.com/automations)
    using the prompt in `two-down/AGENTS.md`.
-   Pick **Grok**. Do not pick Claude / Anthropic.
+   Pick **Claude**. Do not pick Grok.
 
 That is the only thing you pay Cursor for. GitHub Pages and YouTube upload are free.
 

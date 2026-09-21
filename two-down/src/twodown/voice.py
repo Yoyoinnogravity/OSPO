@@ -12,6 +12,8 @@ from twodown.config import (
     ANSWER_PAUSE_SECONDS,
     ANSWER_PITCH,
     ANSWER_RATE,
+    BRAND_STING_SECONDS,
+    PACKAGE_ROOT,
     CLUE_LETTERS_GAP_SECONDS,
     CLUE_PITCH,
     CLUE_RATE,
@@ -49,6 +51,76 @@ from twodown.config import (
 )
 from twodown.render import AUDIO_LOUDNESS, ShortTimings, audio_seconds
 from twodown.script import ScriptParts, to_ssml
+
+BRAND_STING_ASSET = PACKAGE_ROOT / "assets" / "brand-sting.mp3"
+# F major then C major — a small IV–I pair. Same set opens and closes.
+_BRAND_STING_IV = (174.61, 220.00, 261.63, 349.23)
+_BRAND_STING_I = (130.81, 164.81, 196.00, 261.63)
+
+
+def _sine_mix(freqs: tuple[float, ...], label: str, duration: float) -> str:
+    parts: list[str] = []
+    names: list[str] = []
+    for i, freq in enumerate(freqs):
+        name = f"{label}{i}"
+        parts.append(f"sine=frequency={freq}:sample_rate=44100:duration={duration:.2f}[{name}]")
+        names.append(f"[{name}]")
+    fade_out = max(0.08, duration - 0.16)
+    parts.append(
+        "".join(names)
+        + f"amix=inputs={len(freqs)}:duration=first:dropout_transition=0,"
+        + f"afade=t=in:st=0:d=0.05,afade=t=out:st={fade_out:.2f}:d=0.14[{label}]"
+    )
+    return ";".join(parts)
+
+
+def bake_brand_sting(dest: Path | None = None) -> Path:
+    """One sympathetic two-chord sting. Built once; every film reuses it."""
+    dest = Path(dest or BRAND_STING_ASSET)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    ffmpeg = shutil.which("ffmpeg")
+    if not ffmpeg:
+        raise RuntimeError("ffmpeg is required to build the brand sting")
+    first = _sine_mix(_BRAND_STING_IV, "iv", 0.78)
+    second = _sine_mix(_BRAND_STING_I, "i", 0.88)
+    result = subprocess.run(
+        [
+            ffmpeg,
+            "-y",
+            "-f",
+            "lavfi",
+            "-i",
+            "anullsrc=r=44100:cl=stereo:d=0.1",
+            "-filter_complex",
+            (
+                f"{first};{second};"
+                "[iv][i]acrossfade=d=0.12:c1=tri:c2=tri,"
+                "aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo,"
+                "volume=0.55,alimiter=limit=0.89[a]"
+            ),
+            "-map",
+            "[a]",
+            "-c:a",
+            "mp3",
+            "-b:a",
+            "192k",
+            "-t",
+            f"{BRAND_STING_SECONDS:.2f}",
+            str(dest),
+        ],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode:
+        raise RuntimeError(result.stderr[-800:])
+    return dest
+
+
+def ensure_brand_sting() -> Path:
+    """Return the shared sting. Bake it once if the asset is missing."""
+    if BRAND_STING_ASSET.exists() and BRAND_STING_ASSET.stat().st_size > 800:
+        return BRAND_STING_ASSET
+    return bake_brand_sting(BRAND_STING_ASSET)
 
 
 def resolve_voice(name: str | None) -> str:
@@ -236,25 +308,30 @@ def build_short_soundtrack(parts: ScriptParts, dest: Path, voice: str | None = N
     parse_d = audio_seconds(clips["parse"])
     source_d = audio_seconds(clips["source"])
     outro_d = audio_seconds(clips["outro"])
+    sting = ensure_brand_sting()
+    sting_d = audio_seconds(sting)
     ffmpeg = shutil.which("ffmpeg")
     if not ffmpeg:
         raise RuntimeError("ffmpeg is required to build the Short soundtrack")
-    cmd = [ffmpeg, "-y"]
+    cmd = [ffmpeg, "-y", "-i", str(sting)]
     for key in ("intro", "clue", "letters", "think", "hint", "answer", "parse", "source", "outro"):
         cmd.extend(["-i", str(clips[key])])
+    cmd.extend(["-i", str(sting)])
     cmd.extend(
         [
             "-filter_complex",
             (
-                "[0:a]aformat=sample_rates=24000:channel_layouts=mono[c0];"
-                "[1:a]aformat=sample_rates=24000:channel_layouts=mono[c1];"
-                "[2:a]aformat=sample_rates=24000:channel_layouts=mono[c2];"
-                "[3:a]aformat=sample_rates=24000:channel_layouts=mono[c3];"
-                "[4:a]aformat=sample_rates=24000:channel_layouts=mono[c4];"
-                "[5:a]aformat=sample_rates=24000:channel_layouts=mono[c5];"
-                "[6:a]aformat=sample_rates=24000:channel_layouts=mono[c6];"
-                "[7:a]aformat=sample_rates=24000:channel_layouts=mono[c7];"
-                "[8:a]aformat=sample_rates=24000:channel_layouts=mono[c8];"
+                "[0:a]aformat=sample_rates=24000:channel_layouts=mono[s0];"
+                "[1:a]aformat=sample_rates=24000:channel_layouts=mono[c0];"
+                "[2:a]aformat=sample_rates=24000:channel_layouts=mono[c1];"
+                "[3:a]aformat=sample_rates=24000:channel_layouts=mono[c2];"
+                "[4:a]aformat=sample_rates=24000:channel_layouts=mono[c3];"
+                "[5:a]aformat=sample_rates=24000:channel_layouts=mono[c4];"
+                "[6:a]aformat=sample_rates=24000:channel_layouts=mono[c5];"
+                "[7:a]aformat=sample_rates=24000:channel_layouts=mono[c6];"
+                "[8:a]aformat=sample_rates=24000:channel_layouts=mono[c7];"
+                "[9:a]aformat=sample_rates=24000:channel_layouts=mono[c8];"
+                "[10:a]aformat=sample_rates=24000:channel_layouts=mono[s1];"
                 f"anullsrc=r=24000:cl=mono:d={INTRO_GAP_SECONDS:.2f}[g0];"
                 f"anullsrc=r=24000:cl=mono:d={CLUE_LETTERS_GAP_SECONDS:.2f}[g];"
                 f"anullsrc=r=24000:cl=mono:d={LETTERS_PAUSE_SECONDS:.2f}[p1];"
@@ -264,7 +341,8 @@ def build_short_soundtrack(parts: ScriptParts, dest: Path, voice: str | None = N
                 f"anullsrc=r=24000:cl=mono:d={ANSWER_PAUSE_SECONDS:.2f}[p3];"
                 f"anullsrc=r=24000:cl=mono:d={SOURCE_GAP_SECONDS:.2f}[g2];"
                 f"anullsrc=r=24000:cl=mono:d={OUTRO_GAP_SECONDS:.2f}[g1];"
-                "[c0][g0][c1][g][c2][p1][c3][p2][c4][h1][h2][c5][p3][c6][g2][c7][g1][c8]concat=n=18:v=0:a=1[raw];"
+                "[s0][c0][g0][c1][g][c2][p1][c3][p2][c4][h1][h2][c5][p3][c6][g2][c7][g1][c8][s1]"
+                "concat=n=20:v=0:a=1[raw];"
                 f"[raw]aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo,{AUDIO_LOUDNESS}[a]"
             ),
             "-map",
@@ -282,7 +360,7 @@ def build_short_soundtrack(parts: ScriptParts, dest: Path, voice: str | None = N
     )
     subprocess.run(cmd, check=True, capture_output=True)
     return ShortTimings(
-        intro=intro_d + INTRO_GAP_SECONDS,
+        intro=sting_d + intro_d + INTRO_GAP_SECONDS,
         clue=clue_d + CLUE_LETTERS_GAP_SECONDS,
         letters=letters_d + LETTERS_PAUSE_SECONDS,
         think=think_d + THINK_PAUSE_SECONDS,
@@ -290,5 +368,5 @@ def build_short_soundtrack(parts: ScriptParts, dest: Path, voice: str | None = N
         answer=answer_d + ANSWER_PAUSE_SECONDS,
         parse=parse_d + SOURCE_GAP_SECONDS,
         source=source_d + OUTRO_GAP_SECONDS,
-        outro=outro_d + 0.4,
+        outro=outro_d + sting_d + 0.35,
     )
