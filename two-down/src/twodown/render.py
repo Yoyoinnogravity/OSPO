@@ -478,16 +478,43 @@ def _dark_canvas(size: tuple[int, int]) -> Image.Image:
     return img
 
 
+def _thumbnail_clue(clue: Clue) -> str:
+    """Surface and letter count only. Never the answer."""
+    surface = (clue.clue or "").strip()
+    enum = (clue.enumeration or "").strip()
+    if enum and f"({enum})" not in surface:
+        return f"{surface} ({enum})"
+    return surface
+
+
+def _draw_thumbnail_clue(img: Image.Image, clue: Clue) -> None:
+    """Sit the clue under the lockup. Keep it readable on a small YouTube tile."""
+    draw = ImageDraw.Draw(img)
+    text = _thumbnail_clue(clue)
+    max_width = img.size[0] - 120
+    size = 46
+    font = _font(FONT_BOLD, size)
+    wrapped = _wrap(draw, text, font, max_width)
+    while wrapped.count("\n") >= 3 and size > 32:
+        size -= 2
+        font = _font(FONT_BOLD, size)
+        wrapped = _wrap(draw, text, font, max_width)
+    box = draw.multiline_textbbox((0, 0), wrapped, font=font, spacing=10)
+    y = img.size[1] - 52 - (box[3] - box[1])
+    _center_on(draw, y, wrapped, font, CREAM, img.size[0], spacing=10)
+
+
 def draw_thumbnail(clue: Clue, dest: Path) -> Path:
-    """16:9 YouTube thumbnail. Yellow CRYPTIC FIT #N on red. Never the answer."""
+    """16:9 YouTube thumbnail. Yellow CRYPTIC FIT #N on red, clue underneath. Never the answer."""
     dest = dest.with_suffix(".jpg")
     dest.parent.mkdir(parents=True, exist_ok=True)
     img = _dark_canvas((THUMB_W, THUMB_H))
     _paste_centered(
         img,
-        _issue_lockup(clue, (THUMB_W, THUMB_H), brand_size=108, number_size=220),
-        dy=-18,
+        _issue_lockup(clue, (THUMB_W, THUMB_H), brand_size=100, number_size=200),
+        dy=-70,
     )
+    _draw_thumbnail_clue(img, clue)
     img.save(dest, "JPEG", quality=90)
     return dest
 

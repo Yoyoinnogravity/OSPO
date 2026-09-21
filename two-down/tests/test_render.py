@@ -14,6 +14,7 @@ from twodown.render import (
     draw_clue_card,
     draw_reveal_card,
     draw_poster,
+    _thumbnail_clue,
     draw_thumbnail,
     render_video,
     thumbnail_issue,
@@ -460,6 +461,21 @@ def test_youtube_thumbnail_does_not_show_the_answer(tmp_path: Path):
     raw = path.read_bytes()
     assert b"PIN-UP" not in raw
     assert b"PINUP" not in raw
+    assert _thumbnail_clue(clue) == "Model youngster eating in (3-2)"
+    assert clue.answer not in _thumbnail_clue(clue)
+    # Clue sits in the lower third as cream newsprint, not as the answer.
+    cream = 0
+    for y in range((THUMB_H * 2) // 3, THUMB_H - 16):
+        for x in range(0, THUMB_W, 3):
+            r, g, b = thumb.getpixel((x, y))
+            if r > 230 and g > 220 and b > 200:
+                cream += 1
+    assert cream > 80
+    from twodown.pipeline import published_clue
+
+    self_clue = published_clue("guardian-30113-9a")
+    assert _thumbnail_clue(self_clue) == "Will the author flog incomplete bit of fiction? (4)"
+    assert self_clue.answer not in _thumbnail_clue(self_clue)
 
 
 def test_spoiler_free_stills_write_thumb_and_poster(tmp_path: Path):
