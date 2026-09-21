@@ -78,10 +78,11 @@ INTRO_DICTIONARY_BOOK = PACKAGE_ROOT / "assets" / "intro-dictionary-book.jpg"
 INTRO_BOOK_START = (160, 0, 700, 792)
 INTRO_BOOK_END = (710, 8, 1050, 580)
 INTRO_BOOK_TRIM_TOP = 168
-INTRO_DICTIONARY_CROP = (500, 240, 820, 1000)
-INTRO_DICTIONARY_SOURCE_FOCUS = (648, 492)
-INTRO_DICTIONARY_SOURCE_CRYPTOGRAM = (680, 720)
-INTRO_DICTIONARY_SOURCE_GLANCE = (680, 760)
+# New close plate is landscape after a 90° left turn. Tight on the cry- column.
+INTRO_DICTIONARY_CROP = (640, 0, 1180, 960)
+INTRO_DICTIONARY_SOURCE_FOCUS = (820, 180)
+INTRO_DICTIONARY_SOURCE_CRYPTOGRAM = (820, 560)
+INTRO_DICTIONARY_SOURCE_GLANCE = (830, 610)
 INTRO_THESAURUS_SOURCE = "Roget 1911"
 INTRO_THESAURUS_HEADING = "§ 526  Concealment"
 INTRO_THESAURUS_WORDS = (
@@ -602,6 +603,8 @@ def _photo_point(src_xy: tuple[int, int], box: tuple[int, int, int, int], scale:
 def _photographed_dictionary_page() -> tuple[Image.Image, tuple[int, int], tuple[int, int], tuple[int, int]]:
     """Aled's real page, tight on cryptic, plus the glass stops down the column."""
     src = Image.open(INTRO_DICTIONARY_PHOTO).convert("RGB")
+    if src.size[1] > src.size[0]:
+        src = src.transpose(Image.Transpose.ROTATE_90)
     box = INTRO_DICTIONARY_CROP
     left, top, right, bottom = box
     del left, right, bottom

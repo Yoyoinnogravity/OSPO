@@ -279,9 +279,9 @@ def test_intro_beat_is_kaleidoscope_not_the_spoken_line(tmp_path: Path):
     assert 0 < fx < 1080 and 0 < fy < 1920
     assert mid[1] > fy
     assert end[1] >= mid[1]
-    # Focus sits on the photographed cryptic line.
-    wash = page.getpixel((min(1070, fx + 90), fy + 36))
-    assert wash[0] > 130 and wash[1] > 110
+    # The photographed column is paper, not a typeset card.
+    paper_page = page.getpixel((40, 80))
+    assert paper_page[0] > 160 and paper_page[1] > 140
     raw = path.read_bytes()
     assert INTRO_LINE.encode() not in raw
     assert b"daily dose" not in raw.lower()
