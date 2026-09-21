@@ -251,9 +251,10 @@ def test_intro_beat_is_kaleidoscope_not_the_spoken_line(tmp_path: Path):
     # Lexicon paper, not the old black letter-vortex.
     paper = img.getpixel((40, 80))
     assert paper[0] > 200 and paper[1] > 190
-    _, focus = _dictionary_layout()
+    page, focus = _dictionary_layout()
     fx, fy = focus
-    head = list(img.crop((max(40, fx - 220), max(140, fy - 140), fx + 220, fy + 90)).get_flattened_data())
+    # Count ink on the typeset page — the glass interpolates the magnified crop.
+    head = list(page.crop((max(40, fx - 220), max(140, fy - 140), fx + 220, fy + 90)).get_flattened_data())
     assert head.count(INK) > 400
     raw = path.read_bytes()
     assert INTRO_LINE.encode() not in raw
