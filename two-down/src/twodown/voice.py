@@ -318,6 +318,16 @@ def build_short_soundtrack(parts: ScriptParts, dest: Path, voice: str | None = N
     for key in ("intro", "clue", "letters", "think", "hint", "answer", "parse", "source", "outro"):
         cmd.extend(["-i", str(clips[key])])
     cmd.extend(["-i", str(sting)])
+    hold = (
+        f"anullsrc=r=24000:cl=mono:d={HINT_HOLD_SECONDS:.2f}[h1];" if parts.has_picture else ""
+    )
+    hint_chain = (
+        "[s0][look][c0][g0][c1][g][c2][p1][c3][p2][c4][h1][h2][c5][p3][c6][g2][c7][g1][c8][s1]"
+        "concat=n=21:v=0:a=1[raw];"
+        if parts.has_picture
+        else "[s0][look][c0][g0][c1][g][c2][p1][c3][p2][c4][h2][c5][p3][c6][g2][c7][g1][c8][s1]"
+        "concat=n=20:v=0:a=1[raw];"
+    )
     cmd.extend(
         [
             "-filter_complex",
@@ -338,13 +348,12 @@ def build_short_soundtrack(parts: ScriptParts, dest: Path, voice: str | None = N
                 f"anullsrc=r=24000:cl=mono:d={CLUE_LETTERS_GAP_SECONDS:.2f}[g];"
                 f"anullsrc=r=24000:cl=mono:d={LETTERS_PAUSE_SECONDS:.2f}[p1];"
                 f"anullsrc=r=24000:cl=mono:d={THINK_PAUSE_SECONDS:.2f}[p2];"
-                f"anullsrc=r=24000:cl=mono:d={HINT_HOLD_SECONDS:.2f}[h1];"
+                f"{hold}"
                 f"anullsrc=r=24000:cl=mono:d={HINT_PAUSE_SECONDS:.2f}[h2];"
                 f"anullsrc=r=24000:cl=mono:d={ANSWER_PAUSE_SECONDS:.2f}[p3];"
                 f"anullsrc=r=24000:cl=mono:d={SOURCE_GAP_SECONDS:.2f}[g2];"
                 f"anullsrc=r=24000:cl=mono:d={OUTRO_GAP_SECONDS:.2f}[g1];"
-                "[s0][look][c0][g0][c1][g][c2][p1][c3][p2][c4][h1][h2][c5][p3][c6][g2][c7][g1][c8][s1]"
-                "concat=n=21:v=0:a=1[raw];"
+                f"{hint_chain}"
                 f"[raw]aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo,{AUDIO_LOUDNESS}[a]"
             ),
             "-map",
@@ -366,7 +375,7 @@ def build_short_soundtrack(parts: ScriptParts, dest: Path, voice: str | None = N
         clue=clue_d + CLUE_LETTERS_GAP_SECONDS,
         letters=letters_d + LETTERS_PAUSE_SECONDS,
         think=think_d + THINK_PAUSE_SECONDS,
-        hint=hint_d + HINT_HOLD_SECONDS + HINT_PAUSE_SECONDS,
+        hint=hint_d + (HINT_HOLD_SECONDS if parts.has_picture else 0.0) + HINT_PAUSE_SECONDS,
         answer=answer_d + ANSWER_PAUSE_SECONDS,
         parse=parse_d + SOURCE_GAP_SECONDS,
         source=source_d + OUTRO_GAP_SECONDS,

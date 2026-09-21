@@ -10,6 +10,7 @@ from twodown.config import (
     HINT_HOLD_SECONDS,
     HINT_LINE,
     HINT_PAUSE_SECONDS,
+    NO_PICTURE_LINE,
     INTRO_GAP_SECONDS,
     INTRO_LINE,
     LETTERS_PAUSE_SECONDS,
@@ -199,7 +200,12 @@ class ScriptParts:
         return f"{self.answer_speech} {self.parse_speech}"
 
     @property
+    def has_picture(self) -> bool:
+        return self.hint_speech.strip().casefold() != NO_PICTURE_LINE.strip().casefold()
+
+    @property
     def full(self) -> str:
+        hold = f"[pause {HINT_HOLD_SECONDS:.0f}s]\n" if self.has_picture else ""
         return (
             f"{self.intro_speech}\n"
             f"{self.clue_speech}\n"
@@ -208,7 +214,7 @@ class ScriptParts:
             f"{self.think_speech}\n"
             f"[pause {THINK_PAUSE_SECONDS:.0f}s]\n"
             f"{self.hint_speech}\n"
-            f"[pause {HINT_HOLD_SECONDS:.0f}s]\n"
+            f"{hold}"
             f"[pause {HINT_PAUSE_SECONDS:.1f}s]\n"
             f"{self.answer_speech}\n"
             f"[pause {ANSWER_PAUSE_SECONDS:.0f}s]\n"
@@ -275,7 +281,9 @@ def to_ssml(parts: ScriptParts, pause_seconds: float | None = None) -> str:
     intro_ms = int(INTRO_GAP_SECONDS * 1000)
     gap_ms = int(CLUE_LETTERS_GAP_SECONDS * 1000)
     letters_ms = int(LETTERS_PAUSE_SECONDS * 1000)
-    hint_hold_ms = int(HINT_HOLD_SECONDS * 1000)
+    hint_hold = (
+        f'<break time="{int(HINT_HOLD_SECONDS * 1000)}ms"/>' if parts.has_picture else ""
+    )
     hint_ms = int(HINT_PAUSE_SECONDS * 1000)
     answer_ms = int(ANSWER_PAUSE_SECONDS * 1000)
     source_ms = int(SOURCE_GAP_SECONDS * 1000)
@@ -291,7 +299,7 @@ def to_ssml(parts: ScriptParts, pause_seconds: float | None = None) -> str:
         f"{html.escape(parts.think_speech, quote=False)}"
         f'<break time="{think_ms}ms"/>'
         f"{html.escape(parts.hint_speech, quote=False)}"
-        f'<break time="{hint_hold_ms}ms"/>'
+        f"{hint_hold}"
         f'<break time="{hint_ms}ms"/>'
         f"{html.escape(parts.answer_speech, quote=False)}"
         f'<break time="{answer_ms}ms"/>'

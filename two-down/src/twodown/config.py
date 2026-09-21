@@ -84,6 +84,8 @@ THINK_PROMPT = "Just pause here, and have a think."
 HINT_OFFER = "If you need a clue."
 HINT_LOOK = "Have a look at this."
 HINT_LINE = f"{HINT_OFFER} {HINT_LOOK}"
+# When the still is not ~80% close, skip the picture rather than force a weak match.
+NO_PICTURE_LINE = "No picture clue today."
 HINT_VOICE_ALIAS = "ryan"
 HINT_HOLD_SECONDS = 4.0
 HINT_PAUSE_SECONDS = 2.5

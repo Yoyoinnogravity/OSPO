@@ -358,6 +358,8 @@ def _draw_hint_photo(
 ) -> int:
     """Inset a credited hint still. Never a full-bleed travel photo."""
     matched = hint_for_clue(clue)
+    if matched is None:
+        return y
     photo = Image.open(ensure_hint_photo(matched)).convert("RGB")
     frame_w, frame_h = 900, 560
     left = (WIDTH - frame_w) // 2
@@ -972,11 +974,13 @@ def draw_beat(clue: Clue, dest: Path, beat: str = "think") -> Path:
         _center_text(draw, prompt_y, wrapped, prompt, CRIMSON, spacing=8)
     if beat == "hint":
         # Empty lights stay; the picture is the hint. Never fill or print the answer.
+        # No still when the match is weak — Ryan just says there is no picture clue today.
         prompt_y = min(lights_bottom + 36, 980)
         line = (clue.hint_line or HINT_LINE).rstrip(".")
         wrapped = _wrap(draw, line, prompt, WIDTH - 160)
         next_y = _center_text(draw, prompt_y, wrapped, prompt, CRIMSON, spacing=8)
-        _draw_hint_photo(img, draw, min(next_y + 18, 1040), clue)
+        if hint_for_clue(clue) is not None:
+            _draw_hint_photo(img, draw, min(next_y + 18, 1040), clue)
         _footer(draw, _beat_footer(clue, beat))
         img.save(dest, "PNG")
         return dest

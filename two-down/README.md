@@ -4,7 +4,8 @@ cryptic.fit
 We provide unique cryptic crossword clues and solutions.
 We credit all — the setter, the paper, Fifteen Squared, and the photograph.
 The only source is [Fifteen Squared](https://fifteensquared.net/),
-cut as newsprint Shorts. **Ryan** opens and offers the picture clue,
+cut as newsprint Shorts. **Ryan** opens and offers the picture clue
+(or says there is no picture clue today),
 **Sonia** solves, **Thomas** credits the setter and Fifteen Squared.
 The brand is **cryptic.fit** on the site,
 YouTube, TikTok, Instagram and Facebook.
@@ -34,7 +35,7 @@ twodown status
 Studio of the films we already cut: `two-down/site/studio.html`.
 
 Study Shorts are **newsprint**. Older daily pages still have place photos.
-Voices on the film: **Ryan** opens and offers the picture clue, **Sonia** solves, **Thomas** credits. Libby stays as the clearer optional read.
+Voices on the film: **Ryan** opens and offers the picture clue (or says there is no picture clue today), **Sonia** solves, **Thomas** credits. Libby stays as the clearer optional read.
 
 Visitors can **suggest one homemade clue a day**, or ask for a daily clue by
 email. Both open a message to **aledmorgan@gmail.com**.
@@ -62,6 +63,7 @@ export TWODOWN_META_TOKEN=/path/to/meta-token.json
 twodown today
 # or, once videos are already rendered:
 twodown upload
+twodown upload --slug guardian-30113-9a   # one published Short
 twodown upload --no-youtube          # TikTok + Instagram + Facebook only
 ```
 

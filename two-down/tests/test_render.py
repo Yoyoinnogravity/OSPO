@@ -432,6 +432,42 @@ def test_hint_card_keeps_empty_lights(tmp_path: Path):
     assert any(pixel != NEWS_BG for pixel in photo.get_flattened_data())
 
 
+def test_hint_beat_without_a_picture_stays_newsprint(tmp_path: Path):
+    from PIL import Image
+
+    from twodown.config import NEWS_BG, NO_PICTURE_LINE
+    from twodown.hints import attach_hint
+    from twodown.models import Clue
+
+    clue = attach_hint(
+        Clue(
+            source_url="https://fifteensquared.net/example/",
+            paper="Guardian",
+            puzzle_id="30117",
+            setter="Paul",
+            blogger="Andrew",
+            number="6",
+            direction="down",
+            clue="Craft that may be inflated",
+            enumeration="4",
+            answer="RAFT",
+            definition="inflatable craft",
+            parse="hidden",
+        )
+    )
+    assert clue.hint_line == NO_PICTURE_LINE
+    path = draw_beat(clue, tmp_path / "hint.png", "hint")
+    img = Image.open(path)
+    assert img.size == (1080, 1920)
+    assert img.getpixel((24, 40)) == NEWS_BG
+    # No inset still — the photo band stays newsprint.
+    from twodown.config import NEWS_GRID
+
+    band = list(img.crop((200, 1100, 880, 1480)).get_flattened_data())
+    paper = sum(1 for px in band if px in {NEWS_BG, NEWS_GRID})
+    assert paper / len(band) > 0.98
+
+
 def test_dreamlike_parse_fits_under_the_answer(tmp_path: Path):
     from PIL import Image, ImageDraw
 

@@ -26,6 +26,7 @@ from twodown.social import (
     platform_status,
     publish_pair,
     setup_hints,
+    upload_slug,
 )
 from twodown.voice import list_voices, resolve_voice
 from twodown.youtube import YOUTUBE_CHANNEL
@@ -146,6 +147,7 @@ def main(argv: list[str] | None = None) -> int:
     upload = sub.add_parser("upload", help="Upload today's two Shorts to YouTube, TikTok, Instagram and Facebook")
     upload.add_argument("--out", type=Path, default=DEFAULT_OUTPUT)
     upload.add_argument("--date", help="London calendar date YYYY-MM-DD")
+    upload.add_argument("--slug", help="Upload one published Short instead of today's pair")
     upload.add_argument("--youtube-privacy", default="public", choices=["unlisted", "private", "public"])
     _add_social_flags(upload)
 
@@ -273,6 +275,26 @@ def main(argv: list[str] | None = None) -> int:
             print("No connected social accounts for the requested platforms.", file=sys.stderr)
             _print_status()
             return 2
+        slug = getattr(args, "slug", None)
+        if slug:
+            notes = upload_slug(
+                slug,
+                youtube=wanted["youtube"],
+                tiktok=wanted["tiktok"],
+                instagram=wanted["instagram"],
+                facebook=wanted["facebook"],
+                youtube_privacy=args.youtube_privacy,
+            )
+            uploaded = False
+            for name in ready:
+                values = [v for v in notes.get(name, []) if not str(v).startswith("error:")]
+                if values:
+                    uploaded = True
+                print(f"{name}: {', '.join(notes.get(name, []) or ['nothing uploaded'])}")
+            if not uploaded:
+                print("Upload returned no video ids.", file=sys.stderr)
+                return 1
+            return 0
         try:
             pair = _latest_pair(args.out, args.date)
         except FileNotFoundError as exc:

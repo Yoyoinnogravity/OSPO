@@ -30,6 +30,7 @@ Do exactly two clues from https://fifteensquared.net/ . Never invent an answer.
 Never scrape another crossword site.
 Hint pictures may be auto / AI matched to the definition at about 80% closeness.
 That is good enough. Do not ban AI matching. Do not build a cloud vision pipeline.
+If a still is not about 80% close, do not show a picture. Ryan says: No picture clue today.
 
 1. Check two-down/site/d/{today's London date}/index.html.
    If that page already exists, today's pair is done. Do not regenerate, do not open a PR, stop.
