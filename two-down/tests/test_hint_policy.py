@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from twodown.config import HINT_LINE, PACKAGE_ROOT, PINUP_SLUG, STUDY_SLUG
-from twodown.hints import AIM, CLOSE_ENOUGH, COLE, DAVIS, FATS, PAPERS, RASTA, SMILES, TRANCE, WELLINGTON, attach_hint, match_hint
+from twodown.hints import AIM, AUTHOR, CLOSE_ENOUGH, COLE, CRASH, DAVIS, FATS, MAKEUP, PAPERS, PHOTO, RASTA, SMILES, TRANCE, WELLINGTON, attach_hint, match_hint
 from twodown.models import Clue
 from twodown.pipeline import aimlessly_clue, cole_clue, davis_cup_clue, dreamlike_clue, fats_clue, mass_media_clue, published_clue, rasta_clue, smiles_clue, study_clue, wellington_clue
 
@@ -137,11 +137,18 @@ def test_ai_matching_is_allowed():
     assert attached.hint_line == HINT_LINE
 
 
-def test_published_clues_have_optional_hint_fields():
+def test_published_clues_get_a_picture_clue():
     pinup = published_clue(PINUP_SLUG)
-    assert pinup.hint_image is None
-    assert pinup.hint_credit is None
-    assert pinup.hint_line is None
+    assert pinup.hint_line == HINT_LINE
+    assert pinup.hint_image.endswith("photo-still.webp")
+    assert pinup.hint_credit == PHOTO.credit_line
+    assert "PIN-UP" not in pinup.hint_credit
+    mascara = published_clue("guardian-30112-1a")
+    assert mascara.hint_image.endswith("makeup-still.webp")
+    smash = published_clue("guardian-30112-5a")
+    assert smash.hint_image.endswith("crash-still.webp")
+    self_clue = published_clue("guardian-30113-9a")
+    assert self_clue.hint_image.endswith("author-still.webp")
     blank = Clue(
         source_url="https://fifteensquared.net/example/",
         paper="Independent",
@@ -156,12 +163,19 @@ def test_published_clues_have_optional_hint_fields():
         parse="PUP containing IN",
     )
     assert blank.hint_image is None
-    assert blank.hint_credit is None
-    assert blank.hint_line is None
     attached = attach_hint(blank)
     assert attached.hint_line == HINT_LINE
-    assert attached.hint_image
-    assert attached.hint_credit
+    assert attached.hint_image.endswith("photo-still.webp")
+
+
+def test_daily_definitions_match_picture_clues_at_80_percent():
+    assert match_hint("make-up").photo.slug == MAKEUP.slug
+    assert match_hint("a car crash").photo.slug == CRASH.slug
+    assert match_hint("an attractive person appearing in photos").photo.slug == PHOTO.slug
+    assert match_hint("this author").photo.slug == AUTHOR.slug
+    assert match_hint("make-up").closeness >= CLOSE_ENOUGH
+    assert match_hint("a car crash").closeness >= CLOSE_ENOUGH
+    assert match_hint("this author").closeness >= CLOSE_ENOUGH
 
 
 def test_no_cloud_vision_pipeline():

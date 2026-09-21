@@ -69,20 +69,22 @@ def published_clue(slug: str, site_root: Path | None = None) -> Clue:
         if not match or not clue_match:
             raise ValueError(f"Could not parse published clue {slug}")
         blogger = credit.get_text(" ", strip=True).split("·", 1)[-1].strip()
-        return Clue(
-            source_url=str(credit["href"]),
-            paper=match["paper"],
-            puzzle_id=match["puzzle_id"],
-            setter=match["setter"],
-            blogger=blogger,
-            number=match["number"],
-            direction=match["direction"],
-            clue=clue_match["clue"],
-            enumeration=clue_match["enum"],
-            answer=answer.get_text(" ", strip=True),
-            parse=htmlmod.unescape(parse.get_text(" ", strip=True)),
-            device=match["device"],
-            enumeration_ok=True,
+        return attach_hint(
+            Clue(
+                source_url=str(credit["href"]),
+                paper=match["paper"],
+                puzzle_id=match["puzzle_id"],
+                setter=match["setter"],
+                blogger=blogger,
+                number=match["number"],
+                direction=match["direction"],
+                clue=clue_match["clue"],
+                enumeration=clue_match["enum"],
+                answer=answer.get_text(" ", strip=True),
+                parse=htmlmod.unescape(parse.get_text(" ", strip=True)),
+                device=match["device"],
+                enumeration_ok=True,
+            )
         )
     raise FileNotFoundError(f"No published clue {slug}")
 
@@ -557,6 +559,7 @@ def run_today(
     scene_slugs = pick_scenes(stamp, len(pair_clues), scene)
     spoken: list[SpokenClue] = []
     for clue, scene_slug in zip(pair_clues, scene_slugs, strict=True):
+        clue = attach_hint(clue)
         parts = write_parts(clue)
         item = SpokenClue(clue=clue, script=parts.full, voice=resolved_voice, scene=scene_slug)
         slot = dest_root / clue.slug
