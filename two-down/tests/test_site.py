@@ -1,4 +1,4 @@
-from twodown.captions import youtube_description
+from twodown.captions import youtube_description, youtube_tags
 from twodown.models import Clue, DailyPair, SpokenClue
 from twodown.site import JS, publish_site
 from twodown.youtube import YOUTUBE_CHANNEL, set_thumbnail, video_title
@@ -168,13 +168,25 @@ def test_youtube_titles_use_cryptic_fun_channel():
     clue = _item().clue
     title = video_title(clue)
     assert title.startswith("cryptic.fit · ")
+    assert "Independent cryptic by Phi" in title
     assert title.endswith("#Shorts")
     assert YOUTUBE_CHANNEL == "cryptic.fit"
     assert len(title) <= 100
-    assert "https://cryptic.fit/support.html" in youtube_description(_item())
-    assert "unique cryptic crossword clues and solutions" in youtube_description(_item())
-    assert "We credit all" in youtube_description(_item())
-    assert "Fifteen Squared" in youtube_description(_item())
+    assert clue.answer not in title
+    text = youtube_description(_item())
+    assert "https://cryptic.fit/support.html" in text
+    assert "unique cryptic crossword clues and solutions" in text
+    assert "We credit all" in text
+    assert "Fifteen Squared" in text
+    assert "Independent cryptic crossword by Phi" in text
+    assert "#GuardianCryptic" not in text
+    assert "#IndependentCryptic" in text
+    assert text.index("Pause the Short") < text.index("Answer: END RESULT")
+    tags = youtube_tags(clue)
+    assert "cryptic.fit" in tags
+    assert "Independent cryptic" in tags
+    assert "Phi" in tags
+    assert clue.answer not in tags
 
 
 def test_ads_on_writes_ads_txt_and_unit(tmp_path, monkeypatch):

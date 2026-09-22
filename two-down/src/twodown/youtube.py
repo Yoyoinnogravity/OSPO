@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from twodown.captions import youtube_description
+from twodown.captions import youtube_description, youtube_tags
 from twodown.config import BRAND, CLUES_PER_DAY
 from twodown.models import Clue, DailyPair, SpokenClue
 from twodown.render import draw_thumbnail
@@ -36,12 +36,15 @@ def _credentials():
 
 def video_title(clue: Clue) -> str:
     enum = f" ({clue.enumeration})" if clue.enumeration else ""
-    title = f"{YOUTUBE_CHANNEL} · {clue.clue}{enum} #Shorts"
-    if len(title) <= 100:
-        return title
-    room = 100 - len(f"{YOUTUBE_CHANNEL} · {enum} #Shorts")
+    suffix = f"{enum} #Shorts"
+    mid = f"{clue.paper} cryptic by {clue.setter}"
+    prefix = f"{YOUTUBE_CHANNEL} · {mid} · "
+    full = f"{prefix}{clue.clue}{suffix}"
+    if len(full) <= 100:
+        return full
+    room = 100 - len(prefix) - len(suffix)
     clipped = clue.clue[: max(10, room - 1)].rstrip() + "…"
-    return f"{YOUTUBE_CHANNEL} · {clipped}{enum} #Shorts"[:100]
+    return f"{prefix}{clipped}{suffix}"[:100]
 
 
 def video_description(item: SpokenClue) -> str:
@@ -67,7 +70,7 @@ def upload_short(item: SpokenClue, privacy: str = "public") -> str | None:
         "snippet": {
             "title": video_title(item.clue),
             "description": video_description(item),
-            "tags": ["cryptic.fit", "cryptic crossword", item.clue.device, item.clue.setter],
+            "tags": youtube_tags(item.clue),
             "categoryId": "27",
         },
         "status": {

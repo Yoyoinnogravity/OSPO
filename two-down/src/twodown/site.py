@@ -17,6 +17,7 @@ from twodown.seo import (
     article_ld,
     clue_description,
     clue_share_title,
+    video_ld,
     collect_sitemap_urls,
     dumps_ld,
     gsc_verification,
@@ -528,7 +529,9 @@ def _page(body: str, seo: PageSeo, depth: int = 0, show_ads: bool = False) -> st
     default = get_scene(DEFAULT_SCENE)
     background = default.filename or "machu-picchu.webp"
     head_ads = _ads_head() if show_ads else ""
-    image = canonical_share = f"{SITE_ORIGIN}{SHARE_IMAGE}"
+    image = seo.image or f"{SITE_ORIGIN}{SHARE_IMAGE}"
+    if image.startswith("/"):
+        image = f"{SITE_ORIGIN}{image}"
     verify = gsc_verification()
     verify_tag = (
         f'<meta name="google-site-verification" content="{_e(verify)}">\n' if verify else ""
@@ -562,8 +565,8 @@ def _page(body: str, seo: PageSeo, depth: int = 0, show_ads: bool = False) -> st
   <meta property="og:description" content="{_e(seo.description)}">
   <meta property="og:url" content="{_e(seo.canonical)}">
   <meta property="og:image" content="{_e(image)}">
-  <meta property="og:image:width" content="1200">
-  <meta property="og:image:height" content="630">
+  <meta property="og:image:width" content="{seo.image_width}">
+  <meta property="og:image:height" content="{seo.image_height}">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="{_e(seo.title)}">
   <meta name="twitter:description" content="{_e(seo.description)}">
@@ -774,8 +777,14 @@ def publish_site(pair: DailyPair, dest: Path | None = None) -> Path:
                     description=clue_description(item.clue),
                     path=f"/c/{item.clue.slug}/",
                     og_type="article",
-                    json_ld=article_ld(item.clue, canonical=f"{SITE_ORIGIN}/c/{item.clue.slug}/", published=pair.date),
+                    json_ld=[
+                        article_ld(item.clue, canonical=f"{SITE_ORIGIN}/c/{item.clue.slug}/", published=pair.date),
+                        video_ld(item.clue, canonical=f"{SITE_ORIGIN}/c/{item.clue.slug}/", published=pair.date),
+                    ],
                     published=pair.date,
+                    image=f"{SITE_ORIGIN}/media/{item.clue.slug}-thumb.jpg",
+                    image_width=1080,
+                    image_height=1920,
                 ),
                 depth=2,
             ),
