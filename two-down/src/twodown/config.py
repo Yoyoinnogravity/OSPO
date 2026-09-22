@@ -59,8 +59,8 @@ INTRO_VOICE_ALIAS = "ryan"
 INTRO_RATE = "+3%"
 INTRO_PITCH = "+4Hz"
 INTRO_VOLUME = "+8%"
-# After Ryan, stay on the dictionary so the glass can be read.
-INTRO_GAP_SECONDS = 6.5
+# Ryan opens on the dictionary. Then we cut to the Short and Sonia starts.
+INTRO_GAP_SECONDS = 0.35
 # After the sting, sit on the open book before he speaks.
 INTRO_LOOK_BEFORE_SECONDS = 2.4
 OUTRO_LINE = "Thanks for thinking with cryptic.fit."

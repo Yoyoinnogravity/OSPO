@@ -901,12 +901,13 @@ def ensure_intro_kaleidoscope() -> Path:
 
 
 def render_intro_kaleidoscope(clue: Clue | None, dest: Path, duration: float) -> Path:
-    """Trim the stock kaleidoscope to this film's spoken open. No per-clue rebuild."""
+    """Fit the signed-off book-to-glass open into Ryan's window. Sonia starts after the cut."""
     del clue
     dest = Path(dest).with_suffix(".mp4")
     dest.parent.mkdir(parents=True, exist_ok=True)
     source = ensure_intro_kaleidoscope()
     hold = max(0.4, duration)
+    pace = hold / INTRO_KALEIDOSCOPE_HOLD
     ffmpeg = shutil.which("ffmpeg")
     if not ffmpeg:
         raise RuntimeError("ffmpeg is required to build the Short")
@@ -914,11 +915,11 @@ def render_intro_kaleidoscope(clue: Clue | None, dest: Path, duration: float) ->
         [
             ffmpeg,
             "-y",
-            "-stream_loop",
-            "-1",
             "-i",
             str(source),
             "-an",
+            "-filter:v",
+            f"setpts={pace:.4f}*PTS",
             "-t",
             f"{hold:.2f}",
             "-c:v",

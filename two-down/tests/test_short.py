@@ -152,7 +152,8 @@ def test_soundtrack_speaks_source_credit_as_thomas(monkeypatch, tmp_path):
     timings = voice_mod.build_short_soundtrack(parts, tmp_path / "mix.mp3", DEFAULT_VOICE_ALIAS)
     assert timings.intro == 1.4 + INTRO_LOOK_BEFORE_SECONDS + 1.0 + INTRO_GAP_SECONDS
     assert INTRO_LOOK_BEFORE_SECONDS >= 2.0
-    assert INTRO_GAP_SECONDS >= 5.0
+    # Ryan opens, then we cut to Sonia. Do not linger on the dictionary after him.
+    assert INTRO_GAP_SECONDS <= 0.5
     assert timings.outro == 1.0 + 1.4 + 0.35
     assert seen["source"] == "thomas"
     assert seen["source"] != seen["answer"]
