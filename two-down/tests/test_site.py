@@ -121,14 +121,14 @@ def test_publish_site_writes_spoiler_pages(tmp_path):
     assert (tmp_path / "assets" / "favicon.svg").exists()
     assert "application/rss+xml" in index
     js = (root / "assets" / "app.js").read_text(encoding="utf-8")
-    assert 'audio.addEventListener("error"' in js
-    assert "attempt.catch" in js
+    assert "video.muted = false" in js
+    assert "video.muted = true" not in js
 
 
-def test_short_keeps_muxed_sound_when_the_other_voice_is_missing():
-    assert 'audio.addEventListener("error", () => { video.muted = false; }' in JS
-    assert "attempt.catch" in JS
+def test_short_keeps_muxed_sound_when_another_voice_is_selected():
     assert "video.muted = false" in JS
+    assert "video.muted = true" not in JS
+    assert "Never mute it" in JS
 
 
 def test_published_clue_reads_individual_short_pages(tmp_path):
