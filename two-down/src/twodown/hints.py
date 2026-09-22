@@ -365,6 +365,71 @@ AUTHOR = HintPhoto(
     keywords=frozenset({"author", "writer", "novelist", "book"}),
 )
 
+DICTIONARY = HintPhoto(
+    slug="dictionary-still",
+    label="A dictionary",
+    source="generated still",
+    license="generated",
+    filename="dictionary-still.webp",
+    keywords=frozenset(
+        {
+            "dictionary",
+            "dictionar",
+            "american",
+            "page",
+            "pages",
+            "include",
+            "includes",
+            "tragic",
+            "figure",
+            "book",
+            "lexicon",
+            "oed",
+        }
+    ),
+)
+
+SHELTER = HintPhoto(
+    slug="shelter-still",
+    label="Shelter",
+    source="generated still",
+    license="generated",
+    filename="shelter-still.webp",
+    keywords=frozenset(
+        {
+            "shelter",
+            "insurance",
+            "cover",
+            "refuge",
+            "protection",
+            "arrange",
+            "head",
+        }
+    ),
+)
+
+WINE = HintPhoto(
+    slug="wine-still",
+    label="Sparkling wine",
+    source="generated still",
+    license="generated",
+    filename="wine-still.webp",
+    keywords=frozenset(
+        {
+            "wine",
+            "bubbly",
+            "plonk",
+            "sparkling",
+            "champagne",
+            "guzzled",
+            "continental",
+            "break",
+            "short",
+            "bottle",
+        }
+    ),
+)
+
 # Commons alternate: imperial Ethiopian / Rastafari Lion of Judah flag.
 LION = HintPhoto(
     slug="lion-of-judah",
@@ -391,6 +456,9 @@ PHOTOS: dict[str, HintPhoto] = {
     CRASH.slug: CRASH,
     PHOTO.slug: PHOTO,
     AUTHOR.slug: AUTHOR,
+    DICTIONARY.slug: DICTIONARY,
+    SHELTER.slug: SHELTER,
+    WINE.slug: WINE,
     LION.slug: LION,
     "makeup": MAKEUP,
     "make-up": MAKEUP,
@@ -456,6 +524,9 @@ def _catalog() -> tuple[HintPhoto, ...]:
         CRASH,
         PHOTO,
         AUTHOR,
+        DICTIONARY,
+        SHELTER,
+        WINE,
         LION,
     )
 
@@ -501,8 +572,15 @@ def get_hint_photo(slug: str | None = None) -> HintPhoto | None:
     return matched.photo if matched.close_enough else None
 
 
+_WORDPLAY_MARKERS = re.compile(r"[\+\=\[\]\{\}]|\baround\b|\binside\b|\bcontaining\b", re.I)
+
+
 def infer_definition(clue: Clue) -> str:
-    """Definition text for the picture clue. Prefer the stored gloss, then the parse."""
+    """Definition text for the picture clue. Surface gloss beats Fifteen Squared wordplay."""
+    if clue.definition and not _WORDPLAY_MARKERS.search(clue.definition):
+        return clue.definition
+    if clue.clue:
+        return clue.clue
     if clue.definition:
         return clue.definition
     mapped = PHOTOS.get(clue.slug)
@@ -762,6 +840,46 @@ def _generate_papers_still(dest: Path) -> Path:
     return dest
 
 
+def _generate_dictionary_still(dest: Path) -> Path:
+    """Last-resort open dictionary page. No OEDIPUS text."""
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    img = Image.new("RGB", (1280, 720), (243, 234, 214))
+    draw = ImageDraw.Draw(img)
+    draw.rectangle((140, 60, 1140, 660), fill=(184, 28, 41))
+    draw.rectangle((180, 100, 1100, 620), fill=(252, 247, 236))
+    draw.rectangle((240, 160, 1040, 200), fill=(26, 21, 16))
+    draw.rectangle((240, 230, 920, 250), fill=(92, 78, 64))
+    draw.rectangle((240, 280, 860, 296), fill=(92, 78, 64))
+    draw.rectangle((240, 330, 980, 346), fill=(92, 78, 64))
+    draw.rectangle((240, 380, 760, 396), fill=(92, 78, 64))
+    img.save(dest, "WEBP", quality=82, method=6)
+    return dest
+
+
+def _generate_shelter_still(dest: Path) -> Path:
+    """Last-resort refuge / cover colours. No TAKE COVER text."""
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    img = Image.new("RGB", (1280, 720), (72, 88, 104))
+    draw = ImageDraw.Draw(img)
+    draw.polygon([(120, 520), (640, 120), (1160, 520), (1160, 660), (120, 660)], fill=(196, 48, 41))
+    draw.rectangle((280, 360, 1000, 660), fill=(228, 216, 188))
+    draw.rectangle((520, 460, 760, 660), fill=(48, 36, 28))
+    img.save(dest, "WEBP", quality=82, method=6)
+    return dest
+
+
+def _generate_wine_still(dest: Path) -> Path:
+    """Last-resort sparkling wine colours. No answer text."""
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    img = Image.new("RGB", (1280, 720), (248, 244, 236))
+    draw = ImageDraw.Draw(img)
+    draw.rectangle((560, 120, 720, 620), fill=(184, 28, 41))
+    draw.polygon([(560, 120), (640, 40), (720, 120)], fill=(140, 20, 28))
+    draw.ellipse((500, 520, 780, 680), fill=(232, 196, 48))
+    img.save(dest, "WEBP", quality=82, method=6)
+    return dest
+
+
 def ensure_hint_photo(photo: HintPhoto | None = None) -> Path:
     resolved = photo or DEFAULT_HINT
     dest = resolved.path
@@ -793,4 +911,10 @@ def ensure_hint_photo(photo: HintPhoto | None = None) -> Path:
         return _generate_photo_still(dest)
     if resolved.slug in {AUTHOR.slug, "author"}:
         return _generate_author_still(dest)
+    if resolved.slug in {DICTIONARY.slug, "dictionary"}:
+        return _generate_dictionary_still(dest)
+    if resolved.slug in {SHELTER.slug, "shelter"}:
+        return _generate_shelter_still(dest)
+    if resolved.slug in {WINE.slug, "wine", "bubbly"}:
+        return _generate_wine_still(dest)
     return _generate_trance_still(dest)
