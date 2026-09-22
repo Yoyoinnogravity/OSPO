@@ -131,6 +131,31 @@ def test_short_keeps_muxed_sound_when_the_other_voice_is_missing():
     assert "video.muted = false" in JS
 
 
+def test_published_clue_reads_individual_short_pages(tmp_path):
+    from twodown.pipeline import published_clue
+
+    page = tmp_path / "c" / "guardian-30100-9a" / "index.html"
+    page.parent.mkdir(parents=True)
+    page.write_text(
+        """<!DOCTYPE html><html><body>
+        <h1>Oversees advancement of ecstasy in hell (5)</h1>
+        <article class="clue" data-slug="guardian-30100-9a">
+          <p class="kicker">Guardian 30100 · Dice · 9 across · unknown</p>
+          <p class="answer">HEADS</p>
+          <p class="parse">HAD(e)S with E advanced</p>
+          <p class="credit">Parse via <a href="https://fifteensquared.net/example/">Fifteen Squared · loonapick</a></p>
+        </article>
+        </body></html>
+        """,
+        encoding="utf-8",
+    )
+    clue = published_clue("guardian-30100-9a", tmp_path)
+    assert clue.slug == "guardian-30100-9a"
+    assert clue.answer == "HEADS"
+    assert clue.clue == "Oversees advancement of ecstasy in hell"
+    assert clue.enumeration == "5"
+
+
 def test_set_thumbnail_does_nothing_without_a_token(tmp_path, monkeypatch):
     monkeypatch.delenv("TWODOWN_YOUTUBE_TOKEN", raising=False)
     image = tmp_path / "thumb.jpg"

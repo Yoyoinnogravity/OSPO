@@ -1091,11 +1091,11 @@ def _save_issue_ledger(slugs: list[str], path: Path | None = None) -> None:
 
 
 def issue_catalog(slugs: list[str] | None = None) -> list[str]:
-    """One slug, one issue. Published films first, then review cuts, then the ledger."""
+    """One slug, one issue. Ledger numbers stay put; new published films append."""
     if slugs is not None:
         catalog = _unique_slugs(list(slugs))
     else:
-        catalog = _unique_slugs(published_pair_slugs() + _load_issue_ledger() + _study_slugs())
+        catalog = _unique_slugs(_load_issue_ledger() + published_pair_slugs() + _study_slugs())
     if THUMBNAIL_ISSUE_FIRST_SLUG in catalog:
         catalog = catalog[catalog.index(THUMBNAIL_ISSUE_FIRST_SLUG) :]
     return catalog

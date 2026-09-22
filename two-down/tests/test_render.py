@@ -651,3 +651,24 @@ def test_spoiler_free_stills_write_thumb_and_poster(tmp_path: Path):
     assert Image.open(thumb).size == (THUMB_W, THUMB_H)
     assert Image.open(poster).size == (1080, 1920)
     assert Image.open(draw_poster(_clue(), tmp_path / "poster.jpg")).size == (1080, 1920)
+
+
+def test_homepage_swap_does_not_renumber_ledger_issues(monkeypatch):
+    import twodown.render as render_mod
+
+    ledger = [
+        "guardian-30112-1a",
+        "guardian-30112-5a",
+        "guardian-30064-8a",
+        "guardian-30100-9a",
+        "guardian-30077-8a",
+    ]
+    published = ["guardian-30112-1a", "guardian-30112-5a", "guardian-30108-27a"]
+    monkeypatch.setattr(render_mod, "_load_issue_ledger", lambda path=None: ledger)
+    monkeypatch.setattr(render_mod, "published_pair_slugs", lambda site_root=None: published)
+    monkeypatch.setattr(render_mod, "_study_slugs", lambda out_dir=None: [])
+    catalog = issue_catalog()
+    assert catalog[:5] == ledger
+    assert catalog.index("guardian-30108-27a") == 5
+    assert catalog.index("guardian-30100-9a") != catalog.index("guardian-30077-8a")
+    assert len(catalog) == len(set(catalog))

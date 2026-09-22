@@ -52,13 +52,17 @@ def _voice_alias(name: str | None) -> str:
 def published_clue(slug: str, site_root: Path | None = None) -> Clue:
     """Read one already-published clue back from the static site."""
     root = Path(site_root or SITE_ROOT)
-    for page in sorted((root / "d").glob("*/index.html")):
+    pages = sorted((root / "d").glob("*/index.html"))
+    archive = root / "c" / slug / "index.html"
+    if archive.exists():
+        pages.append(archive)
+    for page in pages:
         soup = BeautifulSoup(page.read_text(encoding="utf-8"), "lxml")
         article = soup.select_one(f'article.clue[data-slug="{slug}"]')
         if article is None:
             continue
         kicker = article.select_one("p.kicker")
-        line = article.select_one("p.clue-text")
+        line = article.select_one("p.clue-text") or soup.select_one("h1")
         answer = article.select_one("p.answer")
         parse = article.select_one("p.parse")
         credit = article.select_one("p.credit a")
