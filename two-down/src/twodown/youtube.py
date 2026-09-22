@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
@@ -163,13 +164,20 @@ def finish_authorization(pasted: str) -> Path:
             "No pending OAuth session. Run `twodown youtube-auth --start` first."
         )
     pending = json.loads(pending_file.read_text(encoding="utf-8"))
-    code = authorization_code(pasted)
+    redirect_uri = pending.get("redirect_uri") or REDIRECT_URI
+    if redirect_uri.startswith("http://"):
+        os.environ.setdefault("OAUTHLIB_INSECURE_TRANSPORT", "1")
     flow = InstalledAppFlow.from_client_config(pending["client_config"], scopes=pending["scopes"])
-    flow.redirect_uri = pending.get("redirect_uri") or REDIRECT_URI
+    flow.redirect_uri = redirect_uri
     verifier = pending.get("code_verifier")
     if verifier:
-        flow.oauth2session.code_verifier = verifier
-    flow.fetch_token(code=code)
+        flow.code_verifier = verifier
+        flow.autogenerate_code_verifier = False
+    pasted = pasted.strip()
+    if pasted.startswith("http"):
+        flow.fetch_token(authorization_response=pasted)
+    else:
+        flow.fetch_token(code=authorization_code(pasted))
     return _save_token(flow.credentials)
 
 
