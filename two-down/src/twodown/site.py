@@ -262,7 +262,13 @@ function applyVoice(alias) {
     };
     audio.addEventListener("loadedmetadata", resume, { once: true });
     const video = article.querySelector("video");
-    if (video) video.muted = alias !== "sonia";
+    if (!video) return;
+    if (alias === "sonia") {
+      video.muted = false;
+      return;
+    }
+    video.muted = true;
+    audio.addEventListener("error", () => { video.muted = false; }, { once: true });
   });
 }
 
@@ -343,18 +349,19 @@ document.querySelectorAll("article.clue").forEach((article) => {
   const audio = article.querySelector("audio.parse-voice");
   if (!video || !audio) return;
   const otherVoice = () => currentVoice() !== "sonia";
-  const applyMute = () => {
-    video.muted = otherVoice();
-  };
-  applyMute();
+  audio.addEventListener("error", () => { video.muted = false; });
   video.addEventListener("play", () => {
-    applyMute();
     if (!otherVoice()) {
+      video.muted = false;
       audio.pause();
       return;
     }
+    video.muted = true;
     audio.currentTime = video.currentTime;
-    audio.play();
+    const attempt = audio.play();
+    if (attempt && attempt.catch) {
+      attempt.catch(() => { video.muted = false; });
+    }
   });
   video.addEventListener("pause", () => audio.pause());
   video.addEventListener("seeked", () => {

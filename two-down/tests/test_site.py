@@ -1,6 +1,6 @@
 from twodown.captions import youtube_description
 from twodown.models import Clue, DailyPair, SpokenClue
-from twodown.site import publish_site
+from twodown.site import JS, publish_site
 from twodown.youtube import YOUTUBE_CHANNEL, set_thumbnail, video_title
 
 
@@ -120,6 +120,15 @@ def test_publish_site_writes_spoiler_pages(tmp_path):
     assert (tmp_path / ".nojekyll").exists()
     assert (tmp_path / "assets" / "favicon.svg").exists()
     assert "application/rss+xml" in index
+    js = (root / "assets" / "app.js").read_text(encoding="utf-8")
+    assert 'audio.addEventListener("error"' in js
+    assert "attempt.catch" in js
+
+
+def test_short_keeps_muxed_sound_when_the_other_voice_is_missing():
+    assert 'audio.addEventListener("error", () => { video.muted = false; }' in JS
+    assert "attempt.catch" in JS
+    assert "video.muted = false" in JS
 
 
 def test_set_thumbnail_does_nothing_without_a_token(tmp_path, monkeypatch):
