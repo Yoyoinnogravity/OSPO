@@ -73,7 +73,7 @@ def test_script_credits_fifteen_squared():
     assert "Phi" in script
     assert "cryptic.fit" in script
     parts = write_parts(clue)
-    assert parts.intro_speech == "Right — here's your daily dose of cryptic fun."
+    assert parts.intro_speech == "Hello, here is your daily dose of AI cryptic crossword."
     assert parts.clue_speech == f"{clue.clue}."
     assert "The clue:" not in parts.clue_speech
     assert "(" not in parts.clue_speech

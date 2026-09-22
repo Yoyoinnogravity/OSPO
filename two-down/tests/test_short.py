@@ -65,7 +65,7 @@ def test_study_clue_is_mass_media():
     assert "struggling" in clue.parse.lower()
     assert "mess" in clue.parse.lower()
     parts = write_parts(clue)
-    assert parts.intro_speech == "Right — here's your daily dose of cryptic fun."
+    assert parts.intro_speech == "Hello, here is your daily dose of AI cryptic crossword."
     assert parts.clue_speech == "Maid struggling with a mess — newspapers etc."
     assert parts.letters_speech == "That's four, five."
     assert parts.think_speech == "Just pause here, and have a think."
@@ -151,7 +151,7 @@ def test_soundtrack_speaks_source_credit_as_thomas(monkeypatch, tmp_path):
     parts = write_parts(published_clue("guardian-30113-9a"))
     timings = voice_mod.build_short_soundtrack(parts, tmp_path / "mix.mp3", DEFAULT_VOICE_ALIAS)
     assert timings.intro == 1.4 + INTRO_LOOK_BEFORE_SECONDS + 1.0 + INTRO_GAP_SECONDS
-    assert INTRO_LOOK_BEFORE_SECONDS >= 2.0
+    assert INTRO_LOOK_BEFORE_SECONDS <= 0.2
     # Ryan opens, then we cut to Sonia. Do not linger on the dictionary after him.
     assert INTRO_GAP_SECONDS <= 0.5
     assert timings.outro == 1.0 + 1.4 + 0.35
@@ -170,8 +170,8 @@ def test_brand_sting_is_one_shared_pair():
     assert path == BRAND_STING_ASSET
     assert path.exists()
     duration = audio_seconds(path)
-    assert 1.1 <= duration <= 1.7
-    assert abs(duration - BRAND_STING_SECONDS) < 0.3
+    assert 0.45 <= duration <= 0.85
+    assert abs(duration - BRAND_STING_SECONDS) < 0.25
 
 
 def test_spoken_parse_says_mass_media_as_words():

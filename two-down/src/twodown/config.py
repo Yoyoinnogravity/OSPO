@@ -54,21 +54,19 @@ ANSWER_PITCH = "+1Hz"
 PARSE_RATE = "-8%"
 PARSE_PITCH = "+0Hz"
 PARSE_ASIDE_PAUSE_SECONDS = 0.7
-INTRO_LINE = "Right — here's your daily dose of cryptic fun."
+INTRO_LINE = "Hello, here is your daily dose of AI cryptic crossword."
 INTRO_VOICE_ALIAS = "ryan"
 INTRO_RATE = "+3%"
 INTRO_PITCH = "+4Hz"
 INTRO_VOLUME = "+8%"
 # Ryan opens on the dictionary. Then we cut to the Short and Sonia starts.
 INTRO_GAP_SECONDS = 0.35
-# After the sting, sit on the open book before he speaks.
-INTRO_LOOK_BEFORE_SECONDS = 2.4
+# Sting hits on picture-up. Ryan talks over the book — no long look first.
+INTRO_LOOK_BEFORE_SECONDS = 0.12
 OUTRO_LINE = "Thanks for thinking with cryptic.fit."
 OUTRO_GAP_SECONDS = 0.4
-# Same two chords at both ends, on an up-beat: a short C pickup into F.
-# They sit before Ryan and after the thank-you, so they name the brand
-# without talking over the introduction.
-BRAND_STING_SECONDS = 1.45
+# Short ident on picture-up and after the thank-you. G into C, not the old pad.
+BRAND_STING_SECONDS = 0.62
 # Footer credit is not Sonia. Thomas (male) names the setter, paper, and Fifteen Squared.
 SOURCE_VOICE_ALIAS = "thomas"
 SOURCE_RATE = "-4%"

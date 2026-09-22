@@ -54,50 +54,42 @@ from twodown.render import AUDIO_LOUDNESS, ShortTimings, audio_seconds
 from twodown.script import ScriptParts, to_ssml
 
 BRAND_STING_ASSET = PACKAGE_ROOT / "assets" / "brand-sting.mp3"
-# C major then F major — a short I pickup into an IV lift. Same pair opens and closes.
-_BRAND_STING_I = (130.81, 164.81, 196.00, 261.63)
-_BRAND_STING_IV = (174.61, 220.00, 261.63, 349.23)
+# Struck G then C — a short V–I ident. Immediate attack, no pad.
+_BRAND_STING_PICKUP = 196.00
+_BRAND_STING_LAND = 261.63
 
 
-def _sine_mix(freqs: tuple[float, ...], label: str, duration: float) -> str:
-    parts: list[str] = []
-    names: list[str] = []
-    for i, freq in enumerate(freqs):
-        name = f"{label}{i}"
-        parts.append(f"sine=frequency={freq}:sample_rate=44100:duration={duration:.2f}[{name}]")
-        names.append(f"[{name}]")
-    fade_out = max(0.08, duration - 0.16)
-    parts.append(
-        "".join(names)
-        + f"amix=inputs={len(freqs)}:duration=first:dropout_transition=0,"
-        + f"afade=t=in:st=0:d=0.05,afade=t=out:st={fade_out:.2f}:d=0.14[{label}]"
+def _pluck(freq: float, label: str, duration: float, decay: float) -> str:
+    """Mallet-like tone: fundamental plus two harmonics, exponential decay."""
+    body = (
+        f"exp(-{decay}*t)*(sin(2*PI*{freq}*t)+0.42*sin(2*PI*{freq*2}*t)"
+        f"+0.18*sin(2*PI*{freq*3}*t))"
     )
-    return ";".join(parts)
+    return (
+        f"aevalsrc={body}:s=44100:d={duration:.2f},"
+        f"afade=t=in:st=0:d=0.004,afade=t=out:st={max(0.05, duration - 0.08):.2f}:d=0.07[{label}]"
+    )
 
 
 def bake_brand_sting(dest: Path | None = None) -> Path:
-    """One sympathetic two-chord sting. Built once; every film reuses it."""
+    """One short ident. Hits on picture-up. Rebaked whenever the recipe runs."""
     dest = Path(dest or BRAND_STING_ASSET)
     dest.parent.mkdir(parents=True, exist_ok=True)
     ffmpeg = shutil.which("ffmpeg")
     if not ffmpeg:
         raise RuntimeError("ffmpeg is required to build the brand sting")
-    first = _sine_mix(_BRAND_STING_I, "i", 0.40)
-    second = _sine_mix(_BRAND_STING_IV, "iv", 1.15)
+    pickup = _pluck(_BRAND_STING_PICKUP, "g", 0.16, 18)
+    land = _pluck(_BRAND_STING_LAND, "c", 0.52, 7)
     result = subprocess.run(
         [
             ffmpeg,
             "-y",
-            "-f",
-            "lavfi",
-            "-i",
-            "anullsrc=r=44100:cl=stereo:d=0.1",
             "-filter_complex",
             (
-                f"{first};{second};"
-                "[i][iv]acrossfade=d=0.10:c1=tri:c2=tri,"
+                f"{pickup};{land};"
+                "[g][c]acrossfade=d=0.04:c1=tri:c2=tri,"
                 "aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo,"
-                "volume=0.55,alimiter=limit=0.89[a]"
+                "volume=4.2,alimiter=limit=0.89[a]"
             ),
             "-map",
             "[a]",
@@ -118,10 +110,38 @@ def bake_brand_sting(dest: Path | None = None) -> Path:
 
 
 def ensure_brand_sting() -> Path:
-    """Return the shared sting. Bake it once if the asset is missing."""
-    if BRAND_STING_ASSET.exists() and BRAND_STING_ASSET.stat().st_size > 800:
-        return BRAND_STING_ASSET
+    """Bake the current ident. Do not keep a stale cached pad."""
     return bake_brand_sting(BRAND_STING_ASSET)
+
+
+def _trim_leading_silence(path: Path, threshold_db: float = -38.0) -> Path:
+    """Drop TTS preroll so the first word sits on the picture."""
+    ffmpeg = shutil.which("ffmpeg")
+    if not ffmpeg:
+        return path
+    trimmed = path.with_name(path.stem + "-trim" + path.suffix)
+    result = subprocess.run(
+        [
+            ffmpeg,
+            "-y",
+            "-i",
+            str(path),
+            "-af",
+            f"silenceremove=start_periods=1:start_threshold={threshold_db}dB:start_silence=0.04:detection=peak",
+            str(trimmed),
+        ],
+        capture_output=True,
+        text=True,
+    )
+    if (
+        result is None
+        or getattr(result, "returncode", 1)
+        or not trimmed.exists()
+        or trimmed.stat().st_size < 400
+    ):
+        return path
+    trimmed.replace(path)
+    return path
 
 
 def resolve_voice(name: str | None) -> str:
@@ -248,13 +268,15 @@ def build_short_soundtrack(parts: ScriptParts, dest: Path, voice: str | None = N
     work = Path("/tmp/twodown-beats") / dest.stem
     work.mkdir(parents=True, exist_ok=True)
     clips = {
-        "intro": synthesise(
-            parts.intro_speech,
-            work / "intro.mp3",
-            INTRO_VOICE_ALIAS,
-            rate=INTRO_RATE,
-            pitch=INTRO_PITCH,
-            volume=INTRO_VOLUME,
+        "intro": _trim_leading_silence(
+            synthesise(
+                parts.intro_speech,
+                work / "intro.mp3",
+                INTRO_VOICE_ALIAS,
+                rate=INTRO_RATE,
+                pitch=INTRO_PITCH,
+                volume=INTRO_VOLUME,
+            )
         ),
         "clue": synthesise(
             parts.clue_speech, work / "clue.mp3", voice, rate=CLUE_RATE, pitch=CLUE_PITCH
