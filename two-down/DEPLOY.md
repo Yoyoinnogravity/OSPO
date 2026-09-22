@@ -44,13 +44,21 @@ twodown youtube-auth --finish 'http://localhost/?code=…'
 
 ### 2. GitHub repo secret
 
-Repo **Settings → Secrets and variables → Actions → New repository secret**
+**Manual:** Repo **Settings → Secrets and variables → Actions → New repository secret**
 
 | Name | Value |
 |------|--------|
 | `TWODOWN_YOUTUBE_TOKEN` | Full contents of `~/.config/twodown/youtube-token.json` |
 
-Do not commit that file. The JSON must include `refresh_token`.
+**Macro (one command on your laptop):** after `gh auth login` and `twodown youtube-auth`:
+
+```bash
+./two-down/scripts/bootstrap-github-youtube.sh Yoyoinnogravity/OSPO 50
+```
+
+That runs `gh secret set` and optionally merges the deploy PR. GitHub blocks cloud agents from setting secrets (403) — this script uses **your** `gh` login instead of clicking Settings.
+
+Do not commit `youtube-token.json`. The JSON must include `refresh_token`.
 
 ### 3. GitHub Pages
 
