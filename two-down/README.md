@@ -114,9 +114,12 @@ Yes — pay Cursor to run this every morning.
    around $40 (Cloud Agents and Automations bill from this after included usage).
 5. Create the daily job at [cursor.com/automations](https://cursor.com/automations)
    using the prompt in `two-down/AGENTS.md`.
-   Pick **Claude**. Do not pick Grok.
+   Pick **Claude**. That job **generates and uploads** every morning.
+   Do not pick Grok for generation or for upload.
 
 That is the only thing you pay Cursor for. GitHub Pages and YouTube upload are free.
+
+**Prototype (no Cursor required):** see [`two-down/DEPLOY.md`](DEPLOY.md) for GitHub Actions daily cut + upload + Pages.
 
 **Go live on cryptic.fit**
 

@@ -32,12 +32,8 @@ function applyVoice(alias) {
     audio.addEventListener("loadedmetadata", resume, { once: true });
     const video = article.querySelector("video");
     if (!video) return;
-    if (alias === "sonia") {
-      video.muted = false;
-      return;
-    }
-    video.muted = true;
-    audio.addEventListener("error", () => { video.muted = false; }, { once: true });
+    // The Short already mixes Ryan, Sonia and Thomas. Never mute it.
+    video.muted = false;
   });
 }
 
@@ -117,24 +113,9 @@ document.querySelectorAll("article.clue").forEach((article) => {
   const video = article.querySelector("video");
   const audio = article.querySelector("audio.parse-voice");
   if (!video || !audio) return;
-  const otherVoice = () => currentVoice() !== "sonia";
-  audio.addEventListener("error", () => { video.muted = false; });
   video.addEventListener("play", () => {
-    if (!otherVoice()) {
-      video.muted = false;
-      audio.pause();
-      return;
-    }
-    video.muted = true;
-    audio.currentTime = video.currentTime;
-    const attempt = audio.play();
-    if (attempt && attempt.catch) {
-      attempt.catch(() => { video.muted = false; });
-    }
-  });
-  video.addEventListener("pause", () => audio.pause());
-  video.addEventListener("seeked", () => {
-    audio.currentTime = video.currentTime;
+    video.muted = false;
+    audio.pause();
   });
 });
 

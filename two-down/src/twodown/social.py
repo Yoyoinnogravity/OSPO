@@ -7,7 +7,7 @@ from twodown.config import CLUES_PER_DAY, DEFAULT_VOICE_ALIAS, SITE_ROOT
 from twodown.meta import facebook_ready, instagram_ready, upload_facebook, upload_instagram
 from twodown.models import DailyPair, SpokenClue
 from twodown.tiktok import tiktok_ready, upload_short as upload_tiktok
-from twodown.youtube import upload_pair as upload_youtube, youtube_ready
+from twodown.youtube import upload_pair as upload_youtube, youtube_hint, youtube_ready
 
 PLATFORMS = ("youtube", "tiktok", "instagram", "facebook")
 CURSOR_ENVIRONMENT = "https://cursor.com/dashboard/cloud-agents/environments"
@@ -24,7 +24,7 @@ def platform_status() -> dict[str, bool]:
 
 def setup_hints() -> dict[str, str]:
     return {
-        "youtube": "Set TWODOWN_YOUTUBE_TOKEN to an authorized YouTube OAuth token JSON for cryptic.fit.",
+        "youtube": youtube_hint(),
         "tiktok": "Set TWODOWN_TIKTOK_TOKEN to a TikTok user access token JSON with video.publish.",
         "instagram": "Set TWODOWN_META_TOKEN (access_token + ig_user_id) for the Instagram professional account.",
         "facebook": "Set TWODOWN_META_TOKEN (access_token + page_id) for the cryptic.fit Facebook Page.",
@@ -79,9 +79,15 @@ YOUTUBE  ->  TWODOWN_YOUTUBE_TOKEN
   (your channel → Switch account → Create a channel), name it
   cryptic.fit, then claim @crypticfit.
   1. OAuth desktop client at {GOOGLE_CONSOLE}, YouTube Data API v3 enabled.
-  2. Authorise the cryptic.fit channel for scope youtube.upload.
-  3. Secret value: the authorized-user JSON (token, refresh_token, token_uri,
-     client_id, client_secret, scopes).
+  2. Cloud Agent handoff (no Command Prompt scripts):
+       twodown youtube-auth --start
+     Open the URL, pick cryptic.fit, paste the http://localhost/?code=… line:
+       twodown youtube-auth --finish 'http://localhost/?code=…'
+  3. Laptop with a browser instead:
+       twodown youtube-auth
+  4. Secret value: the authorized-user JSON from ~/.config/twodown/youtube-token.json
+     (token, refresh_token, token_uri, client_id, client_secret, scopes).
+     Save it as TWODOWN_YOUTUBE_TOKEN on the Cloud Agent environment.
 
 Then a Cloud Agent runs:  twodown upload            (all four)
                           twodown upload --no-youtube  (TikTok + IG + FB only)

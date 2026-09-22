@@ -47,8 +47,8 @@ def clue_share_title(clue: Clue) -> str:
 def clue_description(clue: Clue) -> str:
     enum = f" ({clue.enumeration})" if clue.enumeration else ""
     return (
-        f"{clue.clue}{enum} — {clue.paper} {clue.puzzle_id} by {clue.setter}. "
-        "Have a go, then tap solve. Parse via Fifteen Squared."
+        f"{clue.paper} cryptic crossword by {clue.setter} — {clue.clue}{enum}. "
+        f"Daily {BRAND} Short from Fifteen Squared. Have a go, then tap solve."
     )
 
 
@@ -104,8 +104,40 @@ def article_ld(clue: Clue, *, canonical: str, published: str) -> dict:
         "author": {"@type": "Person", "name": clue.setter},
         "contributor": {"@type": "Person", "name": clue.blogger},
         "publisher": {"@type": "Organization", "name": BRAND, "url": f"{SITE_ORIGIN}/"},
-        "about": ["Cryptic crossword", clue.paper],
+        "about": [
+            "Cryptic crossword",
+            clue.paper,
+            f"{clue.paper} cryptic",
+            "Fifteen Squared",
+            "YouTube Shorts",
+        ],
+        "keywords": f"{clue.paper} cryptic crossword, {clue.setter}, {BRAND}, Fifteen Squared",
     }
+
+
+def video_ld(
+    clue: Clue,
+    *,
+    canonical: str,
+    published: str,
+    duration: str | None = None,
+) -> dict:
+    data = {
+        "@context": "https://schema.org",
+        "@type": "VideoObject",
+        "name": clue_share_title(clue),
+        "description": clue_description(clue),
+        "thumbnailUrl": f"{SITE_ORIGIN}/media/{clue.slug}-thumb.jpg",
+        "uploadDate": published,
+        "contentUrl": f"{SITE_ORIGIN}/media/{clue.slug}.mp4",
+        "embedUrl": canonical,
+        "inLanguage": "en-GB",
+        "isFamilyFriendly": True,
+        "publisher": {"@type": "Organization", "name": BRAND, "url": f"{SITE_ORIGIN}/"},
+    }
+    if duration:
+        data["duration"] = duration
+    return data
 
 
 @dataclass
@@ -117,6 +149,9 @@ class PageSeo:
     json_ld: dict | list | None = None
     published: str | None = None
     extra: list[str] = field(default_factory=list)
+    image: str | None = None
+    image_width: int = 1200
+    image_height: int = 630
 
     @property
     def canonical(self) -> str:

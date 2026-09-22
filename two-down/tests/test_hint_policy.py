@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from twodown.config import HINT_LINE, NO_PICTURE_LINE, PACKAGE_ROOT, PINUP_SLUG, STUDY_SLUG
-from twodown.hints import AIM, AUTHOR, CLOSE_ENOUGH, COLE, CRASH, DAVIS, FATS, MAKEUP, PAPERS, PHOTO, RASTA, SMILES, TRANCE, WELLINGTON, attach_hint, has_picture_clue, hint_for_clue, match_hint
+from twodown.hints import AIM, AUTHOR, CLOSE_ENOUGH, COLE, CRASH, DAVIS, DICTIONARY, FATS, MAKEUP, PAPERS, PHOTO, RASTA, SHELTER, SMILES, TRANCE, WELLINGTON, attach_hint, has_picture_clue, hint_for_clue, match_hint
 from twodown.models import Clue
 from twodown.script import write_parts
 from twodown.pipeline import aimlessly_clue, cole_clue, davis_cup_clue, dreamlike_clue, fats_clue, mass_media_clue, published_clue, rasta_clue, smiles_clue, study_clue, wellington_clue
@@ -177,6 +177,51 @@ def test_daily_definitions_match_picture_clues_at_80_percent():
     assert match_hint("make-up").closeness >= CLOSE_ENOUGH
     assert match_hint("a car crash").closeness >= CLOSE_ENOUGH
     assert match_hint("this author").closeness >= CLOSE_ENOUGH
+
+
+def test_ft_take_cover_and_oedipus_surface_clues_get_picture_hints():
+    take_cover = attach_hint(
+        Clue(
+            source_url="https://fifteensquared.net/2026/09/22/financial-times-18486-by-gozo/",
+            paper="Financial Times",
+            puzzle_id="18486",
+            setter="GOZO",
+            blogger="Cineraria",
+            number="1",
+            direction="across",
+            clue="Arrange insurance and head for shelter",
+            enumeration="4,5",
+            answer="TAKE COVER",
+            parse="TAKE + COVER",
+            device="charade",
+        )
+    )
+    assert take_cover.hint_line == HINT_LINE
+    assert take_cover.hint_image == f"assets/hints/{SHELTER.filename}"
+    assert has_picture_clue(take_cover)
+
+    oedipus = attach_hint(
+        Clue(
+            source_url="https://fifteensquared.net/2026/09/22/financial-times-18486-by-gozo/",
+            paper="Financial Times",
+            puzzle_id="18486",
+            setter="GOZO",
+            blogger="Cineraria",
+            number="9",
+            direction="across",
+            clue="Dictionary (American) includes one page on tragic figure",
+            enumeration="7",
+            answer="OEDIPUS",
+            parse="{ oed. Dictionary. Plus us. American.} around. Includes. { I. One. Plus P. Page.}. Tragic figure.",
+            device="container",
+        )
+    )
+    assert oedipus.hint_line == HINT_LINE
+    assert oedipus.hint_image == f"assets/hints/{DICTIONARY.filename}"
+    assert has_picture_clue(oedipus)
+    matched = match_hint(oedipus.clue)
+    assert matched.photo.slug == DICTIONARY.slug
+    assert matched.closeness >= CLOSE_ENOUGH
 
 
 def test_weak_match_says_no_picture_clue_today():
