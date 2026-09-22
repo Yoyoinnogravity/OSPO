@@ -119,6 +119,8 @@ Yes — pay Cursor to run this every morning.
 
 That is the only thing you pay Cursor for. GitHub Pages and YouTube upload are free.
 
+**Prototype (no Cursor required):** see [`two-down/DEPLOY.md`](DEPLOY.md) for GitHub Actions daily cut + upload + Pages.
+
 **Go live on cryptic.fit**
 
 Aled owns **cryptic.fit**. The brand is cryptic.fit on the site and YouTube.
