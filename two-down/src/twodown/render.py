@@ -901,27 +901,30 @@ def ensure_intro_kaleidoscope() -> Path:
 
 
 def render_intro_kaleidoscope(clue: Clue | None, dest: Path, duration: float) -> Path:
-    """Fit the signed-off book-to-glass open into Ryan's window. Sonia starts after the cut."""
+    """Play the signed-off book-to-glass open in Ryan's window. Do not speed a 15s bake."""
     del clue
     dest = Path(dest).with_suffix(".mp4")
     dest.parent.mkdir(parents=True, exist_ok=True)
-    source = ensure_intro_kaleidoscope()
     hold = max(0.4, duration)
-    pace = hold / INTRO_KALEIDOSCOPE_HOLD
+    fps = INTRO_KALEIDOSCOPE_FPS
+    count = max(8, int(round(hold * fps)))
     ffmpeg = shutil.which("ffmpeg")
     if not ffmpeg:
         raise RuntimeError("ffmpeg is required to build the Short")
+    frames = dest.parent / f"{dest.stem}-frames"
+    frames.mkdir(parents=True, exist_ok=True)
+    for i in range(count):
+        progress = i / max(count - 1, 1)
+        _compose_intro_frame(progress).save(frames / f"{i:04d}.jpg", "JPEG", quality=86)
     result = subprocess.run(
         [
             ffmpeg,
             "-y",
+            "-framerate",
+            str(fps),
             "-i",
-            str(source),
+            str(frames / "%04d.jpg"),
             "-an",
-            "-filter:v",
-            f"setpts={pace:.4f}*PTS",
-            "-t",
-            f"{hold:.2f}",
             "-c:v",
             "libx264",
             "-pix_fmt",
@@ -930,11 +933,14 @@ def render_intro_kaleidoscope(clue: Clue | None, dest: Path, duration: float) ->
             "veryfast",
             "-crf",
             "20",
+            "-t",
+            f"{hold:.2f}",
             str(dest),
         ],
         capture_output=True,
         text=True,
     )
+    shutil.rmtree(frames, ignore_errors=True)
     if result.returncode:
         raise RuntimeError(result.stderr[-800:])
     return dest

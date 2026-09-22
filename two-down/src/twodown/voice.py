@@ -405,3 +405,81 @@ def build_short_soundtrack(parts: ScriptParts, dest: Path, voice: str | None = N
         source=source_d + OUTRO_GAP_SECONDS,
         outro=outro_d + sting_d + 0.35,
     )
+
+
+def build_intro_soundtrack(parts: ScriptParts, dest: Path, voice: str | None = None) -> ShortTimings:
+    """Ident, Ryan over the book, then Sonia's first words on the cut."""
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    work = Path("/tmp/twodown-beats") / f"{dest.stem}-intro"
+    work.mkdir(parents=True, exist_ok=True)
+    ryan = _trim_leading_silence(
+        synthesise(
+            parts.intro_speech,
+            work / "intro.mp3",
+            INTRO_VOICE_ALIAS,
+            rate=INTRO_RATE,
+            pitch=INTRO_PITCH,
+            volume=INTRO_VOLUME,
+        )
+    )
+    sonia = _trim_leading_silence(
+        synthesise(
+            parts.clue_speech,
+            work / "clue.mp3",
+            voice,
+            rate=CLUE_RATE,
+            pitch=CLUE_PITCH,
+        )
+    )
+    sting = ensure_brand_sting()
+    sting_d = audio_seconds(sting)
+    intro_d = audio_seconds(ryan)
+    clue_d = audio_seconds(sonia)
+    ffmpeg = shutil.which("ffmpeg")
+    if not ffmpeg:
+        raise RuntimeError("ffmpeg is required to build the intro soundtrack")
+    cmd = [
+        ffmpeg,
+        "-y",
+        "-i",
+        str(sting),
+        "-i",
+        str(ryan),
+        "-i",
+        str(sonia),
+        "-filter_complex",
+        (
+            "[0:a]aformat=sample_rates=24000:channel_layouts=mono[s0];"
+            "[1:a]aformat=sample_rates=24000:channel_layouts=mono[c0];"
+            "[2:a]aformat=sample_rates=24000:channel_layouts=mono[c1];"
+            f"anullsrc=r=24000:cl=mono:d={INTRO_LOOK_BEFORE_SECONDS:.2f}[look];"
+            f"anullsrc=r=24000:cl=mono:d={INTRO_GAP_SECONDS:.2f}[g0];"
+            "[s0][look][c0][g0][c1]concat=n=5:v=0:a=1[raw];"
+            f"[raw]aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo,{AUDIO_LOUDNESS}[a]"
+        ),
+        "-map",
+        "[a]",
+        "-c:a",
+        "mp3",
+        "-b:a",
+        "192k",
+        "-ar",
+        "44100",
+        "-ac",
+        "2",
+        str(dest),
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode:
+        raise RuntimeError(result.stderr[-800:])
+    return ShortTimings(
+        intro=sting_d + INTRO_LOOK_BEFORE_SECONDS + intro_d + INTRO_GAP_SECONDS,
+        clue=clue_d,
+        letters=0.0,
+        think=0.0,
+        hint=0.0,
+        answer=0.0,
+        parse=0.0,
+        source=0.0,
+        outro=0.0,
+    )

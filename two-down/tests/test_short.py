@@ -162,6 +162,33 @@ def test_soundtrack_speaks_source_credit_as_thomas(monkeypatch, tmp_path):
     assert seen["outro"] == INTRO_VOICE_ALIAS
 
 
+def test_intro_soundtrack_is_sting_then_ryan_then_sonia(monkeypatch, tmp_path):
+    from twodown import voice as voice_mod
+
+    seen: dict[str, str | None] = {}
+
+    def fake_synth(script, dest, voice=None, **_kwargs):
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(b"xx")
+        seen[dest.stem] = voice
+        return dest
+
+    monkeypatch.setattr(voice_mod, "synthesise", fake_synth)
+    monkeypatch.setattr(voice_mod, "audio_seconds", lambda path: 0.6 if "sting" in str(path) else 2.0)
+    monkeypatch.setattr(voice_mod, "ensure_brand_sting", lambda: tmp_path / "brand-sting.mp3")
+    (tmp_path / "brand-sting.mp3").write_bytes(b"xx")
+    monkeypatch.setattr(voice_mod.shutil, "which", lambda _name: "/usr/bin/ffmpeg")
+    monkeypatch.setattr(voice_mod.subprocess, "run", lambda *_args, **_kwargs: type("R", (), {"returncode": 0, "stderr": ""})())
+
+    parts = write_parts(study_clue(STUDY_SLUG))
+    timings = voice_mod.build_intro_soundtrack(parts, tmp_path / "open.mp3", DEFAULT_VOICE_ALIAS)
+    assert seen["intro"] == INTRO_VOICE_ALIAS
+    assert seen["clue"] == DEFAULT_VOICE_ALIAS
+    assert timings.intro == 0.6 + INTRO_LOOK_BEFORE_SECONDS + 2.0 + INTRO_GAP_SECONDS
+    assert timings.clue == 2.0
+    assert INTRO_LOOK_BEFORE_SECONDS <= 0.2
+
+
 def test_brand_sting_is_one_shared_pair():
     from twodown.voice import BRAND_STING_ASSET, ensure_brand_sting
     from twodown.render import audio_seconds

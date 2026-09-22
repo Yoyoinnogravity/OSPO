@@ -22,13 +22,26 @@ from twodown.hints import attach_hint
 from twodown.ingest import LONDON, fetch_daily_posts, posts_for_london_date
 from twodown.models import Clue, DailyPair, SpokenClue
 from twodown.parse import parse_post
-from twodown.render import draw_beat, draw_clue_card, draw_reveal_card, render_video, write_spoiler_free_stills
+from twodown.render import (
+    _encode_clips,
+    draw_beat,
+    draw_clue_card,
+    draw_reveal_card,
+    render_intro_kaleidoscope,
+    render_video,
+    write_spoiler_free_stills,
+)
 from twodown.scenes import pick_scenes
 from twodown.script import write_parts
 from twodown.select import select_pair
 from twodown.site import publish_site
 from twodown.social import publish_pair, setup_hints
-from twodown.voice import build_short_soundtrack, resolve_voice, synthesise_parts
+from twodown.voice import (
+    build_intro_soundtrack,
+    build_short_soundtrack,
+    resolve_voice,
+    synthesise_parts,
+)
 
 _KICKER = re.compile(
     r"^(?P<paper>.+) (?P<puzzle_id>\d+) · (?P<setter>.+) · "
@@ -474,6 +487,40 @@ def render_one_short(
         copy2(poster, media / f"{clue.slug}-poster.jpg")
         for alias, path in paths.items():
             copy2(path, media / f"{clue.slug}-{alias}.mp3")
+    return item
+
+
+def render_intro_open(
+    slug: str = STUDY_SLUG,
+    dest: Path | None = None,
+    clue: Clue | None = None,
+) -> SpokenClue:
+    """Ident + Ryan over the book + Sonia's first words on the cut. Hearable review."""
+    clue = resolve_clue(slug, clue=clue)
+    slot = Path(dest or DEFAULT_OUTPUT) / "intro"
+    slot.mkdir(parents=True, exist_ok=True)
+    parts = write_parts(clue)
+    (slot / "script.txt").write_text(
+        f"{parts.intro_speech}\n{parts.clue_speech}\n",
+        encoding="utf-8",
+    )
+    timings = build_intro_soundtrack(parts, slot / "intro.mp3", DEFAULT_VOICE_ALIAS)
+    picture = render_intro_kaleidoscope(clue, slot / "intro-picture.mp4", timings.intro)
+    card = draw_beat(clue, slot / "clue.png", "clue")
+    movie = _encode_clips(
+        [(picture, timings.intro), (card, timings.clue)],
+        slot / "intro.mp3",
+        slot / "intro.mp4",
+    )
+    item = SpokenClue(
+        clue=clue,
+        script=f"{parts.intro_speech}\n{parts.clue_speech}",
+        voice=resolve_voice(DEFAULT_VOICE_ALIAS),
+        audio_path=str(slot / "intro.mp3"),
+        video_path=str(movie),
+        clue_card_path=str(card),
+        clue_hold_seconds=timings.intro,
+    )
     return item
 
 

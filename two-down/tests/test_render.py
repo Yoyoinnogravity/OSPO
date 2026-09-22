@@ -294,6 +294,8 @@ def test_intro_kaleidoscope_renders_an_animated_open(tmp_path: Path):
     frames = _probe(path, "stream=nb_frames")
     assert int(frames.splitlines()[0]) >= 8
     assert _probe(path, "stream=width,height").splitlines()[0] == "1080"
+    duration = float(_probe(path, "format=duration"))
+    assert 0.5 <= duration <= 0.85
 
 
 def test_hint_beat_is_newsprint_with_credited_photo(tmp_path: Path):

@@ -18,7 +18,7 @@ from twodown.live import (
     registry_status,
 )
 from twodown.models import DailyPair
-from twodown.pipeline import render_one_short, run_today
+from twodown.pipeline import render_intro_open, render_one_short, run_today
 from twodown.scenes import DEFAULT_SCENE, list_scenes
 from twodown.social import (
     PLATFORMS,
@@ -162,6 +162,15 @@ def main(argv: list[str] | None = None) -> int:
     short.add_argument("--all-voices", action="store_true", help="Speak all four voices. Default: Libby only.")
     short.add_argument("--no-site", action="store_true", help="Write the film under --out only")
 
+    intro = sub.add_parser("intro", help="Render the audible open: ident, Ryan, then Sonia on the cut")
+    intro.add_argument(
+        "slug",
+        nargs="?",
+        default=STUDY_SLUG,
+        help=f"Study or published clue slug (default: {STUDY_SLUG})",
+    )
+    intro.add_argument("--out", type=Path, default=DEFAULT_OUTPUT)
+
     voices = sub.add_parser("voices", help="List built-in British voices")
     voices.add_argument("--json", action="store_true")
 
@@ -263,6 +272,17 @@ def main(argv: list[str] | None = None) -> int:
         print(f"{clue.paper} {clue.puzzle_id} · {clue.setter} · {clue.number} {clue.direction}")
         print(f"{clue.clue} ({clue.enumeration})")
         print(item.script)
+        if item.video_path:
+            print(f"video {item.video_path}")
+        return 0
+
+    if args.cmd == "intro":
+        item = render_intro_open(args.slug, dest=args.out)
+        clue = item.clue
+        print(f"intro {clue.slug}")
+        print(item.script)
+        if item.audio_path:
+            print(f"audio {item.audio_path}")
         if item.video_path:
             print(f"video {item.video_path}")
         return 0
