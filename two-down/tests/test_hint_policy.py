@@ -1,8 +1,9 @@
 from pathlib import Path
 
-from twodown.config import HINT_LINE, PACKAGE_ROOT, PINUP_SLUG, STUDY_SLUG
-from twodown.hints import AIM, AUTHOR, CLOSE_ENOUGH, COLE, CRASH, DAVIS, FATS, MAKEUP, PAPERS, PHOTO, RASTA, SMILES, TRANCE, WELLINGTON, attach_hint, match_hint
+from twodown.config import HINT_LINE, NO_PICTURE_LINE, PACKAGE_ROOT, PINUP_SLUG, STUDY_SLUG
+from twodown.hints import AIM, AUTHOR, CLOSE_ENOUGH, COLE, CRASH, DAVIS, FATS, MAKEUP, PAPERS, PHOTO, RASTA, SMILES, TRANCE, WELLINGTON, attach_hint, has_picture_clue, hint_for_clue, match_hint
 from twodown.models import Clue
+from twodown.script import write_parts
 from twodown.pipeline import aimlessly_clue, cole_clue, davis_cup_clue, dreamlike_clue, fats_clue, mass_media_clue, published_clue, rasta_clue, smiles_clue, study_clue, wellington_clue
 
 
@@ -176,6 +177,39 @@ def test_daily_definitions_match_picture_clues_at_80_percent():
     assert match_hint("make-up").closeness >= CLOSE_ENOUGH
     assert match_hint("a car crash").closeness >= CLOSE_ENOUGH
     assert match_hint("this author").closeness >= CLOSE_ENOUGH
+
+
+def test_weak_match_says_no_picture_clue_today():
+    attached = attach_hint(
+        Clue(
+            source_url="https://fifteensquared.net/example/",
+            paper="Guardian",
+            puzzle_id="30117",
+            setter="Paul",
+            blogger="Andrew",
+            number="6",
+            direction="down",
+            clue="Craft that may be inflated",
+            enumeration="4",
+            answer="RAFT",
+            definition="inflatable craft",
+            parse="hidden",
+        )
+    )
+    assert attached.hint_line == NO_PICTURE_LINE
+    assert attached.hint_line == "No picture clue today."
+    assert attached.hint_image is None
+    assert attached.hint_credit is None
+    assert hint_for_clue(attached) is None
+    assert not has_picture_clue(attached)
+    leftover = match_hint("inflatable craft")
+    assert leftover.close_enough is False
+    assert leftover.line == NO_PICTURE_LINE
+    parts = write_parts(attached)
+    assert parts.hint_speech == NO_PICTURE_LINE
+    assert parts.has_picture is False
+    assert "[pause 4s]" not in parts.full
+    assert "[pause 2.5s]" in parts.full
 
 
 def test_no_cloud_vision_pipeline():

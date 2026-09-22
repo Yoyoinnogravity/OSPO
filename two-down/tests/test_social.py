@@ -165,3 +165,15 @@ def test_publish_pair_keeps_going_if_tiktok_fails(tmp_path, monkeypatch):
     assert any(str(v).startswith("error:") for v in notes["tiktok"])
     assert notes["instagram"] == ["ig_ok"]
     assert notes["facebook"] == ["fb_ok"]
+
+
+def test_spoken_from_slug_points_at_site_video():
+    from twodown.social import spoken_from_slug
+
+    item = spoken_from_slug("guardian-30113-9a")
+    assert item.clue.answer == "SELF"
+    assert item.video_path
+    assert Path(item.video_path).name == "guardian-30113-9a.mp4"
+    assert Path(item.video_path).is_file()
+    assert item.thumbnail_path
+    assert Path(item.thumbnail_path).is_file()

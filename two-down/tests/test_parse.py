@@ -73,7 +73,7 @@ def test_script_credits_fifteen_squared():
     assert "Phi" in script
     assert "cryptic.fit" in script
     parts = write_parts(clue)
-    assert parts.intro_speech == "Right — here's your daily dose of cryptic fun."
+    assert parts.intro_speech == "Hello, here is your daily dose of AI cryptic crossword."
     assert parts.clue_speech == f"{clue.clue}."
     assert "The clue:" not in parts.clue_speech
     assert "(" not in parts.clue_speech
@@ -101,8 +101,10 @@ def test_script_credits_fifteen_squared():
     assert script.index(parts.source_speech) < script.index(parts.outro_speech)
     ssml = to_ssml(parts)
     assert ssml.index(parts.intro_speech) < ssml.index(parts.clue_speech)
-    assert ssml.index(parts.clue_speech) < ssml.index('break time="350ms"')
-    assert ssml.index('break time="350ms"') < ssml.index(parts.letters_speech)
+    handoff = ssml.index('break time="350ms"')
+    assert ssml.index(parts.intro_speech) < handoff < ssml.index(parts.clue_speech)
+    letters_gap = ssml.index('break time="350ms"', handoff + 1)
+    assert ssml.index(parts.clue_speech) < letters_gap < ssml.index(parts.letters_speech)
     assert ssml.index(parts.letters_speech) < ssml.index('break time="1000ms"')
     assert ssml.index('break time="1000ms"') < ssml.index(parts.think_speech)
     assert ssml.index(parts.think_speech) < ssml.index('break time="7000ms"')

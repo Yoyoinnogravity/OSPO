@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import math
 import re
 import shutil
 import subprocess
@@ -9,7 +8,7 @@ from pathlib import Path
 
 from functools import lru_cache
 
-from PIL import Image, ImageDraw, ImageFilter, ImageFont
+from PIL import Image, ImageDraw, ImageEnhance, ImageFont
 
 from dataclasses import dataclass
 
@@ -56,18 +55,115 @@ PARSE_SPACING = 20
 # Map speech into the Short and make it unmistakable (widgets often play quiet).
 AUDIO_LOUDNESS = "loudnorm=I=-16:TP=-1.5:LRA=11,volume=3,alimiter=limit=0.95"
 INTRO_KALEIDOSCOPE_FPS = 24
-INTRO_KALEIDOSCOPE_FOLDS = 6
-INTRO_KALEIDOSCOPE_SIZE = 720
 # One stock open for every film. Dictionary of "cryptic", not a per-clue graphic.
 INTRO_KALEIDOSCOPE_WORDS = ("CRYPTIC",)
 INTRO_DICTIONARY_HEADWORD = "cryptic"
 INTRO_DICTIONARY_PRONUNCIATION = "/KRIP-tik/"
 INTRO_DICTIONARY_POS = "adjective"
-INTRO_DICTIONARY_SENSES = (
-    "mysterious or obscure in meaning",
-    "of a crossword: clues that use wordplay",
+INTRO_DICTIONARY_SYNONYMS = (
+    "enigmatic",
+    "mysterious",
+    "confusing",
+    "mystifying",
+    "perplexing",
 )
-INTRO_KALEIDOSCOPE_HOLD = 4.0
+INTRO_DICTIONARY_SOURCE = "Webster 1913"
+INTRO_DICTIONARY_GUIDE = ("cry", "crystal")
+# Aled's photographed opening — tight on crypt / cryptic / cryptogram.
+INTRO_DICTIONARY_PHOTO = PACKAGE_ROOT / "assets" / "intro-dictionary-page.jpg"
+INTRO_DICTIONARY_BOOK = PACKAGE_ROOT / "assets" / "intro-dictionary-book.jpg"
+# Overhead plate is a portrait still of a landscape book; rotate 90° left
+# so the pages read upright, trim the lamp, then push in on the cry- leaf.
+# Coordinates are on the trimmed plate (top band with the switch removed).
+INTRO_BOOK_START = (160, 0, 700, 792)
+INTRO_BOOK_END = (710, 8, 1050, 580)
+INTRO_BOOK_TRIM_TOP = 168
+# New close plate is landscape after a 90° left turn. Tight on the cry- column.
+INTRO_DICTIONARY_CROP = (640, 0, 1180, 960)
+INTRO_DICTIONARY_SOURCE_FOCUS = (820, 180)
+INTRO_DICTIONARY_SOURCE_CRYPTOGRAM = (820, 560)
+INTRO_DICTIONARY_SOURCE_GLANCE = (830, 610)
+INTRO_THESAURUS_SOURCE = "Roget 1911"
+INTRO_THESAURUS_HEADING = "§ 526  Concealment"
+INTRO_THESAURUS_WORDS = (
+    "hidden",
+    "occult",
+    "secret",
+    "enigmatic",
+    "cryptic",
+    "recondite",
+    "mysterious",
+    "enigmatical",
+    "latent",
+    "under cover",
+    "in petto",
+)
+
+
+@dataclass(frozen=True)
+class DictionaryEntry:
+    """One headword on the stock dictionary open. Public-domain Webster, plus one modern sense."""
+
+    headword: str
+    pos: str
+    senses: tuple[str, ...]
+    featured: bool = False
+
+
+# Webster's Unabridged 1913 (public domain) around CRYPTIC, so the page has
+# real neighbours. The crossword sense is the living usage, from Wiktionary.
+INTRO_DICTIONARY_ENTRIES: tuple[DictionaryEntry, ...] = (
+    DictionaryEntry("Cry", "v. i.", ("To utter a loud call; to shout; to weep.",)),
+    DictionaryEntry("Crying", "a.", ("Calling for notice; notorious; compelling attention.",)),
+    DictionaryEntry("Cryolite", "n.", ("A fluoride of sodium and aluminium, found in Greenland.",)),
+    DictionaryEntry(
+        "Crypt",
+        "n.",
+        (
+            "A vault wholly or partly under ground; especially, a vault under a church, used for burial purposes.",
+            "(Anat.) A simple gland, glandular cavity, or tube; a follicle.",
+        ),
+    ),
+    DictionaryEntry(
+        "Cryptic, Cryptical",
+        "a.",
+        (
+            "Having a meaning that is mysterious or obscure.",
+            "(Of a crossword) having difficult clues which indicate the solutions indirectly.",
+        ),
+        featured=True,
+    ),
+    DictionaryEntry("Cryptically", "adv.", ("Secretly; occultly.",)),
+    DictionaryEntry("Cryptogam", "n.", ("A plant of the Cryptogamia; a flowerless plant, as a fern or moss.",)),
+    DictionaryEntry(
+        "Cryptogamia",
+        "n. pl.",
+        ("The series or division of flowerless plants, or those never having true stamens and pistils, but propagated by spores.",),
+    ),
+    DictionaryEntry("Cryptogram", "n.", ("A cipher writing; a communication in secret characters.",)),
+    DictionaryEntry("Cryptograph", "n.", ("Cipher; something written in cipher; a system of secret writing.",)),
+    DictionaryEntry(
+        "Cryptography",
+        "n.",
+        ("The act or art of writing in secret characters; also, secret characters, or cipher.",),
+    ),
+    DictionaryEntry("Cryptology", "n.", ("Secret or enigmatical language.",)),
+    DictionaryEntry(
+        "Crystal",
+        "n.",
+        (
+            "The regular form which a substance tends to assume in solidifying.",
+            "A fine kind of glass, used for vessels or for covering a watch dial.",
+        ),
+    ),
+    DictionaryEntry("Crystalline", "a.", ("Consisting of, or like, crystal; clear; transparent; pellucid.",)),
+    DictionaryEntry("Crystallize", "v.", ("To cause to form crystals, or to assume a crystalline form.",)),
+    DictionaryEntry("Cub", "n.", ("A young animal, especially the young of the bear.",)),
+    DictionaryEntry("Cube", "n.", ("A regular solid body, with six equal square sides.",)),
+    DictionaryEntry("Cubic", "a.", ("Having the form or properties of a cube.",)),
+)
+INTRO_DICTIONARY_SENSES = next(entry.senses for entry in INTRO_DICTIONARY_ENTRIES if entry.featured)
+INTRO_KALEIDOSCOPE_HOLD = 15.0
 INTRO_KALEIDOSCOPE_ASSET = PACKAGE_ROOT / "assets" / "intro-kaleidoscope.mp4"
 INTRO_KALEIDOSCOPE_STILL = PACKAGE_ROOT / "assets" / "intro-kaleidoscope.jpg"
 FONT_ITALIC = "/usr/share/fonts/truetype/liberation/LiberationSerif-Italic.ttf"
@@ -262,6 +358,8 @@ def _draw_hint_photo(
 ) -> int:
     """Inset a credited hint still. Never a full-bleed travel photo."""
     matched = hint_for_clue(clue)
+    if matched is None:
+        return y
     photo = Image.open(ensure_hint_photo(matched)).convert("RGB")
     frame_w, frame_h = 900, 560
     left = (WIDTH - frame_w) // 2
@@ -296,104 +394,346 @@ def _circle_mask(size: int, inset: int = 2) -> Image.Image:
     return mask
 
 
-def _sector_mask(size: int, folds: int = INTRO_KALEIDOSCOPE_FOLDS) -> Image.Image:
-    mask = Image.new("L", (size, size), 0)
-    draw = ImageDraw.Draw(mask)
-    cx = cy = size / 2
-    span = 360.0 / folds
-    radius = size
-    points = [(cx, cy)]
-    for i in range(33):
-        angle = math.radians(-span / 2 + span * i / 32)
-        points.append((cx + radius * math.cos(angle), cy + radius * math.sin(angle)))
-    draw.polygon(points, fill=255)
-    return mask
+def _entry_block_height(
+    draw: ImageDraw.ImageDraw,
+    entry: DictionaryEntry,
+    col_w: int,
+    head_font: ImageFont.FreeTypeFont,
+    body_font: ImageFont.FreeTypeFont,
+    pos_font: ImageFont.FreeTypeFont | None = None,
+) -> int:
+    pad = 6 if entry.featured else 2
+    gap = 14 if entry.featured else 10
+    height = pad + head_font.size + 8
+    if entry.featured:
+        height += (pos_font.size if pos_font is not None else 20) + 8
+    for i, sense in enumerate(entry.senses, start=1):
+        wrapped = _wrap(draw, f"{i}.  {sense}", body_font, col_w - 8)
+        height += (wrapped.count("\n") + 1) * (body_font.size + 6) + 4
+    if entry.featured and INTRO_DICTIONARY_SYNONYMS:
+        height += _synonym_pills_height(draw, col_w - 8)
+    return height + gap
 
 
-def _kaleidoscope_tile(field: Image.Image, angle: float, folds: int = INTRO_KALEIDOSCOPE_FOLDS) -> Image.Image:
-    size = field.size[0]
-    rotated = field.rotate(angle, resample=Image.Resampling.BILINEAR)
-    blank = Image.new("RGB", field.size, NEWS_BG)
-    mask = _sector_mask(size, folds)
-    wedge = Image.composite(rotated, blank, mask)
-    mirrored = Image.composite(rotated.transpose(Image.Transpose.FLIP_TOP_BOTTOM), blank, mask)
-    out = Image.new("RGB", field.size, NEWS_BG)
-    step = 360.0 / folds
-    for i in range(folds):
-        piece = wedge if i % 2 == 0 else mirrored
-        spun = piece.rotate(-i * step, resample=Image.Resampling.BILINEAR)
-        spun_mask = mask.rotate(-i * step, resample=Image.Resampling.NEAREST)
-        out = Image.composite(spun, out, spun_mask)
+def _draw_dictionary_entry(
+    draw: ImageDraw.ImageDraw,
+    entry: DictionaryEntry,
+    x: int,
+    y: int,
+    col_w: int,
+    head_font: ImageFont.FreeTypeFont,
+    pos_font: ImageFont.FreeTypeFont,
+    body_font: ImageFont.FreeTypeFont,
+) -> tuple[int, tuple[int, int] | None]:
+    """Typeset one column entry. Returns the y under it, plus enigmatic if featured."""
+    cursor = y + (6 if entry.featured else 2)
+    head = entry.headword
+    draw.text((x, cursor), head, font=head_font, fill=INK)
+    enigmatic: tuple[int, int] | None = None
+    if entry.featured:
+        cursor += head_font.size + 2
+        draw.text(
+            (x, cursor),
+            f"{INTRO_DICTIONARY_PRONUNCIATION}   {entry.pos}",
+            font=pos_font,
+            fill=MUTED,
+        )
+        cursor += pos_font.size + 8
+    else:
+        head_w = draw.textlength(head, font=head_font)
+        draw.text((x + head_w, cursor + 4), f"  {entry.pos}", font=pos_font, fill=MUTED)
+        cursor += head_font.size + 8
+    for i, sense in enumerate(entry.senses, start=1):
+        wrapped = _wrap(draw, f"{i}.  {sense}", body_font, col_w - 8)
+        draw.multiline_text((x, cursor), wrapped, font=body_font, fill=INK, spacing=4)
+        cursor += (wrapped.count("\n") + 1) * (body_font.size + 6) + 4
+    if entry.featured and INTRO_DICTIONARY_SYNONYMS:
+        cursor, enigmatic = _draw_synonym_pills(draw, x, cursor, col_w - 8)
+    return cursor + (14 if entry.featured else 10), enigmatic
+
+
+def _synonym_pill_font() -> ImageFont.FreeTypeFont:
+    return _font(FONT_SANS, 20)
+
+
+def _synonym_pills_height(draw: ImageDraw.ImageDraw, width: int) -> int:
+    """Space for the living-sense synonym chips under cryptic."""
+    font = _synonym_pill_font()
+    x = 0
+    rows = 1
+    pad_x, gap, pill_h = 16, 10, 36
+    for word in INTRO_DICTIONARY_SYNONYMS:
+        w = int(draw.textlength(word, font=font)) + pad_x * 2
+        if x and x + w > width:
+            rows += 1
+            x = 0
+        x += w + gap
+    return 28 + rows * (pill_h + 8)
+
+
+def _draw_synonym_pills(
+    draw: ImageDraw.ImageDraw, x: int, y: int, width: int
+) -> tuple[int, tuple[int, int]]:
+    """Oxford-style synonym chips. Returns (next y, centre of enigmatic)."""
+    font = _synonym_pill_font()
+    label = _font(FONT_SANS, 16)
+    draw.text((x, y), "synonyms", font=label, fill=MUTED)
+    cursor_y = y + 22
+    cursor_x = x
+    pad_x, gap, pill_h = 16, 10, 36
+    enigmatic = (x + 80, cursor_y + pill_h // 2)
+    for word in INTRO_DICTIONARY_SYNONYMS:
+        w = int(draw.textlength(word, font=font)) + pad_x * 2
+        if cursor_x > x and cursor_x + w > x + width:
+            cursor_x = x
+            cursor_y += pill_h + 8
+        box = (cursor_x, cursor_y, cursor_x + w, cursor_y + pill_h)
+        featured = word == "enigmatic"
+        draw.rounded_rectangle(
+            box,
+            radius=18,
+            fill=(36, 32, 28) if featured else (252, 247, 236),
+            outline=INK,
+            width=2,
+        )
+        draw.text(
+            (cursor_x + pad_x, cursor_y + 7),
+            word,
+            font=font,
+            fill=CREAM if featured else INK,
+        )
+        if featured:
+            enigmatic = ((box[0] + box[2]) // 2, (box[1] + box[3]) // 2)
+        cursor_x += w + gap
+    return cursor_y + pill_h + 8, enigmatic
+
+
+def _draw_thesaurus_panel(draw: ImageDraw.ImageDraw, x: int, y: int, width: int) -> None:
+    """Roget cluster under the left column — synonyms around cryptic."""
+    pad = 16
+    heading = _font(FONT_SANS_BOLD, 18)
+    body = _font(FONT_ITALIC, 22)
+    label = _font(FONT_SANS, 16)
+    words = _wrap(draw, ",  ".join(INTRO_THESAURUS_WORDS), body, width - pad * 2)
+    lines = words.count("\n") + 1
+    box_h = 92 + lines * (body.size + 6)
+    draw.rectangle([x - 4, y, x + width + 4, y + box_h], outline=INK, width=2)
+    draw.rectangle([x - 4, y, x + width + 4, y + 36], fill=INK)
+    draw.text((x + pad, y + 8), f"{INTRO_THESAURUS_SOURCE}  ·  {INTRO_THESAURUS_HEADING}", font=label, fill=CREAM)
+    draw.multiline_text((x + pad, y + 48), words, font=body, fill=INK, spacing=6)
+    draw.text((x + pad, y + box_h - 28), "see also  § 519 Enigma", font=heading, fill=CRIMSON)
+
+
+def _smootherstep(t: float) -> float:
+    t = max(0.0, min(1.0, t))
+    return t * t * t * (t * (t * 6.0 - 15.0) + 10.0)
+
+
+def _paint_out_switch(src: Image.Image) -> Image.Image:
+    """Cover the modern 10A switch with table from the same plate."""
+    # After the 90° left turn the adapter sits above the book head.
+    table = src.crop((36, 16, 300, 170))
+    cover = table.resize((540, 210), Image.Resampling.LANCZOS)
+    out = src.copy()
+    out.paste(cover, (460, 0))
     return out
 
 
-def _cryptic_kaleidoscope_disc(angle: float, size: int = INTRO_KALEIDOSCOPE_SIZE) -> Image.Image:
-    """A kaleidoscope plate of the headword, sitting on the dictionary page."""
-    field = Image.new("RGB", (size, size), HIGHLIGHT)
-    draw = ImageDraw.Draw(field)
-    big = _font(FONT_BOLD, 118)
-    word = "CRYPTIC"
-    width = draw.textlength(word, font=big)
-    draw.text(((size - width) / 2, size / 2 - 70), word, font=big, fill=YELLOW)
-    for rot, fill, xy in (
-        (38, CREAM, (20, 80)),
-        (-42, INK, (160, 300)),
-        (12, YELLOW, (40, 400)),
-    ):
-        layer = Image.new("RGBA", (700, 180), (0, 0, 0, 0))
-        ImageDraw.Draw(layer).text((8, 16), word, font=big, fill=(*fill, 255))
-        rotated = layer.rotate(rot, resample=Image.Resampling.BILINEAR, expand=True)
-        field.paste(rotated, xy, rotated)
-    tile = _kaleidoscope_tile(field, angle)
-    circle = Image.new("RGB", (size, size), HIGHLIGHT)
-    circle.paste(tile, (0, 0), _circle_mask(size))
-    return circle
-
-
 @lru_cache(maxsize=1)
-def _dictionary_page() -> Image.Image:
-    """Open lexicon: the word cryptic and its crossword sense. Same on every film."""
-    img, draw = _newsprint_canvas()
-    header = _font(FONT_SANS, 22)
-    draw.text((72, 56), "CRYPTIC.FIT  ·  LEXICON", font=header, fill=MUTED)
-    draw.text((WIDTH - 160, 56), "C", font=_font(FONT_SANS_BOLD, 22), fill=CRIMSON)
-    draw.line([(72, 96), (WIDTH - 72, 96)], fill=CRIMSON, width=3)
-    draw.text((80, 130), "crossword  ·  cryptogram  ·  crux", font=_font(FONT_ITALIC, 26), fill=(168, 150, 128))
-    draw.line([(72, 190), (WIDTH - 72, 190)], fill=INK, width=2)
-    head = _font(FONT_BOLD, 100)
-    draw.text((80, 230), INTRO_DICTIONARY_HEADWORD, font=head, fill=INK)
-    meta = _font(FONT_ITALIC, 30)
-    draw.text(
-        (80, 360),
-        f"{INTRO_DICTIONARY_PRONUNCIATION}   {INTRO_DICTIONARY_POS}",
-        font=meta,
-        fill=MUTED,
+def _book_plate() -> Image.Image:
+    src = Image.open(INTRO_DICTIONARY_BOOK).convert("RGB")
+    # Phone still is 90° clockwise of the pages; turn it left so the book reads.
+    src = src.transpose(Image.Transpose.ROTATE_90)
+    src = _paint_out_switch(src)
+    src = src.crop((0, INTRO_BOOK_TRIM_TOP, src.size[0], src.size[1]))
+    src = ImageEnhance.Contrast(src).enhance(1.08)
+    src = ImageEnhance.Brightness(src).enhance(1.06)
+    return src
+
+
+def _window_crop(src: Image.Image, box: tuple[float, float, float, float]) -> Image.Image:
+    """Crop a (possibly fractional) window and scale it to the Short frame."""
+    left, top, right, bottom = box
+    # Oversample via a pixel-aligned crop, then resize — no shake, just a gimbal ease.
+    pad = 2
+    raw = src.crop(
+        (
+            max(0, int(left) - pad),
+            max(0, int(top) - pad),
+            min(src.size[0], int(right) + pad),
+            min(src.size[1], int(bottom) + pad),
+        )
     )
-    sense = _font(FONT_REGULAR, 36)
-    draw.text((80, 440), f"1.  {INTRO_DICTIONARY_SENSES[0]}", font=sense, fill=INK)
-    sense_two = _wrap(draw, f"2.  {INTRO_DICTIONARY_SENSES[1]}", sense, WIDTH - 200)
-    draw.multiline_text((80, 520), sense_two, font=sense, fill=INK, spacing=10)
-    draw.text((80, 1788), "Fig. 1  kaleidoscope on the entry", font=_font(FONT_ITALIC, 24), fill=MUTED)
-    return img
-
-
-def _paste_disc(page: Image.Image, angle: float) -> Image.Image:
-    frame = page.copy()
-    disc = _cryptic_kaleidoscope_disc(angle)
-    size = disc.size[0]
-    x, y = (WIDTH - size) // 2, 860
-    rim = ImageDraw.Draw(frame)
-    rim.ellipse((x - 12, y - 12, x + size + 12, y + size + 12), outline=INK, width=5)
-    rim.ellipse((x - 22, y - 22, x + size + 22, y + size + 22), outline=BRASS, width=8)
-    frame.paste(disc, (x, y), _circle_mask(size))
+    raw = raw.resize(
+        (
+            int((right - left + 2 * pad) * (WIDTH / (right - left))),
+            int((bottom - top + 2 * pad) * (HEIGHT / (bottom - top))),
+        ),
+        Image.Resampling.LANCZOS,
+    )
+    inset_x = int(pad * (WIDTH / (right - left)))
+    inset_y = int(pad * (HEIGHT / (bottom - top)))
+    frame = raw.crop((inset_x, inset_y, inset_x + WIDTH, inset_y + HEIGHT))
+    if frame.size != (WIDTH, HEIGHT):
+        frame = frame.resize((WIDTH, HEIGHT), Image.Resampling.LANCZOS)
     return frame
 
 
+def _stabilized_book_frame(progress: float) -> Image.Image:
+    """Locked-off overhead plate, pushed in as if the camera were on a gimbal."""
+    src = _book_plate()
+    t = _smootherstep(progress)
+    sl, st, sr, sb = INTRO_BOOK_START
+    el, et, er, eb = INTRO_BOOK_END
+    box = (
+        sl + (el - sl) * t,
+        st + (et - st) * t,
+        sr + (er - sr) * t,
+        sb + (eb - sb) * t,
+    )
+    return _window_crop(src, box)
+
+
+def _photo_point(src_xy: tuple[int, int], box: tuple[int, int, int, int], scale: float, top_trim: int) -> tuple[int, int]:
+    left, top, _, _ = box
+    return (
+        int((src_xy[0] - left) * scale),
+        int((src_xy[1] - top) * scale) - top_trim,
+    )
+
+
+def _photographed_dictionary_page() -> tuple[Image.Image, tuple[int, int], tuple[int, int], tuple[int, int]]:
+    """Aled's real page, tight on cryptic, plus the glass stops down the column."""
+    src = Image.open(INTRO_DICTIONARY_PHOTO).convert("RGB")
+    if src.size[1] > src.size[0]:
+        src = src.transpose(Image.Transpose.ROTATE_90)
+    box = INTRO_DICTIONARY_CROP
+    left, top, right, bottom = box
+    del left, right, bottom
+    crop = src.crop(box)
+    scale = WIDTH / crop.size[0]
+    resized = crop.resize((WIDTH, max(HEIGHT, int(crop.size[1] * scale))), Image.Resampling.LANCZOS)
+    top_trim = 0
+    if resized.size[1] > HEIGHT:
+        focus_y = int((INTRO_DICTIONARY_SOURCE_FOCUS[1] - top) * scale)
+        top_trim = max(0, min(resized.size[1] - HEIGHT, focus_y - int(HEIGHT * 0.38)))
+        resized = resized.crop((0, top_trim, WIDTH, top_trim + HEIGHT))
+    elif resized.size[1] < HEIGHT:
+        canvas = Image.new("RGB", (WIDTH, HEIGHT), (248, 243, 230))
+        canvas.paste(resized, (0, (HEIGHT - resized.size[1]) // 2))
+        resized = canvas
+    page = ImageEnhance.Contrast(resized).enhance(1.2)
+    page = ImageEnhance.Brightness(page).enhance(1.04)
+    page = ImageEnhance.Sharpness(page).enhance(1.55)
+    focus = _photo_point(INTRO_DICTIONARY_SOURCE_FOCUS, box, scale, top_trim)
+    mid = _photo_point(INTRO_DICTIONARY_SOURCE_CRYPTOGRAM, box, scale, top_trim)
+    glance = _photo_point(INTRO_DICTIONARY_SOURCE_GLANCE, box, scale, top_trim)
+    return page, focus, mid, glance
+
+
+@lru_cache(maxsize=1)
+def _dictionary_layout() -> tuple[Image.Image, tuple[int, int], tuple[int, int], tuple[int, int]]:
+    """Same photographed volume as the overhead; typeset only if that plate is missing."""
+    if INTRO_DICTIONARY_PHOTO.exists():
+        return _photographed_dictionary_page()
+    return _typeset_dictionary_page()
+
+
+def _entry_key(entry: DictionaryEntry) -> str:
+    return entry.headword.split(",")[0].strip().lower()
+
+
+def _typeset_dictionary_page() -> tuple[Image.Image, tuple[int, int], tuple[int, int], tuple[int, int]]:
+    """Two-column Webster page: living cryptic sense, enigmatic, then cryptology."""
+    img, draw = _newsprint_canvas()
+    header = _font(FONT_SANS, 20)
+    guide = _font(FONT_ITALIC, 24)
+    draw.text((56, 48), f"{INTRO_DICTIONARY_SOURCE.upper()}  ·  C", font=header, fill=MUTED)
+    brand = _font(FONT_SANS_BOLD, 20)
+    brand_w = draw.textlength(BRAND, font=brand)
+    draw.text((WIDTH - 56 - brand_w, 48), BRAND, font=brand, fill=CRIMSON)
+    draw.line([(56, 84), (WIDTH - 56, 84)], fill=CRIMSON, width=3)
+    left_guide, right_guide = INTRO_DICTIONARY_GUIDE
+    draw.text((56, 96), f"{left_guide}  —  {right_guide}", font=guide, fill=(168, 150, 128))
+    draw.text((WIDTH - 200, 96), "folio  348", font=_font(FONT_SANS, 18), fill=MUTED)
+    draw.line([(56, 132), (WIDTH - 56, 132)], fill=INK, width=2)
+
+    margin_x = 56
+    top = 148
+    bottom = 1848
+    gutter = 32
+    col_w = (WIDTH - margin_x * 2 - gutter) // 2
+    columns = (margin_x, margin_x + col_w + gutter)
+    draw.line([(columns[1] - gutter // 2, top), (columns[1] - gutter // 2, bottom)], fill=NEWS_GRID, width=2)
+
+    head_font = _font(FONT_BOLD, 26)
+    featured_head = _font(FONT_BOLD, 36)
+    pos_font = _font(FONT_ITALIC, 20)
+    body_font = _font(FONT_REGULAR, 21)
+    featured_body = _font(FONT_REGULAR, 24)
+
+    featured_idx = next(i for i, entry in enumerate(INTRO_DICTIONARY_ENTRIES) if entry.featured)
+    # Cryptic stays mid-left; the rest of the C-R neighbours open the right column.
+    split_at = featured_idx + 2
+    featured_box: tuple[int, int, int, int] | None = None
+    centers: dict[str, tuple[int, int]] = {}
+    for col, chunk in (
+        (0, INTRO_DICTIONARY_ENTRIES[:split_at]),
+        (1, INTRO_DICTIONARY_ENTRIES[split_at:]),
+    ):
+        y = top
+        x = columns[col]
+        for entry in chunk:
+            hfont = featured_head if entry.featured else head_font
+            bfont = featured_body if entry.featured else body_font
+            block_h = _entry_block_height(draw, entry, col_w, hfont, bfont, pos_font)
+            if y + block_h > bottom:
+                break
+            if entry.featured:
+                wash = ImageDraw.Draw(img)
+                wash.rectangle([x - 8, y, x + col_w + 4, y + block_h - 4], fill=(252, 236, 196))
+                wash.rectangle([x - 8, y, x - 2, y + block_h - 4], fill=CRIMSON)
+                featured_box = (x, y, x + col_w, y + block_h)
+            y0 = y
+            y, pill = _draw_dictionary_entry(draw, entry, x, y, col_w, hfont, pos_font, bfont)
+            # Sit on the headword and first sense, not the empty gutter.
+            centers[_entry_key(entry)] = (x + 140, y0 + 44)
+            if pill is not None:
+                # Bias right so the glass keeps the chip in frame, not the margin.
+                centers["enigmatic"] = (pill[0] + 90, pill[1])
+
+    _draw_thesaurus_panel(draw, columns[0], 1488, col_w)
+    draw.text(
+        (56, 1864),
+        "Webster’s Unabridged, 1913  ·  living sense  ·  Roget 1911",
+        font=_font(FONT_ITALIC, 18),
+        fill=MUTED,
+    )
+    if featured_box is None:
+        focus = centers.get("cryptic", (columns[0] + col_w // 2, 640))
+    else:
+        # First sense: mysterious or obscure.
+        focus = (featured_box[0] + 160, featured_box[1] + 150)
+    enigmatic = centers.get("enigmatic", (focus[0], focus[1] + 80))
+    cryptology = centers.get("cryptology", (columns[1] + col_w // 2, focus[1] + 420))
+    return img, focus, enigmatic, cryptology
+
+
+def _dictionary_page() -> Image.Image:
+    """Open lexicon: real Webster neighbours around cryptic. Same on every film."""
+    return _dictionary_layout()[0]
+
+
 def _with_magnifier(page: Image.Image, center: tuple[int, int], radius: int = 268, zoom: float = 1.7) -> Image.Image:
-    """Brass glass over the headword and the kaleidoscope plate."""
+    """Brass glass over the dictionary page."""
     cx, cy = center
     src_r = int(radius / zoom)
-    box = (cx - src_r, cy - src_r, cx + src_r, cy + src_r)
+    box = (
+        max(0, cx - src_r),
+        max(0, cy - src_r),
+        min(page.size[0], cx + src_r),
+        min(page.size[1], cy + src_r),
+    )
     crop = page.crop(box).resize((radius * 2, radius * 2), Image.Resampling.LANCZOS)
     lens = Image.new("RGBA", page.size, (0, 0, 0, 0))
     left, top = cx - radius, cy - radius
@@ -414,25 +754,76 @@ def _with_magnifier(page: Image.Image, center: tuple[int, int], radius: int = 26
         width=10,
     )
     hx, hy = cx + int(radius * 0.72), cy + int(radius * 0.72)
-    overlay.line((hx, hy, hx + 210, hy + 250), fill=(*BRASS, 255), width=42)
-    overlay.line((hx, hy, hx + 210, hy + 250), fill=(*INK, 255), width=8)
-    overlay.ellipse((hx + 186, hy + 230, hx + 248, hy + 292), fill=(*BRASS, 255), outline=(*INK, 255), width=4)
+    overlay.line((hx, hy, hx + 132, hy + 158), fill=(*BRASS, 255), width=36)
+    overlay.line((hx, hy, hx + 132, hy + 158), fill=(*INK, 255), width=7)
+    overlay.ellipse((hx + 114, hy + 142, hx + 168, hy + 196), fill=(*BRASS, 255), outline=(*INK, 255), width=4)
     out = page.convert("RGBA")
     out = Image.alpha_composite(out, lens)
     return out.convert("RGB")
 
 
-def _compose_intro_frame(progress: float) -> Image.Image:
-    """Dictionary page, kaleidoscope plate, glass moving from the word onto the disc."""
+def _lerp_xy(start: tuple[int, int], end: tuple[int, int], t: float) -> tuple[int, int]:
+    return (
+        int(start[0] + (end[0] - start[0]) * t),
+        int(start[1] + (end[1] - start[1]) * t),
+    )
+
+
+def _glass_travel(
+    focus: tuple[int, int],
+    cryptogram: tuple[int, int],
+    cryptology: tuple[int, int],
+    progress: float,
+) -> tuple[int, int]:
+    """Mysterious/obscure, rest on enigmatic, then cryptology."""
     t = max(0.0, min(1.0, progress))
-    page = _paste_disc(_dictionary_page(), angle=6 + t * 40)
-    # Glass stays on the kaleidoscope plate, not over the readable entry.
-    glass = (int(WIDTH / 2 - 30 + t * 60), int(1220 + t * 40))
-    frame = _with_magnifier(page, glass, radius=250, zoom=1.55)
+    if t < 0.28:
+        return focus
+    if t < 0.48:
+        return _lerp_xy(focus, cryptogram, _smootherstep((t - 0.28) / 0.20))
+    if t < 0.62:
+        return cryptogram
+    if t < 0.84:
+        return _lerp_xy(cryptogram, cryptology, _smootherstep((t - 0.62) / 0.22))
+    return cryptology
+
+
+def _close_page(progress: float, *, glass: bool) -> Image.Image:
+    """Tight column of the same photographed book. Glass is optional so it can fade on."""
+    t = max(0.0, min(1.0, progress))
+    page, focus, cryptogram, cryptology = _dictionary_layout()
+    if not glass:
+        frame = page.convert("RGB")
+    else:
+        center = _glass_travel(focus, cryptogram, cryptology, t)
+        frame = _with_magnifier(page, center, radius=248, zoom=1.55)
     draw = ImageDraw.Draw(frame)
     draw.rectangle([0, 0, WIDTH, 14], fill=HIGHLIGHT)
     draw.rectangle([0, HEIGHT - 14, WIDTH, HEIGHT], fill=HIGHLIGHT)
-    return frame.filter(ImageFilter.SMOOTH)
+    return frame
+
+
+def _close_page_with_glass(progress: float) -> Image.Image:
+    """Tight column: occult, then cryptogram, then the neighbours."""
+    return _close_page(progress, glass=True)
+
+
+def _compose_intro_frame(progress: float) -> Image.Image:
+    """Push in on the real book, dissolve onto that same page, then fade the glass on."""
+    t = max(0.0, min(1.0, progress))
+    if INTRO_DICTIONARY_BOOK.exists():
+        wide = _stabilized_book_frame(min(1.0, t / 0.40))
+        if t < 0.40:
+            return wide
+        page = _close_page(0.0, glass=False)
+        page_mix = _smootherstep((t - 0.40) / 0.22) if t < 0.62 else 1.0
+        base = Image.blend(wide.convert("RGB"), page.convert("RGB"), page_mix)
+        if t < 0.60:
+            return base
+        close = _close_page(max(0.0, (t - 0.60) / 0.40), glass=True)
+        glass_mix = _smootherstep((t - 0.60) / 0.14) if t < 0.74 else 1.0
+        return Image.blend(base, close.convert("RGB"), glass_mix)
+    return _close_page_with_glass(t)
 
 
 def draw_intro_kaleidoscope_still(clue: Clue | None = None, dest: Path | None = None) -> Image.Image:
@@ -494,6 +885,7 @@ def _bake_intro_kaleidoscope(dest: Path) -> Path:
     )
     if result.returncode:
         raise RuntimeError(result.stderr[-800:])
+    shutil.rmtree(frames, ignore_errors=True)
     still = _compose_intro_frame(0.28)
     INTRO_KALEIDOSCOPE_STILL.parent.mkdir(parents=True, exist_ok=True)
     still.save(INTRO_KALEIDOSCOPE_STILL, "JPEG", quality=90)
@@ -509,12 +901,13 @@ def ensure_intro_kaleidoscope() -> Path:
 
 
 def render_intro_kaleidoscope(clue: Clue | None, dest: Path, duration: float) -> Path:
-    """Trim the stock kaleidoscope to this film's spoken open. No per-clue rebuild."""
+    """Fit the signed-off book-to-glass open into Ryan's window. Sonia starts after the cut."""
     del clue
     dest = Path(dest).with_suffix(".mp4")
     dest.parent.mkdir(parents=True, exist_ok=True)
     source = ensure_intro_kaleidoscope()
     hold = max(0.4, duration)
+    pace = hold / INTRO_KALEIDOSCOPE_HOLD
     ffmpeg = shutil.which("ffmpeg")
     if not ffmpeg:
         raise RuntimeError("ffmpeg is required to build the Short")
@@ -522,11 +915,11 @@ def render_intro_kaleidoscope(clue: Clue | None, dest: Path, duration: float) ->
         [
             ffmpeg,
             "-y",
-            "-stream_loop",
-            "-1",
             "-i",
             str(source),
             "-an",
+            "-filter:v",
+            f"setpts={pace:.4f}*PTS",
             "-t",
             f"{hold:.2f}",
             "-c:v",
@@ -582,11 +975,13 @@ def draw_beat(clue: Clue, dest: Path, beat: str = "think") -> Path:
         _center_text(draw, prompt_y, wrapped, prompt, CRIMSON, spacing=8)
     if beat == "hint":
         # Empty lights stay; the picture is the hint. Never fill or print the answer.
+        # No still when the match is weak — Ryan just says there is no picture clue today.
         prompt_y = min(lights_bottom + 36, 980)
         line = (clue.hint_line or HINT_LINE).rstrip(".")
         wrapped = _wrap(draw, line, prompt, WIDTH - 160)
         next_y = _center_text(draw, prompt_y, wrapped, prompt, CRIMSON, spacing=8)
-        _draw_hint_photo(img, draw, min(next_y + 18, 1040), clue)
+        if hint_for_clue(clue) is not None:
+            _draw_hint_photo(img, draw, min(next_y + 18, 1040), clue)
         _footer(draw, _beat_footer(clue, beat))
         img.save(dest, "PNG")
         return dest
@@ -696,11 +1091,11 @@ def _save_issue_ledger(slugs: list[str], path: Path | None = None) -> None:
 
 
 def issue_catalog(slugs: list[str] | None = None) -> list[str]:
-    """One slug, one issue. Published films first, then review cuts, then the ledger."""
+    """One slug, one issue. Ledger numbers stay put; new published films append."""
     if slugs is not None:
         catalog = _unique_slugs(list(slugs))
     else:
-        catalog = _unique_slugs(published_pair_slugs() + _load_issue_ledger() + _study_slugs())
+        catalog = _unique_slugs(_load_issue_ledger() + published_pair_slugs() + _study_slugs())
     if THUMBNAIL_ISSUE_FIRST_SLUG in catalog:
         catalog = catalog[catalog.index(THUMBNAIL_ISSUE_FIRST_SLUG) :]
     return catalog

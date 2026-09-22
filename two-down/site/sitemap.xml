@@ -2,39 +2,35 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://cryptic.fit/</loc>
-    <lastmod>2026-09-16</lastmod>
+    <lastmod>2026-09-22</lastmod>
   </url>
   <url>
     <loc>https://cryptic.fit/about.html</loc>
-    <lastmod>2026-09-16</lastmod>
+    <lastmod>2026-09-22</lastmod>
   </url>
   <url>
     <loc>https://cryptic.fit/support.html</loc>
-    <lastmod>2026-09-16</lastmod>
+    <lastmod>2026-09-22</lastmod>
   </url>
   <url>
     <loc>https://cryptic.fit/follow.html</loc>
-    <lastmod>2026-09-16</lastmod>
+    <lastmod>2026-09-22</lastmod>
   </url>
   <url>
     <loc>https://cryptic.fit/suggest.html</loc>
-    <lastmod>2026-09-16</lastmod>
+    <lastmod>2026-09-22</lastmod>
   </url>
   <url>
     <loc>https://cryptic.fit/privacy.html</loc>
-    <lastmod>2026-09-16</lastmod>
+    <lastmod>2026-09-22</lastmod>
   </url>
   <url>
-    <loc>https://cryptic.fit/d/2026-09-16/</loc>
-    <lastmod>2026-09-16</lastmod>
+    <loc>https://cryptic.fit/d/2026-09-22/</loc>
+    <lastmod>2026-09-22</lastmod>
   </url>
   <url>
-    <loc>https://cryptic.fit/c/independent-12462-6a/</loc>
-    <lastmod>2026-09-16</lastmod>
-  </url>
-  <url>
-    <loc>https://cryptic.fit/c/guardian-30113-9a/</loc>
-    <lastmod>2026-09-16</lastmod>
+    <loc>https://cryptic.fit/c/guardian-30108-27a/</loc>
+    <lastmod>2026-09-22</lastmod>
   </url>
   <url>
     <loc>https://cryptic.fit/d/2026-09-11/</loc>
@@ -57,43 +53,87 @@
     <lastmod>2026-09-15</lastmod>
   </url>
   <url>
-    <loc>https://cryptic.fit/c/financial-times-18477-14a/</loc>
+    <loc>https://cryptic.fit/d/2026-09-16/</loc>
     <lastmod>2026-09-16</lastmod>
+  </url>
+  <url>
+    <loc>https://cryptic.fit/d/2026-09-21/</loc>
+    <lastmod>2026-09-21</lastmod>
+  </url>
+  <url>
+    <loc>https://cryptic.fit/c/financial-times-18477-14a/</loc>
+    <lastmod>2026-09-22</lastmod>
   </url>
   <url>
     <loc>https://cryptic.fit/c/financial-times-18478-1a/</loc>
-    <lastmod>2026-09-16</lastmod>
+    <lastmod>2026-09-22</lastmod>
   </url>
   <url>
     <loc>https://cryptic.fit/c/financial-times-18478-5a/</loc>
-    <lastmod>2026-09-16</lastmod>
+    <lastmod>2026-09-22</lastmod>
+  </url>
+  <url>
+    <loc>https://cryptic.fit/c/guardian-26372-27a/</loc>
+    <lastmod>2026-09-22</lastmod>
+  </url>
+  <url>
+    <loc>https://cryptic.fit/c/guardian-30064-8a/</loc>
+    <lastmod>2026-09-22</lastmod>
+  </url>
+  <url>
+    <loc>https://cryptic.fit/c/guardian-30066-22a/</loc>
+    <lastmod>2026-09-22</lastmod>
+  </url>
+  <url>
+    <loc>https://cryptic.fit/c/guardian-30077-8a/</loc>
+    <lastmod>2026-09-22</lastmod>
+  </url>
+  <url>
+    <loc>https://cryptic.fit/c/guardian-30100-9a/</loc>
+    <lastmod>2026-09-22</lastmod>
+  </url>
+  <url>
+    <loc>https://cryptic.fit/c/guardian-30103-23a/</loc>
+    <lastmod>2026-09-22</lastmod>
   </url>
   <url>
     <loc>https://cryptic.fit/c/guardian-30112-1a/</loc>
-    <lastmod>2026-09-16</lastmod>
+    <lastmod>2026-09-22</lastmod>
   </url>
   <url>
     <loc>https://cryptic.fit/c/guardian-30112-5a/</loc>
-    <lastmod>2026-09-16</lastmod>
+    <lastmod>2026-09-22</lastmod>
+  </url>
+  <url>
+    <loc>https://cryptic.fit/c/guardian-30113-9a/</loc>
+    <lastmod>2026-09-22</lastmod>
+  </url>
+  <url>
+    <loc>https://cryptic.fit/c/guardian-30117-28a/</loc>
+    <lastmod>2026-09-22</lastmod>
   </url>
   <url>
     <loc>https://cryptic.fit/c/independent-12458-11a/</loc>
-    <lastmod>2026-09-16</lastmod>
+    <lastmod>2026-09-22</lastmod>
   </url>
   <url>
     <loc>https://cryptic.fit/c/independent-12459-12a/</loc>
-    <lastmod>2026-09-16</lastmod>
+    <lastmod>2026-09-22</lastmod>
   </url>
   <url>
     <loc>https://cryptic.fit/c/independent-12459-8a/</loc>
-    <lastmod>2026-09-16</lastmod>
+    <lastmod>2026-09-22</lastmod>
+  </url>
+  <url>
+    <loc>https://cryptic.fit/c/independent-12462-6a/</loc>
+    <lastmod>2026-09-22</lastmod>
   </url>
   <url>
     <loc>https://cryptic.fit/c/independent-on-sunday-1907-1a/</loc>
-    <lastmod>2026-09-16</lastmod>
+    <lastmod>2026-09-22</lastmod>
   </url>
   <url>
     <loc>https://cryptic.fit/c/independent-on-sunday-1907-9a/</loc>
-    <lastmod>2026-09-16</lastmod>
+    <lastmod>2026-09-22</lastmod>
   </url>
 </urlset>

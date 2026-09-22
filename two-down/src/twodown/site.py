@@ -262,7 +262,13 @@ function applyVoice(alias) {
     };
     audio.addEventListener("loadedmetadata", resume, { once: true });
     const video = article.querySelector("video");
-    if (video) video.muted = alias !== "sonia";
+    if (!video) return;
+    if (alias === "sonia") {
+      video.muted = false;
+      return;
+    }
+    video.muted = true;
+    audio.addEventListener("error", () => { video.muted = false; }, { once: true });
   });
 }
 
@@ -343,18 +349,19 @@ document.querySelectorAll("article.clue").forEach((article) => {
   const audio = article.querySelector("audio.parse-voice");
   if (!video || !audio) return;
   const otherVoice = () => currentVoice() !== "sonia";
-  const applyMute = () => {
-    video.muted = otherVoice();
-  };
-  applyMute();
+  audio.addEventListener("error", () => { video.muted = false; });
   video.addEventListener("play", () => {
-    applyMute();
     if (!otherVoice()) {
+      video.muted = false;
       audio.pause();
       return;
     }
+    video.muted = true;
     audio.currentTime = video.currentTime;
-    audio.play();
+    const attempt = audio.play();
+    if (attempt && attempt.catch) {
+      attempt.catch(() => { video.muted = false; });
+    }
   });
   video.addEventListener("pause", () => audio.pause());
   video.addEventListener("seeked", () => {
@@ -709,9 +716,12 @@ def publish_site(pair: DailyPair, dest: Path | None = None) -> Path:
 
     pretty = datetime.strptime(pair.date, "%Y-%m-%d").strftime("%A %-d %B %Y")
     articles = "\n".join(_article(item, "media/") for item in pair.clues)
+    one = len(pair.clues) == 1
+    kicker = "One clue · premiere" if one else "Two clues"
+    heading = "Today’s premiere." if one else "Today’s pair."
     index_body = f"""
-    <p class="kicker">Two clues · {_e(pretty)}</p>
-    <h1>Today’s pair.</h1>
+    <p class="kicker">{kicker} · {_e(pretty)}</p>
+    <h1>{heading}</h1>
     <p class="lede">Have a go before you tap solve. Parses follow Fifteen Squared — we speak them, we don’t nick the grid. Pick a place from the header if you’d rather solve against the Matterhorn than newsprint.</p>
     <section class="pair">
       {articles}

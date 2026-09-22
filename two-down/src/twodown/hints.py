@@ -9,7 +9,7 @@ from urllib.parse import quote
 import requests
 from PIL import Image, ImageDraw, ImageFilter
 
-from twodown.config import HINT_LINE, PACKAGE_ROOT, USER_AGENT
+from twodown.config import HINT_LINE, NO_PICTURE_LINE, PACKAGE_ROOT, USER_AGENT
 from twodown.models import Clue
 
 HINTS_DIR = PACKAGE_ROOT / "assets" / "hints"
@@ -94,7 +94,7 @@ class MatchedHint:
 
     @property
     def line(self) -> str:
-        return HINT_LINE
+        return HINT_LINE if self.close_enough else NO_PICTURE_LINE
 
 
 # Sleeping face in soft haze. Reads as trance / dream / as-in-a-trance ~80% of the time.
@@ -491,13 +491,14 @@ def match_hint(definition: str, answer: str | None = None) -> MatchedHint:
     return MatchedHint(photo=best, closeness=score, close_enough=score >= CLOSE_ENOUGH)
 
 
-def get_hint_photo(slug: str | None = None) -> HintPhoto:
-    """Resolve a still by slug. Unknown slugs auto-match. AI stills are allowed."""
+def get_hint_photo(slug: str | None = None) -> HintPhoto | None:
+    """Resolve a still by slug. Unknown slugs auto-match when close enough."""
     if slug in PHOTOS:
         return PHOTOS[slug]
     if not slug:
         return DEFAULT_HINT
-    return match_hint(slug).photo
+    matched = match_hint(slug)
+    return matched.photo if matched.close_enough else None
 
 
 def infer_definition(clue: Clue) -> str:
@@ -516,7 +517,7 @@ def infer_definition(clue: Clue) -> str:
     return clue.clue
 
 
-def hint_for_clue(clue: Clue) -> HintPhoto:
+def _photo_from_clue_fields(clue: Clue) -> HintPhoto | None:
     if clue.hint_image:
         found = PHOTOS.get(clue.hint_image)
         if found is not None:
@@ -527,26 +528,43 @@ def hint_for_clue(clue: Clue) -> HintPhoto:
                 return photo
     if clue.slug in PHOTOS:
         return PHOTOS[clue.slug]
-    return match_hint(infer_definition(clue)).photo
+    return None
+
+
+def hint_for_clue(clue: Clue) -> HintPhoto | None:
+    """Return a still only when one is chosen. Weak matches stay off the card."""
+    if (clue.hint_line or "").strip().casefold() == NO_PICTURE_LINE.strip().casefold():
+        return None
+    found = _photo_from_clue_fields(clue)
+    if found is not None:
+        return found
+    matched = match_hint(infer_definition(clue))
+    return matched.photo if matched.close_enough else None
+
+
+def has_picture_clue(clue: Clue) -> bool:
+    return hint_for_clue(clue) is not None
 
 
 def attach_hint(clue: Clue) -> Clue:
-    """Carry hint_image + hint_line matched to the definition (~80%)."""
+    """Carry a picture clue when the still is ~80% close. Otherwise say so."""
     definition = infer_definition(clue)
     matched = match_hint(definition)
-    if clue.slug in PHOTOS:
-        photo = PHOTOS[clue.slug]
-    else:
+    photo = _photo_from_clue_fields(clue)
+    if photo is None and matched.close_enough:
         photo = matched.photo
     updates: dict[str, str] = {}
     if not clue.definition:
         updates["definition"] = definition
-    if not clue.hint_image:
-        updates["hint_image"] = f"assets/hints/{photo.filename}"
-    if not clue.hint_credit:
-        updates["hint_credit"] = photo.credit_line
-    if not clue.hint_line:
-        updates["hint_line"] = HINT_LINE
+    if photo is not None:
+        if not clue.hint_image:
+            updates["hint_image"] = f"assets/hints/{photo.filename}"
+        if not clue.hint_credit:
+            updates["hint_credit"] = photo.credit_line
+        if not clue.hint_line:
+            updates["hint_line"] = HINT_LINE
+    elif not clue.hint_line:
+        updates["hint_line"] = NO_PICTURE_LINE
     return clue.model_copy(update=updates) if updates else clue
 
 

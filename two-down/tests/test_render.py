@@ -4,8 +4,18 @@ from pathlib import Path
 from twodown.models import Clue
 from twodown.render import (
     AUDIO_LOUDNESS,
+    INTRO_DICTIONARY_ENTRIES,
     INTRO_DICTIONARY_HEADWORD,
+    INTRO_DICTIONARY_SENSES,
+    INTRO_DICTIONARY_BOOK,
+    INTRO_DICTIONARY_PHOTO,
+    INTRO_DICTIONARY_SOURCE,
+    INTRO_DICTIONARY_SYNONYMS,
+    INTRO_KALEIDOSCOPE_HOLD,
     INTRO_KALEIDOSCOPE_WORDS,
+    INTRO_THESAURUS_HEADING,
+    INTRO_THESAURUS_SOURCE,
+    INTRO_THESAURUS_WORDS,
     ShortTimings,
     THUMB_H,
     THUMB_W,
@@ -199,6 +209,7 @@ def test_intro_kaleidoscope_is_generic_not_per_clue():
     assert words == list(INTRO_KALEIDOSCOPE_WORDS)
     assert "CRYPTIC" in words
     assert INTRO_DICTIONARY_HEADWORD == "cryptic"
+    assert INTRO_DICTIONARY_SOURCE == "Webster 1913"
     assert "FIT" not in words
     assert "MODEL" not in words
     assert "YOUNGSTER" not in words
@@ -209,20 +220,68 @@ def test_intro_kaleidoscope_is_generic_not_per_clue():
     assert intro_kaleidoscope_words(other) == words
 
 
+def test_intro_dictionary_is_webster_with_neighbours():
+    heads = [entry.headword.lower() for entry in INTRO_DICTIONARY_ENTRIES]
+    featured = next(entry for entry in INTRO_DICTIONARY_ENTRIES if entry.featured)
+    assert any("cryptic" in head for head in heads)
+    assert any(head == "crypt" for head in heads)
+    assert any("cryptogram" in head for head in heads)
+    assert any(head == "crystal" for head in heads)
+    assert any(head == "cry" for head in heads)
+    assert featured.headword.lower().startswith("cryptic")
+    senses = " ".join(featured.senses).lower()
+    assert "mysterious" in senses
+    assert "obscure" in senses
+    assert "crossword" in senses
+    assert INTRO_DICTIONARY_SENSES == featured.senses
+    assert INTRO_DICTIONARY_SYNONYMS[0] == "enigmatic"
+    assert "enigmatic" in INTRO_DICTIONARY_SYNONYMS
+    assert "mysterious" in INTRO_DICTIONARY_SYNONYMS
+    # Neighbours carry their own definitions, not a single invented blurb.
+    crypt = next(entry for entry in INTRO_DICTIONARY_ENTRIES if entry.headword.lower() == "crypt")
+    assert "vault" in " ".join(crypt.senses).lower()
+    assert INTRO_THESAURUS_SOURCE == "Roget 1911"
+    assert "concealment" in INTRO_THESAURUS_HEADING.lower()
+    assert "cryptic" in INTRO_THESAURUS_WORDS
+    assert "hidden" in INTRO_THESAURUS_WORDS
+    assert "mysterious" in INTRO_THESAURUS_WORDS
+    assert "enigmatic" in INTRO_THESAURUS_WORDS
+    cryptology = next(entry for entry in INTRO_DICTIONARY_ENTRIES if entry.headword.lower() == "cryptology")
+    assert "enigmatic" in " ".join(cryptology.senses).lower()
+    assert "secret" in " ".join(cryptology.senses).lower()
+
+
 def test_intro_beat_is_kaleidoscope_not_the_spoken_line(tmp_path: Path):
-    from PIL import Image
+    from twodown.config import INTRO_LINE
+    from twodown.render import _dictionary_layout
 
-    from twodown.config import INK, INTRO_LINE
-
-    img = _compose_intro_frame(0.25)
+    assert INTRO_KALEIDOSCOPE_HOLD >= 14.0
+    wide = _compose_intro_frame(0.08)
+    close = _compose_intro_frame(0.72)
     path = tmp_path / "intro.png"
-    img.save(path)
-    assert img.size == (1080, 1920)
-    # Lexicon paper, not the old black letter-vortex.
-    paper = img.getpixel((40, 80))
-    assert paper[0] > 200 and paper[1] > 190
-    head = list(img.crop((80, 230, 720, 350)).get_flattened_data())
-    assert head.count(INK) > 400
+    close.save(path)
+    assert wide.size == (1080, 1920)
+    assert close.size == (1080, 1920)
+    # Overhead plate starts on the dark table; the close landing is paper.
+    table = wide.getpixel((40, 80))
+    assert table[0] < 80 and table[1] < 80
+    # The modern switch is trimmed off the plate; the top of the wide frame is page or table, not a white button on a black box.
+    from twodown.render import _book_plate
+
+    plate = _book_plate()
+    assert plate.size[1] <= 800
+    paper = close.getpixel((40, 80))
+    assert paper[0] > 160 and paper[1] > 140
+    page, focus, mid, end = _dictionary_layout()
+    fx, fy = focus
+    assert INTRO_DICTIONARY_BOOK.exists()
+    assert INTRO_DICTIONARY_PHOTO.exists()
+    assert 0 < fx < 1080 and 0 < fy < 1920
+    assert mid[1] > fy
+    assert end[1] >= mid[1]
+    # The photographed column is paper, not a typeset card.
+    paper_page = page.getpixel((40, 80))
+    assert paper_page[0] > 160 and paper_page[1] > 140
     raw = path.read_bytes()
     assert INTRO_LINE.encode() not in raw
     assert b"daily dose" not in raw.lower()
@@ -371,6 +430,42 @@ def test_hint_card_keeps_empty_lights(tmp_path: Path):
     # Inset still is not newsprint; the picture is the hint.
     photo = hint_img.crop((140, 980, 940, 1480))
     assert any(pixel != NEWS_BG for pixel in photo.get_flattened_data())
+
+
+def test_hint_beat_without_a_picture_stays_newsprint(tmp_path: Path):
+    from PIL import Image
+
+    from twodown.config import NEWS_BG, NO_PICTURE_LINE
+    from twodown.hints import attach_hint
+    from twodown.models import Clue
+
+    clue = attach_hint(
+        Clue(
+            source_url="https://fifteensquared.net/example/",
+            paper="Guardian",
+            puzzle_id="30117",
+            setter="Paul",
+            blogger="Andrew",
+            number="6",
+            direction="down",
+            clue="Craft that may be inflated",
+            enumeration="4",
+            answer="RAFT",
+            definition="inflatable craft",
+            parse="hidden",
+        )
+    )
+    assert clue.hint_line == NO_PICTURE_LINE
+    path = draw_beat(clue, tmp_path / "hint.png", "hint")
+    img = Image.open(path)
+    assert img.size == (1080, 1920)
+    assert img.getpixel((24, 40)) == NEWS_BG
+    # No inset still — the photo band stays newsprint.
+    from twodown.config import NEWS_GRID
+
+    band = list(img.crop((200, 1100, 880, 1480)).get_flattened_data())
+    paper = sum(1 for px in band if px in {NEWS_BG, NEWS_GRID})
+    assert paper / len(band) > 0.98
 
 
 def test_dreamlike_parse_fits_under_the_answer(tmp_path: Path):
@@ -556,3 +651,24 @@ def test_spoiler_free_stills_write_thumb_and_poster(tmp_path: Path):
     assert Image.open(thumb).size == (THUMB_W, THUMB_H)
     assert Image.open(poster).size == (1080, 1920)
     assert Image.open(draw_poster(_clue(), tmp_path / "poster.jpg")).size == (1080, 1920)
+
+
+def test_homepage_swap_does_not_renumber_ledger_issues(monkeypatch):
+    import twodown.render as render_mod
+
+    ledger = [
+        "guardian-30112-1a",
+        "guardian-30112-5a",
+        "guardian-30064-8a",
+        "guardian-30100-9a",
+        "guardian-30077-8a",
+    ]
+    published = ["guardian-30112-1a", "guardian-30112-5a", "guardian-30108-27a"]
+    monkeypatch.setattr(render_mod, "_load_issue_ledger", lambda path=None: ledger)
+    monkeypatch.setattr(render_mod, "published_pair_slugs", lambda site_root=None: published)
+    monkeypatch.setattr(render_mod, "_study_slugs", lambda out_dir=None: [])
+    catalog = issue_catalog()
+    assert catalog[:5] == ledger
+    assert catalog.index("guardian-30108-27a") == 5
+    assert catalog.index("guardian-30100-9a") != catalog.index("guardian-30077-8a")
+    assert len(catalog) == len(set(catalog))

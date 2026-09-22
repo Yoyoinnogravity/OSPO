@@ -54,17 +54,19 @@ ANSWER_PITCH = "+1Hz"
 PARSE_RATE = "-8%"
 PARSE_PITCH = "+0Hz"
 PARSE_ASIDE_PAUSE_SECONDS = 0.7
-INTRO_LINE = "Right — here's your daily dose of cryptic fun."
+INTRO_LINE = "Hello, here is your daily dose of AI cryptic crossword."
 INTRO_VOICE_ALIAS = "ryan"
 INTRO_RATE = "+3%"
 INTRO_PITCH = "+4Hz"
 INTRO_VOLUME = "+8%"
-INTRO_GAP_SECONDS = 0.45
+# Ryan opens on the dictionary. Then we cut to the Short and Sonia starts.
+INTRO_GAP_SECONDS = 0.35
+# Sting hits on picture-up. Ryan talks over the book — no long look first.
+INTRO_LOOK_BEFORE_SECONDS = 0.12
 OUTRO_LINE = "Thanks for thinking with cryptic.fit."
 OUTRO_GAP_SECONDS = 0.4
-# Same two chords at both ends. They sit before Ryan and after the thank-you,
-# so they name the brand without talking over the introduction.
-BRAND_STING_SECONDS = 1.45
+# Short ident on picture-up and after the thank-you. G into C, not the old pad.
+BRAND_STING_SECONDS = 0.62
 # Footer credit is not Sonia. Thomas (male) names the setter, paper, and Fifteen Squared.
 SOURCE_VOICE_ALIAS = "thomas"
 SOURCE_RATE = "-4%"
@@ -80,6 +82,8 @@ THINK_PROMPT = "Just pause here, and have a think."
 HINT_OFFER = "If you need a clue."
 HINT_LOOK = "Have a look at this."
 HINT_LINE = f"{HINT_OFFER} {HINT_LOOK}"
+# When the still is not ~80% close, skip the picture rather than force a weak match.
+NO_PICTURE_LINE = "No picture clue today."
 HINT_VOICE_ALIAS = "ryan"
 HINT_HOLD_SECONDS = 4.0
 HINT_PAUSE_SECONDS = 2.5

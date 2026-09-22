@@ -3,9 +3,9 @@ from __future__ import annotations
 from pathlib import Path
 
 from twodown.captions import facebook_title, social_caption
-from twodown.config import CLUES_PER_DAY, SITE_ROOT
+from twodown.config import CLUES_PER_DAY, DEFAULT_VOICE_ALIAS, SITE_ROOT
 from twodown.meta import facebook_ready, instagram_ready, upload_facebook, upload_instagram
-from twodown.models import DailyPair
+from twodown.models import DailyPair, SpokenClue
 from twodown.tiktok import tiktok_ready, upload_short as upload_tiktok
 from twodown.youtube import upload_pair as upload_youtube, youtube_ready
 
@@ -88,6 +88,47 @@ Then a Cloud Agent runs:  twodown upload            (all four)
 """
 
 
+def spoken_from_slug(slug: str, site_root: Path | None = None) -> SpokenClue:
+    """One published Short pointed at site/media/{slug}.mp4."""
+    from twodown.pipeline import published_clue
+    from twodown.script import write_parts
+    from twodown.voice import resolve_voice
+
+    clue = published_clue(slug, site_root)
+    item = SpokenClue(
+        clue=clue,
+        script=write_parts(clue).full,
+        voice=resolve_voice(DEFAULT_VOICE_ALIAS),
+    )
+    pair = DailyPair(date="upload", voice=item.voice, clues=[item])
+    attach_site_videos(pair, site_root)
+    return pair.clues[0]
+
+
+def upload_slug(
+    slug: str,
+    *,
+    youtube: bool = True,
+    tiktok: bool = True,
+    instagram: bool = True,
+    facebook: bool = True,
+    youtube_privacy: str = "public",
+    site_root: Path | None = None,
+) -> dict[str, list[str]]:
+    """Upload one published Short. Used for the first channel film."""
+    item = spoken_from_slug(slug, site_root)
+    pair = DailyPair(date="upload", voice=item.voice, clues=[item])
+    notes = publish_pair(
+        pair,
+        youtube=youtube,
+        tiktok=tiktok,
+        instagram=instagram,
+        facebook=facebook,
+        youtube_privacy=youtube_privacy,
+    )
+    return notes
+
+
 def attach_site_videos(pair: DailyPair, site_root: Path | None = None) -> DailyPair:
     """Point clues at two-down/site/media/{slug}.mp4 when the render path is missing."""
     root = Path(site_root or SITE_ROOT)
@@ -97,6 +138,9 @@ def attach_site_videos(pair: DailyPair, site_root: Path | None = None) -> DailyP
         site_video = root / "media" / f"{item.clue.slug}.mp4"
         if site_video.exists():
             item.video_path = str(site_video)
+        site_thumb = root / "media" / f"{item.clue.slug}-thumb.jpg"
+        if site_thumb.exists() and not item.thumbnail_path:
+            item.thumbnail_path = str(site_thumb)
     return pair
 
 

@@ -1,6 +1,6 @@
 from twodown.captions import youtube_description
 from twodown.models import Clue, DailyPair, SpokenClue
-from twodown.site import publish_site
+from twodown.site import JS, publish_site
 from twodown.youtube import YOUTUBE_CHANNEL, set_thumbnail, video_title
 
 
@@ -120,6 +120,40 @@ def test_publish_site_writes_spoiler_pages(tmp_path):
     assert (tmp_path / ".nojekyll").exists()
     assert (tmp_path / "assets" / "favicon.svg").exists()
     assert "application/rss+xml" in index
+    js = (root / "assets" / "app.js").read_text(encoding="utf-8")
+    assert 'audio.addEventListener("error"' in js
+    assert "attempt.catch" in js
+
+
+def test_short_keeps_muxed_sound_when_the_other_voice_is_missing():
+    assert 'audio.addEventListener("error", () => { video.muted = false; }' in JS
+    assert "attempt.catch" in JS
+    assert "video.muted = false" in JS
+
+
+def test_published_clue_reads_individual_short_pages(tmp_path):
+    from twodown.pipeline import published_clue
+
+    page = tmp_path / "c" / "guardian-30100-9a" / "index.html"
+    page.parent.mkdir(parents=True)
+    page.write_text(
+        """<!DOCTYPE html><html><body>
+        <h1>Oversees advancement of ecstasy in hell (5)</h1>
+        <article class="clue" data-slug="guardian-30100-9a">
+          <p class="kicker">Guardian 30100 · Dice · 9 across · unknown</p>
+          <p class="answer">HEADS</p>
+          <p class="parse">HAD(e)S with E advanced</p>
+          <p class="credit">Parse via <a href="https://fifteensquared.net/example/">Fifteen Squared · loonapick</a></p>
+        </article>
+        </body></html>
+        """,
+        encoding="utf-8",
+    )
+    clue = published_clue("guardian-30100-9a", tmp_path)
+    assert clue.slug == "guardian-30100-9a"
+    assert clue.answer == "HEADS"
+    assert clue.clue == "Oversees advancement of ecstasy in hell"
+    assert clue.enumeration == "5"
 
 
 def test_set_thumbnail_does_nothing_without_a_token(tmp_path, monkeypatch):
