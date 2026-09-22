@@ -245,7 +245,10 @@ def upload_short(item: SpokenClue, privacy: str = "public") -> str | None:
     if video_id:
         thumb = _ensure_thumbnail(item)
         if thumb:
-            set_thumbnail(video_id, thumb)
+            try:
+                set_thumbnail(video_id, thumb)
+            except Exception:
+                pass  # verified channels only; the Short still uploads
     return video_id
 
 
