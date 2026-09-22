@@ -29,7 +29,7 @@ from twodown.social import (
     upload_slug,
 )
 from twodown.voice import list_voices, resolve_voice
-from twodown.youtube import YOUTUBE_CHANNEL
+from twodown.youtube import YOUTUBE_CHANNEL, finish_authorization, start_authorization, token_path
 
 
 def _print_pair(pair) -> None:
@@ -172,6 +172,25 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("connect", help="Show the token JSON the upload agent needs")
     sub.add_parser("live", help="Check which public URLs actually respond")
 
+    auth = sub.add_parser("youtube-auth", help="One-time Google login for youtube.com/@crypticfit")
+    auth.add_argument(
+        "--start",
+        action="store_true",
+        help="Print a consent URL (Cloud Agent: paste the localhost redirect back with --finish)",
+    )
+    auth.add_argument(
+        "--finish",
+        nargs="?",
+        const="__STDIN__",
+        metavar="REDIRECT_URL",
+        help="Exchange the http://localhost/?code=… redirect for a refresh token",
+    )
+    auth.add_argument(
+        "--console",
+        action="store_true",
+        help="Laptop-only: paste the redirect URL at a terminal prompt",
+    )
+
     args = parser.parse_args(argv)
 
     if args.cmd == "voices":
@@ -215,6 +234,40 @@ def main(argv: list[str] | None = None) -> int:
         print(connect_instructions(), end="")
         _print_status()
         return 0
+
+    if args.cmd == "youtube-auth":
+        from twodown.youtube import authorize
+
+        try:
+            if args.start:
+                print(start_authorization())
+                print(
+                    "\nOpen that URL, pick cryptic.fit (@crypticfit), then paste the "
+                    "http://localhost/?code=… address bar with:\n"
+                    "  twodown youtube-auth --finish 'http://localhost/?code=…'",
+                    file=sys.stderr,
+                )
+                return 0
+            if args.finish is not None:
+                pasted = args.finish
+                if pasted == "__STDIN__":
+                    pasted = sys.stdin.read()
+                path = finish_authorization(pasted)
+                print(f"wrote {path}")
+                print(
+                    f"Paste {path} as TWODOWN_YOUTUBE_TOKEN on the Cloud Agent environment "
+                    "so the next machine can upload.",
+                    file=sys.stderr,
+                )
+                _print_status()
+                return 0
+            path = authorize(console=args.console)
+            print(f"wrote {path}")
+            _print_status()
+            return 0
+        except (FileNotFoundError, ValueError, RuntimeError) as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
 
     if args.cmd == "live":
         print("Public URLs (live = HTTP 2xx/3xx from here right now)")
