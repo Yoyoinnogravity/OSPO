@@ -278,8 +278,10 @@ def build_short_soundtrack(parts: ScriptParts, dest: Path, voice: str | None = N
                 volume=INTRO_VOLUME,
             )
         ),
-        "clue": synthesise(
-            parts.clue_speech, work / "clue.mp3", voice, rate=CLUE_RATE, pitch=CLUE_PITCH
+        "clue": _trim_leading_silence(
+            synthesise(
+                parts.clue_speech, work / "clue.mp3", voice, rate=CLUE_RATE, pitch=CLUE_PITCH
+            )
         ),
         "letters": synthesise(
             parts.letters_speech, work / "letters.mp3", voice, rate=LETTERS_RATE, pitch=LETTERS_PITCH
