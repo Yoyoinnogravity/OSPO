@@ -110,12 +110,12 @@ def _portrait(sprite: Image.Image) -> Image.Image:
     """Head, bow and snout. The body shows through a plain box crop."""
     keep = Image.new("L", sprite.size, 0)
     mask = ImageDraw.Draw(keep)
-    # Match the drawn bow, head and snout. A looser box lets the belly through.
-    mask.polygon([(300, 78), (244, 42), (264, 114)], fill=255)
-    mask.polygon([(332, 78), (392, 40), (368, 118)], fill=255)
-    mask.ellipse([288, 60, 344, 116], fill=255)
-    mask.ellipse([250, 70, 470, 270], fill=255)
-    mask.ellipse([360, 130, 512, 250], fill=255)
+    # Exact head, band and snout. A looser box lets the belly through.
+    mask.polygon([(286, 114), (372, 104), (368, 116), (290, 128)], fill=255)
+    mask.ellipse([248, 104, 296, 146], fill=255)
+    mask.polygon([(262, 128), (232, 142), (252, 160)], fill=255)
+    mask.ellipse([248, 96, 452, 276], fill=255)
+    mask.ellipse([344, 152, 518, 236], fill=255)
     sprite = sprite.copy()
     sprite.putalpha(ImageChops.multiply(sprite.getchannel("A"), keep))
     box = sprite.getbbox()

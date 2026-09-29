@@ -60,29 +60,27 @@ def croc_sprite(beat: str, frame: int) -> Image.Image:
     for claw_x in (168, 196, 274, 302):
         draw.ellipse([claw_x, 360, claw_x + 16, 376], fill=TOOTH)
 
-    # Head and snout.
-    draw.ellipse([250, 70, 470, 270], fill=SCALE)
-    draw.ellipse([360, 130, 512, 250], fill=SNOUT)
-    draw.ellipse([430, 168, 446, 184], fill=SCALE_DARK)
-    draw.ellipse([468, 172, 484, 188], fill=SCALE_DARK)
+    # A longer jaw than the first round head. She is grown.
+    draw.ellipse([248, 96, 452, 276], fill=SCALE)
+    draw.ellipse([344, 152, 518, 236], fill=SNOUT)
+    draw.ellipse([452, 176, 474, 186], fill=SCALE_DARK)
+    draw.ellipse([492, 178, 514, 188], fill=SCALE_DARK)
 
-    # Crimson bow. She is Cryptic Croc, and she is female.
-    draw.polygon([(300, 78), (248, 48), (268, 108)], fill=CRIMSON)
-    draw.polygon([(332, 78), (386, 46), (364, 112)], fill=CRIMSON)
-    draw.ellipse([292, 64, 340, 112], fill=CRIMSON)
-    draw.ellipse([304, 76, 328, 100], fill=CREAM)
+    # A short scarf tied at the side of the crown, back from the brow.
+    draw.polygon([(286, 114), (372, 104), (368, 116), (290, 128)], fill=CRIMSON)
+    draw.ellipse([252, 108, 292, 142], fill=CRIMSON)
+    draw.polygon([(262, 128), (238, 146), (256, 154)], fill=CRIMSON)
 
-    _eye(draw, 300, 130, blink, glance=8 if mood == "think" else 0)
-    _eye(draw, 390, 124, blink, glance=8 if mood == "think" else 0)
-    _lashes(draw, 300, 108)
-    _lashes(draw, 390, 102)
+    glance = 3 if mood == "think" else 0
+    _eye(draw, 318, 156, blink, glance)
+    _eye(draw, 372, 150, blink, glance)
 
     if mouth == 0 and mood != "cheer":
-        draw.arc([390, 176, 490, 230], 20, 160, fill=SCALE_DARK, width=4)
+        draw.arc([400, 186, 486, 222], 18, 162, fill=SCALE_DARK, width=4)
     else:
-        open_by = 16 + mouth * 8 + (10 if mood == "cheer" else 0)
-        draw.pieslice([392, 168, 500, 188 + open_by], 10, 170, fill=(176, 64, 72))
-        draw.rectangle([408, 186, 484, 196], fill=TOOTH)
+        open_by = 12 + mouth * 6 + (8 if mood == "cheer" else 0)
+        draw.pieslice([404, 178, 492, 196 + open_by], 12, 168, fill=(176, 64, 72))
+        draw.rectangle([418, 192, 478, 202], fill=TOOTH)
 
     if mood == "wave":
         _arm(draw, 236, 214, -80 + wave)
@@ -96,17 +94,12 @@ def croc_sprite(beat: str, frame: int) -> Image.Image:
 
 def _eye(draw: ImageDraw.ImageDraw, x: int, y: int, blink: bool, glance: int) -> None:
     if blink:
-        draw.arc([x - 22, y, x + 22, y + 16], 200, 340, fill=INK, width=4)
+        draw.arc([x - 12, y - 1, x + 12, y + 6], 200, 340, fill=INK, width=2)
         return
-    draw.ellipse([x - 22, y - 16, x + 22, y + 18], fill=CREAM, outline=INK, width=3)
-    draw.ellipse([x - 8 + glance, y - 8, x + 8 + glance, y + 10], fill=INK)
-    draw.ellipse([x - 2 + glance, y - 4, x + 4 + glance, y + 2], fill=CREAM)
-
-
-def _lashes(draw: ImageDraw.ImageDraw, x: int, y: int) -> None:
-    draw.line([(x - 16, y + 8), (x - 24, y - 2)], fill=INK, width=3)
-    draw.line([(x, y + 2), (x - 2, y - 10)], fill=INK, width=3)
-    draw.line([(x + 16, y + 8), (x + 22, y - 2)], fill=INK, width=3)
+    draw.ellipse([x - 12, y - 7, x + 12, y + 7], fill=CREAM, outline=INK, width=2)
+    draw.ellipse([x - 4 + glance, y - 4, x + 4 + glance, y + 4], fill=INK)
+    draw.ellipse([x - 1 + glance, y - 2, x + 2 + glance, y + 1], fill=CREAM)
+    draw.arc([x - 14, y - 14, x + 14, y - 1], 210, 340, fill=INK, width=2)
 
 
 def _arm(draw: ImageDraw.ImageDraw, x: int, y: int, angle: int) -> None:
