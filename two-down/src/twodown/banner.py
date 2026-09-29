@@ -1,16 +1,19 @@
-"""YouTube channel banner for cryptic.fit.
+"""YouTube channel art for cryptic.fit.
 
-Upload size is 2560×1440, YouTube's recommended canvas. The minimum they
+The banner is 2560×1440, YouTube's recommended canvas. The minimum they
 accept is 2048×1152. Phones only keep the centre 1546×423, so the name
 and Cryptic Croc sit inside that band. The newsprint runs to the edges
 for desktop and TV.
+
+The profile picture is an 800×800 still PNG. YouTube masks it to a circle
+and shows it as small as 98 pixels, so the bow and snout sit inside that circle.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageChops, ImageDraw, ImageFont
 
 from twodown.config import (
     BRAND,
@@ -29,6 +32,9 @@ BANNER_SIZE = (2560, 1440)
 # Centre region YouTube keeps on every device, scaled to this canvas.
 SAFE_SIZE = (1546, 423)
 MAX_BYTES = 6_000_000
+# YouTube shows the profile picture as a circle, down to 98 pixels.
+PICTURE_SIZE = 800
+PICTURE_MAX_BYTES = 4_000_000
 
 
 def _font(path: str, size: int) -> ImageFont.FreeTypeFont:
@@ -97,4 +103,67 @@ def write_youtube_banner(dest: Path) -> Path:
         img.save(jpeg, "JPEG", quality=90, optimize=True)
         dest.unlink()
         return jpeg
+    return dest
+
+
+def _portrait(sprite: Image.Image) -> Image.Image:
+    """Head, bow and snout. The body shows through a plain box crop."""
+    keep = Image.new("L", sprite.size, 0)
+    mask = ImageDraw.Draw(keep)
+    # Match the drawn bow, head and snout. A looser box lets the belly through.
+    mask.polygon([(300, 78), (244, 42), (264, 114)], fill=255)
+    mask.polygon([(332, 78), (392, 40), (368, 118)], fill=255)
+    mask.ellipse([288, 60, 344, 116], fill=255)
+    mask.ellipse([250, 70, 470, 270], fill=255)
+    mask.ellipse([360, 130, 512, 250], fill=255)
+    sprite = sprite.copy()
+    sprite.putalpha(ImageChops.multiply(sprite.getchannel("A"), keep))
+    box = sprite.getbbox()
+    return sprite.crop(box) if box else sprite
+
+
+def write_youtube_picture(dest: Path) -> Path:
+    """Square PNG for the channel picture. YouTube masks it to a circle."""
+    dest = Path(dest)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    size = PICTURE_SIZE
+    img = Image.new("RGB", (size, size), NEWS_BG)
+    draw = ImageDraw.Draw(img)
+    step = 28
+    for x in range(0, size, step):
+        draw.line([(x, 0), (x, size)], fill=NEWS_GRID, width=1)
+    for y in range(0, size, step):
+        draw.line([(0, y), (size, y)], fill=NEWS_GRID, width=1)
+
+    # Quiet pose: eyes open, smile closed, arm down on the body.
+    head = _portrait(croc_sprite("letters", 4))
+    inset = 18
+    ring = 22
+    # Inner edge of the ring, with a gap so the bow is not cut by it.
+    limit = size / 2 - inset - ring / 2 - 20
+    cx = (head.width - 1) / 2
+    cy = (head.height - 1) / 2
+    alpha = head.getchannel("A")
+    farthest = 1.0
+    for y in range(head.height):
+        for x in range(head.width):
+            if alpha.getpixel((x, y)) == 0:
+                continue
+            farthest = max(farthest, ((x - cx) ** 2 + (y - cy) ** 2) ** 0.5)
+    ratio = limit / farthest
+    head = head.resize(
+        (max(1, int(head.width * ratio)), max(1, int(head.height * ratio))),
+        Image.Resampling.NEAREST,
+    )
+    x = (size - head.width) // 2
+    y = (size - head.height) // 2
+    img.paste(head, (x, y), head)
+    draw.ellipse(
+        [inset, inset, size - 1 - inset, size - 1 - inset],
+        outline=CRIMSON,
+        width=ring,
+    )
+    img.save(dest, "PNG", optimize=True)
+    if dest.stat().st_size > PICTURE_MAX_BYTES:
+        raise ValueError("YouTube profile picture is over 4 MB")
     return dest
