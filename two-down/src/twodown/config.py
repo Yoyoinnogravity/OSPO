@@ -21,63 +21,66 @@ CRAWL_GAP_SECONDS = 1.0
 
 DAILY_CATEGORY_SLUGS = frozenset({"independent", "ft", "guardian"})
 
-# Sonia is the solver: warmer, more empathy. Libby stays as the clearer optional read.
-DEFAULT_VOICE_ALIAS = "sonia"
+# Cryptic Croc presents new films. Maisie is the fun female read.
+# Sonia, Libby, Ryan and Thomas stay available as alternate voices.
+DEFAULT_VOICE_ALIAS = "croc"
 VOICES = {
+    "croc": "en-GB-MaisieNeural",
     "sonia": "en-GB-SoniaNeural",
     "libby": "en-GB-LibbyNeural",
     "ryan": "en-GB-RyanNeural",
     "thomas": "en-GB-ThomasNeural",
 }
 VOICE_LABELS = {
+    "croc": "Cryptic Croc",
     "sonia": "Sonia",
     "libby": "Libby",
     "ryan": "Ryan",
     "thomas": "Thomas",
 }
-# Spoken like people, not a card reader. A bit slower than stock TTS.
-VOICE_RATE = "-10%"
-VOICE_PITCH = "+0Hz"
+# Brighter than the old card-reader pace. Still clear enough to solve by.
+VOICE_RATE = "+2%"
+VOICE_PITCH = "+8Hz"
 VOICE_VOLUME = "+5%"
-CLUE_RATE = "-12%"
-CLUE_PITCH = "-1Hz"
-LETTERS_RATE = "-8%"
-LETTERS_PITCH = "+0Hz"
-THINK_RATE = "-8%"
-THINK_PITCH = "+1Hz"
-HINT_RATE = "+2%"
-HINT_PITCH = "+3Hz"
+CLUE_RATE = "-2%"
+CLUE_PITCH = "+6Hz"
+LETTERS_RATE = "+0%"
+LETTERS_PITCH = "+8Hz"
+THINK_RATE = "+0%"
+THINK_PITCH = "+6Hz"
+HINT_RATE = "+6%"
+HINT_PITCH = "+10Hz"
 HINT_VOLUME = "+7%"
-ANSWER_RATE = "-2%"
-ANSWER_PITCH = "+1Hz"
-# Parse is the same woman, unhurried, with space around the asides.
-PARSE_RATE = "-8%"
-PARSE_PITCH = "+0Hz"
+ANSWER_RATE = "+4%"
+ANSWER_PITCH = "+12Hz"
+# Parse is the same croc, still with space around the asides.
+PARSE_RATE = "-4%"
+PARSE_PITCH = "+4Hz"
 PARSE_ASIDE_PAUSE_SECONDS = 0.7
-INTRO_LINE = "Right — here's your daily dose of cryptic fun."
-INTRO_VOICE_ALIAS = "ryan"
-INTRO_RATE = "+3%"
-INTRO_PITCH = "+4Hz"
+INTRO_LINE = "Hello! I'm Cryptic Croc. Here's your daily dose of cryptic fun."
+INTRO_VOICE_ALIAS = "croc"
+INTRO_RATE = "+6%"
+INTRO_PITCH = "+10Hz"
 INTRO_VOLUME = "+8%"
 INTRO_GAP_SECONDS = 0.45
-OUTRO_LINE = "Thanks for thinking with cryptic.fit."
+OUTRO_LINE = "Thanks for thinking with Cryptic Croc on cryptic.fit."
 OUTRO_GAP_SECONDS = 0.4
-# Source credit is not Sonia — Thomas reads the paper and Fifteen Squared.
-SOURCE_VOICE_ALIAS = "thomas"
-SOURCE_RATE = "-4%"
-SOURCE_PITCH = "+0Hz"
+# She names the setter too, a little steadier than the solve.
+SOURCE_VOICE_ALIAS = "croc"
+SOURCE_RATE = "-2%"
+SOURCE_PITCH = "+2Hz"
 SOURCE_VOLUME = "+4%"
 SOURCE_GAP_SECONDS = 0.35
 THINK_PAUSE_SECONDS = 7.0
 CLUE_LETTERS_GAP_SECONDS = 0.35
 LETTERS_PAUSE_SECONDS = 1.0
 ANSWER_PAUSE_SECONDS = 1.2
-THINK_PROMPT = "Just pause here, and have a think."
-# Ryan offers a clue, then points at the picture. Then we wait for the answer.
+THINK_PROMPT = "Pause here with me, and have a think."
+# Cryptic Croc offers a clue, then points at the picture.
 HINT_OFFER = "If you need a clue."
 HINT_LOOK = "Have a look at this."
 HINT_LINE = f"{HINT_OFFER} {HINT_LOOK}"
-HINT_VOICE_ALIAS = "ryan"
+HINT_VOICE_ALIAS = "croc"
 HINT_HOLD_SECONDS = 4.0
 HINT_PAUSE_SECONDS = 2.5
 CLUES_PER_DAY = 2

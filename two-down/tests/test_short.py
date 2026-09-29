@@ -24,10 +24,10 @@ from twodown.script import (
 from twodown.voice import _speech_sentences
 
 
-def test_solver_voice_is_warm_sonia():
-    assert DEFAULT_VOICE_ALIAS == "sonia"
-    assert VOICES["sonia"] == "en-GB-SoniaNeural"
-    assert VOICE_RATE == "-10%"
+def test_solver_voice_is_cryptic_croc():
+    assert DEFAULT_VOICE_ALIAS == "croc"
+    assert VOICES["croc"] == "en-GB-MaisieNeural"
+    assert VOICE_RATE == "+2%"
 
 
 def test_parse_is_split_into_spoken_sentences():
@@ -65,19 +65,19 @@ def test_study_clue_is_mass_media():
     assert "struggling" in clue.parse.lower()
     assert "mess" in clue.parse.lower()
     parts = write_parts(clue)
-    assert parts.intro_speech == "Right — here's your daily dose of cryptic fun."
+    assert parts.intro_speech == "Hello! I'm Cryptic Croc. Here's your daily dose of cryptic fun."
     assert parts.clue_speech == "Maid struggling with a mess — newspapers etc."
     assert parts.letters_speech == "That's four, five."
-    assert parts.think_speech == "Just pause here, and have a think."
+    assert parts.think_speech == "Pause here with me, and have a think."
     assert parts.hint_speech == HINT_LINE
     assert parts.hint_speech.startswith(HINT_OFFER)
     assert parts.hint_speech.endswith(HINT_LOOK)
     assert parts.hint_speech == "If you need a clue. Have a look at this."
-    assert HINT_VOICE_ALIAS == "ryan"
+    assert HINT_VOICE_ALIAS == "croc"
     assert HINT_VOICE_ALIAS == INTRO_VOICE_ALIAS
     assert parts.answer_speech == "It's mass media."
     assert parts.answer_speech == speak_answer(clue.answer)
-    assert parts.outro_speech == "Thanks for thinking with cryptic.fit."
+    assert parts.outro_speech == "Thanks for thinking with Cryptic Croc on cryptic.fit."
     assert "Brendan" not in parts.parse_speech
     assert "Fifteen Squared" not in parts.parse_speech
     assert parts.source_speech == "That's Arrietty, in the Financial Times — via Fifteen Squared."
@@ -105,11 +105,11 @@ def test_speak_answer_rasta_is_a_word():
 def test_source_credit_is_its_own_line():
     clue = rasta_clue()
     assert speak_source(clue) == "That's Brendan, in the Guardian — via Fifteen Squared."
-    assert SOURCE_VOICE_ALIAS == "thomas"
+    assert SOURCE_VOICE_ALIAS == "croc"
     parts = write_parts(clue)
     assert parts.source_speech == speak_source(clue)
     assert "Fifteen Squared" not in parts.parse_speech
-    assert parts.outro_speech == "Thanks for thinking with cryptic.fit."
+    assert parts.outro_speech == "Thanks for thinking with Cryptic Croc on cryptic.fit."
 
 
 def test_spoken_parse_says_mass_media_as_words():

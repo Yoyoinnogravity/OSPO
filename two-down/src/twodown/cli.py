@@ -129,7 +129,7 @@ def main(argv: list[str] | None = None) -> int:
 
     today = sub.add_parser("today", help="Ingest https://fifteensquared.net/, pick two clues, speak, publish")
     today.add_argument("--out", type=Path, default=DEFAULT_OUTPUT)
-    today.add_argument("--voice", default=DEFAULT_VOICE_ALIAS, help="YouTube/social voice: sonia, libby, ryan, thomas. Site visitors can pick any of these.")
+    today.add_argument("--voice", default=DEFAULT_VOICE_ALIAS, help="Film voice: croc, sonia, libby, ryan, thomas. Site visitors can pick any of these.")
     today.add_argument(
         "--scene",
         choices=[scene.slug for scene in list_scenes()],

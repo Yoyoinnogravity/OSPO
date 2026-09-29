@@ -2,16 +2,22 @@
 const VOICE_KEY = "cryptic-fun-voice";
 const SCENE_KEY = "cryptic-fun-scene";
 
+function filmVoice(video) {
+  return (video && video.dataset.voice) || "sonia";
+}
+
 function currentVoice() {
-  return localStorage.getItem(VOICE_KEY) || "sonia";
+  const saved = localStorage.getItem(VOICE_KEY);
+  if (saved) return saved;
+  return filmVoice(document.querySelector("video.short"));
 }
 
 function currentScene() {
   return localStorage.getItem(SCENE_KEY) || document.body.dataset.defaultScene || "machu-picchu";
 }
 
-function applyVoice(alias) {
-  localStorage.setItem(VOICE_KEY, alias);
+function applyVoice(alias, persist) {
+  if (persist !== false) localStorage.setItem(VOICE_KEY, alias);
   document.querySelectorAll("[data-voice-btn]").forEach((btn) => {
     btn.classList.toggle("on", btn.dataset.voice === alias);
     btn.setAttribute("aria-pressed", btn.dataset.voice === alias ? "true" : "false");
@@ -31,7 +37,11 @@ function applyVoice(alias) {
     };
     audio.addEventListener("loadedmetadata", resume, { once: true });
     const video = article.querySelector("video");
-    if (video) video.muted = alias !== "sonia";
+    if (video) video.muted = alias !== filmVoice(video);
+    audio.addEventListener("error", () => {
+      const fallback = filmVoice(video);
+      if (audio.dataset.voice !== fallback) applyVoice(fallback, false);
+    }, { once: true });
   });
 }
 
@@ -64,7 +74,7 @@ document.querySelectorAll("[data-voice-btn]").forEach((btn) => {
 document.querySelectorAll("[data-scene-btn]").forEach((btn) => {
   btn.addEventListener("click", () => applyScene(btn.dataset.scene));
 });
-applyVoice(currentVoice());
+applyVoice(currentVoice(), false);
 applyScene(currentScene());
 
 const FOLLOW_KEY = "cryptic-fun-follow";
@@ -117,7 +127,7 @@ document.querySelectorAll("article.clue").forEach((article) => {
   const video = article.querySelector("video");
   const audio = article.querySelector("audio.parse-voice");
   if (!video || !audio) return;
-  const otherVoice = () => currentVoice() !== "sonia";
+  const otherVoice = () => currentVoice() !== filmVoice(video);
   const applyMute = () => {
     video.muted = otherVoice();
   };

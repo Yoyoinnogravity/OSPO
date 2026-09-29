@@ -42,6 +42,8 @@ That is good enough. Do not ban AI matching. Do not build a cloud vision pipelin
 3. If it built a new pair:
    - The site poster and the YouTube thumbnail are the unsolved clue with empty lights.
      Do not upload a frame, card, or image that shows the answer or the filled grid.
+   - New films are presented by Cryptic Croc, in her own fun female voice.
+     Leave the older study cuts and earlier daily films as they are.
    - Commit only two-down/site/ (HTML, CSS, JS, media, scenes). Do not commit two-down/output/.
    - Open or update a PR onto main titled like: cryptic.fit · {date}
    - In the PR body list both clues, papers, 15² URLs, scenes, and which social uploads happened or were skipped.

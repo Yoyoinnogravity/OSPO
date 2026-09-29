@@ -26,6 +26,7 @@ from twodown.config import (
     NEWS_GRID,
     THINK_PROMPT,
 )
+from twodown.croc import paste_croc
 from twodown.hints import ensure_hint_photo, hint_for_clue
 from twodown.models import Clue
 from twodown.scenes import DEFAULT_SCENE, Scene, get_scene
@@ -232,19 +233,17 @@ def _new_card() -> tuple[Image.Image, ImageDraw.ImageDraw]:
     return _newsprint_canvas()
 
 
-def draw_beat(clue: Clue, dest: Path, beat: str = "think") -> Path:
-    """One visual beat of the Short. Scene never appears — the clue is the picture."""
-    dest.parent.mkdir(parents=True, exist_ok=True)
+def _paint_beat(clue: Clue, beat: str) -> Image.Image:
+    """The card without Cryptic Croc, so each animation frame can reuse it."""
     img, draw = _new_card()
     _draw_wordmark(draw)
     if beat in {"intro", "outro"}:
         line = INTRO_LINE if beat == "intro" else OUTRO_LINE
-        line_font = _font(FONT_REGULAR, 72)
-        wrapped = _wrap(draw, line.rstrip("."), line_font, WIDTH - 160)
-        _center_text(draw, 760, wrapped, line_font, INK, spacing=18)
+        line_font = _font(FONT_REGULAR, 64)
+        wrapped = _wrap(draw, line.rstrip("."), line_font, WIDTH - 180)
+        _center_text(draw, 280, wrapped, line_font, INK, spacing=16)
         _footer(draw, "")
-        img.save(dest, "PNG")
-        return dest
+        return img
     _draw_kicker(draw, clue)
     show_lights = beat != "clue"
     filled = beat in {"answer", "parse", "source"}
@@ -271,8 +270,7 @@ def draw_beat(clue: Clue, dest: Path, beat: str = "think") -> Path:
         next_y = _center_text(draw, prompt_y, wrapped, prompt, CRIMSON, spacing=8)
         _draw_hint_photo(img, draw, min(next_y + 18, 1040), clue)
         _footer(draw, _source_footer(clue))
-        img.save(dest, "PNG")
-        return dest
+        return img
     if show_answer:
         answer = _font(FONT_BOLD, 84)
         answer_y = min(lights_bottom + 40, 1080)
@@ -292,7 +290,20 @@ def draw_beat(clue: Clue, dest: Path, beat: str = "think") -> Path:
         _footer(draw, "How many letters")
     else:
         _footer(draw, "")
-    img.save(dest, "PNG")
+    return img
+
+
+def compose_beat(clue: Clue, beat: str = "think", frame: int = 0) -> Image.Image:
+    """One frame of a beat, with Cryptic Croc in that pose."""
+    img = _paint_beat(clue, beat)
+    paste_croc(img, beat, frame)
+    return img
+
+
+def draw_beat(clue: Clue, dest: Path, beat: str = "think") -> Path:
+    """One visual beat of the Short. Scene never appears — the clue is the picture."""
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    compose_beat(clue, beat, 0).save(dest, "PNG")
     return dest
 
 
@@ -484,6 +495,103 @@ def _encode_clips(clips: list[tuple[Path, float]], audio: Path, dest: Path) -> P
     return dest
 
 
+def _motion_clip(clue: Clue, beat: str, seconds: float, folder: Path) -> Path:
+    """A few poses of Cryptic Croc, held for this beat."""
+    ffmpeg = shutil.which("ffmpeg")
+    if not ffmpeg:
+        raise RuntimeError("ffmpeg is required to build the Short")
+    seconds = max(float(seconds), 0.24)
+    frames = max(4, int(round(seconds * 6)))
+    folder.mkdir(parents=True, exist_ok=True)
+    base = _paint_beat(clue, beat)
+    for index in range(frames):
+        card = base.copy()
+        paste_croc(card, beat, index)
+        card.save(folder / f"{index:04d}.png")
+    dest = folder.with_suffix(".mp4")
+    subprocess.run(
+        [
+            ffmpeg,
+            "-y",
+            "-framerate",
+            f"{frames / seconds:.5f}",
+            "-i",
+            str(folder / "%04d.png"),
+            "-frames:v",
+            str(frames),
+            "-c:v",
+            "libx264",
+            "-pix_fmt",
+            "yuv420p",
+            "-preset",
+            "veryfast",
+            "-crf",
+            "20",
+            str(dest),
+        ],
+        check=True,
+        capture_output=True,
+    )
+    return dest
+
+
+def _concat_motion(clips: list[Path], audio: Path, dest: Path) -> Path:
+    ffmpeg = shutil.which("ffmpeg")
+    if not ffmpeg:
+        raise RuntimeError("ffmpeg is required to build the Short")
+    listing = dest.with_suffix(".concat.txt")
+    listing.write_text("".join(f"file '{path}'\n" for path in clips), encoding="utf-8")
+    subprocess.run(
+        [
+            ffmpeg,
+            "-y",
+            "-f",
+            "concat",
+            "-safe",
+            "0",
+            "-i",
+            str(listing),
+            "-i",
+            str(audio),
+            "-filter_complex",
+            f"[1:a]aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo,{AUDIO_LOUDNESS}[a]",
+            "-map",
+            "0:v",
+            "-map",
+            "[a]",
+            "-c:v",
+            "libx264",
+            "-profile:v",
+            "main",
+            "-level",
+            "4.0",
+            "-pix_fmt",
+            "yuv420p",
+            "-preset",
+            "veryfast",
+            "-crf",
+            "20",
+            "-c:a",
+            "aac",
+            "-profile:a",
+            "aac_low",
+            "-b:a",
+            "192k",
+            "-ar",
+            "44100",
+            "-ac",
+            "2",
+            "-movflags",
+            "+faststart",
+            "-shortest",
+            str(dest),
+        ],
+        check=True,
+        capture_output=True,
+    )
+    return dest
+
+
 def render_video(
     clue_card: Path,
     reveal_card: Path,
@@ -503,18 +611,33 @@ def render_video(
             timings = ShortTimings(
                 slice_, slice_, slice_, slice_, slice_, slice_, slice_, slice_, slice_
             )
+        names = (
+            "intro",
+            "clue",
+            "letters",
+            "think",
+            "hint",
+            "answer",
+            "parse",
+            "source",
+            "outro",
+        )
+        holds = (
+            timings.intro,
+            timings.clue,
+            timings.letters,
+            timings.think,
+            timings.hint,
+            timings.answer,
+            timings.parse,
+            timings.source,
+            timings.outro,
+        )
         clips = [
-            (draw_beat(clue, work / "intro.png", "intro"), timings.intro),
-            (draw_beat(clue, work / "clue.png", "clue"), timings.clue),
-            (draw_beat(clue, work / "letters.png", "letters"), timings.letters),
-            (draw_beat(clue, work / "think.png", "think"), timings.think),
-            (draw_beat(clue, work / "hint.png", "hint"), timings.hint),
-            (draw_beat(clue, work / "answer.png", "answer"), timings.answer),
-            (draw_beat(clue, work / "parse.png", "parse"), timings.parse),
-            (draw_beat(clue, work / "source.png", "source"), timings.source),
-            (draw_beat(clue, work / "outro.png", "outro"), timings.outro),
+            _motion_clip(clue, name, hold, work / name)
+            for name, hold in zip(names, holds, strict=True)
         ]
-        return _encode_clips(clips, audio, dest)
+        return _concat_motion(clips, audio, dest)
     if clue_hold is None:
         clue_secs = max(7.0, min(duration * 0.42, duration - 6.0))
     else:

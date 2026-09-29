@@ -10,7 +10,7 @@ from bs4 import BeautifulSoup
 from PIL import Image
 
 from twodown.ads import ads_enabled, ads_txt, adsense_client, adsense_slot
-from twodown.config import BRAND, BRAND_LINE, CREDIT_LINE, CREDIT_WHO, SITE_HOST, SITE_ORIGIN, SITE_ROOT, SOURCE_SITE, SPONSOR_EMAIL, SUGGEST_EMAIL, VOICE_LABELS, follow_profiles
+from twodown.config import BRAND, BRAND_LINE, CREDIT_LINE, CREDIT_WHO, DEFAULT_VOICE_ALIAS, SITE_HOST, SITE_ORIGIN, SITE_ROOT, SOURCE_SITE, SPONSOR_EMAIL, SUGGEST_EMAIL, VOICE_LABELS, VOICES, follow_profiles
 from twodown.models import DailyPair, SpokenClue
 from twodown.render import opening_frame_poster, write_share_card, write_thumbnail
 from twodown.scenes import DEFAULT_SCENE, get_scene, list_scenes
@@ -242,16 +242,22 @@ JS = """
 const VOICE_KEY = "cryptic-fun-voice";
 const SCENE_KEY = "cryptic-fun-scene";
 
+function filmVoice(video) {
+  return (video && video.dataset.voice) || "sonia";
+}
+
 function currentVoice() {
-  return localStorage.getItem(VOICE_KEY) || "sonia";
+  const saved = localStorage.getItem(VOICE_KEY);
+  if (saved) return saved;
+  return filmVoice(document.querySelector("video.short"));
 }
 
 function currentScene() {
   return localStorage.getItem(SCENE_KEY) || document.body.dataset.defaultScene || "machu-picchu";
 }
 
-function applyVoice(alias) {
-  localStorage.setItem(VOICE_KEY, alias);
+function applyVoice(alias, persist) {
+  if (persist !== false) localStorage.setItem(VOICE_KEY, alias);
   document.querySelectorAll("[data-voice-btn]").forEach((btn) => {
     btn.classList.toggle("on", btn.dataset.voice === alias);
     btn.setAttribute("aria-pressed", btn.dataset.voice === alias ? "true" : "false");
@@ -271,7 +277,11 @@ function applyVoice(alias) {
     };
     audio.addEventListener("loadedmetadata", resume, { once: true });
     const video = article.querySelector("video");
-    if (video) video.muted = alias !== "sonia";
+    if (video) video.muted = alias !== filmVoice(video);
+    audio.addEventListener("error", () => {
+      const fallback = filmVoice(video);
+      if (audio.dataset.voice !== fallback) applyVoice(fallback, false);
+    }, { once: true });
   });
 }
 
@@ -304,7 +314,7 @@ document.querySelectorAll("[data-voice-btn]").forEach((btn) => {
 document.querySelectorAll("[data-scene-btn]").forEach((btn) => {
   btn.addEventListener("click", () => applyScene(btn.dataset.scene));
 });
-applyVoice(currentVoice());
+applyVoice(currentVoice(), false);
 applyScene(currentScene());
 
 const FOLLOW_KEY = "cryptic-fun-follow";
@@ -357,7 +367,7 @@ document.querySelectorAll("article.clue").forEach((article) => {
   const video = article.querySelector("video");
   const audio = article.querySelector("audio.parse-voice");
   if (!video || !audio) return;
-  const otherVoice = () => currentVoice() !== "sonia";
+  const otherVoice = () => currentVoice() !== filmVoice(video);
   const applyMute = () => {
     video.muted = otherVoice();
   };
@@ -457,6 +467,13 @@ if (subscribeForm) {
   });
 }
 """
+
+
+def _voice_alias(voice: str | None) -> str:
+    for alias, neural in VOICES.items():
+        if voice in {alias, neural}:
+            return alias
+    return DEFAULT_VOICE_ALIAS
 
 
 def _e(text: str | None) -> str:
@@ -635,18 +652,19 @@ def _page(body: str, seo: PageSeo, depth: int = 0, show_ads: bool = False) -> st
 def _article(item: SpokenClue, media_prefix: str, open_by_default: bool = False, show_clue_text: bool = True) -> str:
     clue = item.clue
     opened = " is-open" if open_by_default else ""
+    alias = _voice_alias(item.voice)
     video = ""
     if item.video_path:
         poster = ""
         if item.thumbnail_path:
             poster = f' poster="{_e(media_prefix + clue.slug + "-poster.webp")}"'
         video = (
-            f'<video class="short" controls playsinline preload="metadata"{poster} '
+            f'<video class="short" controls playsinline preload="metadata" data-voice="{_e(alias)}"{poster} '
             f'src="{_e(media_prefix + clue.slug + ".mp4")}"></video>'
         )
     audio = (
         f'<audio class="parse-voice" controls preload="none" data-prefix="{_e(media_prefix)}" '
-        f'src="{_e(media_prefix + clue.slug)}-sonia.mp3"></audio>'
+        f'src="{_e(media_prefix + clue.slug)}-{_e(alias)}.mp3"></audio>'
     )
     enum = f" ({_e(clue.enumeration)})" if clue.enumeration else ""
     clue_block = f'<p class="clue-text">{_e(clue.clue)}{enum}</p>' if show_clue_text else ""
@@ -1177,7 +1195,7 @@ def publish_site(pair: DailyPair, dest: Path | None = None) -> Path:
 
     about = f"""
     <h1>About.</h1>
-    <p class="lede">{BRAND_LINE} {CREDIT_LINE} {CREDIT_WHO[:1].upper()}{CREDIT_WHO[1:]}. The only source is <a href="{SOURCE_SITE}">Fifteen Squared</a> — Independent, Guardian and Financial Times blogs. We never invent answers. Choose Sonia, Ryan, Libby or Thomas, and a real place as the backdrop. The same Shorts go to YouTube, TikTok, Instagram and Facebook when those accounts are connected. The site is the spoiler-safe home.</p>
+    <p class="lede">{BRAND_LINE} {CREDIT_LINE} {CREDIT_WHO[:1].upper()}{CREDIT_WHO[1:]}. The only source is <a href="{SOURCE_SITE}">Fifteen Squared</a> — Independent, Guardian and Financial Times blogs. We never invent answers. Cryptic Croc presents the new films. Sonia, Libby, Ryan and Thomas stay on the voice list, and you can still pick a real place as the backdrop. The same Shorts go to YouTube, TikTok, Instagram and Facebook when those accounts are connected. The site is the spoiler-safe home.</p>
     <p>Answers and wordplay belong to the setters and the 15² bloggers. We rewrite for speech and always link the original post.</p>
     <p>Readers can <a href="suggest.html">suggest one homemade clue a day</a>, or ask for a daily clue by email. Both land in Aled’s inbox at <a href="mailto:{_e(SUGGEST_EMAIL)}">{_e(SUGGEST_EMAIL)}</a>.</p>
     <p>When the site has readers, a small labelled ad can sit under the pair — never on the answer. How that works is on <a href="support.html">Support</a>.</p>

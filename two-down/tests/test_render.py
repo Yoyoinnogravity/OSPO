@@ -88,6 +88,19 @@ def test_thumbnail_is_the_unsolved_clue(tmp_path: Path):
         assert leaked < len(spoilers) * 0.05
 
 
+def test_cryptic_croc_moves_on_the_card(tmp_path: Path):
+    from twodown.config import NEWS_BG
+    from twodown.render import compose_beat
+
+    talking = compose_beat(_clue(), "letters", 2)
+    later = compose_beat(_clue(), "letters", 6)
+    assert talking.size == (1080, 1920)
+    assert talking.getpixel((24, 40)) == NEWS_BG
+    assert talking.crop((20, 1400, 420, 1880)).tobytes() != later.crop((20, 1400, 420, 1880)).tobytes()
+    greeting = compose_beat(_clue(), "intro", 3)
+    assert greeting.crop((200, 1000, 880, 1700)).tobytes() != talking.crop((200, 1000, 880, 1700)).tobytes()
+
+
 def test_clue_card_is_a_solve_along(tmp_path: Path):
     from PIL import Image
 
