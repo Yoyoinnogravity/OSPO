@@ -11,7 +11,7 @@ from bs4 import BeautifulSoup
 from PIL import Image
 
 from twodown.ads import ads_enabled, ads_txt, adsense_client, adsense_slot
-from twodown.banner import write_youtube_picture
+from twodown.banner import write_site_croc, write_youtube_picture
 from twodown.config import BRAND, BRAND_LINE, CREDIT_LINE, CREDIT_WHO, DEFAULT_VOICE_ALIAS, SITE_HOST, SITE_ORIGIN, SITE_ROOT, SOURCE_SITE, SPONSOR_EMAIL, SUGGEST_EMAIL, VOICE_LABELS, VOICES, follow_profiles
 from twodown.models import DailyPair, SpokenClue
 from twodown.render import opening_frame_poster, write_share_card, write_thumbnail
@@ -41,7 +41,7 @@ CSS = """
   --crimson: #b81c29;
   --muted: #5c4e40;
   --cream: #fcf7ec;
-  --rule: rgba(184, 28, 41, 0.35);
+  --rule: rgba(26, 21, 16, 0.14);
 }
 * { box-sizing: border-box; }
 html { background: #120f0c; }
@@ -70,24 +70,24 @@ body.scene-photo::before {
   content: "";
   position: fixed;
   inset: 0;
-  background: linear-gradient(180deg, rgba(12,10,8,0.48) 0%, rgba(12,10,8,0.28) 42%, rgba(12,10,8,0.58) 100%);
+  background: linear-gradient(180deg, rgba(12,10,8,0.58) 0%, rgba(12,10,8,0.4) 42%, rgba(12,10,8,0.66) 100%);
   pointer-events: none;
   z-index: 0;
 }
 body > * { position: relative; z-index: 1; }
 a { color: var(--crimson); }
-body.scene-photo a { color: #ffb3b8; }
+body.scene-photo a { color: #e7d2d4; }
 header, main, footer { width: min(1100px, calc(100% - 40px)); margin: 0 auto; }
 header {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 18px 18px 14px;
+  gap: 10px;
+  padding: 16px 18px 12px;
   margin-top: 18px;
-  border-bottom: 4px solid var(--crimson);
-  background: rgba(252, 247, 236, 0.92);
+  border-bottom: 1px solid var(--rule);
+  background: rgba(252, 247, 236, 0.94);
   color: var(--ink);
-  box-shadow: 0 10px 40px rgba(8,6,4,0.18);
+  box-shadow: 0 8px 24px rgba(8,6,4,0.1);
 }
 header a { color: var(--muted); }
 body.scene-photo header a { color: var(--muted); }
@@ -97,32 +97,32 @@ body.scene-photo header .follow a.on { color: var(--cream); }
 nav a:hover { color: var(--crimson); }
 .chrome-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
 .wordmark { display: inline-flex; align-items: center; gap: 10px; font-family: "Liberation Sans", "Helvetica Neue", sans-serif; font-weight: 700; font-size: 1.6rem; letter-spacing: 0.02em; color: var(--ink); text-decoration: none; }
-.wordmark .profile { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; background: var(--news); flex: none; }
+.wordmark .profile { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; background: var(--news); flex: none; }
 .wordmark span { color: var(--crimson); }
-.channel-picture { width: 160px; height: 160px; border-radius: 50%; object-fit: cover; background: var(--news); display: block; margin: 12px 0 16px; }
+.channel-picture { width: 128px; height: 128px; border-radius: 50%; object-fit: cover; background: var(--news); display: block; margin: 12px 0 16px; }
 .croc-hello {
   display: flex;
-  align-items: center;
-  gap: 22px;
+  align-items: flex-end;
+  gap: 8px;
   background: rgba(252, 247, 236, 0.94);
   color: var(--ink);
-  padding: 22px;
-  margin: 28px 0 8px;
-  border-bottom: 4px solid var(--crimson);
-  box-shadow: 6px 6px 0 rgba(184, 28, 41, 0.12);
+  padding: 18px 22px 0 12px;
+  margin: 22px 0 8px;
+  border: 1px solid var(--rule);
 }
 .croc-hello img {
-  width: 148px;
-  height: 148px;
-  border-radius: 50%;
-  object-fit: cover;
-  background: var(--news);
+  width: 168px;
+  height: auto;
+  border-radius: 0;
+  object-fit: contain;
+  background: transparent;
   flex: none;
 }
-.croc-hello h1 { margin: 0 0 8px; font-size: clamp(1.8rem, 4vw, 2.8rem); }
+.croc-hello h1 { margin: 0 0 8px; font-size: clamp(1.35rem, 2.2vw, 1.85rem); font-weight: 400; }
 .croc-hello p { margin: 0; max-width: 38rem; }
 .croc-hello h1, .croc-hello p, .croc-hello .kicker { text-shadow: none; }
 .croc-hello p { color: var(--muted); }
+.croc-hello div { padding-bottom: 18px; }
 h2.day-title { font-size: clamp(2rem, 5vw, 3.4rem); line-height: 1.05; margin: 28px 0 8px; font-weight: 400; }
 section.solved { margin: 12px 0 36px; }
 .shelf { display: grid; grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); gap: 14px; margin: 16px 0 18px; }
@@ -135,7 +135,6 @@ a.film-card {
   text-decoration: none;
   padding: 8px;
   border: 1px solid var(--rule);
-  box-shadow: 4px 4px 0 rgba(184, 28, 41, 0.12);
 }
 body.scene-photo a.film-card,
 body.scene-photo a.film-card .clue-text,
@@ -145,8 +144,9 @@ a.film-card .clue-text { font-size: 0.92rem; line-height: 1.25; margin: 0; color
 a.film-card .when,
 body.scene-photo a.film-card .when { font-family: "Liberation Sans", sans-serif; font-size: 0.72rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); margin: 0; }
 @media (max-width: 700px) {
-  .croc-hello { flex-direction: column; align-items: flex-start; }
-  .croc-hello img { width: 112px; height: 112px; }
+  .croc-hello { flex-direction: column; align-items: flex-start; padding-bottom: 8px; }
+  .croc-hello img { width: 132px; }
+  .croc-hello div { padding-bottom: 10px; }
 }
 nav a { margin-left: 18px; font-family: "Liberation Sans", sans-serif; font-size: 0.9rem; text-decoration: none; color: var(--muted); }
 .voices, .places, .follow { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
@@ -176,11 +176,10 @@ article.clue {
   color: var(--ink);
   border: 1px solid var(--rule);
   padding: 22px 22px 18px;
-  box-shadow: 6px 6px 0 rgba(184, 28, 41, 0.12);
 }
 article.clue a { color: var(--crimson); }
 .kicker { font-family: "Liberation Sans", sans-serif; font-size: 0.78rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--crimson); margin: 0 0 12px; }
-body.scene-photo > main > .kicker { color: #ffb3b8; }
+body.scene-photo > main > .kicker { color: #f0d8d6; }
 .clue-text { font-size: 1.55rem; line-height: 1.25; margin: 0 0 18px; }
 button.reveal {
   font-family: "Liberation Sans", sans-serif;
@@ -215,7 +214,7 @@ audio.parse-voice { width: 100%; margin-top: 8px; }
 .scene-credits { list-style: none; padding: 0; }
 .scene-credits li { margin: 0 0 8px; }
 footer {
-  border-top: 2px solid var(--crimson);
+  border-top: 1px solid var(--rule);
   padding: 24px 18px 48px;
   margin-bottom: 24px;
   color: var(--muted);
@@ -231,7 +230,6 @@ body.scene-photo h2 { text-shadow: 0 2px 18px rgba(0,0,0,0.55); }
   color: var(--ink);
   border: 1px solid var(--rule);
   padding: 22px 22px 18px;
-  box-shadow: 6px 6px 0 rgba(184, 28, 41, 0.12);
   margin: 0 0 36px;
   max-width: 40rem;
 }
@@ -1017,7 +1015,7 @@ def solved_films(root: Path, skip_date: str | None = None) -> list[SolvedFilm]:
 def _croc_hello(prefix: str, *, title: str, lede: str) -> str:
     return f"""
     <section class="croc-hello">
-      <img src="{prefix}assets/profile.png" width="800" height="800" alt="Cryptic Croc">
+      <img class="croc-figure" src="{prefix}assets/croc.webp" width="640" height="560" alt="">
       <div>
         <p class="kicker">Cryptic Croc</p>
         <h1>{_e(title)}</h1>
@@ -1296,7 +1294,8 @@ def publish_site(pair: DailyPair, dest: Path | None = None) -> Path:
     (root / ".nojekyll").write_text("", encoding="utf-8")
     (root / "robots.txt").write_text(robots_txt(), encoding="utf-8")
     (root / "assets" / "favicon.svg").write_text(FAVICON_SVG, encoding="utf-8")
-    write_youtube_picture(root / "assets" / "profile.png")
+    write_youtube_picture(root / "assets" / "profile.png", ring=False)
+    write_site_croc(root / "assets" / "croc.webp")
     write_share_card(root / "media" / "og.webp")
     ads_path = root / "ads.txt"
     listing = ads_txt()

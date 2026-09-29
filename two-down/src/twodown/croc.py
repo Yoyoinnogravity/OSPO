@@ -168,11 +168,10 @@ def _head(splat, open_jaw: float, blink: bool, neck: bool) -> None:
 
     eyes = (np.array((1.02, 0.98, 0.5)), np.array((1.42, 1.02, 0.54)))
     for eye in eyes:
-        splat(eye, (0.17, 0.16, 0.13), _SCLERA, specular=0.9, shiny=96)
-        splat(eye + (0.015, 0.0, 0.08), (0.075, 0.075, 0.04), _IRIS, specular=0.45, shiny=32)
-        splat(eye + (0.02, -0.005, 0.11), (0.036, 0.036, 0.02), _PUPIL, specular=0.02, shiny=4)
-        splat(eye + (-0.04, 0.045, 0.13), (0.032, 0.024, 0.012), _LIGHT, emissive=True)
-        splat(eye + (0.035, -0.02, 0.13), (0.012, 0.01, 0.008), _LIGHT, emissive=True)
+        splat(eye, (0.145, 0.132, 0.11), _SCLERA, specular=0.5, shiny=64)
+        splat(eye + (0.012, 0.0, 0.07), (0.06, 0.06, 0.032), _IRIS, specular=0.28, shiny=24)
+        splat(eye + (0.016, -0.004, 0.1), (0.028, 0.028, 0.016), _PUPIL, specular=0.02, shiny=4)
+        splat(eye + (-0.032, 0.036, 0.12), (0.02, 0.016, 0.01), _LIGHT, emissive=True)
         # A lid along the top of the eye, leaving most of the eye open.
         splat(eye + (0.0, 0.15, 0.02), (0.17, 0.035, 0.05), _BODY * 0.82, specular=0.05, shiny=8)
         if blink:

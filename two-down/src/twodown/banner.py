@@ -118,7 +118,23 @@ def _center_sprite(sprite: Image.Image) -> Image.Image:
     return square
 
 
-def write_youtube_picture(dest: Path) -> Path:
+def write_site_croc(dest: Path) -> Path:
+    """Resting Cryptic Croc for the site. Transparent around her, no ring."""
+    dest = Path(dest)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    sprite = croc_sprite("think", 4)
+    bbox = sprite.getbbox()
+    if bbox is None:
+        raise ValueError("Cryptic Croc sprite is empty")
+    cropped = sprite.crop(bbox)
+    pad = 8
+    canvas = Image.new("RGBA", (cropped.width + pad * 2, cropped.height + pad * 2), (0, 0, 0, 0))
+    canvas.paste(cropped, (pad, pad), cropped)
+    canvas.save(dest, "WEBP", quality=82, method=6)
+    return dest
+
+
+def write_youtube_picture(dest: Path, *, ring: bool = True) -> Path:
     """Square PNG for the channel picture. YouTube masks it to a circle."""
     dest = Path(dest)
     dest.parent.mkdir(parents=True, exist_ok=True)
@@ -133,10 +149,10 @@ def write_youtube_picture(dest: Path) -> Path:
 
     # Quiet pose: eyes open, mouth closed. Centre the head before the circle crop.
     head = _center_sprite(croc_portrait())
-    inset = 18
-    ring = 22
+    inset = 18 if ring else 10
+    ring_width = 22 if ring else 0
     # Inner edge of the ring, with a gap so the scarf and snout are not cut.
-    limit = size / 2 - inset - ring / 2 - 36
+    limit = size / 2 - inset - ring_width / 2 - (36 if ring else 24)
     cx = (head.width - 1) / 2
     cy = (head.height - 1) / 2
     alpha = head.getchannel("A")
@@ -154,11 +170,12 @@ def write_youtube_picture(dest: Path) -> Path:
     x = (size - head.width) // 2
     y = (size - head.height) // 2
     img.paste(head, (x, y), head)
-    draw.ellipse(
-        [inset, inset, size - 1 - inset, size - 1 - inset],
-        outline=CRIMSON,
-        width=ring,
-    )
+    if ring:
+        draw.ellipse(
+            [inset, inset, size - 1 - inset, size - 1 - inset],
+            outline=CRIMSON,
+            width=ring_width,
+        )
     img.save(dest, "PNG", optimize=True)
     if dest.stat().st_size > PICTURE_MAX_BYTES:
         raise ValueError("YouTube profile picture is over 4 MB")
