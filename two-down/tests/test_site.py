@@ -2,12 +2,15 @@ from twodown.captions import youtube_description
 from twodown.models import Clue, DailyPair, SpokenClue
 from twodown.site import (
     _ensure_profile,
+    _playable_daily,
+    _solved_shelf,
     attach_video_posters,
     earlier_days,
     legacy_videos,
     publish_films,
     publish_site,
     retarget_cdn,
+    solved_films,
 )
 from twodown.youtube import YOUTUBE_CHANNEL, thumbnail_file, upload_short, video_title
 
@@ -103,6 +106,8 @@ def test_publish_site_writes_spoiler_pages(tmp_path):
     assert "https://cryptic.fit/films.html" in (tmp_path / "sitemap.xml").read_text(encoding="utf-8")
     assert 'href="films.html">Films</a>' in index
     assert "All the Shorts" in index
+    assert "Hello. I’m Cryptic Croc." in index
+    assert "croc-hello" in index
     assert "How we pay for this" in index
     assert "adsbygoogle" not in index
     assert not (tmp_path / "ads.txt").exists()
@@ -146,6 +151,37 @@ def test_publish_site_writes_spoiler_pages(tmp_path):
     assert 'class="channel-picture"' in follow
     assert ".wordmark .profile" in css
     assert "application/rss+xml" in index
+
+
+def test_solved_shelf_hides_the_answer(tmp_path):
+    day = tmp_path / "d" / "2026-09-16"
+    day.mkdir(parents=True)
+    (day / "index.html").write_text(
+        """
+        <article class="clue" data-slug="independent-12462-6a">
+          <p class="kicker">Independent 12462</p>
+          <p class="clue-text">Model youngster eating in (3-2)</p>
+          <p class="answer">PIN-UP</p>
+          <video src="../../media/independent-12462-6a.mp4" poster="../../media/independent-12462-6a-poster.webp"></video>
+        </article>
+        """,
+        encoding="utf-8",
+    )
+    media = tmp_path / "media"
+    media.mkdir()
+    (media / "independent-12462-6a.mp4").write_bytes(b"film")
+    (media / "independent-12462-6a-poster.webp").write_bytes(b"RIFF")
+    films = solved_films(tmp_path)
+    assert films[0].slug == "independent-12462-6a"
+    assert films[0].video == "independent-12462-6a.mp4"
+    shelf = _solved_shelf(tmp_path)
+    assert "PIN-UP" not in shelf
+    assert 'href="c/independent-12462-6a/"' in shelf
+    assert "independent-12462-6a-poster.webp" in shelf
+    played = _playable_daily(tmp_path)
+    assert "PIN-UP" not in played
+    assert 'src="media/independent-12462-6a.mp4"' in played
+    assert 'poster="media/independent-12462-6a-poster.webp"' in played
 
 
 def test_films_page_serves_legacy_videos_from_the_site(tmp_path):

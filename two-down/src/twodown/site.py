@@ -5,6 +5,7 @@ import re
 from datetime import datetime
 from pathlib import Path
 from shutil import copy2
+from typing import NamedTuple
 
 from bs4 import BeautifulSoup
 from PIL import Image
@@ -99,6 +100,55 @@ nav a:hover { color: var(--crimson); }
 .wordmark .profile { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; border: 2px solid var(--crimson); background: var(--news); flex: none; }
 .wordmark span { color: var(--crimson); }
 .channel-picture { width: 160px; height: 160px; border-radius: 50%; object-fit: cover; border: 4px solid var(--crimson); background: var(--news); display: block; margin: 12px 0 16px; }
+.croc-hello {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  background: rgba(252, 247, 236, 0.94);
+  color: var(--ink);
+  padding: 22px;
+  margin: 28px 0 8px;
+  border-bottom: 4px solid var(--crimson);
+  box-shadow: 6px 6px 0 rgba(184, 28, 41, 0.12);
+}
+.croc-hello img {
+  width: 148px;
+  height: 148px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 4px solid var(--crimson);
+  background: var(--news);
+  flex: none;
+}
+.croc-hello h1 { margin: 0 0 8px; font-size: clamp(1.8rem, 4vw, 2.8rem); }
+.croc-hello p { margin: 0; max-width: 38rem; }
+.croc-hello h1, .croc-hello p, .croc-hello .kicker { text-shadow: none; }
+.croc-hello p { color: var(--muted); }
+h2.day-title { font-size: clamp(2rem, 5vw, 3.4rem); line-height: 1.05; margin: 28px 0 8px; font-weight: 400; }
+section.solved { margin: 12px 0 36px; }
+.shelf { display: grid; grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); gap: 14px; margin: 16px 0 18px; }
+a.film-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: rgba(252, 247, 236, 0.94);
+  color: var(--ink);
+  text-decoration: none;
+  padding: 8px;
+  border: 1px solid var(--rule);
+  box-shadow: 4px 4px 0 rgba(184, 28, 41, 0.12);
+}
+body.scene-photo a.film-card,
+body.scene-photo a.film-card .clue-text,
+a.film-card:hover { color: var(--ink); }
+a.film-card img { width: 100%; aspect-ratio: 9 / 16; object-fit: cover; background: #111; border-radius: 8px; }
+a.film-card .clue-text { font-size: 0.92rem; line-height: 1.25; margin: 0; color: var(--ink); }
+a.film-card .when,
+body.scene-photo a.film-card .when { font-family: "Liberation Sans", sans-serif; font-size: 0.72rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); margin: 0; }
+@media (max-width: 700px) {
+  .croc-hello { flex-direction: column; align-items: flex-start; }
+  .croc-hello img { width: 112px; height: 112px; }
+}
 nav a { margin-left: 18px; font-family: "Liberation Sans", sans-serif; font-size: 0.9rem; text-decoration: none; color: var(--muted); }
 .voices, .places, .follow { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .voices span, .places span, .follow span { font-family: "Liberation Sans", sans-serif; font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-right: 4px; }
@@ -912,6 +962,124 @@ def _pretty_day(date: str) -> str:
     return datetime.strptime(date, "%Y-%m-%d").strftime("%A %-d %B %Y")
 
 
+class SolvedFilm(NamedTuple):
+    """One published daily clue. The written answer is never copied onto a shelf."""
+
+    date: str
+    pretty: str
+    clue: str
+    kicker: str
+    slug: str
+    video: str
+    poster: str
+
+
+def solved_films(root: Path, skip_date: str | None = None) -> list[SolvedFilm]:
+    """Daily solves, newest first. The answer line on the day page stays out."""
+    day_root = Path(root) / "d"
+    if not day_root.is_dir():
+        return []
+    found: list[SolvedFilm] = []
+    folders = [folder for folder in day_root.iterdir() if folder.is_dir() and (folder / "index.html").exists()]
+    folders.sort(key=lambda folder: folder.name, reverse=True)
+    for folder in folders:
+        if skip_date and folder.name == skip_date:
+            continue
+        try:
+            pretty = _pretty_day(folder.name)
+        except ValueError:
+            continue
+        soup = BeautifulSoup((folder / "index.html").read_text(encoding="utf-8"), "lxml")
+        articles = soup.select("article.clue")
+        if not articles:
+            for node in soup.select("p.clue-text"):
+                found.append(SolvedFilm(folder.name, pretty, node.get_text(" ", strip=True), "", "", "", ""))
+            continue
+        for article in articles:
+            clue_node = article.select_one("p.clue-text")
+            clue = clue_node.get_text(" ", strip=True) if clue_node else ""
+            kicker_node = article.select_one("p.kicker")
+            kicker = kicker_node.get_text(" ", strip=True) if kicker_node else ""
+            slug = article.get("data-slug") or ""
+            video = ""
+            poster = ""
+            video_node = article.select_one("video")
+            src = video_node.get("src", "") if video_node else ""
+            name = Path(src).name
+            if name.endswith(".mp4") and (Path(root) / "media" / name).is_file():
+                video = name
+                card = f"{Path(name).stem}-poster.webp"
+                if (Path(root) / "media" / card).is_file():
+                    poster = card
+            found.append(SolvedFilm(folder.name, pretty, clue, kicker, slug, video, poster))
+    return found
+
+
+def _croc_hello(prefix: str, *, title: str, lede: str) -> str:
+    return f"""
+    <section class="croc-hello">
+      <img src="{prefix}assets/profile.png" width="800" height="800" alt="Cryptic Croc">
+      <div>
+        <p class="kicker">Cryptic Croc</p>
+        <h1>{_e(title)}</h1>
+        <p>{_e(lede)}</p>
+      </div>
+    </section>
+    """
+
+
+def _solved_shelf(root: Path, prefix: str = "", skip_date: str | None = None) -> str:
+    cards = []
+    for film in solved_films(root, skip_date=skip_date):
+        href = f"{prefix}c/{film.slug}/" if film.slug else f"{prefix}d/{film.date}/"
+        image = ""
+        if film.poster:
+            image = f'<img src="{prefix}media/{_e(film.poster)}" alt="">'
+        cards.append(
+            f'<a class="film-card" href="{href}">'
+            f"{image}"
+            f'<p class="when">{_e(film.pretty)}</p>'
+            f'<p class="clue-text">{_e(film.clue)}</p>'
+            f"</a>"
+        )
+    grid = f'<div class="shelf">{"".join(cards)}</div>' if cards else ""
+    return f"""
+    <section class="solved">
+      <p class="kicker">Solved</p>
+      <h2>Every film we have cut.</h2>
+      {grid}
+      <a class="action" href="{prefix}films.html">All the Shorts</a>
+    </section>
+    """
+
+
+def _playable_daily(root: Path) -> str:
+    blocks = []
+    for film in solved_films(root):
+        player = ""
+        if film.video:
+            poster_attr = f' poster="media/{_e(film.poster)}"' if film.poster else ""
+            player = (
+                f'<video class="short" controls playsinline preload="metadata"{poster_attr} '
+                f'src="media/{_e(film.video)}"></video>'
+            )
+        opener = ""
+        if film.slug:
+            opener = f'<p class="credit"><a href="c/{_e(film.slug)}/">Open this clue</a></p>'
+        elif film.date:
+            opener = f'<p class="credit"><a href="d/{_e(film.date)}/">Open this day</a></p>'
+        blocks.append(
+            '<article class="clue">'
+            f'<p class="kicker">{_e(film.pretty)}</p>'
+            f'<p class="clue-text">{_e(film.clue)}</p>'
+            f"{player}{opener}"
+            "</article>"
+        )
+    if not blocks:
+        return "<p>No daily pair on the site yet.</p>"
+    return "<section class='pair'>" + "\n".join(blocks) + "</section>"
+
+
 def earlier_days(root: Path, skip_date: str | None = None) -> list[tuple[str, str, list[str]]]:
     """Published day pages, newest first. Each item is date, pretty date, clue surfaces."""
     day_root = root / "d"
@@ -955,39 +1123,19 @@ def _legacy_article(path: Path) -> str:
 
 
 def _earlier_teaser(root: Path, prefix: str = "", skip_date: str | None = None) -> str:
-    items = []
-    for date, pretty, clues in earlier_days(root, skip_date=skip_date):
-        surface = " · ".join(clues) if clues else pretty
-        items.append(f'<li><a href="{prefix}d/{_e(date)}/">{_e(pretty)}</a> — {_e(surface)}</li>')
-    listing = f"<ul class='archive'>{''.join(items)}</ul>" if items else ""
-    return f"""
-    <aside class="teaser">
-      <p class="kicker">Earlier</p>
-      <h2>Every film we have cut.</h2>
-      {listing}
-      <a class="action" href="{prefix}films.html">All the Shorts</a>
-    </aside>
-    """
+    return _solved_shelf(root, prefix=prefix, skip_date=skip_date)
 
 
 def _films_body(root: Path) -> str:
-    days = []
-    for date, pretty, clues in earlier_days(root):
-        surface = " · ".join(clues) if clues else pretty
-        days.append(f'<li><a href="d/{_e(date)}/">{_e(pretty)}</a> — {_e(surface)}</li>')
-    day_list = f"<ul class='archive'>{''.join(days)}</ul>" if days else "<p>No daily pair on the site yet.</p>"
     films = legacy_videos(root)
-    grid = ""
     if films:
         grid = "<section class='pair'>" + "\n".join(_legacy_article(path) for path in films) + "</section>"
     else:
         grid = "<p>Study cuts will sit here once their films are in the site media folder.</p>"
     return f"""
-    <p class="kicker">Archive</p>
-    <h1>Films.</h1>
-    <p class="lede">Every Short is on cryptic.fit. Daily pairs stay spoiler-safe on their own page. The study cuts play here.</p>
+    {_croc_hello("", title="Every film on cryptic.fit.", lede="Daily solves play here, newest first. I present the new ones. The study cuts sit underneath.")}
     <h2>Daily pairs.</h2>
-    {day_list}
+    {_playable_daily(root)}
     <h2>Study cuts.</h2>
     {grid}
     """
@@ -1162,8 +1310,9 @@ def publish_site(pair: DailyPair, dest: Path | None = None) -> Path:
     pretty = datetime.strptime(pair.date, "%Y-%m-%d").strftime("%A %-d %B %Y")
     articles = "\n".join(_article(item, "media/") for item in pair.clues)
     index_body = f"""
+    {_croc_hello("", title="Hello. I’m Cryptic Croc.", lede="Two clues a day from Fifteen Squared. Have a go before you tap solve, then I’ll talk the new films through.")}
     <p class="kicker">Two clues · {_e(pretty)}</p>
-    <h1>Today’s pair.</h1>
+    <h2 class="day-title">Today’s pair.</h2>
     <p class="lede">Have a go before you tap solve. Parses follow Fifteen Squared — we speak them, we don’t nick the grid. Pick a place from the header if you’d rather solve against the Matterhorn than newsprint.</p>
     <section class="pair">
       {articles}
