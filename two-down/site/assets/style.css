@@ -179,6 +179,8 @@ a.action {
   text-decoration: none;
   font-size: 0.95rem;
 }
+ul.archive { list-style: none; padding: 0; margin: 0 0 16px; }
+ul.archive li { margin: 0 0 8px; }
 aside.ad {
   background: rgba(252, 247, 236, 0.94);
   color: var(--ink);

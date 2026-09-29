@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import html
+import re
 from datetime import datetime
 from pathlib import Path
 from shutil import copy2
+
+from bs4 import BeautifulSoup
 
 from twodown.ads import ads_enabled, ads_txt, adsense_client, adsense_slot
 from twodown.config import BRAND, BRAND_LINE, CREDIT_LINE, CREDIT_WHO, SITE_HOST, SITE_ORIGIN, SITE_ROOT, SOURCE_SITE, SPONSOR_EMAIL, SUGGEST_EMAIL, VOICE_LABELS, follow_profiles
@@ -209,6 +212,8 @@ a.action {
   text-decoration: none;
   font-size: 0.95rem;
 }
+ul.archive { list-style: none; padding: 0; margin: 0 0 16px; }
+ul.archive li { margin: 0 0 8px; }
 aside.ad {
   background: rgba(252, 247, 236, 0.94);
   color: var(--ink);
@@ -487,6 +492,7 @@ def _nav(prefix: str) -> str:
     return f"""
       <nav>
         <a href="{prefix}index.html">Today</a>
+        <a href="{prefix}films.html">Films</a>
         <a href="{prefix}follow.html">Follow</a>
         <a href="{prefix}suggest.html">Suggest</a>
         <a href="{prefix}support.html">Support</a>
@@ -685,6 +691,256 @@ def _about_credits() -> str:
     return "<ul class='scene-credits'>" + "".join(items) + "</ul>"
 
 
+# Study cuts that predate the daily pages. The filename is the file in site/media/.
+_LEGACY_LABELS: dict[str, tuple[str, str]] = {
+    "mass-media-if-you-need.mp4": (
+        "Maid struggling with a mess — newspapers etc (4,5)",
+        "Financial Times 18483 · Arrietty · studio cut",
+    ),
+    "mass-media-ryan-clue.mp4": (
+        "Maid struggling with a mess — newspapers etc (4,5)",
+        "Financial Times 18483 · Arrietty · Ryan offers the picture",
+    ),
+    "mass-media-sonia.mp4": (
+        "Maid struggling with a mess — newspapers etc (4,5)",
+        "Financial Times 18483 · Arrietty · Sonia",
+    ),
+    "aimlessly-sonia.mp4": (
+        "Sly e-mails recycled without end (9)",
+        "Guardian 30115 · Brendan · Sonia",
+    ),
+    "smiles-kind-sonia.mp4": (
+        "First in school by a long way, is visibly pleased (6)",
+        "Guardian 30115 · Brendan · Sonia",
+    ),
+    "smiles-acted-libby.mp4": (
+        "First in school by a long way, is visibly pleased (6)",
+        "Guardian 30115 · Brendan · Libby",
+    ),
+    "smiles-warm-libby.mp4": (
+        "First in school by a long way, is visibly pleased (6)",
+        "Guardian 30115 · Brendan · earlier Libby",
+    ),
+    "smiles-next-q-libby.mp4": (
+        "First in school by a long way, is visibly pleased (6)",
+        "Guardian 30115 · Brendan · earlier Libby",
+    ),
+    "smiles-libby.mp4": (
+        "First in school by a long way, is visibly pleased (6)",
+        "Guardian 30115 · Brendan · earlier Libby",
+    ),
+    "cole-king-libby.mp4": (
+        "So-called King of jazz, or another one accompanied by string trio (4)",
+        "Guardian 30115 · Brendan · Libby",
+    ),
+    "cole-libby.mp4": (
+        "So-called King of jazz, or another one accompanied by string trio (4)",
+        "Guardian 30115 · Brendan · earlier Libby",
+    ),
+    "wellington-libby.mp4": (
+        "Duke is thoroughly acquainted with good style (10)",
+        "Guardian 30115 · Brendan · Libby",
+    ),
+    "wellington-parse.mp4": (
+        "Duke is thoroughly acquainted with good style (10)",
+        "Guardian 30115 · Brendan · parse take",
+    ),
+    "fats-libby.mp4": (
+        "Refrain from eating, with final twist, such unhealthy foods (4)",
+        "Guardian 30115 · Brendan · Libby",
+    ),
+    "rasta-libby.mp4": (
+        "One emperor backing follower of another (5)",
+        "Guardian 30115 · Brendan · Libby",
+    ),
+    "rasta-study.mp4": (
+        "One emperor backing follower of another (5)",
+        "Guardian 30115 · Brendan · study take",
+    ),
+    "rasta-source.mp4": (
+        "One emperor backing follower of another (5)",
+        "Guardian 30115 · Brendan · source take",
+    ),
+    "davis-cup-libby.mp4": (
+        "Frenzied divas caught up in international court event (5,3)",
+        "Guardian 30115 · Brendan · Libby",
+    ),
+}
+_LEGACY_ORDER = list(_LEGACY_LABELS)
+_CDN_MEDIA = re.compile(
+    r"https://cdn\.jsdelivr\.net/gh/Yoyoinnogravity/OSPO@[^\"']+/two-down/site/(media/[^\"']+)"
+)
+
+
+def retarget_cdn(html_text: str, prefix: str = "") -> str:
+    """Point a page at the copy of the film that ships with the site."""
+    return _CDN_MEDIA.sub(lambda match: prefix + match.group(1), html_text)
+
+
+def _ensure_films_nav(html_text: str) -> str:
+    if ">Films</a>" in html_text:
+        return html_text
+    return re.sub(
+        r'(<a href="((?:\.\./)*)index\.html">Today</a>)',
+        r'\1\n        <a href="\2films.html">Films</a>',
+        html_text,
+        count=1,
+    )
+
+
+def _media_prefix(html_path: Path, root: Path) -> str:
+    rel = html_path.parent.relative_to(root)
+    return "../" * len(rel.parts)
+
+
+def legacy_videos(root: Path) -> list[Path]:
+    """Study Shorts that are not already the film on a published clue page."""
+    media = root / "media"
+    if not media.is_dir():
+        return []
+    rank = {name: index for index, name in enumerate(_LEGACY_ORDER)}
+    files = [
+        path
+        for path in media.glob("*.mp4")
+        if not (root / "c" / path.stem / "index.html").exists()
+    ]
+    files.sort(key=lambda path: (rank.get(path.name, 1000), path.name))
+    return files
+
+
+def _pretty_day(date: str) -> str:
+    return datetime.strptime(date, "%Y-%m-%d").strftime("%A %-d %B %Y")
+
+
+def earlier_days(root: Path, skip_date: str | None = None) -> list[tuple[str, str, list[str]]]:
+    """Published day pages, newest first. Each item is date, pretty date, clue surfaces."""
+    day_root = root / "d"
+    if not day_root.is_dir():
+        return []
+    found: list[tuple[str, str, list[str]]] = []
+    for folder in day_root.iterdir():
+        page = folder / "index.html"
+        if not folder.is_dir() or not page.exists():
+            continue
+        try:
+            datetime.strptime(folder.name, "%Y-%m-%d")
+        except ValueError:
+            continue
+        soup = BeautifulSoup(page.read_text(encoding="utf-8"), "lxml")
+        clues = [node.get_text(" ", strip=True) for node in soup.select("p.clue-text")]
+        found.append((folder.name, _pretty_day(folder.name), clues))
+    found.sort(reverse=True)
+    if skip_date:
+        return [item for item in found if item[0] != skip_date]
+    return found
+
+
+def _legacy_article(path: Path) -> str:
+    title, credit = _LEGACY_LABELS.get(path.name, (path.stem.replace("-", " "), "Study cut"))
+    audio = path.with_suffix(".mp3")
+    soundtrack = ""
+    if audio.exists():
+        soundtrack = f'<audio controls preload="none" src="media/{_e(audio.name)}"></audio>'
+    return (
+        '<article class="clue">'
+        f'<p class="kicker">{_e(credit)}</p>'
+        f'<p class="clue-text">{_e(title)}</p>'
+        f'<video class="short" controls playsinline preload="metadata" src="media/{_e(path.name)}"></video>'
+        f"{soundtrack}"
+        "</article>"
+    )
+
+
+def _earlier_teaser(root: Path, prefix: str = "", skip_date: str | None = None) -> str:
+    items = []
+    for date, pretty, clues in earlier_days(root, skip_date=skip_date):
+        surface = " · ".join(clues) if clues else pretty
+        items.append(f'<li><a href="{prefix}d/{_e(date)}/">{_e(pretty)}</a> — {_e(surface)}</li>')
+    listing = f"<ul class='archive'>{''.join(items)}</ul>" if items else ""
+    return f"""
+    <aside class="teaser">
+      <p class="kicker">Earlier</p>
+      <h2>Every film we have cut.</h2>
+      {listing}
+      <a class="action" href="{prefix}films.html">All the Shorts</a>
+    </aside>
+    """
+
+
+def _films_body(root: Path) -> str:
+    days = []
+    for date, pretty, clues in earlier_days(root):
+        surface = " · ".join(clues) if clues else pretty
+        days.append(f'<li><a href="d/{_e(date)}/">{_e(pretty)}</a> — {_e(surface)}</li>')
+    day_list = f"<ul class='archive'>{''.join(days)}</ul>" if days else "<p>No daily pair on the site yet.</p>"
+    films = legacy_videos(root)
+    grid = ""
+    if films:
+        grid = "<section class='pair'>" + "\n".join(_legacy_article(path) for path in films) + "</section>"
+    else:
+        grid = "<p>Study cuts will sit here once their films are in the site media folder.</p>"
+    return f"""
+    <p class="kicker">Archive</p>
+    <h1>Films.</h1>
+    <p class="lede">Every Short is on cryptic.fit. Daily pairs stay spoiler-safe on their own page. The study cuts play here.</p>
+    <h2>Daily pairs.</h2>
+    {day_list}
+    <h2>Study cuts.</h2>
+    {grid}
+    """
+
+
+def publish_films(root: Path) -> Path:
+    """Write the archive and point older pages at the films that ship with the site."""
+    root = Path(root)
+    page = root / "films.html"
+    page.write_text(
+        _page(
+            _films_body(root),
+            PageSeo(
+                title=f"Films — {BRAND}",
+                description="Every cryptic.fit Short, including earlier daily pairs and the study cuts. Have a go before you tap solve.",
+                path="/films.html",
+                json_ld=website_ld(),
+            ),
+        ),
+        encoding="utf-8",
+    )
+    index = root / "index.html"
+    if index.exists():
+        text = index.read_text(encoding="utf-8")
+        if "All the Shorts" not in text:
+            days = earlier_days(root)
+            skip = days[0][0] if days else None
+            teaser = _earlier_teaser(root, skip_date=skip)
+            text = text.replace("<aside class=\"teaser\">", teaser + "\n    <aside class=\"teaser\">", 1)
+        index.write_text(_ensure_films_nav(text), encoding="utf-8")
+    for html_path in root.rglob("*.html"):
+        if html_path == page:
+            continue
+        original = html_path.read_text(encoding="utf-8")
+        updated = retarget_cdn(original, _media_prefix(html_path, root))
+        updated = _ensure_films_nav(updated)
+        if updated != original:
+            html_path.write_text(updated, encoding="utf-8")
+    _ensure_sitemap_films(root)
+    return page
+
+
+def _ensure_sitemap_films(root: Path) -> None:
+    path = root / "sitemap.xml"
+    if not path.exists():
+        return
+    text = path.read_text(encoding="utf-8")
+    loc = f"{SITE_ORIGIN}/films.html"
+    if loc in text:
+        return
+    days = earlier_days(root)
+    lastmod = days[0][0] if days else datetime.now().date().isoformat()
+    entry = f"  <url>\n    <loc>{loc}</loc>\n    <lastmod>{lastmod}</lastmod>\n  </url>\n"
+    path.write_text(text.replace("</urlset>", entry + "</urlset>", 1), encoding="utf-8")
+
+
 def publish_site(pair: DailyPair, dest: Path | None = None) -> Path:
     root = Path(dest or SITE_ROOT)
     (root / "assets").mkdir(parents=True, exist_ok=True)
@@ -718,6 +974,7 @@ def publish_site(pair: DailyPair, dest: Path | None = None) -> Path:
       <p>Follow is on by default. Email one clue a day, the RSS feed, or {BRAND} on YouTube. No account on the site.</p>
       <a class="action" href="follow.html">Follow {BRAND}</a>
     </aside>
+    {_earlier_teaser(root, skip_date=pair.date)}
     {_keep_free_teaser("")}
     <aside class="teaser">
       <p class="kicker">Readers</p>
@@ -975,6 +1232,7 @@ def publish_site(pair: DailyPair, dest: Path | None = None) -> Path:
         ),
         encoding="utf-8",
     )
+    publish_films(root)
     (root / "feed.xml").write_text(rss_xml(pair, pretty), encoding="utf-8")
     (root / "sitemap.xml").write_text(sitemap_xml(collect_sitemap_urls(root, pair)), encoding="utf-8")
     pair.site_index = f"{SITE_ORIGIN}/"

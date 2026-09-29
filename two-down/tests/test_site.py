@@ -1,6 +1,6 @@
 from twodown.captions import youtube_description
 from twodown.models import Clue, DailyPair, SpokenClue
-from twodown.site import publish_site
+from twodown.site import earlier_days, legacy_videos, publish_films, publish_site, retarget_cdn
 from twodown.youtube import YOUTUBE_CHANNEL, video_title
 
 
@@ -77,6 +77,9 @@ def test_publish_site_writes_spoiler_pages(tmp_path):
     assert "feed.xml" in follow
     assert "youtube.com/@crypticfit" in follow
     assert "https://cryptic.fit/follow.html" in (tmp_path / "sitemap.xml").read_text(encoding="utf-8")
+    assert "https://cryptic.fit/films.html" in (tmp_path / "sitemap.xml").read_text(encoding="utf-8")
+    assert 'href="films.html">Films</a>' in index
+    assert "All the Shorts" in index
     assert "How we pay for this" in index
     assert "adsbygoogle" not in index
     assert not (tmp_path / "ads.txt").exists()
@@ -109,6 +112,49 @@ def test_publish_site_writes_spoiler_pages(tmp_path):
     assert (tmp_path / ".nojekyll").exists()
     assert (tmp_path / "assets" / "favicon.svg").exists()
     assert "application/rss+xml" in index
+
+
+def test_films_page_serves_legacy_videos_from_the_site(tmp_path):
+    media = tmp_path / "media"
+    media.mkdir()
+    (media / "rasta-libby.mp4").write_bytes(b"film")
+    (media / "rasta-libby.mp3").write_bytes(b"audio")
+    (media / "independent-12458-11a.mp4").write_bytes(b"daily")
+    clue = tmp_path / "c" / "independent-12458-11a"
+    clue.mkdir(parents=True)
+    (clue / "index.html").write_text("<p>daily</p>", encoding="utf-8")
+    day = tmp_path / "d" / "2026-09-11"
+    day.mkdir(parents=True)
+    (day / "index.html").write_text(
+        '<p class="clue-text">Model youngster eating in (3-2)</p>',
+        encoding="utf-8",
+    )
+    studio = tmp_path / "studio.html"
+    studio.write_text(
+        '<video src="https://cdn.jsdelivr.net/gh/Yoyoinnogravity/OSPO@cursor/fifteensquared-two-down-agent-42cd/two-down/site/media/rasta-libby.mp4"></video>',
+        encoding="utf-8",
+    )
+    publish_films(tmp_path)
+    films = (tmp_path / "films.html").read_text(encoding="utf-8")
+    assert 'src="media/rasta-libby.mp4"' in films
+    assert 'src="media/rasta-libby.mp3"' in films
+    assert "jsdelivr" not in films
+    assert "One emperor backing follower of another" in films
+    assert 'href="d/2026-09-11/"' in films
+    assert "independent-12458-11a.mp4" not in films
+    assert "media/rasta-libby.mp4" in studio.read_text(encoding="utf-8")
+    assert "jsdelivr" not in studio.read_text(encoding="utf-8")
+    assert [path.name for path in legacy_videos(tmp_path)] == ["rasta-libby.mp4"]
+    assert earlier_days(tmp_path)[0][0] == "2026-09-11"
+
+
+def test_retarget_cdn_keeps_the_media_filename():
+    html = (
+        '<video src="https://cdn.jsdelivr.net/gh/Yoyoinnogravity/OSPO@cursor/'
+        'fifteensquared-two-down-agent-42cd/two-down/site/media/fats-libby.mp4"></video>'
+    )
+    assert retarget_cdn(html) == '<video src="media/fats-libby.mp4"></video>'
+    assert retarget_cdn(html, "../../") == '<video src="../../media/fats-libby.mp4"></video>'
 
 
 def test_youtube_titles_use_cryptic_fun_channel():
