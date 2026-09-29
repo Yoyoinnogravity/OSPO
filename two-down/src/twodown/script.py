@@ -84,10 +84,10 @@ def speak_enumeration(enumeration: str) -> str:
         elif token == ",":
             spoken.append(",")
     text = " ".join(spoken).replace(" ,", ",")
-    text = text[:1].upper() + text[1:]
+    count = text[:1].upper() + text[1:].lower()
     if len(numbers) == 1 and "-" not in raw and "," not in raw:
-        return f"That's {text.lower()} letters."
-    return f"That's {text.lower()}."
+        return f"{count} letters. Do try to count."
+    return f"{count}. Do try to count."
 
 
 # ALL-CAPS crossword lights/fodder (PIN-UP, PUP, END RESULT). Leave numbers
@@ -104,8 +104,8 @@ def speak_answer(answer: str) -> str:
     """Speak the crossword light as a word, not letter-by-letter."""
     spoken = speak_construction(answer)
     if not spoken:
-        return "Here it is."
-    return f"It's {spoken}."
+        return "Work it out."
+    return f"Obviously it's {spoken}."
 
 
 def speak_parse_tokens(text: str) -> str:
@@ -225,10 +225,12 @@ def speak_source(clue: Clue) -> str:
     setter = (clue.setter or "").strip()
     paper = (clue.paper or "").strip()
     if setter and paper:
-        return f"That's {setter}, in the {paper} — via Fifteen Squared."
-    if setter:
-        return f"That's {setter} — via Fifteen Squared."
-    return "That's via Fifteen Squared."
+        credit = f"That's {setter}, in the {paper} — via Fifteen Squared."
+    elif setter:
+        credit = f"That's {setter} — via Fifteen Squared."
+    else:
+        credit = "That's via Fifteen Squared."
+    return f"{credit} You're welcome."
 
 
 def write_parts(clue: Clue) -> ScriptParts:

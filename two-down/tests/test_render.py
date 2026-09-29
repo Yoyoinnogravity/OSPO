@@ -235,7 +235,7 @@ def test_hint_beat_is_newsprint_with_credited_photo(tmp_path: Path):
     assert photo != NEWS_BG
     assert clue.hint_credit == TRANCE.credit_line
     assert "DREAMLIKE" not in (clue.hint_credit or "")
-    assert HINT_LINE == "If you need a clue. Have a look at this."
+    assert HINT_LINE == "Stuck already? Look at this."
     assert DEFAULT_HINT.source == "generated still"
     assert ensure_hint_photo(TRANCE).exists()
     assert ensure_hint_photo(RASTA).exists()
@@ -304,26 +304,26 @@ def test_hint_beat_does_not_spoil_dreamlike(tmp_path: Path):
 
 
 def test_speak_enumeration_is_separate_from_the_clue():
-    assert speak_enumeration("5") == "That's five letters."
-    assert speak_enumeration("7") == "That's seven letters."
-    assert speak_enumeration("9") == "That's nine letters."
-    assert speak_enumeration("3-2") == "That's three hyphen two."
-    assert speak_enumeration("3,6") == "That's three, six."
+    assert speak_enumeration("5") == "Five letters. Do try to count."
+    assert speak_enumeration("7") == "Seven letters. Do try to count."
+    assert speak_enumeration("9") == "Nine letters. Do try to count."
+    assert speak_enumeration("3-2") == "Three hyphen two. Do try to count."
+    assert speak_enumeration("3,6") == "Three, six. Do try to count."
 
 
 def test_speak_answer_is_a_word_not_letters():
-    assert speak_answer("PIN-UP") == "It's pin-up."
-    assert speak_answer("SMASH-UP") == "It's smash-up."
-    assert speak_answer("END RESULT") == "It's end result."
-    assert speak_answer("DREAMLIKE") == "It's dreamlike."
-    assert speak_answer("RASTA") == "It's rasta."
-    assert speak_answer("FATS") == "It's fats."
-    assert speak_answer("WELLINGTON") == "It's wellington."
-    assert speak_answer("COLE") == "It's cole."
-    assert speak_answer("SMILES") == "It's smiles."
-    assert speak_answer("DAVIS CUP") == "It's davis cup."
-    assert speak_answer("AIMLESSLY") == "It's aimlessly."
-    assert speak_answer("MASS MEDIA") == "It's mass media."
+    assert speak_answer("PIN-UP") == "Obviously it's pin-up."
+    assert speak_answer("SMASH-UP") == "Obviously it's smash-up."
+    assert speak_answer("END RESULT") == "Obviously it's end result."
+    assert speak_answer("DREAMLIKE") == "Obviously it's dreamlike."
+    assert speak_answer("RASTA") == "Obviously it's rasta."
+    assert speak_answer("FATS") == "Obviously it's fats."
+    assert speak_answer("WELLINGTON") == "Obviously it's wellington."
+    assert speak_answer("COLE") == "Obviously it's cole."
+    assert speak_answer("SMILES") == "Obviously it's smiles."
+    assert speak_answer("DAVIS CUP") == "Obviously it's davis cup."
+    assert speak_answer("AIMLESSLY") == "Obviously it's aimlessly."
+    assert speak_answer("MASS MEDIA") == "Obviously it's mass media."
     assert _clue().answer == "PIN-UP"
 
 

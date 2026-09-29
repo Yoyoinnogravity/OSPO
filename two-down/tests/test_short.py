@@ -55,9 +55,9 @@ def test_study_clue_is_mass_media():
     assert clue.blogger == "Turbolegs"
     assert clue.definition == "newspapers, the press"
     assert clue.hint_line == HINT_LINE
-    assert HINT_OFFER == "If you need a clue."
-    assert HINT_LOOK == "Have a look at this."
-    assert clue.hint_line == "If you need a clue. Have a look at this."
+    assert HINT_OFFER == "Stuck already?"
+    assert HINT_LOOK == "Look at this."
+    assert clue.hint_line == "Stuck already? Look at this."
     assert clue.hint_image == "assets/hints/papers-still.webp"
     assert clue.source_url == (
         "https://fifteensquared.net/2026/09/18/financial-times-18483-by-arrietty/"
@@ -65,22 +65,22 @@ def test_study_clue_is_mass_media():
     assert "struggling" in clue.parse.lower()
     assert "mess" in clue.parse.lower()
     parts = write_parts(clue)
-    assert parts.intro_speech == "Hello! I'm Cryptic Croc. Here's your daily dose of cryptic fun."
+    assert parts.intro_speech == "Solve it, you idiot. I'm Cryptic Croc."
     assert parts.clue_speech == "Maid struggling with a mess — newspapers etc."
-    assert parts.letters_speech == "That's four, five."
-    assert parts.think_speech == "Pause here with me, and have a think."
+    assert parts.letters_speech == "Four, five. Do try to count."
+    assert parts.think_speech == "Go on. Think. I can wait."
     assert parts.hint_speech == HINT_LINE
     assert parts.hint_speech.startswith(HINT_OFFER)
     assert parts.hint_speech.endswith(HINT_LOOK)
-    assert parts.hint_speech == "If you need a clue. Have a look at this."
+    assert parts.hint_speech == "Stuck already? Look at this."
     assert HINT_VOICE_ALIAS == "croc"
     assert HINT_VOICE_ALIAS == INTRO_VOICE_ALIAS
-    assert parts.answer_speech == "It's mass media."
+    assert parts.answer_speech == "Obviously it's mass media."
     assert parts.answer_speech == speak_answer(clue.answer)
-    assert parts.outro_speech == "Thanks for thinking with Cryptic Croc on cryptic.fit."
+    assert parts.outro_speech == "That was cryptic.fit. Try to keep up."
     assert "Brendan" not in parts.parse_speech
     assert "Fifteen Squared" not in parts.parse_speech
-    assert parts.source_speech == "That's Arrietty, in the Financial Times — via Fifteen Squared."
+    assert parts.source_speech == "That's Arrietty, in the Financial Times — via Fifteen Squared. You're welcome."
     script = parts.full
     assert script.index(parts.intro_speech) < script.index(parts.clue_speech)
     assert script.index(parts.clue_speech) < script.index(parts.letters_speech)
@@ -96,7 +96,7 @@ def test_study_clue_is_mass_media():
 
 
 def test_speak_answer_rasta_is_a_word():
-    assert speak_answer("RASTA") == "It's rasta."
+    assert speak_answer("RASTA") == "Obviously it's rasta."
     assert speak_answer("RASTA") != "The answer is R-A-S-T-A."
     assert "rasta" in speak_answer("RASTA")
     assert "R-A-S-T-A" not in speak_answer("RASTA")
@@ -104,12 +104,12 @@ def test_speak_answer_rasta_is_a_word():
 
 def test_source_credit_is_its_own_line():
     clue = rasta_clue()
-    assert speak_source(clue) == "That's Brendan, in the Guardian — via Fifteen Squared."
+    assert speak_source(clue) == "That's Brendan, in the Guardian — via Fifteen Squared. You're welcome."
     assert SOURCE_VOICE_ALIAS == "croc"
     parts = write_parts(clue)
     assert parts.source_speech == speak_source(clue)
     assert "Fifteen Squared" not in parts.parse_speech
-    assert parts.outro_speech == "Thanks for thinking with Cryptic Croc on cryptic.fit."
+    assert parts.outro_speech == "That was cryptic.fit. Try to keep up."
 
 
 def test_spoken_parse_says_mass_media_as_words():
@@ -130,8 +130,8 @@ def test_spoken_parse_says_mass_media_as_words():
 def test_five_three_letters():
     clue = davis_cup_clue()
     assert clue.enumeration == "5,3"
-    assert speak_enumeration("5,3") == "That's five, three."
-    assert speak_enumeration(clue.enumeration) == "That's five, three."
+    assert speak_enumeration("5,3") == "Five, three. Do try to count."
+    assert speak_enumeration(clue.enumeration) == "Five, three. Do try to count."
 
 
 def test_spoken_parse_says_aimlessly_as_a_word():
@@ -257,8 +257,8 @@ def test_dreamlike_stays_constructable():
     clue = dreamlike_clue()
     assert clue.answer == "DREAMLIKE"
     assert clue.slug == "guardian-30115-12a"
-    assert speak_answer("DREAMLIKE") == "It's dreamlike."
-    assert speak_enumeration("9") == "That's nine letters."
+    assert speak_answer("DREAMLIKE") == "Obviously it's dreamlike."
+    assert speak_enumeration("9") == "Nine letters. Do try to count."
     parts = write_parts(clue)
     assert "armed" in parts.parse_speech
     assert "like" in parts.parse_speech

@@ -114,20 +114,20 @@ def test_script_credits_fifteen_squared():
     assert "Phi" in script
     assert "cryptic.fit" in script
     parts = write_parts(clue)
-    assert parts.intro_speech == "Hello! I'm Cryptic Croc. Here's your daily dose of cryptic fun."
+    assert parts.intro_speech == "Solve it, you idiot. I'm Cryptic Croc."
     assert parts.clue_speech == f"{clue.clue}."
     assert "The clue:" not in parts.clue_speech
     assert "(" not in parts.clue_speech
     assert parts.letters_speech == speak_enumeration(clue.enumeration)
-    assert parts.think_speech == "Pause here with me, and have a think."
-    assert parts.hint_speech == "If you need a clue. Have a look at this."
+    assert parts.think_speech == "Go on. Think. I can wait."
+    assert parts.hint_speech == "Stuck already? Look at this."
     assert parts.answer_speech == speak_answer(clue.answer)
-    assert parts.answer_speech == "It's end result."
+    assert parts.answer_speech == "Obviously it's end result."
     assert "end result" in parts.breakdown
     assert "Fifteen Squared" not in parts.parse_speech
     assert "Fifteen Squared" in parts.source_speech
     assert "Phi" in parts.source_speech
-    assert parts.outro_speech == "Thanks for thinking with Cryptic Croc on cryptic.fit."
+    assert parts.outro_speech == "That was cryptic.fit. Try to keep up."
     assert script.index(parts.intro_speech) < script.index(parts.clue_speech)
     assert script.index(parts.clue_speech) < script.index(parts.letters_speech)
     assert script.index(parts.letters_speech) < script.index("[pause 1s]")
