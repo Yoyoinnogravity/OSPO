@@ -97,9 +97,9 @@ body.scene-photo header .follow a.on { color: var(--cream); }
 nav a:hover { color: var(--crimson); }
 .chrome-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
 .wordmark { display: inline-flex; align-items: center; gap: 10px; font-family: "Liberation Sans", "Helvetica Neue", sans-serif; font-weight: 700; font-size: 1.6rem; letter-spacing: 0.02em; color: var(--ink); text-decoration: none; }
-.wordmark .profile { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; border: 2px solid var(--crimson); background: var(--news); flex: none; }
+.wordmark .profile { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; background: var(--news); flex: none; }
 .wordmark span { color: var(--crimson); }
-.channel-picture { width: 160px; height: 160px; border-radius: 50%; object-fit: cover; border: 4px solid var(--crimson); background: var(--news); display: block; margin: 12px 0 16px; }
+.channel-picture { width: 160px; height: 160px; border-radius: 50%; object-fit: cover; background: var(--news); display: block; margin: 12px 0 16px; }
 .croc-hello {
   display: flex;
   align-items: center;
@@ -116,7 +116,6 @@ nav a:hover { color: var(--crimson); }
   height: 148px;
   border-radius: 50%;
   object-fit: cover;
-  border: 4px solid var(--crimson);
   background: var(--news);
   flex: none;
 }

@@ -6,14 +6,14 @@ and Cryptic Croc sit inside that band. The newsprint runs to the edges
 for desktop and TV.
 
 The profile picture is an 800×800 still PNG. YouTube masks it to a circle
-and shows it as small as 98 pixels, so the bow and snout sit inside that circle.
+and shows it as small as 98 pixels, so the scarf and snout sit inside that circle.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
 
-from PIL import Image, ImageChops, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont
 
 from twodown.config import (
     BRAND,
@@ -26,7 +26,7 @@ from twodown.config import (
     NEWS_BG,
     NEWS_GRID,
 )
-from twodown.croc import croc_sprite
+from twodown.croc import croc_portrait, croc_sprite
 
 BANNER_SIZE = (2560, 1440)
 # Centre region YouTube keeps on every device, scaled to this canvas.
@@ -106,20 +106,16 @@ def write_youtube_banner(dest: Path) -> Path:
     return dest
 
 
-def _portrait(sprite: Image.Image) -> Image.Image:
-    """Head, bow and snout. The body shows through a plain box crop."""
-    keep = Image.new("L", sprite.size, 0)
-    mask = ImageDraw.Draw(keep)
-    # Exact head, band and snout. A looser box lets the belly through.
-    mask.polygon([(286, 114), (372, 104), (368, 116), (290, 128)], fill=255)
-    mask.ellipse([248, 104, 296, 146], fill=255)
-    mask.polygon([(262, 128), (232, 142), (252, 160)], fill=255)
-    mask.ellipse([248, 96, 452, 276], fill=255)
-    mask.ellipse([344, 152, 518, 236], fill=255)
-    sprite = sprite.copy()
-    sprite.putalpha(ImageChops.multiply(sprite.getchannel("A"), keep))
-    box = sprite.getbbox()
-    return sprite.crop(box) if box else sprite
+def _center_sprite(sprite: Image.Image) -> Image.Image:
+    """Square the opaque pixels so a circle crop keeps the snout and the scarf."""
+    bbox = sprite.getbbox()
+    if bbox is None:
+        return sprite
+    cropped = sprite.crop(bbox)
+    side = max(cropped.size) + 8
+    square = Image.new("RGBA", (side, side), (0, 0, 0, 0))
+    square.paste(cropped, ((side - cropped.width) // 2, (side - cropped.height) // 2), cropped)
+    return square
 
 
 def write_youtube_picture(dest: Path) -> Path:
@@ -135,12 +131,12 @@ def write_youtube_picture(dest: Path) -> Path:
     for y in range(0, size, step):
         draw.line([(0, y), (size, y)], fill=NEWS_GRID, width=1)
 
-    # Quiet pose: eyes open, smile closed, arm down on the body.
-    head = _portrait(croc_sprite("letters", 4))
+    # Quiet pose: eyes open, mouth closed. Centre the head before the circle crop.
+    head = _center_sprite(croc_portrait())
     inset = 18
     ring = 22
-    # Inner edge of the ring, with a gap so the bow is not cut by it.
-    limit = size / 2 - inset - ring / 2 - 20
+    # Inner edge of the ring, with a gap so the scarf and snout are not cut.
+    limit = size / 2 - inset - ring / 2 - 36
     cx = (head.width - 1) / 2
     cy = (head.height - 1) / 2
     alpha = head.getchannel("A")
@@ -153,7 +149,7 @@ def write_youtube_picture(dest: Path) -> Path:
     ratio = limit / farthest
     head = head.resize(
         (max(1, int(head.width * ratio)), max(1, int(head.height * ratio))),
-        Image.Resampling.NEAREST,
+        Image.Resampling.LANCZOS,
     )
     x = (size - head.width) // 2
     y = (size - head.height) // 2
