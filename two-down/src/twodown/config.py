@@ -21,11 +21,12 @@ CRAWL_GAP_SECONDS = 1.0
 
 DAILY_CATEGORY_SLUGS = frozenset({"independent", "ft", "guardian"})
 
-# Cryptic Croc presents new films. Maisie is the fun female read.
+# Cryptic Croc is a grown woman: Emma’s clear American read, Friends-plain,
+# with a quicker South Park snap. Maisie stays off — she sounded like a child.
 # Sonia, Libby, Ryan and Thomas stay available as alternate voices.
 DEFAULT_VOICE_ALIAS = "croc"
 VOICES = {
-    "croc": "en-GB-MaisieNeural",
+    "croc": "en-US-EmmaNeural",
     "sonia": "en-GB-SoniaNeural",
     "libby": "en-GB-LibbyNeural",
     "ryan": "en-GB-RyanNeural",
@@ -38,26 +39,26 @@ VOICE_LABELS = {
     "ryan": "Ryan",
     "thomas": "Thomas",
 }
-# Brighter than the old card-reader pace. Still clear enough to solve by.
-VOICE_RATE = "+2%"
-VOICE_PITCH = "+8Hz"
-VOICE_VOLUME = "+5%"
-# She presents the clue, brighter than the think and the parse.
-CLUE_RATE = "+6%"
-CLUE_PITCH = "+12Hz"
-CLUE_VOLUME = "+6%"
-LETTERS_RATE = "+0%"
-LETTERS_PITCH = "+8Hz"
-THINK_RATE = "+0%"
-THINK_PITCH = "-2Hz"
-HINT_RATE = "+6%"
-HINT_PITCH = "+10Hz"
-HINT_VOLUME = "+7%"
-ANSWER_RATE = "+4%"
-ANSWER_PITCH = "+2Hz"
-# Parse is the same croc, still with space around the asides.
-PARSE_RATE = "-4%"
-PARSE_PITCH = "+4Hz"
+# Punchier than a sitcom read, still slow enough to catch every word.
+VOICE_RATE = "+8%"
+VOICE_PITCH = "+4Hz"
+VOICE_VOLUME = "+7%"
+# She presents the clue with a bit more snap.
+CLUE_RATE = "+12%"
+CLUE_PITCH = "+6Hz"
+CLUE_VOLUME = "+8%"
+LETTERS_RATE = "+4%"
+LETTERS_PITCH = "+4Hz"
+THINK_RATE = "+2%"
+THINK_PITCH = "+0Hz"
+HINT_RATE = "+10%"
+HINT_PITCH = "+6Hz"
+HINT_VOLUME = "+8%"
+ANSWER_RATE = "+8%"
+ANSWER_PITCH = "+4Hz"
+# Parse stays a touch slower so the wordplay lands.
+PARSE_RATE = "+0%"
+PARSE_PITCH = "+2Hz"
 PARSE_ASIDE_PAUSE_SECONDS = 0.7
 TAGLINE = "Solve it, I know you can."
 # Ryan invites, upbeat. Cryptic Croc then presents the clue.

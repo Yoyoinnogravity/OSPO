@@ -27,8 +27,8 @@ from twodown.voice import _speech_sentences
 
 def test_solver_voice_is_cryptic_croc():
     assert DEFAULT_VOICE_ALIAS == "croc"
-    assert VOICES["croc"] == "en-GB-MaisieNeural"
-    assert VOICE_RATE == "+2%"
+    assert VOICES["croc"] == "en-US-EmmaNeural"
+    assert VOICE_RATE == "+8%"
 
 
 def test_parse_is_split_into_spoken_sentences():
@@ -78,7 +78,7 @@ def test_study_clue_is_mass_media():
     assert INTRO_VOICE_ALIAS == "ryan"
     assert VOICES[INTRO_VOICE_ALIAS] == "en-GB-RyanNeural"
     assert DEFAULT_VOICE_ALIAS == "croc"
-    assert VOICES["croc"] == "en-GB-MaisieNeural"
+    assert VOICES["croc"] == "en-US-EmmaNeural"
     assert INTRO_LINE.startswith("Solve it, I know you can.")
     assert "Here's Cryptic Croc." in INTRO_LINE
     assert CLUE_RATE.startswith("+")
