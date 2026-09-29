@@ -40,6 +40,8 @@ That is good enough. Do not ban AI matching. Do not build a cloud vision pipelin
    If it exits 1 because 15² has no usable Independent / FT / Guardian clues yet, stop.
    Do not invent clues. A later scheduled run can pick them up.
 3. If it built a new pair:
+   - The site poster and the YouTube thumbnail are the unsolved clue with empty lights.
+     Do not upload a frame, card, or image that shows the answer or the filled grid.
    - Commit only two-down/site/ (HTML, CSS, JS, media, scenes). Do not commit two-down/output/.
    - Open or update a PR onto main titled like: cryptic.fit · {date}
    - In the PR body list both clues, papers, 15² URLs, scenes, and which social uploads happened or were skipped.

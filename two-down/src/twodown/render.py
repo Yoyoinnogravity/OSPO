@@ -300,6 +300,56 @@ def draw_clue_card(clue: Clue, dest: Path, scene: str | Scene | None = None, **_
     return draw_beat(clue, dest, beat="think")
 
 
+def opening_frame_poster(video: Path, dest: Path) -> Path:
+    """Opening frame of the Short, before the answer is drawn.
+
+    Use this only when the clue text is not available to draw a fresh
+    unsolved card. JPEG for a one-off grab; WebP when the site will serve it.
+    """
+    ffmpeg = shutil.which("ffmpeg")
+    if not ffmpeg:
+        raise RuntimeError("ffmpeg is required to copy the opening frame")
+    dest = Path(dest)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    grab = dest if dest.suffix.lower() in {".jpg", ".jpeg"} else dest.with_suffix(".jpg")
+    try:
+        subprocess.run(
+            [ffmpeg, "-y", "-ss", "0.05", "-i", str(video), "-frames:v", "1", "-q:v", "3", str(grab)],
+            check=True,
+            capture_output=True,
+        )
+    except subprocess.CalledProcessError as exc:
+        raise RuntimeError("could not copy the opening frame") from exc
+    if grab.resolve() != dest.resolve():
+        Image.open(grab).convert("RGB").save(dest, "WEBP", quality=82)
+        grab.unlink(missing_ok=True)
+    return dest
+
+
+def write_thumbnail(clue: Clue, dest: Path) -> Path:
+    """Poster for the site and the YouTube Short.
+
+    The unsolved clue and empty lights only. The answer word and the filled
+    grid stay off this image, so a thumbnail cannot spoil the solve.
+    YouTube takes JPEG. The site takes WebP, because Git LFS would otherwise
+    publish a pointer instead of the picture.
+    """
+    dest = Path(dest)
+    if dest.suffix.lower() not in {".jpg", ".jpeg", ".webp"}:
+        dest = dest.with_suffix(".jpg")
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    png = dest.with_suffix(".png")
+    draw_beat(clue, png, beat="letters")
+    image = Image.open(png).convert("RGB")
+    if dest.suffix.lower() == ".webp":
+        image.save(dest, "WEBP", quality=82)
+    else:
+        image.save(dest, "JPEG", quality=85, optimize=True)
+    if png.resolve() != dest.resolve() and png.exists():
+        png.unlink()
+    return dest
+
+
 def draw_reveal_card(clue: Clue, dest: Path, scene: str | Scene | None = None) -> Path:
     return draw_beat(clue, dest, beat="parse")
 

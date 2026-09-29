@@ -1,6 +1,8 @@
 import subprocess
 from pathlib import Path
 
+from PIL import Image
+
 from twodown.models import Clue
 from twodown.render import (
     AUDIO_LOUDNESS,
@@ -50,6 +52,40 @@ def _probe(path: Path, entries: str) -> str:
         text=True,
     )
     return result.stdout.strip()
+
+
+def _is_spoiler_red(pixel: tuple[int, int, int]) -> bool:
+    red, green, blue = pixel
+    return red > 150 and green < 80 and blue < 90
+
+
+def _rgb_pixels(img: Image.Image):
+    flat = getattr(img, "get_flattened_data", None)
+    return flat() if flat else img.getdata()
+
+
+def test_thumbnail_is_the_unsolved_clue(tmp_path: Path):
+    from twodown.render import write_thumbnail
+
+    thumb = write_thumbnail(_clue(), tmp_path / "thumb.jpg")
+    web = write_thumbnail(_clue(), tmp_path / "poster.webp")
+    letters = Image.open(draw_beat(_clue(), tmp_path / "letters.png", "letters")).convert("RGB")
+    answer = Image.open(draw_beat(_clue(), tmp_path / "answer.png", "answer")).convert("RGB")
+    assert thumb.suffix == ".jpg"
+    assert web.suffix == ".webp"
+    assert Image.open(thumb).size == (1080, 1920)
+    assert thumb.stat().st_size < 2_000_000
+    # Pixels that turn crimson only when the answer is drawn.
+    spoilers = [
+        index
+        for index, (solved, unsolved) in enumerate(zip(_rgb_pixels(answer), _rgb_pixels(letters), strict=True))
+        if _is_spoiler_red(solved) and not _is_spoiler_red(unsolved)
+    ]
+    assert len(spoilers) > 2000
+    for poster in (Image.open(thumb).convert("RGB"), Image.open(web).convert("RGB")):
+        pixels = list(_rgb_pixels(poster))
+        leaked = sum(1 for index in spoilers if _is_spoiler_red(pixels[index]))
+        assert leaked < len(spoilers) * 0.05
 
 
 def test_clue_card_is_a_solve_along(tmp_path: Path):

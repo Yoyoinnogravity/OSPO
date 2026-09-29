@@ -7,11 +7,12 @@ from pathlib import Path
 from shutil import copy2
 
 from bs4 import BeautifulSoup
+from PIL import Image
 
 from twodown.ads import ads_enabled, ads_txt, adsense_client, adsense_slot
 from twodown.config import BRAND, BRAND_LINE, CREDIT_LINE, CREDIT_WHO, SITE_HOST, SITE_ORIGIN, SITE_ROOT, SOURCE_SITE, SPONSOR_EMAIL, SUGGEST_EMAIL, VOICE_LABELS, follow_profiles
 from twodown.models import DailyPair, SpokenClue
-from twodown.render import write_share_card
+from twodown.render import opening_frame_poster, write_share_card, write_thumbnail
 from twodown.scenes import DEFAULT_SCENE, get_scene, list_scenes
 from twodown.seo import (
     FAVICON_SVG,
@@ -624,8 +625,11 @@ def _article(item: SpokenClue, media_prefix: str, open_by_default: bool = False,
     opened = " is-open" if open_by_default else ""
     video = ""
     if item.video_path:
+        poster = ""
+        if item.thumbnail_path:
+            poster = f' poster="{_e(media_prefix + clue.slug + "-poster.webp")}"'
         video = (
-            f'<video class="short" controls playsinline preload="metadata" '
+            f'<video class="short" controls playsinline preload="metadata"{poster} '
             f'src="{_e(media_prefix + clue.slug + ".mp4")}"></video>'
         )
     audio = (
@@ -648,6 +652,20 @@ def _article(item: SpokenClue, media_prefix: str, open_by_default: bool = False,
       </div>
     </article>
     """
+
+
+def _copy_poster(src: str | Path, dest: Path) -> None:
+    """Site posters are WebP. A JPEG thumbnail is converted on the way in."""
+    source = Path(src)
+    if not source.exists():
+        return
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    if source.resolve() == dest.resolve():
+        return
+    if source.suffix.lower() == ".webp":
+        copy2(source, dest)
+        return
+    Image.open(source).convert("RGB").save(dest, "WEBP", quality=82)
 
 
 def _copy_file(src: str | Path, dest: Path) -> None:
@@ -674,6 +692,8 @@ def _copy_media(pair: DailyPair, dest: Path) -> None:
     for item in pair.clues:
         if item.video_path:
             _copy_file(item.video_path, media / f"{item.clue.slug}.mp4")
+        if item.thumbnail_path:
+            _copy_poster(item.thumbnail_path, media / f"{item.clue.slug}-poster.webp")
         for alias, path in item.voice_paths.items():
             _copy_file(path, media / f"{item.clue.slug}-{alias}.mp3")
     _copy_scenes(dest)
@@ -841,11 +861,14 @@ def _legacy_article(path: Path) -> str:
     soundtrack = ""
     if audio.exists():
         soundtrack = f'<audio controls preload="none" src="media/{_e(audio.name)}"></audio>'
+    poster = path.with_name(f"{path.stem}-poster.webp")
+    poster_attr = f' poster="media/{_e(poster.name)}"' if poster.exists() else ""
     return (
         '<article class="clue">'
         f'<p class="kicker">{_e(credit)}</p>'
         f'<p class="clue-text">{_e(title)}</p>'
-        f'<video class="short" controls playsinline preload="metadata" src="media/{_e(path.name)}"></video>'
+        f'<video class="short" controls playsinline preload="metadata"{poster_attr} '
+        f'src="media/{_e(path.name)}"></video>'
         f"{soundtrack}"
         "</article>"
     )
@@ -890,9 +913,103 @@ def _films_body(root: Path) -> str:
     """
 
 
+_STUDY_POSTER = {
+    "mass-media-if-you-need": "mass-media",
+    "mass-media-ryan-clue": "mass-media",
+    "mass-media-sonia": "mass-media",
+    "aimlessly-sonia": "aimlessly",
+    "smiles-kind-sonia": "smiles",
+    "smiles-acted-libby": "smiles",
+    "smiles-warm-libby": "smiles",
+    "smiles-next-q-libby": "smiles",
+    "smiles-libby": "smiles",
+    "cole-king-libby": "cole",
+    "cole-libby": "cole",
+    "wellington-libby": "wellington",
+    "wellington-parse": "wellington",
+    "fats-libby": "fats",
+    "rasta-libby": "rasta",
+    "rasta-study": "rasta",
+    "rasta-source": "rasta",
+    "davis-cup-libby": "davis-cup",
+}
+
+
+def clue_for_media(root: Path, stem: str):
+    """Clue behind a media filename, so the poster can be drawn unsolved."""
+    from twodown.pipeline import published_clue, study_clue
+
+    found = study_clue(_STUDY_POSTER.get(stem, stem))
+    if found is not None:
+        return found
+    try:
+        return published_clue(stem, root)
+    except (FileNotFoundError, ValueError):
+        return None
+
+
+def ensure_safe_posters(root: Path) -> None:
+    """Write a spoiler-free poster beside every Short on the site."""
+    media = root / "media"
+    if not media.is_dir():
+        return
+    for video in sorted(media.glob("*.mp4")):
+        dest = video.with_name(f"{video.stem}-poster.webp")
+        clue = clue_for_media(root, video.stem)
+        if clue is not None:
+            write_thumbnail(clue, dest)
+        else:
+            try:
+                opening_frame_poster(video, dest)
+            except (OSError, RuntimeError):
+                continue
+        leftover = video.with_name(f"{video.stem}-poster.jpg")
+        if leftover.exists():
+            leftover.unlink()
+
+
+def attach_video_posters(html_text: str) -> str:
+    """Point each player at the unsolved poster, not a later frame of the film."""
+
+    def _poster_for(src: str) -> str:
+        return src[:-4] + "-poster.webp" if src.endswith(".mp4") else ""
+
+    def _video(match: re.Match[str]) -> str:
+        tag = re.sub(r'\s+poster="[^"]*"', "", match.group(0), count=1)
+        src_match = re.search(r'\bsrc="([^"]+\.mp4)"', tag)
+        if not src_match:
+            return tag
+        poster = _poster_for(src_match.group(1))
+        if tag.endswith("/>"):
+            return tag[:-2] + f' poster="{poster}"/>'
+        return tag[:-1] + f' poster="{poster}">'
+
+    html_text = re.sub(r"<video\b[^>]*>", _video, html_text, flags=re.I)
+
+    def _source(match: re.Match[str]) -> str:
+        video_open, src = match.group(1), match.group(2)
+        if "poster=" in video_open:
+            return match.group(0)
+        poster = _poster_for(src)
+        if not poster:
+            return match.group(0)
+        if video_open.endswith("/>"):
+            return match.group(0)
+        opened = video_open[:-1] + f' poster="{poster}">'
+        return opened + match.group(0)[len(video_open) :]
+
+    return re.sub(
+        r'(<video\b[^>]*>)\s*<source\b[^>]*\bsrc="([^"]+\.mp4)"',
+        _source,
+        html_text,
+        flags=re.I,
+    )
+
+
 def publish_films(root: Path) -> Path:
     """Write the archive and point older pages at the films that ship with the site."""
     root = Path(root)
+    ensure_safe_posters(root)
     page = root / "films.html"
     page.write_text(
         _page(
@@ -920,6 +1037,7 @@ def publish_films(root: Path) -> Path:
             continue
         original = html_path.read_text(encoding="utf-8")
         updated = retarget_cdn(original, _media_prefix(html_path, root))
+        updated = attach_video_posters(updated)
         updated = _ensure_films_nav(updated)
         if updated != original:
             html_path.write_text(updated, encoding="utf-8")

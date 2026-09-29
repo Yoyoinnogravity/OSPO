@@ -1,7 +1,7 @@
 from twodown.captions import youtube_description
 from twodown.models import Clue, DailyPair, SpokenClue
-from twodown.site import earlier_days, legacy_videos, publish_films, publish_site, retarget_cdn
-from twodown.youtube import YOUTUBE_CHANNEL, video_title
+from twodown.site import attach_video_posters, earlier_days, legacy_videos, publish_films, publish_site, retarget_cdn
+from twodown.youtube import YOUTUBE_CHANNEL, thumbnail_file, upload_short, video_title
 
 
 def _item(answer: str = "END RESULT", number: str = "12") -> SpokenClue:
@@ -142,10 +142,86 @@ def test_films_page_serves_legacy_videos_from_the_site(tmp_path):
     assert "One emperor backing follower of another" in films
     assert 'href="d/2026-09-11/"' in films
     assert "independent-12458-11a.mp4" not in films
-    assert "media/rasta-libby.mp4" in studio.read_text(encoding="utf-8")
-    assert "jsdelivr" not in studio.read_text(encoding="utf-8")
+    poster = media / "rasta-libby-poster.webp"
+    assert poster.exists()
+    assert poster.read_bytes()[:4] == b"RIFF"
+    assert 'poster="media/rasta-libby-poster.webp"' in films
+    studio_html = studio.read_text(encoding="utf-8")
+    assert "media/rasta-libby.mp4" in studio_html
+    assert 'poster="media/rasta-libby-poster.webp"' in studio_html
+    assert "jsdelivr" not in studio_html
     assert [path.name for path in legacy_videos(tmp_path)] == ["rasta-libby.mp4"]
     assert earlier_days(tmp_path)[0][0] == "2026-09-11"
+
+
+def test_attach_video_posters_follows_the_film_not_an_old_card():
+    html = """<video controls playsinline
+      poster="media/rasta-study-poster.jpg">
+      <source src="media/davis-cup-libby.mp4" type="video/mp4">
+    </video>"""
+    updated = attach_video_posters(html)
+    assert 'poster="media/davis-cup-libby-poster.webp"' in updated
+    assert "rasta-study-poster" not in updated
+    direct = attach_video_posters('<video src="../../media/fats-libby.mp4"></video>')
+    assert 'poster="../../media/fats-libby-poster.webp"' in direct
+
+
+def test_youtube_thumbnail_is_set_without_dropping_the_video_id(tmp_path, monkeypatch):
+    item = _item()
+    video = tmp_path / "short.mp4"
+    video.write_bytes(b"mp4")
+    thumb = tmp_path / "thumb.jpg"
+    thumb.write_bytes(b"jpeg")
+    item.video_path = str(video)
+    item.thumbnail_path = str(thumb)
+    assert thumbnail_file(item) == thumb
+
+    seen: dict[str, object] = {}
+
+    class _Call:
+        def __init__(self, result):
+            self._result = result
+
+        def execute(self):
+            if isinstance(self._result, Exception):
+                raise self._result
+            return self._result
+
+    class _Thumbnails:
+        def set(self, **kwargs):
+            seen["thumb"] = kwargs
+            return _Call(seen.get("thumb_error", {}))
+
+    class _Videos:
+        def insert(self, **kwargs):
+            seen["insert"] = kwargs
+            return _Call({"id": "abc123"})
+
+    class _YouTube:
+        def thumbnails(self):
+            return _Thumbnails()
+
+        def videos(self):
+            return _Videos()
+
+    class _Media:
+        def __init__(self, path, **kwargs):
+            seen.setdefault("media", []).append((path, kwargs.get("mimetype")))
+
+    monkeypatch.setattr("twodown.youtube._credentials", lambda: object())
+    monkeypatch.setattr("googleapiclient.discovery.build", lambda *args, **kwargs: _YouTube())
+    monkeypatch.setattr("googleapiclient.http.MediaFileUpload", _Media)
+
+    assert upload_short(item) == "abc123"
+    assert item.youtube_id == "abc123"
+    assert seen["thumb"]["videoId"] == "abc123"
+    assert ("thumb.jpg" in seen["media"][1][0]) or seen["media"][1][0].endswith("thumb.jpg")
+    assert seen["media"][1][1] == "image/jpeg"
+
+    item.youtube_id = None
+    seen["thumb_error"] = RuntimeError("thumbnail forbidden")
+    assert upload_short(item) == "abc123"
+    assert item.youtube_id == "abc123"
 
 
 def test_retarget_cdn_keeps_the_media_filename():

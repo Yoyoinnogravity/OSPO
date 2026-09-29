@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 from twodown.captions import youtube_description
 from twodown.config import BRAND, CLUES_PER_DAY
 from twodown.models import Clue, DailyPair, SpokenClue
+from twodown.render import write_thumbnail
 from twodown.tokens import secret_text
 
 YOUTUBE_CHANNEL = BRAND
@@ -46,6 +48,28 @@ def video_description(item: SpokenClue) -> str:
     return youtube_description(item)
 
 
+def thumbnail_file(item: SpokenClue) -> Path | None:
+    """Unsolved JPEG for this Short, never a frame that shows the answer."""
+    if item.thumbnail_path and Path(item.thumbnail_path).exists():
+        return Path(item.thumbnail_path)
+    if item.clue is None:
+        return None
+    dest = Path(item.video_path).with_name("thumb.jpg") if item.video_path else Path("/tmp") / f"{item.clue.slug}-thumb.jpg"
+    path = write_thumbnail(item.clue, dest)
+    item.thumbnail_path = str(path)
+    return path
+
+
+def _set_thumbnail(youtube, video_id: str, item: SpokenClue) -> None:
+    path = thumbnail_file(item)
+    if path is None or not video_id:
+        return
+    from googleapiclient.http import MediaFileUpload
+
+    media = MediaFileUpload(str(path), mimetype="image/jpeg", resumable=False)
+    youtube.thumbnails().set(videoId=video_id, media_body=media).execute()
+
+
 def upload_short(item: SpokenClue, privacy: str = "public") -> str | None:
     """Upload one Short to the authorised channel.
 
@@ -77,6 +101,13 @@ def upload_short(item: SpokenClue, privacy: str = "public") -> str | None:
     result = youtube.videos().insert(part="snippet,status", body=body, media_body=media).execute()
     video_id = result.get("id")
     item.youtube_id = video_id
+    if video_id:
+        try:
+            _set_thumbnail(youtube, video_id, item)
+        except Exception as exc:
+            # The film is already on the channel. Losing the id here would
+            # upload a second copy on the next run.
+            print(f"YouTube thumbnail was not set for {video_id}: {exc}")
     return video_id
 
 
