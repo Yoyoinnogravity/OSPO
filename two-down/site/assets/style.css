@@ -108,6 +108,9 @@ button.reveal {
 .spoiler { display: none; margin-top: 16px; }
 article.clue.is-open .spoiler { display: block; }
 article.clue.is-open button.reveal { display: none; }
+/* The film is the solve. The written answer stays off the page until it ends. */
+.spoiler .answer, .spoiler .parse { display: none; }
+article.clue.is-solved .answer, article.clue.is-solved .parse { display: block; }
 video { width: 100%; background: #111; }
 video.short {
   display: block;

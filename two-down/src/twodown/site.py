@@ -142,6 +142,9 @@ button.reveal {
 .spoiler { display: none; margin-top: 16px; }
 article.clue.is-open .spoiler { display: block; }
 article.clue.is-open button.reveal { display: none; }
+/* The film is the solve. The written answer stays off the page until it ends. */
+.spoiler .answer, .spoiler .parse { display: none; }
+article.clue.is-solved .answer, article.clue.is-solved .parse { display: block; }
 video { width: 100%; background: #111; }
 video.short {
   display: block;
@@ -340,6 +343,12 @@ if (followToggle) {
 }
 applyFollow();
 
+function showWrittenAnswer(article, video) {
+  if (!article || article.classList.contains("is-solved")) return;
+  if (!video || !video.duration || video.currentTime < video.duration - 0.4) return;
+  article.classList.add("is-solved");
+}
+
 document.querySelectorAll("button.reveal").forEach((btn) => {
   btn.addEventListener("click", () => btn.closest("article").classList.add("is-open"));
 });
@@ -365,7 +374,10 @@ document.querySelectorAll("article.clue").forEach((article) => {
   video.addEventListener("pause", () => audio.pause());
   video.addEventListener("seeked", () => {
     audio.currentTime = video.currentTime;
+    showWrittenAnswer(article, video);
   });
+  video.addEventListener("timeupdate", () => showWrittenAnswer(article, video));
+  video.addEventListener("ended", () => article.classList.add("is-solved"));
 });
 
 const SUGGEST_KEY = "cryptic-fun-suggest-day";

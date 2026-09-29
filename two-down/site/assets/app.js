@@ -103,6 +103,12 @@ if (followToggle) {
 }
 applyFollow();
 
+function showWrittenAnswer(article, video) {
+  if (!article || article.classList.contains("is-solved")) return;
+  if (!video || !video.duration || video.currentTime < video.duration - 0.4) return;
+  article.classList.add("is-solved");
+}
+
 document.querySelectorAll("button.reveal").forEach((btn) => {
   btn.addEventListener("click", () => btn.closest("article").classList.add("is-open"));
 });
@@ -128,7 +134,10 @@ document.querySelectorAll("article.clue").forEach((article) => {
   video.addEventListener("pause", () => audio.pause());
   video.addEventListener("seeked", () => {
     audio.currentTime = video.currentTime;
+    showWrittenAnswer(article, video);
   });
+  video.addEventListener("timeupdate", () => showWrittenAnswer(article, video));
+  video.addEventListener("ended", () => article.classList.add("is-solved"));
 });
 
 const SUGGEST_KEY = "cryptic-fun-suggest-day";

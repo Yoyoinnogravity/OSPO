@@ -92,6 +92,10 @@ def test_publish_site_writes_spoiler_pages(tmp_path):
     assert (tmp_path / "robots.txt").exists()
     css = (tmp_path / "assets" / "style.css").read_text(encoding="utf-8")
     assert "body.scene-photo header a" in css
+    assert ".spoiler .answer, .spoiler .parse { display: none; }" in css
+    assert "article.clue.is-solved .answer" in css
+    app = (tmp_path / "assets" / "app.js").read_text(encoding="utf-8")
+    assert "is-solved" in app
     assert 'rel="canonical"' in index
     assert 'property="og:title"' in index
     assert "application/ld+json" in index
