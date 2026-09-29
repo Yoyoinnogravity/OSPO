@@ -790,7 +790,7 @@ def publish_site(pair: DailyPair, dest: Path | None = None) -> Path:
 
     about = f"""
     <h1>About.</h1>
-    <p class="lede">{BRAND_LINE} {CREDIT_LINE} {CREDIT_WHO.capitalize()}. The only source is <a href="{SOURCE_SITE}">Fifteen Squared</a> — Independent, Guardian and Financial Times blogs. We never invent answers. Choose Sonia, Ryan, Libby or Thomas, and a real place as the backdrop. The same Shorts go to YouTube, TikTok, Instagram and Facebook when those accounts are connected. The site is the spoiler-safe home.</p>
+    <p class="lede">{BRAND_LINE} {CREDIT_LINE} {CREDIT_WHO[:1].upper()}{CREDIT_WHO[1:]}. The only source is <a href="{SOURCE_SITE}">Fifteen Squared</a> — Independent, Guardian and Financial Times blogs. We never invent answers. Choose Sonia, Ryan, Libby or Thomas, and a real place as the backdrop. The same Shorts go to YouTube, TikTok, Instagram and Facebook when those accounts are connected. The site is the spoiler-safe home.</p>
     <p>Answers and wordplay belong to the setters and the 15² bloggers. We rewrite for speech and always link the original post.</p>
     <p>Readers can <a href="suggest.html">suggest one homemade clue a day</a>, or ask for a daily clue by email. Both land in Aled’s inbox at <a href="mailto:{_e(SUGGEST_EMAIL)}">{_e(SUGGEST_EMAIL)}</a>.</p>
     <p>When the site has readers, a small labelled ad can sit under the pair — never on the answer. How that works is on <a href="support.html">Support</a>.</p>
