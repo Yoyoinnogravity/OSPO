@@ -15,6 +15,7 @@ from twodown.config import (
     CLUE_LETTERS_GAP_SECONDS,
     CLUE_PITCH,
     CLUE_RATE,
+    CLUE_VOLUME,
     DEFAULT_VOICE_ALIAS,
     HINT_HOLD_SECONDS,
     HINT_PAUSE_SECONDS,
@@ -31,6 +32,10 @@ from twodown.config import (
     LETTERS_PITCH,
     LETTERS_RATE,
     OUTRO_GAP_SECONDS,
+    OUTRO_PITCH,
+    OUTRO_RATE,
+    OUTRO_VOICE_ALIAS,
+    OUTRO_VOLUME,
     PARSE_ASIDE_PAUSE_SECONDS,
     PARSE_PITCH,
     PARSE_RATE,
@@ -184,7 +189,12 @@ def build_short_soundtrack(parts: ScriptParts, dest: Path, voice: str | None = N
             volume=INTRO_VOLUME,
         ),
         "clue": synthesise(
-            parts.clue_speech, work / "clue.mp3", voice, rate=CLUE_RATE, pitch=CLUE_PITCH
+            parts.clue_speech,
+            work / "clue.mp3",
+            DEFAULT_VOICE_ALIAS,
+            rate=CLUE_RATE,
+            pitch=CLUE_PITCH,
+            volume=CLUE_VOLUME,
         ),
         "letters": synthesise(
             parts.letters_speech, work / "letters.mp3", voice, rate=LETTERS_RATE, pitch=LETTERS_PITCH
@@ -221,10 +231,10 @@ def build_short_soundtrack(parts: ScriptParts, dest: Path, voice: str | None = N
         "outro": synthesise(
             parts.outro_speech,
             work / "outro.mp3",
-            INTRO_VOICE_ALIAS,
-            rate=INTRO_RATE,
-            pitch=INTRO_PITCH,
-            volume=INTRO_VOLUME,
+            OUTRO_VOICE_ALIAS,
+            rate=OUTRO_RATE,
+            pitch=OUTRO_PITCH,
+            volume=OUTRO_VOLUME,
         ),
     }
     intro_d = audio_seconds(clips["intro"])

@@ -114,7 +114,7 @@ def test_script_credits_the_setter_and_paper():
     assert "Phi" in script
     assert "cryptic.fit" in script
     parts = write_parts(clue)
-    assert parts.intro_speech == "Solve it, I know you can. I'm Cryptic Croc."
+    assert parts.intro_speech == "Solve it, I know you can. Here's Cryptic Croc."
     assert parts.clue_speech == f"{clue.clue}."
     assert "The clue:" not in parts.clue_speech
     assert "(" not in parts.clue_speech

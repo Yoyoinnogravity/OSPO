@@ -42,8 +42,10 @@ VOICE_LABELS = {
 VOICE_RATE = "+2%"
 VOICE_PITCH = "+8Hz"
 VOICE_VOLUME = "+5%"
-CLUE_RATE = "-2%"
-CLUE_PITCH = "+6Hz"
+# She presents the clue, brighter than the think and the parse.
+CLUE_RATE = "+6%"
+CLUE_PITCH = "+12Hz"
+CLUE_VOLUME = "+6%"
 LETTERS_RATE = "+0%"
 LETTERS_PITCH = "+8Hz"
 THINK_RATE = "+0%"
@@ -58,13 +60,18 @@ PARSE_RATE = "-4%"
 PARSE_PITCH = "+4Hz"
 PARSE_ASIDE_PAUSE_SECONDS = 0.7
 TAGLINE = "Solve it, I know you can."
-INTRO_LINE = f"{TAGLINE} I'm Cryptic Croc."
-INTRO_VOICE_ALIAS = "croc"
-INTRO_RATE = "+0%"
-INTRO_PITCH = "+0Hz"
-INTRO_VOLUME = "+4%"
+# Ryan invites, upbeat. Cryptic Croc then presents the clue.
+INTRO_LINE = f"{TAGLINE} Here's Cryptic Croc."
+INTRO_VOICE_ALIAS = "ryan"
+INTRO_RATE = "+10%"
+INTRO_PITCH = "+8Hz"
+INTRO_VOLUME = "+8%"
 INTRO_GAP_SECONDS = 0.45
 OUTRO_LINE = "That was cryptic.fit. Try to keep up."
+OUTRO_VOICE_ALIAS = "croc"
+OUTRO_RATE = "+0%"
+OUTRO_PITCH = "+0Hz"
+OUTRO_VOLUME = "+4%"
 OUTRO_GAP_SECONDS = 0.4
 # She names the setter too, a little steadier than the solve.
 SOURCE_VOICE_ALIAS = "croc"

@@ -1,4 +1,4 @@
-from twodown.config import DEFAULT_VOICE_ALIAS, HINT_LINE, HINT_LOOK, HINT_OFFER, HINT_VOICE_ALIAS, INTRO_VOICE_ALIAS, PINUP_SLUG, SOURCE_VOICE_ALIAS, STUDY_SLUG, VOICE_RATE, VOICES
+from twodown.config import CLUE_PITCH, CLUE_RATE, DEFAULT_VOICE_ALIAS, HINT_LINE, HINT_LOOK, HINT_OFFER, HINT_VOICE_ALIAS, INTRO_LINE, INTRO_RATE, INTRO_VOICE_ALIAS, PINUP_SLUG, SOURCE_VOICE_ALIAS, STUDY_SLUG, VOICE_RATE, VOICES
 from twodown.models import Clue
 from twodown.pipeline import (
     dreamlike_clue,
@@ -66,7 +66,7 @@ def test_study_clue_is_mass_media():
     assert "struggling" in clue.parse.lower()
     assert "mess" in clue.parse.lower()
     parts = write_parts(clue)
-    assert parts.intro_speech == "Solve it, I know you can. I'm Cryptic Croc."
+    assert parts.intro_speech == "Solve it, I know you can. Here's Cryptic Croc."
     assert parts.clue_speech == "Maid struggling with a mess — newspapers etc."
     assert parts.letters_speech == "Four, five. Do try to count."
     assert parts.think_speech == "Go on. Think. I can wait."
@@ -75,7 +75,15 @@ def test_study_clue_is_mass_media():
     assert parts.hint_speech.endswith(HINT_LOOK)
     assert parts.hint_speech == "Stuck already? Look at this."
     assert HINT_VOICE_ALIAS == "croc"
-    assert HINT_VOICE_ALIAS == INTRO_VOICE_ALIAS
+    assert INTRO_VOICE_ALIAS == "ryan"
+    assert VOICES[INTRO_VOICE_ALIAS] == "en-GB-RyanNeural"
+    assert DEFAULT_VOICE_ALIAS == "croc"
+    assert VOICES["croc"] == "en-GB-MaisieNeural"
+    assert INTRO_LINE.startswith("Solve it, I know you can.")
+    assert "Here's Cryptic Croc." in INTRO_LINE
+    assert CLUE_RATE.startswith("+")
+    assert CLUE_PITCH.startswith("+")
+    assert INTRO_RATE.startswith("+")
     assert parts.answer_speech == "Obviously it's mass media."
     assert parts.answer_speech == speak_answer(clue.answer)
     assert parts.outro_speech == "That was cryptic.fit. Try to keep up."
