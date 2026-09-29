@@ -63,6 +63,7 @@ def test_publish_site_writes_spoiler_pages(tmp_path):
     assert "unique cryptic crossword clues and solutions" in about
     assert "We credit all" in about
     assert "the photograph" in about
+    assert "Fifteen Squared, and the photograph" in about
     assert (tmp_path / "c" / "independent-12458-12a" / "index.html").exists()
     assert (tmp_path / "support.html").exists()
     assert (tmp_path / "privacy.html").exists()
