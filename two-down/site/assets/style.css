@@ -59,9 +59,11 @@ body.scene-photo header .wordmark { color: var(--ink); }
 body.scene-photo header .follow a { color: var(--ink); }
 body.scene-photo header .follow a.on { color: var(--cream); }
 nav a:hover { color: var(--crimson); }
-.chrome-top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
-.wordmark { font-family: "Liberation Sans", "Helvetica Neue", sans-serif; font-weight: 700; font-size: 1.6rem; letter-spacing: 0.02em; color: var(--ink); text-decoration: none; }
+.chrome-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.wordmark { display: inline-flex; align-items: center; gap: 10px; font-family: "Liberation Sans", "Helvetica Neue", sans-serif; font-weight: 700; font-size: 1.6rem; letter-spacing: 0.02em; color: var(--ink); text-decoration: none; }
+.wordmark .profile { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; border: 2px solid var(--crimson); background: var(--news); flex: none; }
 .wordmark span { color: var(--crimson); }
+.channel-picture { width: 160px; height: 160px; border-radius: 50%; object-fit: cover; border: 4px solid var(--crimson); background: var(--news); display: block; margin: 12px 0 16px; }
 nav a { margin-left: 18px; font-family: "Liberation Sans", sans-serif; font-size: 0.9rem; text-decoration: none; color: var(--muted); }
 .voices, .places, .follow { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .voices span, .places span, .follow span { font-family: "Liberation Sans", sans-serif; font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-right: 4px; }

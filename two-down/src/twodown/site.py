@@ -10,6 +10,7 @@ from bs4 import BeautifulSoup
 from PIL import Image
 
 from twodown.ads import ads_enabled, ads_txt, adsense_client, adsense_slot
+from twodown.banner import write_youtube_picture
 from twodown.config import BRAND, BRAND_LINE, CREDIT_LINE, CREDIT_WHO, DEFAULT_VOICE_ALIAS, SITE_HOST, SITE_ORIGIN, SITE_ROOT, SOURCE_SITE, SPONSOR_EMAIL, SUGGEST_EMAIL, VOICE_LABELS, VOICES, follow_profiles
 from twodown.models import DailyPair, SpokenClue
 from twodown.render import opening_frame_poster, write_share_card, write_thumbnail
@@ -93,9 +94,11 @@ body.scene-photo header .wordmark { color: var(--ink); }
 body.scene-photo header .follow a { color: var(--ink); }
 body.scene-photo header .follow a.on { color: var(--cream); }
 nav a:hover { color: var(--crimson); }
-.chrome-top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
-.wordmark { font-family: "Liberation Sans", "Helvetica Neue", sans-serif; font-weight: 700; font-size: 1.6rem; letter-spacing: 0.02em; color: var(--ink); text-decoration: none; }
+.chrome-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.wordmark { display: inline-flex; align-items: center; gap: 10px; font-family: "Liberation Sans", "Helvetica Neue", sans-serif; font-weight: 700; font-size: 1.6rem; letter-spacing: 0.02em; color: var(--ink); text-decoration: none; }
+.wordmark .profile { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; border: 2px solid var(--crimson); background: var(--news); flex: none; }
 .wordmark span { color: var(--crimson); }
+.channel-picture { width: 160px; height: 160px; border-radius: 50%; object-fit: cover; border: 4px solid var(--crimson); background: var(--news); display: block; margin: 12px 0 16px; }
 nav a { margin-left: 18px; font-family: "Liberation Sans", sans-serif; font-size: 0.9rem; text-decoration: none; color: var(--muted); }
 .voices, .places, .follow { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .voices span, .places span, .follow span { font-family: "Liberation Sans", sans-serif; font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-right: 4px; }
@@ -518,6 +521,52 @@ def _follow_bar(prefix: str) -> str:
     )
 
 
+def _wordmark(prefix: str) -> str:
+    return (
+        f'<a class="wordmark" href="{prefix}index.html">'
+        f'<img class="profile" src="{prefix}assets/profile.png" width="48" height="48" alt="Cryptic Croc">'
+        f"cryptic<span>.fit</span></a>"
+    )
+
+
+def _picture_panel(prefix: str) -> str:
+    return f"""<section class="panel" id="picture">
+        <h2>Profile picture.</h2>
+        <img class="channel-picture" src="{prefix}assets/profile.png" width="800" height="800" alt="Cryptic Croc">
+        <p>Cryptic Croc is the face of {BRAND}, beside the name on every page and on the YouTube channel. The file is a still PNG, 800×800.</p>
+        <p><a class="action" href="{prefix}assets/profile.png" download="cryptic-fit-profile.png">Save the picture</a></p>
+      </section>"""
+
+
+def _ensure_profile(html_text: str, *, picture_panel: bool = False) -> str:
+    """Put Cryptic Croc in the header of pages written before she was the mark."""
+    html_text = re.sub(
+        r'<link rel="icon" href="((?:\.\./)*)assets/favicon\.svg" type="image/svg\+xml">',
+        '<link rel="icon" href="\\1assets/profile.png" type="image/png">\n'
+        '  <link rel="apple-touch-icon" href="\\1assets/profile.png">',
+        html_text,
+        count=1,
+    )
+    if 'class="profile"' not in html_text:
+        html_text = re.sub(
+            r'<a class="wordmark" href="((?:\.\./)*)index\.html">cryptic<span>\.fit</span></a>',
+            r'<a class="wordmark" href="\1index.html">'
+            r'<img class="profile" src="\1assets/profile.png" width="48" height="48" alt="Cryptic Croc">'
+            r"cryptic<span>.fit</span></a>",
+            html_text,
+            count=1,
+        )
+    if picture_panel and 'id="picture"' not in html_text:
+        found = re.search(r'src="((?:\.\./)*)assets/profile\.png"', html_text)
+        prefix = found.group(1) if found else ""
+        html_text = html_text.replace(
+            '<div class="suggest-forms">',
+            '<div class="suggest-forms">\n      ' + _picture_panel(prefix),
+            1,
+        )
+    return html_text
+
+
 def _nav(prefix: str) -> str:
     return f"""
       <nav>
@@ -600,7 +649,8 @@ def _page(body: str, seo: PageSeo, depth: int = 0, show_ads: bool = False) -> st
   <link rel="alternate" hreflang="en-GB" href="{_e(seo.canonical)}">
   <link rel="alternate" hreflang="x-default" href="{_e(seo.canonical)}">
   <link rel="alternate" type="application/rss+xml" title="{_e(BRAND)}" href="{SITE_ORIGIN}/feed.xml">
-  <link rel="icon" href="{prefix}assets/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="{prefix}assets/profile.png" type="image/png">
+  <link rel="apple-touch-icon" href="{prefix}assets/profile.png">
   <meta name="theme-color" content="#b81c29">
   <meta name="color-scheme" content="light">
   <meta property="og:site_name" content="{_e(BRAND)}">
@@ -623,7 +673,7 @@ def _page(body: str, seo: PageSeo, depth: int = 0, show_ads: bool = False) -> st
 <body class="scene-photo" data-scene="{_e(default.slug)}" data-default-scene="{_e(default.slug)}" data-scene-prefix="{_e(scene_prefix)}" style="background-image: url('{_e(scene_prefix + background)}');">
   <header>
     <div class="chrome-top">
-      <a class="wordmark" href="{prefix}index.html">cryptic<span>.fit</span></a>
+      {_wordmark(prefix)}
       {_nav(prefix)}
     </div>
     {_voice_bar()}
@@ -1069,6 +1119,7 @@ def publish_films(root: Path) -> Path:
         updated = retarget_cdn(original, _media_prefix(html_path, root))
         updated = attach_video_posters(updated)
         updated = _ensure_films_nav(updated)
+        updated = _ensure_profile(updated, picture_panel=html_path.name == "follow.html")
         if updated != original:
             html_path.write_text(updated, encoding="utf-8")
     _ensure_sitemap_films(root)
@@ -1098,6 +1149,7 @@ def publish_site(pair: DailyPair, dest: Path | None = None) -> Path:
     (root / ".nojekyll").write_text("", encoding="utf-8")
     (root / "robots.txt").write_text(robots_txt(), encoding="utf-8")
     (root / "assets" / "favicon.svg").write_text(FAVICON_SVG, encoding="utf-8")
+    write_youtube_picture(root / "assets" / "profile.png")
     write_share_card(root / "media" / "og.webp")
     ads_path = root / "ads.txt"
     listing = ads_txt()
@@ -1283,6 +1335,7 @@ def publish_site(pair: DailyPair, dest: Path | None = None) -> Path:
     <h1>Follow {BRAND}.</h1>
     <p class="lede">Following is the default. Stay for the daily pair, or take it with you by email, RSS or YouTube. There is no account to create on the site.</p>
     <div class="suggest-forms">
+      {_picture_panel("")}
       <section class="panel" id="email">
         <h2>Email, one clue a day.</h2>
         <p>Spoiler-safe: the clue only. Sends to <a href="mailto:{inbox}">{inbox}</a>.</p>

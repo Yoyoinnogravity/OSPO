@@ -1,6 +1,14 @@
 from twodown.captions import youtube_description
 from twodown.models import Clue, DailyPair, SpokenClue
-from twodown.site import attach_video_posters, earlier_days, legacy_videos, publish_films, publish_site, retarget_cdn
+from twodown.site import (
+    _ensure_profile,
+    attach_video_posters,
+    earlier_days,
+    legacy_videos,
+    publish_films,
+    publish_site,
+    retarget_cdn,
+)
 from twodown.youtube import YOUTUBE_CHANNEL, thumbnail_file, upload_short, video_title
 
 
@@ -21,6 +29,20 @@ def _item(answer: str = "END RESULT", number: str = "12") -> SpokenClue:
         enumeration_ok=True,
     )
     return SpokenClue(clue=clue, script="cryptic.fit. The answer is END RESULT.", voice="en-GB-SoniaNeural")
+
+
+def test_old_pages_gain_the_profile_picture():
+    old = (
+        '<link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">\n'
+        '<a class="wordmark" href="../../index.html">cryptic<span>.fit</span></a>\n'
+        '<div class="suggest-forms">'
+    )
+    once = _ensure_profile(old, picture_panel=True)
+    assert 'src="../../assets/profile.png"' in once
+    assert 'rel="icon" href="../../assets/profile.png"' in once
+    assert "favicon.svg" not in once
+    assert once.count('id="picture"') == 1
+    assert _ensure_profile(once, picture_panel=True) == once
 
 
 def test_publish_site_writes_spoiler_pages(tmp_path):
@@ -116,6 +138,13 @@ def test_publish_site_writes_spoiler_pages(tmp_path):
     assert (tmp_path / "CNAME").read_text(encoding="utf-8") == "cryptic.fit\n"
     assert (tmp_path / ".nojekyll").exists()
     assert (tmp_path / "assets" / "favicon.svg").exists()
+    assert (tmp_path / "assets" / "profile.png").stat().st_size > 1000
+    assert 'class="profile"' in index
+    assert 'src="assets/profile.png"' in index
+    assert 'rel="icon" href="assets/profile.png"' in index
+    assert 'id="picture"' in follow
+    assert 'class="channel-picture"' in follow
+    assert ".wordmark .profile" in css
     assert "application/rss+xml" in index
 
 
