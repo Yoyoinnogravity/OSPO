@@ -42,6 +42,47 @@ def test_parse_independent_detail_table():
     assert nereids.skipped_reason == "cross-reference"
 
 
+def test_highlighted_letter_stays_out_of_the_previous_word():
+    """Guardian wraps the deleted letter in <strong><em>, splitting the word."""
+    html = """
+    <table><tbody>
+    <tr><td colspan="3">ACROSS</td></tr>
+    <tr>
+      <td>9</td>
+      <td><span>ELICIT</span></td>
+      <td><div>Bring out client I fancy with no end of distinction (6)</div></td>
+    </tr>
+    <tr>
+      <td colspan="2"></td>
+      <td>anagram/“fancy” of (clie<strong><em>n</em></strong>t I)*, without the
+      <strong><em>n</em></strong> (“no end of distinctio-<strong><em>n</em></strong>“)</td>
+    </tr>
+    </tbody></table>
+    """
+    clue = next(c for c in parse_post(_post(html, paper="Guardian", puzzle_id="30124", setter="Chandler")))
+    assert clue.answer == "ELICIT"
+    assert "(client I)*" in clue.parse
+    assert "without the n" in clue.parse
+    assert "without then" not in clue.parse
+    assert "distinction" in clue.parse
+    parts = write_parts(clue)
+    assert "without then" not in parts.parse_speech
+    assert "client" in parts.parse_speech.lower()
+    assert "anagram indicator" in parts.parse_speech.lower()
+    assert "no end of distinction" in parts.parse_speech.lower()
+    assert '"' not in parts.parse_speech
+
+
+def test_letter_spans_rejoin():
+    html = "<p>c<span>l</span><span>i</span>e</p>"
+    from bs4 import BeautifulSoup
+
+    from twodown.parse import _smart_strings
+
+    node = BeautifulSoup(html, "lxml").p
+    assert _smart_strings(node) == "clie"
+
+
 def test_parse_three_column_skips_see_n():
     html = (FIXTURES / "guardian_three_col.html").read_text(encoding="utf-8")
     clues = parse_post(_post(html, paper="Guardian", puzzle_id="30108", setter="Paul"))

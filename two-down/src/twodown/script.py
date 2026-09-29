@@ -124,7 +124,7 @@ def speak_parse_asides(text: str) -> str:
     """Give parenthetical asides their own sentence so they do not glue to the construction."""
 
     def _aside(match: re.Match[str]) -> str:
-        inner = re.sub(r"\s+", " ", match.group(1)).strip(" .")
+        inner = re.sub(r"\s+", " ", match.group(1)).strip(" .\"'\u201c\u201d\u2018\u2019")
         if not inner:
             return ""
         return f". {inner}."
@@ -155,7 +155,7 @@ def _drop_construction(text: str, answer: str) -> str:
 
 
 def _spoken_parse(parse: str, answer: str = "") -> str:
-    text = parse
+    text = parse.replace("\u201c", '"').replace("\u201d", '"').replace("\u2018", "'").replace("\u2019", "'")
     # 15² / Aled notation: LIKE="positive response" and anagram/"Doctor".
     notation = bool(re.search(r'="|\banagram\s*/', text))
     text = re.sub(r'="([^"]+)"', r" (\1)", text)

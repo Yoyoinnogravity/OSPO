@@ -26,25 +26,79 @@ def _clean(text: str) -> str:
     return text.strip()
 
 
+def _last_token(text: str) -> str:
+    raw = re.split(r"\s+", text)[-1] if text else ""
+    return re.sub(r"^[^A-Za-z]+|[^A-Za-z]+$", "", raw)
+
+
+def _glue_letter(parts: list[str], bit: str, nxt: str) -> bool:
+    """True when a 1–2 letter highlight belongs inside the previous word.
+
+    "clie" + "n" + "t" is one word. "without the" + "n" is a letter on its own.
+    A hyphen ("distinctio-" + "n") always continues the word.
+    """
+    if not parts or not bit.isalpha() or not bit.islower() or len(bit) > 2:
+        return False
+    prev = parts[-1]
+    if not prev or not (prev[-1].islower() or prev.endswith("-")):
+        return False
+    if prev.endswith("-") or nxt[:1].isalpha():
+        return True
+    token = _last_token(prev).rstrip("-")
+    # Last letter of a span run glues onto a fragment, not a short finished word.
+    if " " in prev and len(token) <= 3:
+        return False
+    return bool(token) and token.isalpha() and token.islower()
+
+
 def _smart_strings(node: Tag) -> str:
-    """Join highlighted single letters back into words (FT/Guardian letter spans)."""
+    """Join highlighted letters that sit inside a word (FT/Guardian letter spans)."""
+    bits = [raw.strip() for raw in node.strings if raw.strip()]
     parts: list[str] = []
-    for raw in node.strings:
-        bit = raw.strip()
-        if not bit:
-            continue
-        if (
-            parts
-            and bit.isalpha()
-            and bit.islower()
-            and len(bit) <= 2
-            and parts[-1]
-            and parts[-1][-1].islower()
-        ):
-            parts[-1] += bit
-        else:
+    i = 0
+    while i < len(bits):
+        bit = bits[i]
+        nxt = bits[i + 1] if i + 1 < len(bits) else ""
+        if not _glue_letter(parts, bit, nxt):
             parts.append(bit)
-    return _clean(" ".join(parts))
+            i += 1
+            continue
+        parts[-1] = parts[-1].rstrip("-") + bit
+        i += 1
+        while i < len(bits):
+            follower = bits[i]
+            if follower.isalpha() and follower.islower() and len(follower) <= 2:
+                after = bits[i + 1] if i + 1 < len(bits) else ""
+                token = _last_token(parts[-1])
+                if after[:1].isalpha() or not after or (token.isalpha() and len(token) <= 12 and " " not in token):
+                    parts[-1] += follower
+                    i += 1
+                    continue
+                break
+            lead = re.match(r"^([a-z]{1,2})(?![a-z])", follower)
+            token = _last_token(parts[-1])
+            if lead and token.isalpha() and token.islower():
+                parts[-1] += lead.group(1)
+                rest = follower[lead.end() :].lstrip()
+                if rest:
+                    bits[i] = rest
+                else:
+                    i += 1
+            break
+    return _clean(_join_bits(parts))
+
+
+def _join_bits(parts: list[str]) -> str:
+    """Keep closing quotes and brackets on the previous word."""
+    out = ""
+    for bit in parts:
+        if not out:
+            out = bit
+        elif bit[:1] in ".,;:!?)]\"'\u201d\u2019":
+            out += bit
+        else:
+            out += " " + bit
+    return out
 
 
 def _cell_text(cell: Tag | None) -> str:
