@@ -25,6 +25,7 @@ from twodown.config import (
     MUTED,
     NEWS_BG,
     NEWS_GRID,
+    TAGLINE,
 )
 from twodown.croc import croc_portrait, croc_site_sprite, croc_sprite
 
@@ -74,7 +75,7 @@ def write_youtube_banner(dest: Path) -> Path:
     cryptic, _, tail = BRAND.partition(".")
     suffix = f".{tail}" if tail else ""
     name = "Two cryptic clues a day"
-    credit = "Cryptic Croc  ·  Fifteen Squared"
+    credit = TAGLINE
     cryptic_w = draw.textlength(cryptic, font=word)
     name_w = cryptic_w + draw.textlength(suffix, font=word)
     text_w = max(name_w, draw.textlength(name, font=sub), draw.textlength(credit, font=small))

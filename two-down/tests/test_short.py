@@ -1,4 +1,5 @@
 from twodown.config import DEFAULT_VOICE_ALIAS, HINT_LINE, HINT_LOOK, HINT_OFFER, HINT_VOICE_ALIAS, INTRO_VOICE_ALIAS, PINUP_SLUG, SOURCE_VOICE_ALIAS, STUDY_SLUG, VOICE_RATE, VOICES
+from twodown.models import Clue
 from twodown.pipeline import (
     dreamlike_clue,
     fats_clue,
@@ -65,7 +66,7 @@ def test_study_clue_is_mass_media():
     assert "struggling" in clue.parse.lower()
     assert "mess" in clue.parse.lower()
     parts = write_parts(clue)
-    assert parts.intro_speech == "Solve it, you idiot. I'm Cryptic Croc."
+    assert parts.intro_speech == "Solve it, I know you can. I'm Cryptic Croc."
     assert parts.clue_speech == "Maid struggling with a mess — newspapers etc."
     assert parts.letters_speech == "Four, five. Do try to count."
     assert parts.think_speech == "Go on. Think. I can wait."
@@ -80,7 +81,8 @@ def test_study_clue_is_mass_media():
     assert parts.outro_speech == "That was cryptic.fit. Try to keep up."
     assert "Brendan" not in parts.parse_speech
     assert "Fifteen Squared" not in parts.parse_speech
-    assert parts.source_speech == "That's Arrietty, in the Financial Times — via Fifteen Squared. You're welcome."
+    assert parts.source_speech == "That's Arrietty, in the Financial Times. You're welcome."
+    assert "Fifteen Squared" not in parts.source_speech
     script = parts.full
     assert script.index(parts.intro_speech) < script.index(parts.clue_speech)
     assert script.index(parts.clue_speech) < script.index(parts.letters_speech)
@@ -104,7 +106,7 @@ def test_speak_answer_rasta_is_a_word():
 
 def test_source_credit_is_its_own_line():
     clue = rasta_clue()
-    assert speak_source(clue) == "That's Brendan, in the Guardian — via Fifteen Squared. You're welcome."
+    assert speak_source(clue) == "That's Brendan, in the Guardian. You're welcome."
     assert SOURCE_VOICE_ALIAS == "croc"
     parts = write_parts(clue)
     assert parts.source_speech == speak_source(clue)
@@ -295,3 +297,38 @@ def test_pin_up_stays_on_the_published_site():
     assert speak_parse_tokens("Three hyphen two.") == "Three hyphen two."
     assert speak_parse_tokens("Slang for an attractive person.") == "Slang for an attractive person."
     assert speak_parse_tokens("12 across, 3-2") == "12 across, 3-2"
+
+
+def test_speech_uses_the_clue_and_the_solution_not_a_web_address():
+    clue = Clue(
+        source_url="https://fifteensquared.net/example/",
+        paper="Independent",
+        puzzle_id="12459",
+        setter="Bluebird",
+        blogger="beermagnet",
+        number="8",
+        direction="across",
+        clue="Troops in disarray after Ukraine’s leader pulls out completely",
+        enumeration="7",
+        answer="UPROOTS",
+        parse=(
+            'U[kraine], (TROOPS)* AInd: in disarray. '
+            "See https://fifteensquared.net/2026/09/12/independent-12459-by-bluebird/ "
+            "and cryptic.fun. Fifteen Squared."
+        ),
+        device="anagram",
+        enumeration_ok=True,
+    )
+    parts = write_parts(clue)
+    spoken = parts.full
+    assert "https://" not in spoken
+    assert "fifteensquared" not in spoken.lower()
+    assert "Fifteen Squared" not in spoken
+    assert "cryptic.fun" not in spoken
+    assert "AInd" not in spoken
+    assert "anagram indicator" in parts.parse_speech.lower()
+    assert "anagram anagram" not in parts.parse_speech.lower()
+    assert "Ukraine" in parts.parse_speech
+    assert "uproots" in parts.answer_speech
+    assert "Troops in disarray" in parts.clue_speech
+    assert "cryptic.fit" in parts.outro_speech

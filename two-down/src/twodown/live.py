@@ -27,8 +27,8 @@ def _fifteen_squared_from_site() -> list[tuple[str, str]]:
             if url.rstrip("/") not in [u.rstrip("/") for u in found]:
                 found.append(url)
     if not found:
-        return [("Fifteen Squared", SOURCE_SITE)]
-    return [(f"15² {i}", url) for i, url in enumerate(found, start=1)]
+        return [("source", SOURCE_SITE)]
+    return [(f"source {i}", url) for i, url in enumerate(found, start=1)]
 
 
 def public_checks() -> list[tuple[str, str]]:

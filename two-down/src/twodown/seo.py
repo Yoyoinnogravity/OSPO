@@ -7,13 +7,13 @@ from datetime import datetime
 from pathlib import Path
 from xml.sax.saxutils import escape as xml_escape
 
-from twodown.config import BRAND, BRAND_LINE, CREDIT_LINE, SITE_ORIGIN, SOURCE_SITE, follow_profiles
+from twodown.config import BRAND, BRAND_LINE, CREDIT_LINE, SITE_ORIGIN, follow_profiles
 from twodown.models import Clue, DailyPair
 
 GSC_ENV = "TWODOWN_GSC_VERIFY"
 SHARE_IMAGE = "/media/og.webp"
 DEFAULT_DESCRIPTION = (
-    f"{BRAND_LINE} {CREDIT_LINE} From Fifteen Squared. "
+    f"{BRAND_LINE} {CREDIT_LINE} "
     "Have a go before you tap solve. Spoken parses on cryptic.fit."
 )
 
@@ -33,7 +33,7 @@ def gsc_verification() -> str | None:
 
 def homepage_description(pretty_date: str) -> str:
     return (
-        f"Two cryptic crossword clues for {pretty_date}, taken from Fifteen Squared. "
+        f"Two cryptic crossword clues for {pretty_date}. "
         "Have a go before you tap solve."
     )
 
@@ -48,7 +48,7 @@ def clue_description(clue: Clue) -> str:
     enum = f" ({clue.enumeration})" if clue.enumeration else ""
     return (
         f"{clue.clue}{enum} — {clue.paper} {clue.puzzle_id} by {clue.setter}. "
-        "Have a go, then tap solve. Parse via Fifteen Squared."
+        "Have a go, then tap solve."
     )
 
 
@@ -57,7 +57,7 @@ def dumps_ld(data: dict | list) -> str:
 
 
 def website_ld() -> dict:
-    same = [f"{SITE_ORIGIN}/", SOURCE_SITE, f"{SITE_ORIGIN}/feed.xml"]
+    same = [f"{SITE_ORIGIN}/", f"{SITE_ORIGIN}/feed.xml"]
     same.extend(url for _slug, _label, url in follow_profiles())
     return {
         "@context": "https://schema.org",
@@ -67,7 +67,6 @@ def website_ld() -> dict:
         "description": DEFAULT_DESCRIPTION,
         "inLanguage": "en-GB",
         "publisher": {"@type": "Organization", "name": BRAND, "url": f"{SITE_ORIGIN}/", "sameAs": same},
-        "sourceOrganization": {"@type": "Organization", "name": "Fifteen Squared", "url": SOURCE_SITE},
     }
 
 

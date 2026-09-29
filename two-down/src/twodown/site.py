@@ -12,7 +12,7 @@ from PIL import Image
 
 from twodown.ads import ads_enabled, ads_txt, adsense_client, adsense_slot
 from twodown.banner import write_site_croc, write_youtube_picture
-from twodown.config import BRAND, BRAND_LINE, CREDIT_LINE, CREDIT_WHO, DEFAULT_VOICE_ALIAS, SITE_HOST, SITE_ORIGIN, SITE_ROOT, SOURCE_SITE, SPONSOR_EMAIL, SUGGEST_EMAIL, VOICE_LABELS, VOICES, follow_profiles
+from twodown.config import BRAND, BRAND_LINE, CREDIT_LINE, CREDIT_WHO, DEFAULT_VOICE_ALIAS, SITE_HOST, SITE_ORIGIN, SITE_ROOT, SPONSOR_EMAIL, SUGGEST_EMAIL, TAGLINE, VOICE_LABELS, VOICES, follow_profiles
 from twodown.models import DailyPair, SpokenClue
 from twodown.render import opening_frame_poster, write_share_card, write_thumbnail
 from twodown.scenes import DEFAULT_SCENE, get_scene, list_scenes
@@ -731,8 +731,7 @@ def _page(body: str, seo: PageSeo, depth: int = 0, show_ads: bool = False) -> st
     {body}
   </main>
   <footer>
-    Two clues a day from the Independent, Guardian and FT blogs on
-    <a href="{SOURCE_SITE}">Fifteen Squared</a>.
+    Two clues a day from the Independent, the Guardian and the Financial Times.
     Not affiliated with those papers. Pick a voice and a place.
     One homemade clue a day via <a href="{prefix}suggest.html">Suggest</a>,
     or <a href="{prefix}follow.html">follow</a> by email, RSS or YouTube.
@@ -775,7 +774,7 @@ def _article(item: SpokenClue, media_prefix: str, open_by_default: bool = False,
         {audio}
         <p class="answer">{_e(clue.answer)}</p>
         <p class="parse">{_e(clue.parse)}</p>
-        <p class="credit">Parse via <a href="{_e(clue.source_url)}">Fifteen Squared · {_e(clue.blogger)}</a></p>
+        <p class="credit">Parse via <a href="{_e(clue.source_url)}">{_e(clue.blogger)}</a></p>
       </div>
     </article>
     """
@@ -1308,10 +1307,10 @@ def publish_site(pair: DailyPair, dest: Path | None = None) -> Path:
     pretty = datetime.strptime(pair.date, "%Y-%m-%d").strftime("%A %-d %B %Y")
     articles = "\n".join(_article(item, "media/") for item in pair.clues)
     index_body = f"""
-    {_croc_hello("", title="Solve it, you idiot.", lede="Two clues a day from Fifteen Squared. Fail them yourself before you tap solve.")}
+    {_croc_hello("", title=TAGLINE, lede="Two clues a day from the Independent, the Guardian and the Financial Times. Have a go before you tap solve.")}
     <p class="kicker">Two clues · {_e(pretty)}</p>
     <h2 class="day-title">Today’s pair.</h2>
-    <p class="lede">Have a go before you tap solve. Parses follow Fifteen Squared — we speak them, we don’t nick the grid. Pick a place from the header if you’d rather solve against the Matterhorn than newsprint.</p>
+    <p class="lede">Have a go before you tap solve. We speak the parses. We don’t nick the grid. Pick a place from the header if you’d rather solve against the Matterhorn than newsprint.</p>
     <section class="pair">
       {articles}
     </section>
@@ -1394,8 +1393,8 @@ def publish_site(pair: DailyPair, dest: Path | None = None) -> Path:
 
     about = f"""
     <h1>About.</h1>
-    <p class="lede">{BRAND_LINE} {CREDIT_LINE} {CREDIT_WHO[:1].upper()}{CREDIT_WHO[1:]}. The only source is <a href="{SOURCE_SITE}">Fifteen Squared</a> — Independent, Guardian and Financial Times blogs. We never invent answers. Cryptic Croc presents the new films. Sonia, Libby, Ryan and Thomas stay on the voice list, and you can still pick a real place as the backdrop. The same Shorts go to YouTube, TikTok, Instagram and Facebook when those accounts are connected. The site is the spoiler-safe home.</p>
-    <p>Answers and wordplay belong to the setters and the 15² bloggers. We rewrite for speech and always link the original post.</p>
+    <p class="lede">{BRAND_LINE} {CREDIT_LINE} {CREDIT_WHO[:1].upper()}{CREDIT_WHO[1:]}. The only source is the Independent, the Guardian and the Financial Times. We never invent answers. Cryptic Croc presents the new films. Sonia, Libby, Ryan and Thomas stay on the voice list, and you can still pick a real place as the backdrop. The same Shorts go to YouTube, TikTok, Instagram and Facebook when those accounts are connected. The site is the spoiler-safe home.</p>
+    <p>Answers and wordplay belong to the setters and the bloggers. We rewrite for speech and always link the original post.</p>
     <p>Readers can <a href="suggest.html">suggest one homemade clue a day</a>, or ask for a daily clue by email. Both land in Aled’s inbox at <a href="mailto:{_e(SUGGEST_EMAIL)}">{_e(SUGGEST_EMAIL)}</a>.</p>
     <p>When the site has readers, a small labelled ad can sit under the pair — never on the answer. How that works is on <a href="support.html">Support</a>.</p>
     <h2>Backgrounds.</h2>
@@ -1408,7 +1407,7 @@ def publish_site(pair: DailyPair, dest: Path | None = None) -> Path:
             about,
             PageSeo(
                 title=f"About — {BRAND}",
-                description=f"{BRAND_LINE} {CREDIT_LINE} From the Independent, Guardian and FT blogs on Fifteen Squared. We never invent answers.",
+                description=f"{BRAND_LINE} {CREDIT_LINE} From the Independent, the Guardian and the Financial Times. We never invent answers.",
                 path="/about.html",
                 json_ld=website_ld(),
             ),
@@ -1507,7 +1506,7 @@ def publish_site(pair: DailyPair, dest: Path | None = None) -> Path:
             follow_page,
             PageSeo(
                 title=f"Follow — {BRAND}",
-                description=f"Follow {BRAND} by email, RSS or YouTube. {BRAND_LINE} {CREDIT_LINE} From Fifteen Squared. No account required.",
+                description=f"Follow {BRAND} by email, RSS or YouTube. {BRAND_LINE} {CREDIT_LINE} No account required.",
                 path="/follow.html",
             ),
         ),
@@ -1527,7 +1526,7 @@ def publish_site(pair: DailyPair, dest: Path | None = None) -> Path:
     <section class="panel">
       <h2>2. A small ad on the site.</h2>
       <p>Once <a href="{SITE_ORIGIN}/">{BRAND}</a> is live, Google AdSense can put one labelled display unit <em>under</em> the pair. Manual placement only — no Auto ads, no ads inside Solve, no ads on a single-clue spoiler page. The UK needs a consent banner before any ad cookie is set; ads stay off until that is in place.</p>
-      <p>AdSense can refuse sites that mostly reprint other people’s puzzles. We write original pages (this one, About, how the agent works) and we credit all — the setter, the paper, <a href="{SOURCE_SITE}">Fifteen Squared</a>, and the photograph. Approval is not guaranteed. If Google says no, we skip site ads and lean on YouTube and sponsors.</p>
+      <p>AdSense can refuse sites that mostly reprint other people’s puzzles. We write original pages (this one, About, how the agent works) and we credit all — the setter, the paper, and the photograph. Approval is not guaranteed. If Google says no, we skip site ads and lean on YouTube and sponsors.</p>
     </section>
     <section class="panel">
       <h2>3. Sponsor a week.</h2>
@@ -1537,7 +1536,7 @@ def publish_site(pair: DailyPair, dest: Path | None = None) -> Path:
     <ul class="rules">
       <li>The clue stays free. Solve stays a tap, not a paywall.</li>
       <li>No ad on the answer, the parse, or the spoken pause.</li>
-      <li>Parses still come only from {SOURCE_SITE}.</li>
+      <li>Parses still come only from the original posts.</li>
       <li>TikTok, Instagram and Facebook are for reach. Their creator funds are extra if they ever qualify — not the plan.</li>
     </ul>
     {_ad_unit()}

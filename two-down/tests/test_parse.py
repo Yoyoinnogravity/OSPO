@@ -104,17 +104,17 @@ def test_select_pair_prefers_device_contrast():
     assert pair[0].device != pair[1].device
 
 
-def test_script_credits_fifteen_squared():
+def test_script_credits_the_setter_and_paper():
     html = (FIXTURES / "independent_detail.html").read_text(encoding="utf-8")
     clue = next(c for c in parse_post(_post(html)) if c.number == "12")
     script = write_script(clue)
-    assert "Fifteen Squared" in script
+    assert "Fifteen Squared" not in script
     assert clue.answer == "END RESULT"
     assert "end result" in script
     assert "Phi" in script
     assert "cryptic.fit" in script
     parts = write_parts(clue)
-    assert parts.intro_speech == "Solve it, you idiot. I'm Cryptic Croc."
+    assert parts.intro_speech == "Solve it, I know you can. I'm Cryptic Croc."
     assert parts.clue_speech == f"{clue.clue}."
     assert "The clue:" not in parts.clue_speech
     assert "(" not in parts.clue_speech
@@ -125,7 +125,8 @@ def test_script_credits_fifteen_squared():
     assert parts.answer_speech == "Obviously it's end result."
     assert "end result" in parts.breakdown
     assert "Fifteen Squared" not in parts.parse_speech
-    assert "Fifteen Squared" in parts.source_speech
+    assert "Fifteen Squared" not in parts.source_speech
+    assert "Independent" in parts.source_speech
     assert "Phi" in parts.source_speech
     assert parts.outro_speech == "That was cryptic.fit. Try to keep up."
     assert script.index(parts.intro_speech) < script.index(parts.clue_speech)
@@ -156,7 +157,8 @@ def test_script_credits_fifteen_squared():
     assert ssml.index(parts.parse_speech) < ssml.index(parts.source_speech)
     assert ssml.index(parts.source_speech) < ssml.index('break time="400ms"')
     assert ssml.index('break time="400ms"') < ssml.index(parts.outro_speech)
-    assert "Fifteen Squared" in parts.source_speech
+    assert "Fifteen Squared" not in parts.source_speech
+    assert "Independent" in parts.source_speech
 
 
 def test_parse_title_variants():

@@ -57,7 +57,7 @@ def test_publish_site_writes_spoiler_pages(tmp_path):
     assert "cryptic<span>.fun</span>" not in index
     assert "Rioting led unrest" in index
     assert "Solve" in index
-    assert "Fifteen Squared" in index
+    assert "Fifteen Squared" not in index
     assert (root / "about.html").exists()
     assert "data-voice-btn" in index
     assert "Cryptic Croc" in index
@@ -84,12 +84,12 @@ def test_publish_site_writes_spoiler_pages(tmp_path):
     assert "Instagram" in about
     assert "Facebook" in about
     assert "aledmorgan@gmail.com" in about
-    assert "https://fifteensquared.net/" in about
+    assert "https://fifteensquared.net/" not in about
     assert "only source" in about
     assert "unique cryptic crossword clues and solutions" in about
     assert "We credit all" in about
     assert "the photograph" in about
-    assert "Fifteen Squared, and the photograph" in about
+    assert "the paper, and the photograph" in about
     assert (tmp_path / "c" / "independent-12458-12a" / "index.html").exists()
     assert (tmp_path / "support.html").exists()
     assert (tmp_path / "privacy.html").exists()
@@ -106,7 +106,7 @@ def test_publish_site_writes_spoiler_pages(tmp_path):
     assert "https://cryptic.fit/films.html" in (tmp_path / "sitemap.xml").read_text(encoding="utf-8")
     assert 'href="films.html">Films</a>' in index
     assert "All the Shorts" in index
-    assert "Solve it, you idiot." in index
+    assert "Solve it, I know you can." in index
     assert "croc-hello" in index
     assert "How we pay for this" in index
     assert "adsbygoogle" not in index
@@ -313,7 +313,8 @@ def test_youtube_titles_use_cryptic_fun_channel():
     assert "https://cryptic.fit/support.html" in youtube_description(_item())
     assert "unique cryptic crossword clues and solutions" in youtube_description(_item())
     assert "We credit all" in youtube_description(_item())
-    assert "Fifteen Squared" in youtube_description(_item())
+    assert "Fifteen Squared" not in youtube_description(_item())
+    assert "Blogged by" in youtube_description(_item())
 
 
 def test_ads_on_writes_ads_txt_and_unit(tmp_path, monkeypatch):

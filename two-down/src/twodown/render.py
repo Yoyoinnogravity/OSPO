@@ -20,6 +20,7 @@ from twodown.config import (
     HINT_LINE,
     INK,
     INTRO_LINE,
+    TAGLINE,
     MUTED,
     OUTRO_LINE,
     NEWS_BG,
@@ -186,16 +187,18 @@ def _draw_lights(
 
 
 def _source_footer(clue: Clue) -> str:
-    """One Short line naming the setter, paper, and Fifteen Squared."""
+    """One Short line naming the setter and the paper."""
     setter = (clue.setter or "").strip()
     paper = (clue.paper or "").strip()
     if paper and not paper.lower().startswith("the "):
         paper = f"the {paper}"
     if setter and paper:
-        return f"{setter} in {paper} · Fifteen Squared"
+        return f"{setter} in {paper}"
     if setter:
-        return f"Parse via Fifteen Squared · {setter}"
-    return "Parse via Fifteen Squared"
+        return setter
+    if paper:
+        return paper
+    return BRAND
 
 
 def _footer(draw: ImageDraw.ImageDraw, text: str) -> None:
@@ -389,7 +392,7 @@ def write_share_card(dest: Path, scene: str | Scene | None = None) -> Path:
     fit_x = 72 + draw.textlength(cryptic, font=word)
     draw.text((fit_x, 200), suffix, font=word, fill=CRIMSON)
     draw.text((72, 300), "Two cryptic clues a day", font=sub, fill=muted)
-    draw.text((72, 350), "from Fifteen Squared", font=sub, fill=muted)
+    draw.text((72, 350), TAGLINE, font=sub, fill=muted)
     img.save(dest, "WEBP", quality=82)
     return dest
 

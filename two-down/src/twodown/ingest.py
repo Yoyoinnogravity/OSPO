@@ -79,8 +79,8 @@ def _blogger(post: dict) -> str:
     embedded = post.get("_embedded") or {}
     authors = embedded.get("author") or []
     if authors:
-        return str(authors[0].get("name") or "Fifteen Squared")
-    return "Fifteen Squared"
+        return str(authors[0].get("name") or "the blogger")
+    return "the blogger"
 
 
 def _headers() -> dict[str, str]:

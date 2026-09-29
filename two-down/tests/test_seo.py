@@ -35,4 +35,6 @@ def test_json_ld_escapes_script_breakers():
     assert "https://www.youtube.com/@crypticfit" in website_ld()["publisher"]["sameAs"]
     assert "unique cryptic crossword clues and solutions" in website_ld()["description"]
     assert "We credit all" in website_ld()["description"]
-    assert "Fifteen Squared" in website_ld()["description"]
+    assert "Fifteen Squared" not in website_ld()["description"]
+    assert "sourceOrganization" not in website_ld()
+    assert "https://fifteensquared.net/" not in website_ld()["publisher"]["sameAs"]

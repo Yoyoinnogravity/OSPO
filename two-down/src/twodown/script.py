@@ -117,6 +117,25 @@ def speak_parse_tokens(text: str) -> str:
     return _ALL_CAPS_TOKEN.sub(_word, text)
 
 
+# A blog address or a site name is not part of the clue or the solution.
+_SITE_ADDRESS = re.compile(
+    r"https?://\S+|www\.\S+|\bcryptic\.fun\b|fifteensquared(?:\.net)?|fifteen\s+squared|\b15²\b",
+    re.I,
+)
+
+
+def _strip_site_code(text: str) -> str:
+    """Keep speech on the clue and the solution. Drop addresses and blog tokens."""
+    text = re.sub(r"\banagram\s+AInd\b", "anagram indicator", text, flags=re.I)
+    text = re.sub(r"\bAInd\b", "anagram indicator", text)
+    text = re.sub(r"&Lit\.?", "and the whole clue is the definition", text, flags=re.I)
+    text = _SITE_ADDRESS.sub("", text)
+    text = re.sub(r"\s+", " ", text)
+    text = re.sub(r",\s*\.", ".", text)
+    text = re.sub(r"\s+([.;,:])", r"\1", text)
+    return text.strip(" ,;")
+
+
 _ASIDE = re.compile(r"\s*\(([^)]+)\)(?:,)?")
 
 
@@ -164,6 +183,14 @@ def _spoken_parse(parse: str, answer: str = "") -> str:
         text = re.sub(r"\(([^)]+)\)\*", r"\1", text)
         text = re.sub(r",?\s*e\.g\.[^.]*", "", text)
     text = text.replace("*", " anagram ")
+    # U[kraine] is the word with the unused tail marked, not two tokens.
+    def _glue_tail(match: re.Match[str]) -> str:
+        head, tail = match.group(1), match.group(2)
+        if len(tail) == 1:
+            return head + (tail.upper() if head.isupper() else tail.lower())
+        return head + tail.lower()
+
+    text = re.sub(r"([A-Za-z])\[([a-z]+|[A-Z])\]", _glue_tail, text)
     text = re.sub(r"\[([^]]+)\]", r" \1 ", text)
     text = text.replace("+", " plus ")
     text = re.sub(r"\s+", " ", text)
@@ -174,6 +201,7 @@ def _spoken_parse(parse: str, answer: str = "") -> str:
         first = re.split(r"(?<=\.)\s+", text, maxsplit=1)[0].strip(" .;,-")
         if first:
             text = first
+    text = _strip_site_code(text)
     text = re.sub(r"\s+([.;,:])", r"\1", text)
     if len(text) > 220:
         text = text[:217].rsplit(" ", 1)[0]
@@ -221,15 +249,17 @@ class ScriptParts:
 
 
 def speak_source(clue: Clue) -> str:
-    """Credit the setter, paper, and Fifteen Squared — spoken in a different voice."""
+    """Credit the setter and the paper."""
     setter = (clue.setter or "").strip()
     paper = (clue.paper or "").strip()
     if setter and paper:
-        credit = f"That's {setter}, in the {paper} — via Fifteen Squared."
+        credit = f"That's {setter}, in the {paper}."
     elif setter:
-        credit = f"That's {setter} — via Fifteen Squared."
+        credit = f"That's {setter}."
+    elif paper:
+        credit = f"That's the {paper}."
     else:
-        credit = "That's via Fifteen Squared."
+        credit = "That's the setter."
     return f"{credit} You're welcome."
 
 
@@ -240,15 +270,17 @@ def write_parts(clue: Clue) -> ScriptParts:
         gloss = clue.definition.strip(" .")
         meaning = f" {gloss[0].upper()}{gloss[1:]}."
     return ScriptParts(
-        intro_speech=INTRO_LINE,
-        clue_speech=f"{clue.clue}.",
-        letters_speech=speak_enumeration(clue.enumeration),
-        think_speech=THINK_PROMPT,
-        hint_speech=clue.hint_line or HINT_LINE,
-        answer_speech=speak_answer(clue.answer),
-        parse_speech=speak_parse_asides(speak_parse_tokens(f"{parse}{meaning}".strip())),
-        source_speech=speak_source(clue),
-        outro_speech=OUTRO_LINE,
+        intro_speech=_strip_site_code(INTRO_LINE),
+        clue_speech=_strip_site_code(f"{clue.clue}."),
+        letters_speech=_strip_site_code(speak_enumeration(clue.enumeration)),
+        think_speech=_strip_site_code(THINK_PROMPT),
+        hint_speech=_strip_site_code(clue.hint_line or HINT_LINE),
+        answer_speech=_strip_site_code(speak_answer(clue.answer)),
+        parse_speech=_strip_site_code(
+            speak_parse_asides(speak_parse_tokens(f"{parse}{meaning}".strip()))
+        ),
+        source_speech=_strip_site_code(speak_source(clue)),
+        outro_speech=_strip_site_code(OUTRO_LINE),
     )
 
 

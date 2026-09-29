@@ -122,41 +122,41 @@ def test_clue_card_is_a_solve_along(tmp_path: Path):
     assert draw_beat(_clue(), tmp_path / "solved.png", "answer").exists()
 
 
-def test_answer_footer_credits_setter_paper_and_fifteen_squared():
+def test_answer_footer_credits_setter_and_paper():
     clue = _clue()
-    assert _source_footer(clue) == "Eccles in the Independent · Fifteen Squared"
+    assert _source_footer(clue) == "Eccles in the Independent"
     guardian = clue.model_copy(update={"setter": "Dice", "paper": "Guardian"})
-    assert _source_footer(guardian) == "Dice in the Guardian · Fifteen Squared"
+    assert _source_footer(guardian) == "Dice in the Guardian"
     from twodown.pipeline import aimlessly_clue, cole_clue, davis_cup_clue, dreamlike_clue, fats_clue, mass_media_clue, rasta_clue, smiles_clue, study_clue, wellington_clue
 
     mass_media = mass_media_clue()
     assert mass_media.answer == "MASS MEDIA"
-    assert _source_footer(mass_media) == "Arrietty in the Financial Times · Fifteen Squared"
+    assert _source_footer(mass_media) == "Arrietty in the Financial Times"
     aimlessly = aimlessly_clue()
     assert aimlessly.answer == "AIMLESSLY"
-    assert _source_footer(aimlessly) == "Brendan in the Guardian · Fifteen Squared"
+    assert _source_footer(aimlessly) == "Brendan in the Guardian"
     davis = davis_cup_clue()
     assert davis.answer == "DAVIS CUP"
-    assert _source_footer(davis) == "Brendan in the Guardian · Fifteen Squared"
+    assert _source_footer(davis) == "Brendan in the Guardian"
     smiles = smiles_clue()
     assert smiles.answer == "SMILES"
-    assert _source_footer(smiles) == "Brendan in the Guardian · Fifteen Squared"
+    assert _source_footer(smiles) == "Brendan in the Guardian"
     cole = cole_clue()
     assert cole.answer == "COLE"
-    assert _source_footer(cole) == "Brendan in the Guardian · Fifteen Squared"
+    assert _source_footer(cole) == "Brendan in the Guardian"
     wellington = wellington_clue()
     assert wellington.answer == "WELLINGTON"
-    assert _source_footer(wellington) == "Brendan in the Guardian · Fifteen Squared"
+    assert _source_footer(wellington) == "Brendan in the Guardian"
     fats = fats_clue()
     assert fats.answer == "FATS"
-    assert _source_footer(fats) == "Brendan in the Guardian · Fifteen Squared"
+    assert _source_footer(fats) == "Brendan in the Guardian"
     rasta = rasta_clue()
     assert rasta.answer == "RASTA"
-    assert _source_footer(rasta) == "Brendan in the Guardian · Fifteen Squared"
+    assert _source_footer(rasta) == "Brendan in the Guardian"
     dreamlike = dreamlike_clue()
     assert dreamlike.answer == "DREAMLIKE"
-    assert _source_footer(dreamlike) == "Brendan in the Guardian · Fifteen Squared"
-    assert _source_footer(study_clue()) == "Arrietty in the Financial Times · Fifteen Squared"
+    assert _source_footer(dreamlike) == "Brendan in the Guardian"
+    assert _source_footer(study_clue()) == "Arrietty in the Financial Times"
 
 
 def test_parse_under_answer_is_very_bold_ink(tmp_path: Path):
