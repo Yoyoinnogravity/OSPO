@@ -26,24 +26,59 @@ def _clean(text: str) -> str:
     return text.strip()
 
 
+# A lone highlighted letter after one of these is its own word ("without the n"),
+# not the next letter of the previous word ("clie" + "n" + "t").
+_LETTER_STOP = frozenset(
+    {
+        "a",
+        "an",
+        "the",
+        "of",
+        "to",
+        "and",
+        "for",
+        "from",
+        "with",
+        "without",
+        "by",
+        "then",
+        "plus",
+    }
+)
+
+
+def _last_word(token: str) -> str:
+    match = re.search(r"[A-Za-z]+$", token)
+    return match.group(0).lower() if match else ""
+
+
 def _smart_strings(node: Tag) -> str:
-    """Join highlighted single letters back into words (FT/Guardian letter spans)."""
+    """Join highlighted single letters back into words (FT/Guardian letter spans).
+
+    Fifteen Squared often wraps one letter of the fodder:
+    ``(clie <strong>n</strong> t I)*`` and ``distinctio-<strong>n</strong>``.
+    A letter that follows a real word stays put: ``without the n``.
+    """
     parts: list[str] = []
     for raw in node.strings:
         bit = raw.strip()
         if not bit:
             continue
-        if (
-            parts
-            and bit.isalpha()
-            and bit.islower()
-            and len(bit) <= 2
-            and parts[-1]
-            and parts[-1][-1].islower()
-        ):
-            parts[-1] += bit
-        else:
-            parts.append(bit)
+        previous = parts[-1] if parts else ""
+        hyphenated = previous.endswith("-")
+        stem = _last_word(previous[:-1] if hyphenated else previous)
+        can_join = bool(stem) and stem not in _LETTER_STOP and (hyphenated or previous[-1].islower())
+        match = re.match(r"^([a-z]{1,2})(?![a-z])(.*)$", bit) if can_join else None
+        if match:
+            if hyphenated:
+                parts[-1] = previous[:-1] + match.group(1)
+            else:
+                parts[-1] = previous + match.group(1)
+            rest = match.group(2).strip()
+            if rest:
+                parts.append(rest)
+            continue
+        parts.append(bit)
     return _clean(" ".join(parts))
 
 

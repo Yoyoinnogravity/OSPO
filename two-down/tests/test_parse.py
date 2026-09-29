@@ -132,3 +132,29 @@ def test_parse_title_variants():
 def test_classify_anagram():
     assert classify_device("anagram of LED UNREST") == "anagram"
     assert classify_device("hidden answer in the clue") == "hidden"
+
+
+def test_highlighted_letter_rejoins_fodder_not_real_words():
+    """Guardian blogs wrap one letter of the fodder in strong/em."""
+    html = """
+    <table><tr><td colspan="3">ACROSS</td></tr>
+    <tr>
+      <td>9</td><td>ELICIT</td>
+      <td><div><span style="text-decoration: underline">Bring out</span> client I fancy with no end of distinction (6)</div></td>
+    </tr>
+    <tr>
+      <td colspan="2"></td>
+      <td>anagram/”fancy” of (clie <strong><em>n</em></strong> t I)*, without the <strong><em>n </em></strong>(“no end of distinctio-<strong><em>n</em></strong>“)</td>
+    </tr>
+    </table>
+    """
+    clues = usable(parse_post(_post(html, paper="Guardian", puzzle_id="30124", setter="Chandler")))
+    assert len(clues) == 1
+    clue = clues[0]
+    assert clue.answer == "ELICIT"
+    assert "client I" in clue.parse
+    assert "clien t" not in clue.parse
+    assert "distinction" in clue.parse
+    assert "distinctio-" not in clue.parse
+    assert "without the n" in clue.parse
+    assert "without then" not in clue.parse
