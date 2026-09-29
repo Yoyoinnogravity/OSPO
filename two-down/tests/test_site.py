@@ -106,7 +106,7 @@ def test_publish_site_writes_spoiler_pages(tmp_path):
     assert "https://cryptic.fit/films.html" in (tmp_path / "sitemap.xml").read_text(encoding="utf-8")
     assert 'href="films.html">Films</a>' in index
     assert "All the Shorts" in index
-    assert "Hello. I’m Cryptic Croc." in index
+    assert "Solve it, you idiot." in index
     assert "croc-hello" in index
     assert "How we pay for this" in index
     assert "adsbygoogle" not in index

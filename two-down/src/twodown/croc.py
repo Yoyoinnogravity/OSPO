@@ -70,6 +70,11 @@ def croc_portrait() -> Image.Image:
     return _render("talk", False, 0, 0.0, 0.0, view="head")
 
 
+def croc_site_sprite() -> Image.Image:
+    """The figure on the site: mouth shut, brows down, unimpressed."""
+    return _render("think", False, 0, 0.0, 0.0, view="body", scowl=True)
+
+
 def _render(
     mood: str,
     blink: bool,
@@ -77,6 +82,7 @@ def _render(
     tail: float,
     wave: float,
     view: str,
+    scowl: bool = False,
 ) -> Image.Image:
     if view == "head":
         width, height, scale = 760, 760, 250.0
@@ -130,12 +136,21 @@ def _render(
         _arm(capsule, splat, mood, wave, near=True)
         _arm(capsule, splat, "rest", 0.0, near=False)
 
-    _head(splat, open_jaw, blink, neck=view != "head")
+    _head(splat, open_jaw, blink, neck=view != "head", scowl=scowl)
     rgba = np.dstack((np.clip(color, 0, 1), np.clip(alpha, 0, 1)))
     return Image.fromarray((rgba * 255).astype(np.uint8), "RGBA")
 
 
-def _head(splat, open_jaw: float, blink: bool, neck: bool) -> None:
+def _z_rot(degrees: float) -> np.ndarray:
+    angle = math.radians(degrees)
+    cosine, sine = math.cos(angle), math.sin(angle)
+    return np.array(
+        [[cosine, -sine, 0.0], [sine, cosine, 0.0], [0.0, 0.0, 1.0]],
+        dtype=np.float32,
+    )
+
+
+def _head(splat, open_jaw: float, blink: bool, neck: bool, scowl: bool = False) -> None:
     if neck:
         splat((0.78, 0.42, 0.02), (0.34, 0.28, 0.32), _BODY, specular=0.08, shiny=16)
     splat((1.15, 0.78, 0.08), (0.58, 0.5, 0.5), _BODY, specular=0.1, shiny=18)
@@ -172,8 +187,20 @@ def _head(splat, open_jaw: float, blink: bool, neck: bool) -> None:
         splat(eye + (0.012, 0.0, 0.07), (0.06, 0.06, 0.032), _IRIS, specular=0.28, shiny=24)
         splat(eye + (0.016, -0.004, 0.1), (0.028, 0.028, 0.016), _PUPIL, specular=0.02, shiny=4)
         splat(eye + (-0.032, 0.036, 0.12), (0.02, 0.016, 0.01), _LIGHT, emissive=True)
-        # A lid along the top of the eye, leaving most of the eye open.
-        splat(eye + (0.0, 0.15, 0.02), (0.17, 0.035, 0.05), _BODY * 0.82, specular=0.05, shiny=8)
+        if scowl:
+            # Brow down toward the snout, lid dropped into a glare.
+            splat(
+                eye + (0.02, 0.14, 0.05),
+                (0.16, 0.028, 0.04),
+                _DARK,
+                specular=0.04,
+                shiny=8,
+                rotation=_z_rot(-18),
+            )
+            splat(eye + (0.0, 0.045, 0.09), (0.15, 0.075, 0.06), _BODY, specular=0.08, shiny=12)
+        else:
+            # A lid along the top of the eye, leaving most of the eye open.
+            splat(eye + (0.0, 0.15, 0.02), (0.17, 0.035, 0.05), _BODY * 0.82, specular=0.05, shiny=8)
         if blink:
             splat(eye + (0.0, 0.0, 0.1), (0.18, 0.15, 0.08), _BODY, specular=0.08, shiny=14)
 

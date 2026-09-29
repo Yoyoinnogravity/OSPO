@@ -26,7 +26,7 @@ from twodown.config import (
     NEWS_BG,
     NEWS_GRID,
 )
-from twodown.croc import croc_portrait, croc_sprite
+from twodown.croc import croc_portrait, croc_site_sprite, croc_sprite
 
 BANNER_SIZE = (2560, 1440)
 # Centre region YouTube keeps on every device, scaled to this canvas.
@@ -122,7 +122,7 @@ def write_site_croc(dest: Path) -> Path:
     """Resting Cryptic Croc for the site. Transparent around her, no ring."""
     dest = Path(dest)
     dest.parent.mkdir(parents=True, exist_ok=True)
-    sprite = croc_sprite("think", 4)
+    sprite = croc_site_sprite()
     bbox = sprite.getbbox()
     if bbox is None:
         raise ValueError("Cryptic Croc sprite is empty")

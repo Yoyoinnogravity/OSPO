@@ -1130,7 +1130,7 @@ def _films_body(root: Path) -> str:
     else:
         grid = "<p>Study cuts will sit here once their films are in the site media folder.</p>"
     return f"""
-    {_croc_hello("", title="Every film on cryptic.fit.", lede="Daily solves play here, newest first. I present the new ones. The study cuts sit underneath.")}
+    {_croc_hello("", title="Every film on cryptic.fit.", lede="Daily solves, newest first. The study cuts are underneath, for when you are stuck.")}
     <h2>Daily pairs.</h2>
     {_playable_daily(root)}
     <h2>Study cuts.</h2>
@@ -1308,7 +1308,7 @@ def publish_site(pair: DailyPair, dest: Path | None = None) -> Path:
     pretty = datetime.strptime(pair.date, "%Y-%m-%d").strftime("%A %-d %B %Y")
     articles = "\n".join(_article(item, "media/") for item in pair.clues)
     index_body = f"""
-    {_croc_hello("", title="Hello. I’m Cryptic Croc.", lede="Two clues a day from Fifteen Squared. Have a go before you tap solve, then I’ll talk the new films through.")}
+    {_croc_hello("", title="Solve it, you idiot.", lede="Two clues a day from Fifteen Squared. Fail them yourself before you tap solve.")}
     <p class="kicker">Two clues · {_e(pretty)}</p>
     <h2 class="day-title">Today’s pair.</h2>
     <p class="lede">Have a go before you tap solve. Parses follow Fifteen Squared — we speak them, we don’t nick the grid. Pick a place from the header if you’d rather solve against the Matterhorn than newsprint.</p>
