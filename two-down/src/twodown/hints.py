@@ -9,7 +9,7 @@ from urllib.parse import quote
 import requests
 from PIL import Image, ImageDraw, ImageFilter
 
-from twodown.config import HINT_LINE, PACKAGE_ROOT, USER_AGENT
+from twodown.config import HINT_LINE, HINT_MISS, PACKAGE_ROOT, USER_AGENT
 from twodown.models import Clue
 
 HINTS_DIR = PACKAGE_ROOT / "assets" / "hints"
@@ -428,29 +428,44 @@ def get_hint_photo(slug: str | None = None) -> HintPhoto:
     return match_hint(slug).photo
 
 
-def hint_for_clue(clue: Clue) -> HintPhoto:
-    if clue.hint_image:
-        found = PHOTOS.get(clue.hint_image)
+def hint_for_clue(clue: Clue) -> HintPhoto | None:
+    """Return a matching still, or None when nothing is close enough."""
+    attached = attach_hint(clue)
+    if attached.hint_line == HINT_MISS or not attached.hint_image:
+        return None
+    if attached.hint_image:
+        found = PHOTOS.get(attached.hint_image)
         if found is not None:
             return found
-        name = Path(clue.hint_image).name
+        name = Path(attached.hint_image).name
         for photo in _catalog():
-            if photo.filename == name or photo.slug == clue.hint_image:
+            if photo.filename == name or photo.slug == attached.hint_image:
                 return photo
-    return match_hint(clue.definition or "").photo
+    matched = match_hint(attached.definition or attached.clue or "")
+    if matched.close_enough:
+        return matched.photo
+    return None
 
 
 def attach_hint(clue: Clue) -> Clue:
-    """Study helper: carry hint_image + hint_line matched to the definition (~80%)."""
-    matched = match_hint(clue.definition or "")
-    photo = matched.photo
-    updates: dict[str, str] = {}
-    if not clue.hint_image:
-        updates["hint_image"] = f"assets/hints/{photo.filename}"
-    if not clue.hint_credit:
-        updates["hint_credit"] = photo.credit_line
-    if not clue.hint_line:
-        updates["hint_line"] = HINT_LINE
+    """Carry a still only when the definition is ~80% close. Otherwise say so."""
+    matched = match_hint(clue.definition or clue.clue or "")
+    updates: dict[str, str | None] = {}
+    if matched.close_enough:
+        if not clue.hint_image:
+            updates["hint_image"] = f"assets/hints/{matched.photo.filename}"
+        if not clue.hint_credit:
+            updates["hint_credit"] = matched.photo.credit_line
+        if not clue.hint_line:
+            updates["hint_line"] = HINT_LINE
+    else:
+        # Never paste the leftover default still.
+        if clue.hint_image:
+            updates["hint_image"] = None
+        if clue.hint_credit:
+            updates["hint_credit"] = None
+        if not clue.hint_line or clue.hint_line == HINT_LINE:
+            updates["hint_line"] = HINT_MISS
     return clue.model_copy(update=updates) if updates else clue
 
 

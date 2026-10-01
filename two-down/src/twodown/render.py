@@ -18,6 +18,7 @@ from twodown.config import (
     FONT_SANS,
     FONT_SANS_BOLD,
     HINT_LINE,
+    HINT_MISS,
     INK,
     TAGLINE,
     MUTED,
@@ -27,7 +28,7 @@ from twodown.config import (
     pick_wisdom,
 )
 from twodown.croc import paste_croc
-from twodown.hints import ensure_hint_photo, hint_for_clue
+from twodown.hints import attach_hint, ensure_hint_photo, hint_for_clue
 from twodown.models import Clue
 from twodown.scenes import DEFAULT_SCENE, Scene, get_scene
 from twodown.script import _spoken_parse
@@ -213,6 +214,8 @@ def _draw_hint_photo(
 ) -> int:
     """Inset a credited hint still. Never a full-bleed travel photo."""
     matched = hint_for_clue(clue)
+    if matched is None:
+        return y
     photo = Image.open(ensure_hint_photo(matched)).convert("RGB")
     frame_w, frame_h = 900, 560
     left = (WIDTH - frame_w) // 2
@@ -242,6 +245,7 @@ def _paint_beat(clue: Clue, beat: str) -> Image.Image:
     so the pattern is on screen from the first second. Do not fill the
     answer until the reveal beats.
     """
+    clue = attach_hint(clue)
     img, draw = _new_card()
     _draw_wordmark(draw)
     if beat == "outro":
@@ -269,12 +273,15 @@ def _paint_beat(clue: Clue, beat: str) -> Image.Image:
         wrapped = _wrap(draw, THINK_PROMPT, prompt, WIDTH - 160)
         _center_text(draw, prompt_y, wrapped, prompt, CRIMSON, spacing=8)
     if beat == "hint":
-        # Empty lights stay; the picture is the hint. Never fill or print the answer.
+        # Empty lights stay. A matching still is the hint; otherwise say so.
+        # Never paste the leftover default photo.
         prompt_y = min(lights_bottom + 36, 980)
-        line = (clue.hint_line or HINT_LINE).rstrip(".")
-        wrapped = _wrap(draw, line, prompt, WIDTH - 160)
+        line = clue.hint_line or HINT_LINE
+        shown = line if line == HINT_MISS else line.rstrip(".")
+        wrapped = _wrap(draw, shown, prompt, WIDTH - 160)
         next_y = _center_text(draw, prompt_y, wrapped, prompt, CRIMSON, spacing=8)
-        _draw_hint_photo(img, draw, min(next_y + 18, 1040), clue)
+        if hint_for_clue(clue) is not None:
+            _draw_hint_photo(img, draw, min(next_y + 18, 1040), clue)
         _footer(draw, _source_footer(clue))
         return img
     if show_answer:

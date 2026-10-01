@@ -405,11 +405,11 @@ def study_clue(slug: str | None = None) -> Clue | None:
 def resolve_clue(slug: str, site_root: Path | None = None, clue: Clue | None = None) -> Clue:
     """Prefer a passed Clue, then a constructed study clue, then published site HTML."""
     if clue is not None:
-        return clue
+        return attach_hint(clue)
     constructed = study_clue(slug)
     if constructed is not None:
         return constructed
-    return published_clue(slug, site_root)
+    return attach_hint(published_clue(slug, site_root))
 
 
 def render_one_short(

@@ -21,6 +21,7 @@ from twodown.config import (
     THINK_PROMPT,
     pick_wisdom,
 )
+from twodown.hints import attach_hint
 from twodown.models import Clue
 
 DEVICE_LINE = {
@@ -291,6 +292,7 @@ def speak_outro(clue: Clue) -> str:
 
 
 def write_parts(clue: Clue) -> ScriptParts:
+    clue = attach_hint(clue)
     parse = speak_parse_tokens(_spoken_parse(clue.parse, clue.answer))
     meaning = ""
     if clue.definition:
