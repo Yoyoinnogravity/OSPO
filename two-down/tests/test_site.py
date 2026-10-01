@@ -4,12 +4,14 @@ from twodown.site import (
     _ensure_profile,
     _playable_daily,
     _solved_shelf,
+    attach_play_anchor,
     attach_video_posters,
     earlier_days,
     legacy_videos,
     publish_films,
     publish_site,
     retarget_cdn,
+    retarget_play_links,
     solved_films,
 )
 from twodown.youtube import YOUTUBE_CHANNEL, thumbnail_file, upload_short, video_title
@@ -124,6 +126,8 @@ def test_publish_site_writes_spoiler_pages(tmp_path):
     assert "article.clue.is-solved .answer" in css
     app = (tmp_path / "assets" / "app.js").read_text(encoding="utf-8")
     assert "is-solved" in app
+    assert "playFromHash" in app
+    assert "wantsPlay" in app
     assert 'rel="canonical"' in index
     assert 'property="og:title"' in index
     assert "application/ld+json" in index
@@ -176,12 +180,56 @@ def test_solved_shelf_hides_the_answer(tmp_path):
     assert films[0].video == "independent-12462-6a.mp4"
     shelf = _solved_shelf(tmp_path)
     assert "PIN-UP" not in shelf
-    assert 'href="c/independent-12462-6a/"' in shelf
+    assert 'href="c/independent-12462-6a/#play"' in shelf
     assert "independent-12462-6a-poster.webp" in shelf
     played = _playable_daily(tmp_path)
     assert "PIN-UP" not in played
     assert 'src="media/independent-12462-6a.mp4"' in played
     assert 'poster="media/independent-12462-6a-poster.webp"' in played
+    assert 'href="c/independent-12462-6a/#play"' in played
+    assert 'id="independent-12462-6a"' in played
+    assert 'data-slug="independent-12462-6a"' in played
+
+
+def test_thumbnail_links_skip_the_solve_gate():
+    shelf = (
+        '<a class="film-card" href="c/independent-12462-6a/">'
+        '<img src="media/independent-12462-6a-poster.webp" alt="">'
+        "</a>"
+    )
+    linked = retarget_play_links(shelf)
+    assert 'href="c/independent-12462-6a/#play"' in linked
+    assert retarget_play_links(linked) == linked
+    assert 'href="c/guardian-30113-9a/#play"' in retarget_play_links(
+        '<p class="credit"><a href="c/guardian-30113-9a/">Open this clue</a></p>'
+    )
+    anchored = attach_play_anchor(
+        '<video class="short" controls playsinline src="../../media/independent-12462-6a.mp4">'
+    )
+    assert 'id="play"' in anchored
+    assert attach_play_anchor(anchored) == anchored
+
+
+def test_publish_site_opens_a_clue_page_at_the_player(tmp_path):
+    item = _item()
+    video = tmp_path / "clip.mp4"
+    video.write_bytes(b"film")
+    poster = tmp_path / "clip.webp"
+    poster.write_bytes(b"RIFF")
+    item.video_path = str(video)
+    item.thumbnail_path = str(poster)
+    other = _item(answer="AXES", number="14")
+    pair = DailyPair(date="2026-09-11", voice="en-GB-SoniaNeural", clues=[item, other])
+    root = publish_site(pair, tmp_path / "site")
+    clue_page = (root / "c" / "independent-12458-12a" / "index.html").read_text(encoding="utf-8")
+    assert 'id="play"' in clue_page
+    assert ">Solve<" in clue_page
+    assert "is-open" not in clue_page
+    index = (root / "index.html").read_text(encoding="utf-8")
+    pair_html = index.split("Today’s pair.", 1)[1].split("Keep the pair coming", 1)[0]
+    assert ">Solve<" in pair_html
+    assert "is-open" not in pair_html
+    assert 'id="play"' not in pair_html
 
 
 def test_films_page_serves_legacy_videos_from_the_site(tmp_path):
@@ -206,10 +254,12 @@ def test_films_page_serves_legacy_videos_from_the_site(tmp_path):
     )
     publish_films(tmp_path)
     films = (tmp_path / "films.html").read_text(encoding="utf-8")
+    app = (tmp_path / "assets" / "app.js").read_text(encoding="utf-8")
+    assert "playFromHash" in app
     assert "Study cuts" not in films
     assert "rasta-libby" not in films
     assert "jsdelivr" not in films
-    assert 'href="d/2026-09-11/"' in films
+    assert 'href="d/2026-09-11/#play"' in films
     assert "independent-12458-11a.mp4" not in films
     studio_html = studio.read_text(encoding="utf-8")
     assert "media/rasta-libby.mp4" in studio_html

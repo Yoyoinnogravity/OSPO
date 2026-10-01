@@ -413,6 +413,51 @@ document.querySelectorAll("button.reveal").forEach((btn) => {
   btn.addEventListener("click", () => btn.closest("article").classList.add("is-open"));
 });
 
+function playHash() {
+  return (location.hash || "").replace(/^#/, "");
+}
+
+function slugFromVideo(video) {
+  const src = (video && video.getAttribute("src")) || "";
+  const name = src.split("/").pop() || "";
+  return name.replace(/\\.mp4$/i, "");
+}
+
+function wantsPlay(article) {
+  const hash = playHash();
+  if (!hash) return false;
+  const slug = article.dataset.slug || slugFromVideo(article.querySelector("video"));
+  if (hash === "play") return true;
+  return Boolean(slug && (hash === slug || hash === "play-" + slug));
+}
+
+function playFilm(article) {
+  article.classList.add("is-open");
+  const video = article.querySelector("video");
+  if (!video) return;
+  try {
+    video.focus({ preventScroll: true });
+  } catch (err) {
+    video.focus();
+  }
+  video.scrollIntoView({ block: "center" });
+  const start = () => {
+    const attempt = video.play();
+    if (attempt && attempt.catch) attempt.catch(() => {});
+  };
+  if (video.readyState >= 2) start();
+  else video.addEventListener("loadeddata", start, { once: true });
+}
+
+function playFromHash() {
+  document.querySelectorAll("article.clue").forEach((article) => {
+    if (wantsPlay(article)) playFilm(article);
+  });
+}
+
+playFromHash();
+window.addEventListener("hashchange", playFromHash);
+
 document.querySelectorAll("article.clue").forEach((article) => {
   const video = article.querySelector("video");
   const audio = article.querySelector("audio.parse-voice");
@@ -745,7 +790,13 @@ def _page(body: str, seo: PageSeo, depth: int = 0, show_ads: bool = False) -> st
 """
 
 
-def _article(item: SpokenClue, media_prefix: str, open_by_default: bool = False, show_clue_text: bool = True) -> str:
+def _article(
+    item: SpokenClue,
+    media_prefix: str,
+    open_by_default: bool = False,
+    show_clue_text: bool = True,
+    play_anchor: bool = False,
+) -> str:
     clue = item.clue
     opened = " is-open" if open_by_default else ""
     alias = _voice_alias(item.voice)
@@ -754,8 +805,9 @@ def _article(item: SpokenClue, media_prefix: str, open_by_default: bool = False,
         poster = ""
         if item.thumbnail_path:
             poster = f' poster="{_e(media_prefix + clue.slug + "-poster.webp")}"'
+        play_id = ' id="play"' if play_anchor else ""
         video = (
-            f'<video class="short" controls playsinline preload="metadata" data-voice="{_e(alias)}"{poster} '
+            f'<video class="short" controls playsinline preload="metadata" data-voice="{_e(alias)}"{poster}{play_id} '
             f'src="{_e(media_prefix + clue.slug + ".mp4")}"></video>'
         )
     audio = (
@@ -923,6 +975,39 @@ def retarget_cdn(html_text: str, prefix: str = "") -> str:
     return _CDN_MEDIA.sub(lambda match: prefix + match.group(1), html_text)
 
 
+def retarget_play_links(html_text: str) -> str:
+    """Shelf cards and 'Open this clue' skip the Solve gate and land on the player."""
+    html_text = re.sub(
+        r'(<a class="film-card" href="(?:\.\./)*(?:c|d)/[^"/]+/)(?!#play")(")',
+        r"\1#play\2",
+        html_text,
+    )
+    html_text = re.sub(
+        r'(<a href="(?:\.\./)*c/[^"/]+/)(?!#play")(">Open this clue</a>)',
+        r"\1#play\2",
+        html_text,
+    )
+    html_text = re.sub(
+        r'(<a href="(?:\.\./)*d/[^"/]+/)(?!#play")(">Open this day</a>)',
+        r"\1#play\2",
+        html_text,
+    )
+    return html_text
+
+
+def attach_play_anchor(html_text: str) -> str:
+    """Give a single-clue page a #play target so a thumbnail can open the Short."""
+    if 'id="play"' in html_text:
+        return html_text
+    return re.sub(
+        r'(<video\b[^>]*\bclass="short"[^>]*)(>)',
+        r'\1 id="play">',
+        html_text,
+        count=1,
+        flags=re.I,
+    )
+
+
 def _ensure_films_nav(html_text: str) -> str:
     if ">Films</a>" in html_text:
         return html_text
@@ -1027,7 +1112,7 @@ def _croc_hello(prefix: str, *, title: str, lede: str) -> str:
 def _solved_shelf(root: Path, prefix: str = "", skip_date: str | None = None) -> str:
     cards = []
     for film in solved_films(root, skip_date=skip_date):
-        href = f"{prefix}c/{film.slug}/" if film.slug else f"{prefix}d/{film.date}/"
+        href = f"{prefix}c/{film.slug}/#play" if film.slug else f"{prefix}d/{film.date}/#play"
         image = ""
         if film.poster:
             image = f'<img src="{prefix}media/{_e(film.poster)}" alt="">'
@@ -1060,12 +1145,15 @@ def _playable_daily(root: Path) -> str:
                 f'src="media/{_e(film.video)}"></video>'
             )
         opener = ""
+        slug_attr = ""
         if film.slug:
-            opener = f'<p class="credit"><a href="c/{_e(film.slug)}/">Open this clue</a></p>'
+            opener = f'<p class="credit"><a href="c/{_e(film.slug)}/#play">Open this clue</a></p>'
+            slug_attr = f' data-slug="{_e(film.slug)}" id="{_e(film.slug)}"'
         elif film.date:
-            opener = f'<p class="credit"><a href="d/{_e(film.date)}/">Open this day</a></p>'
+            opener = f'<p class="credit"><a href="d/{_e(film.date)}/#play">Open this day</a></p>'
+            slug_attr = f' id="day-{_e(film.date)}"'
         blocks.append(
-            '<article class="clue">'
+            f'<article class="clue"{slug_attr}>'
             f'<p class="kicker">{_e(film.pretty)}</p>'
             f'<p class="clue-text">{_e(film.clue)}</p>'
             f"{player}{opener}"
@@ -1226,6 +1314,9 @@ def attach_video_posters(html_text: str) -> str:
 def publish_films(root: Path) -> Path:
     """Write the archive and point older pages at the films that ship with the site."""
     root = Path(root)
+    assets = root / "assets"
+    assets.mkdir(parents=True, exist_ok=True)
+    (assets / "app.js").write_text(JS, encoding="utf-8")
     ensure_safe_posters(root)
     page = root / "films.html"
     page.write_text(
@@ -1255,6 +1346,9 @@ def publish_films(root: Path) -> Path:
         original = html_path.read_text(encoding="utf-8")
         updated = retarget_cdn(original, _media_prefix(html_path, root))
         updated = attach_video_posters(updated)
+        updated = retarget_play_links(updated)
+        if html_path.parent.parent.name == "c":
+            updated = attach_play_anchor(updated)
         updated = _ensure_films_nav(updated)
         updated = _ensure_profile(updated, picture_panel=html_path.name == "follow.html")
         if updated != original:
@@ -1364,7 +1458,7 @@ def publish_site(pair: DailyPair, dest: Path | None = None) -> Path:
         body = (
             f'<p class="kicker">One clue.</p>'
             f"<h1>{_e(item.clue.clue)}{enum}</h1>"
-            f"{_article(item, '../../media/', open_by_default=False, show_clue_text=False)}"
+            f"{_article(item, '../../media/', open_by_default=False, show_clue_text=False, play_anchor=True)}"
         )
         path = page_dir / "index.html"
         path.write_text(

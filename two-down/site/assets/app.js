@@ -123,6 +123,51 @@ document.querySelectorAll("button.reveal").forEach((btn) => {
   btn.addEventListener("click", () => btn.closest("article").classList.add("is-open"));
 });
 
+function playHash() {
+  return (location.hash || "").replace(/^#/, "");
+}
+
+function slugFromVideo(video) {
+  const src = (video && video.getAttribute("src")) || "";
+  const name = src.split("/").pop() || "";
+  return name.replace(/\.mp4$/i, "");
+}
+
+function wantsPlay(article) {
+  const hash = playHash();
+  if (!hash) return false;
+  const slug = article.dataset.slug || slugFromVideo(article.querySelector("video"));
+  if (hash === "play") return true;
+  return Boolean(slug && (hash === slug || hash === "play-" + slug));
+}
+
+function playFilm(article) {
+  article.classList.add("is-open");
+  const video = article.querySelector("video");
+  if (!video) return;
+  try {
+    video.focus({ preventScroll: true });
+  } catch (err) {
+    video.focus();
+  }
+  video.scrollIntoView({ block: "center" });
+  const start = () => {
+    const attempt = video.play();
+    if (attempt && attempt.catch) attempt.catch(() => {});
+  };
+  if (video.readyState >= 2) start();
+  else video.addEventListener("loadeddata", start, { once: true });
+}
+
+function playFromHash() {
+  document.querySelectorAll("article.clue").forEach((article) => {
+    if (wantsPlay(article)) playFilm(article);
+  });
+}
+
+playFromHash();
+window.addEventListener("hashchange", playFromHash);
+
 document.querySelectorAll("article.clue").forEach((article) => {
   const video = article.querySelector("video");
   const audio = article.querySelector("audio.parse-voice");
