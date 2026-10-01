@@ -345,6 +345,45 @@ def test_published_pair_hint_beats_use_different_stills(tmp_path: Path):
     assert b"CHICAGO" not in raw_chicago
 
 
+def test_hint_beat_says_no_relevant_image_when_unmatched(tmp_path: Path):
+    from PIL import Image
+
+    from twodown.config import CREAM, HINT_MISS, NEWS_BG, NEWS_GRID
+    from twodown.models import Clue
+    from twodown.pipeline import chicago_clue
+
+    blank = Clue(
+        source_url="https://fifteensquared.net/example/",
+        paper="Independent",
+        puzzle_id="0",
+        setter="Test",
+        blogger="Test",
+        number="1",
+        direction="across",
+        clue="Final analysis of a distant quay",
+        enumeration="4",
+        answer="NONE",
+        parse="nothing useful here",
+    )
+    miss = Image.open(draw_beat(blank, tmp_path / "miss-hint.png", "hint"))
+    think = Image.open(draw_beat(blank, tmp_path / "miss-think.png", "think"))
+    chicago = chicago_clue()
+    chicago_hint = Image.open(draw_beat(chicago, tmp_path / "chicago-hint.png", "hint"))
+    assert miss.size == (1080, 1920)
+    assert miss.getpixel((24, 40)) == NEWS_BG
+    band = miss.getpixel((540, 1200))
+    assert band in {NEWS_BG, NEWS_GRID}
+    assert chicago.hint_image
+    assert chicago_hint.getpixel((540, 1200)) not in {NEWS_BG, NEWS_GRID}
+    miss_lights = list(miss.crop((80, 610, 1000, 740)).get_flattened_data())
+    think_lights = list(think.crop((80, 610, 1000, 740)).get_flattened_data())
+    assert miss_lights.count(CREAM) > 400
+    assert abs(miss_lights.count(CREAM) - think_lights.count(CREAM)) < 80
+    assert HINT_MISS == "No relevant image found."
+    assert b"NONE" not in (tmp_path / "miss-hint.png").read_bytes()
+    assert b"CHICAGO" not in (tmp_path / "chicago-hint.png").read_bytes()
+
+
 def test_hint_beat_does_not_spoil_dreamlike(tmp_path: Path):
     from PIL import Image
 

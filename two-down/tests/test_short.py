@@ -2,7 +2,7 @@ import inspect
 
 import pytest
 
-from twodown.config import CLUE_PITCH, CLUE_RATE, DEFAULT_VOICE_ALIAS, HINT_LINE, HINT_LOOK, HINT_OFFER, HINT_VOICE_ALIAS, INTRO_LINE, INTRO_RATE, INTRO_VOICE_ALIAS, OUTRO_LINE, OUTRO_VOICE_ALIAS, PINUP_SLUG, SOURCE_VOICE_ALIAS, STUDY_SLUG, THINK_PAUSE_SECONDS, THINK_PROMPT, VOICE_RATE, VOICES, WISDOM_LINES, pick_wisdom
+from twodown.config import CLUE_PITCH, CLUE_RATE, DEFAULT_VOICE_ALIAS, HINT_LINE, HINT_LOOK, HINT_MISS, HINT_OFFER, HINT_VOICE_ALIAS, INTRO_LINE, INTRO_RATE, INTRO_VOICE_ALIAS, OUTRO_LINE, OUTRO_VOICE_ALIAS, PINUP_SLUG, SOURCE_VOICE_ALIAS, STUDY_SLUG, THINK_PAUSE_SECONDS, THINK_PROMPT, VOICE_RATE, VOICES, WISDOM_LINES, pick_wisdom
 from twodown.models import Clue
 from twodown.pipeline import (
     dreamlike_clue,
@@ -16,6 +16,7 @@ from twodown.pipeline import (
     smiles_clue,
     davis_cup_clue,
     aimlessly_clue,
+    chicago_clue,
     mass_media_clue,
 )
 from twodown.script import (
@@ -445,3 +446,38 @@ def test_speech_uses_the_clue_and_the_solution_not_a_web_address():
     assert "speak version" not in spoken
     assert "<speak" not in spoken
     assert "xmlns" not in spoken
+
+
+def test_chicago_speaks_andrew_ava_pause_and_wisdom():
+    chicago = chicago_clue()
+    parts = write_parts(chicago)
+    assert chicago.answer == "CHICAGO"
+    assert chicago.paper == "Independent"
+    assert chicago.setter == "Bard"
+    assert parts.intro_speech.startswith(INTRO_LINE)
+    assert "Independent" in parts.intro_speech
+    assert "Bard" in parts.intro_speech
+    assert parts.think_speech == THINK_PROMPT
+    assert parts.hint_speech == HINT_LINE
+    assert "chicago" not in parts.hint_speech.lower()
+    assert parts.source_speech == ""
+    wisdom = pick_wisdom(chicago.slug)
+    assert parts.outro_speech == f"{wisdom} {OUTRO_LINE}"
+    assert "Independent" not in parts.outro_speech
+    assert "Bard" not in parts.outro_speech
+    assert "Fifteen Squared" not in parts.full
+    assert "<speak" not in parts.full
+    miss = Clue(
+        source_url="https://fifteensquared.net/example/",
+        paper="Independent",
+        puzzle_id="0",
+        setter="Test",
+        blogger="Test",
+        number="1",
+        direction="across",
+        clue="Final analysis of a distant quay",
+        enumeration="4",
+        answer="NONE",
+        parse="nothing useful here",
+    )
+    assert write_parts(miss).hint_speech == HINT_MISS

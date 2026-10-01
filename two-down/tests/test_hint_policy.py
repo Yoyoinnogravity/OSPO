@@ -1,9 +1,9 @@
 from pathlib import Path
 
-from twodown.config import HINT_LINE, PACKAGE_ROOT, PINUP_SLUG, STUDY_SLUG
-from twodown.hints import AIM, AUTHOR, BRING, CLOSE_ENOUGH, COLE, CROSS, DAVIS, FATS, MODEL, PAPERS, RASTA, SMILES, TRANCE, USA, WELLINGTON, attach_hint, match_hint
+from twodown.config import HINT_LINE, HINT_MISS, PACKAGE_ROOT, PINUP_SLUG, STUDY_SLUG
+from twodown.hints import AIM, AUTHOR, BRING, CLOSE_ENOUGH, COLE, CROSS, DAVIS, FATS, MODEL, PAPERS, RASTA, SMILES, TRANCE, USA, WELLINGTON, attach_hint, match_hint, spoken_hint
 from twodown.models import Clue
-from twodown.pipeline import aimlessly_clue, cole_clue, davis_cup_clue, dreamlike_clue, fats_clue, mass_media_clue, published_clue, rasta_clue, smiles_clue, study_clue, wellington_clue
+from twodown.pipeline import aimlessly_clue, chicago_clue, cole_clue, davis_cup_clue, dreamlike_clue, fats_clue, mass_media_clue, published_clue, rasta_clue, smiles_clue, study_clue, wellington_clue
 
 
 def test_study_slug_and_hint_fields_are_mass_media():
@@ -201,6 +201,35 @@ def test_aled_bring_out_and_usa_match_at_80_percent():
     )
     assert leftover.photo.slug == USA.slug
 
+
+def test_unmatched_clue_says_no_relevant_image_found():
+    leftover = match_hint("final analysis")
+    assert leftover.close_enough is False
+    assert leftover.photo is None
+    assert leftover.line == HINT_MISS
+    blank = Clue(
+        source_url="https://fifteensquared.net/example/",
+        paper="Independent",
+        puzzle_id="0",
+        setter="Test",
+        blogger="Test",
+        number="1",
+        direction="across",
+        clue="Final analysis of a distant quay",
+        enumeration="4",
+        answer="NONE",
+        parse="nothing useful here",
+    )
+    attached = attach_hint(blank)
+    assert attached.hint_image is None
+    assert attached.hint_credit is None
+    assert attached.hint_line == HINT_MISS
+    assert spoken_hint(attached) == HINT_MISS
+    chicago = chicago_clue()
+    assert chicago.answer == "CHICAGO"
+    assert chicago.hint_image == f"assets/hints/{USA.filename}"
+    assert spoken_hint(chicago) == HINT_LINE
+    assert "CHICAGO" not in (chicago.hint_credit or "")
 
 
 def test_no_cloud_vision_pipeline():

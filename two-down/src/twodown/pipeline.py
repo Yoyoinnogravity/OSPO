@@ -345,6 +345,11 @@ def mass_media_clue() -> Clue:
     )
 
 
+def chicago_clue() -> Clue:
+    """Independent 12473 1a CHICAGO — published pair, not invented."""
+    return published_clue("independent-12473-1a")
+
+
 def study_clues() -> dict[str, Clue]:
     """MASS MEDIA is the study default. Earlier study clues stay constructable."""
     dreamlike = dreamlike_clue()

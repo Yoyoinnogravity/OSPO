@@ -8,7 +8,6 @@ from twodown.config import (
     ANSWER_PAUSE_SECONDS,
     CLUE_LETTERS_GAP_SECONDS,
     HINT_HOLD_SECONDS,
-    HINT_LINE,
     HINT_PAUSE_SECONDS,
     INTRO_GAP_SECONDS,
     INTRO_LINE,
@@ -21,6 +20,7 @@ from twodown.config import (
     THINK_PROMPT,
     pick_wisdom,
 )
+from twodown.hints import spoken_hint
 from twodown.models import Clue
 
 DEVICE_LINE = {
@@ -301,7 +301,7 @@ def write_parts(clue: Clue) -> ScriptParts:
         clue_speech=_strip_site_code(f"{clue.clue}."),
         letters_speech=_strip_site_code(speak_enumeration(clue.enumeration)),
         think_speech=_strip_site_code(THINK_PROMPT),
-        hint_speech=_strip_site_code(clue.hint_line or HINT_LINE),
+        hint_speech=_strip_site_code(spoken_hint(clue)),
         answer_speech=_strip_site_code(speak_answer(clue.answer)),
         parse_speech=_strip_site_code(
             speak_parse_asides(speak_parse_tokens(f"{parse}{meaning}".strip()))

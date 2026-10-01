@@ -9,7 +9,7 @@ from urllib.parse import quote
 import requests
 from PIL import Image, ImageDraw, ImageFilter
 
-from twodown.config import HINT_LINE, PACKAGE_ROOT, USER_AGENT
+from twodown.config import HINT_LINE, HINT_MISS, PACKAGE_ROOT, USER_AGENT
 from twodown.models import Clue
 
 HINTS_DIR = PACKAGE_ROOT / "assets" / "hints"
@@ -80,17 +80,17 @@ class HintPhoto:
 
 @dataclass(frozen=True)
 class MatchedHint:
-    photo: HintPhoto
+    photo: HintPhoto | None
     closeness: float
     close_enough: bool
 
     @property
     def slug(self) -> str:
-        return self.photo.slug
+        return self.photo.slug if self.photo is not None else ""
 
     @property
     def line(self) -> str:
-        return HINT_LINE
+        return HINT_LINE if self.close_enough else HINT_MISS
 
 
 # Sleeping face in soft haze. Reads as trance / dream / as-in-a-trance ~80% of the time.
@@ -658,9 +658,13 @@ def match_hint(
     clue: str = "",
     parse: str = "",
 ) -> MatchedHint:
-    """Pick a still from definition / clue / parse. 80% close is enough; never refuse AI."""
+    """Pick a still from definition / clue / parse. 80% close is enough; never refuse AI.
+
+    A miss is honest: close_enough is False and photo is None.
+    Never fall back to DEFAULT_HINT.
+    """
     del answer  # Hint the definition, not the light — do not leak the answer.
-    best = DEFAULT_HINT
+    best = None
     score = 0.0
     for text in hint_texts(definition, clue, parse):
         needles = _tokens(text)
@@ -670,9 +674,9 @@ def match_hint(
             closeness = _closeness(needles, photo.keywords)
             if closeness > score:
                 best, score = photo, closeness
-    close_enough = score >= CLOSE_ENOUGH
+    close_enough = bool(best is not None and score >= CLOSE_ENOUGH)
     if not close_enough:
-        return MatchedHint(photo=DEFAULT_HINT, closeness=score, close_enough=False)
+        return MatchedHint(photo=None, closeness=score, close_enough=False)
     return MatchedHint(photo=best, closeness=score, close_enough=True)
 
 
@@ -682,7 +686,8 @@ def get_hint_photo(slug: str | None = None) -> HintPhoto:
         return PHOTOS[slug]
     if not slug:
         return DEFAULT_HINT
-    return match_hint(slug).photo
+    matched = match_hint(slug)
+    return matched.photo if matched.close_enough else DEFAULT_HINT
 
 
 def _photo_from_path(name: str) -> HintPhoto | None:
@@ -696,8 +701,16 @@ def _photo_from_path(name: str) -> HintPhoto | None:
     return None
 
 
-def hint_for_clue(clue: Clue) -> HintPhoto:
-    """Always match from definition / parse / clue, not a leftover default still."""
+def spoken_hint(clue: Clue) -> str:
+    """Ava offers a still, or says the miss line. Never paste a generic photo."""
+    attached = attach_hint(clue)
+    if attached.hint_image:
+        return attached.hint_line or HINT_LINE
+    return HINT_MISS
+
+
+def hint_for_clue(clue: Clue) -> HintPhoto | None:
+    """Return a still only when one was attached or the definition matches ~80%."""
     attached = attach_hint(clue)
     if attached.hint_image:
         found = _photo_from_path(attached.hint_image)
@@ -706,16 +719,30 @@ def hint_for_clue(clue: Clue) -> HintPhoto:
     matched = match_hint(attached.definition or "", clue=attached.clue, parse=attached.parse)
     if matched.close_enough:
         return matched.photo
-    return PHOTOS.get(attached.slug, DEFAULT_HINT)
+    return PHOTOS.get(attached.slug)
 
 
 def attach_hint(clue: Clue) -> Clue:
-    """Carry hint_image + hint_line matched to the definition (~80%)."""
+    """Attach a definition still only when it is ~80% close or slug-mapped.
+
+    Never paste DEFAULT_HINT / the leftover trance still. A miss says
+    "No relevant image found."
+    """
     matched = match_hint(clue.definition or "", clue=clue.clue, parse=clue.parse)
-    photo = matched.photo if matched.close_enough else PHOTOS.get(clue.slug, DEFAULT_HINT)
+    photo = matched.photo if matched.close_enough else PHOTOS.get(clue.slug)
+    if photo is None:
+        updates: dict[str, str | None] = {}
+        if clue.hint_image:
+            updates["hint_image"] = None
+        if clue.hint_credit:
+            updates["hint_credit"] = None
+        if not clue.hint_line or clue.hint_line == HINT_LINE:
+            updates["hint_line"] = HINT_MISS
+        return clue.model_copy(update=updates) if updates else clue
+    path = f"assets/hints/{photo.filename}"
     updates: dict[str, str] = {}
     if not clue.hint_image:
-        updates["hint_image"] = f"assets/hints/{photo.filename}"
+        updates["hint_image"] = path
     if not clue.hint_credit:
         updates["hint_credit"] = photo.credit_line
     if not clue.hint_line:

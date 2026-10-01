@@ -17,7 +17,6 @@ from twodown.config import (
     FONT_REGULAR,
     FONT_SANS,
     FONT_SANS_BOLD,
-    HINT_LINE,
     INK,
     TAGLINE,
     MUTED,
@@ -27,7 +26,7 @@ from twodown.config import (
     pick_wisdom,
 )
 from twodown.croc import paste_croc
-from twodown.hints import attach_hint, ensure_hint_photo, hint_for_clue
+from twodown.hints import attach_hint, ensure_hint_photo, hint_for_clue, spoken_hint
 from twodown.models import Clue
 from twodown.scenes import DEFAULT_SCENE, Scene, get_scene
 from twodown.script import _spoken_parse
@@ -214,6 +213,8 @@ def _draw_hint_photo(
     """Inset a credited hint still. Never a full-bleed travel photo."""
     clue = attach_hint(clue)
     matched = hint_for_clue(clue)
+    if matched is None:
+        return y
     photo = Image.open(ensure_hint_photo(matched)).convert("RGB")
     frame_w, frame_h = 900, 560
     left = (WIDTH - frame_w) // 2
@@ -270,12 +271,13 @@ def _paint_beat(clue: Clue, beat: str) -> Image.Image:
         wrapped = _wrap(draw, THINK_PROMPT, prompt, WIDTH - 160)
         _center_text(draw, prompt_y, wrapped, prompt, CRIMSON, spacing=8)
     if beat == "hint":
-        # Empty lights stay; the picture is the hint. Never fill or print the answer.
+        # Empty lights stay. Picture only if it matches; otherwise the honest miss line.
         prompt_y = min(lights_bottom + 36, 980)
-        line = (clue.hint_line or HINT_LINE).rstrip(".")
+        line = spoken_hint(clue).rstrip(".")
         wrapped = _wrap(draw, line, prompt, WIDTH - 160)
         next_y = _center_text(draw, prompt_y, wrapped, prompt, CRIMSON, spacing=8)
-        _draw_hint_photo(img, draw, min(next_y + 18, 1040), clue)
+        if hint_for_clue(clue) is not None:
+            _draw_hint_photo(img, draw, min(next_y + 18, 1040), clue)
         _footer(draw, _source_footer(clue))
         return img
     if show_answer:
