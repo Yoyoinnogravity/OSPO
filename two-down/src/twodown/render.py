@@ -18,6 +18,7 @@ from twodown.config import (
     FONT_SANS,
     FONT_SANS_BOLD,
     HINT_LINE,
+    HINT_MISS,
     INK,
     TAGLINE,
     MUTED,
@@ -272,12 +273,14 @@ def _paint_beat(clue: Clue, beat: str) -> Image.Image:
         wrapped = _wrap(draw, THINK_PROMPT, prompt, WIDTH - 160)
         _center_text(draw, prompt_y, wrapped, prompt, CRIMSON, spacing=8)
     if beat == "hint":
-        # Empty lights stay; the picture is the hint. Never fill or print the answer.
-        # No still → no picture-clue beat. Do not paste the leftover default photo.
+        # Empty lights stay. A matching still is the hint; otherwise say so.
+        # Never paste the leftover sleeping-woman still.
+        prompt_y = min(lights_bottom + 36, 980)
         if hint_for_clue(clue) is None:
+            wrapped = _wrap(draw, HINT_MISS, prompt, WIDTH - 160)
+            _center_text(draw, prompt_y, wrapped, prompt, CRIMSON, spacing=8)
             _footer(draw, "")
             return img
-        prompt_y = min(lights_bottom + 36, 980)
         line = (clue.hint_line or HINT_LINE).rstrip(".")
         wrapped = _wrap(draw, line, prompt, WIDTH - 160)
         next_y = _center_text(draw, prompt_y, wrapped, prompt, CRIMSON, spacing=8)

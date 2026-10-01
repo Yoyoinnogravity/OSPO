@@ -268,7 +268,7 @@ def test_hint_beat_is_newsprint_with_credited_photo(tmp_path: Path):
     from PIL import Image
 
     from twodown.config import HINT_LINE, NEWS_BG
-    from twodown.hints import DEFAULT_HINT, RASTA, TRANCE, ensure_hint_photo
+    from twodown.hints import DEFAULT_HINT, FIELD, RASTA, TRANCE, ensure_hint_photo
     from twodown.pipeline import dreamlike_clue, rasta_clue
 
     clue = dreamlike_clue()
@@ -285,9 +285,10 @@ def test_hint_beat_is_newsprint_with_credited_photo(tmp_path: Path):
     assert clue.hint_credit == TRANCE.credit_line
     assert "DREAMLIKE" not in (clue.hint_credit or "")
     assert HINT_LINE == "Here's a hint."
-    assert DEFAULT_HINT.source == "generated still"
+    assert DEFAULT_HINT is None
     assert ensure_hint_photo(TRANCE).exists()
     assert ensure_hint_photo(RASTA).exists()
+    assert ensure_hint_photo(FIELD).exists()
     assert rasta_clue().answer == "RASTA"
 
 
@@ -420,6 +421,68 @@ def test_hint_card_keeps_empty_lights(tmp_path: Path):
     # Inset still is not newsprint; the picture is the hint.
     photo = hint_img.crop((140, 980, 940, 1480))
     assert any(pixel != NEWS_BG for pixel in photo.get_flattened_data())
+
+
+def test_sphere_hint_beat_is_a_field_not_the_sleeping_woman(tmp_path: Path):
+    from PIL import Image
+
+    from twodown.config import CREAM, HINT_LINE, NEWS_BG
+    from twodown.hints import FIELD, TRANCE, hint_for_clue
+    from twodown.pipeline import published_clue
+
+    clue = published_clue("financial-times-18478-5a")
+    assert clue.answer == "SPHERE"
+    assert hint_for_clue(clue) is not None
+    assert hint_for_clue(clue).slug == FIELD.slug
+    path = draw_beat(clue, tmp_path / "sphere-hint.png", "hint")
+    img = Image.open(path)
+    assert img.size == (1080, 1920)
+    assert img.getpixel((24, 40)) == NEWS_BG
+    lights = list(img.crop((80, 610, 1000, 740)).get_flattened_data())
+    assert lights.count(CREAM) > 400
+    raw = path.read_bytes()
+    assert b"SPHERE" not in raw
+    assert b"sphere" not in raw.lower()
+    trance = Image.open(TRANCE.path).convert("RGB").resize((1280, 720))
+    inset = img.crop((140, 1040, 940, 1580)).convert("RGB").resize((1280, 720))
+    trance_green = sum(1 for r, g, b in trance.get_flattened_data() if g > r + 20 and g > b)
+    inset_green = sum(1 for r, g, b in inset.get_flattened_data() if g > r + 20 and g > b)
+    assert inset_green > trance_green
+    assert clue.hint_line == HINT_LINE
+
+
+def test_unmatched_hint_beat_has_empty_lights_and_no_photo(tmp_path: Path):
+    from PIL import Image
+
+    from twodown.config import CREAM, NEWS_BG
+    from twodown.hints import hint_for_clue
+    from twodown.models import Clue
+
+    blank = Clue(
+        source_url="https://fifteensquared.net/example/",
+        paper="Independent",
+        puzzle_id="99999",
+        setter="Phi",
+        blogger="tester",
+        number="12",
+        direction="across",
+        clue="Rioting led unrest in the final analysis",
+        enumeration="3,6",
+        answer="END RESULT",
+        parse="Anagram of LED UNREST",
+    )
+    assert hint_for_clue(blank) is None
+    path = draw_beat(blank, tmp_path / "miss-hint.png", "hint")
+    img = Image.open(path)
+    assert img.size == (1080, 1920)
+    assert img.getpixel((24, 40)) == NEWS_BG
+    lights = list(img.crop((80, 610, 1000, 740)).get_flattened_data())
+    assert lights.count(CREAM) > 400
+    band = img.crop((140, 1040, 940, 1580))
+    newsprint = sum(1 for pixel in band.get_flattened_data() if pixel == NEWS_BG)
+    assert newsprint > 200_000
+    raw = path.read_bytes()
+    assert b"END RESULT" not in raw
 
 
 def test_dreamlike_parse_fits_under_the_answer(tmp_path: Path):

@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from twodown.config import HINT_LINE, PACKAGE_ROOT, PINUP_SLUG, STUDY_SLUG
-from twodown.hints import AIM, AUTHOR, BRING, CLOSE_ENOUGH, COLE, CROSS, DAVIS, FATS, MODEL, PAPERS, RASTA, SMILES, TRANCE, USA, WELLINGTON, attach_hint, match_hint
+from twodown.config import HINT_LINE, HINT_MISS, PACKAGE_ROOT, PINUP_SLUG, STUDY_SLUG
+from twodown.hints import AIM, AUTHOR, BRING, CLOSE_ENOUGH, COLE, CROSS, DAVIS, DEFAULT_HINT, FATS, FIELD, MODEL, PAPERS, RASTA, SMILES, TRANCE, USA, WELLINGTON, attach_hint, match_hint
 from twodown.models import Clue
 from twodown.pipeline import aimlessly_clue, cole_clue, davis_cup_clue, dreamlike_clue, fats_clue, mass_media_clue, published_clue, rasta_clue, smiles_clue, study_clue, wellington_clue
 
@@ -203,8 +203,8 @@ def test_aled_bring_out_and_usa_match_at_80_percent():
 
 
 
-def test_unmatched_clue_skips_the_picture_clue_beat():
-    from twodown.hints import DEFAULT_HINT, hint_for_clue, spoken_hint
+def test_unmatched_clue_says_no_relevant_image_found():
+    from twodown.hints import hint_for_clue, spoken_hint
     from twodown.script import write_parts
 
     blank = Clue(
@@ -222,17 +222,78 @@ def test_unmatched_clue_skips_the_picture_clue_beat():
     )
     attached = attach_hint(blank)
     assert attached.hint_image is None
-    assert not attached.hint_line
+    assert attached.hint_line == HINT_MISS
     assert hint_for_clue(attached) is None
-    assert spoken_hint(attached) == ""
+    assert spoken_hint(attached) == HINT_MISS
     leftover = match_hint(blank.definition or "", clue=blank.clue, parse=blank.parse)
     assert not leftover.close_enough
-    assert leftover.photo.slug == DEFAULT_HINT.slug
+    assert leftover.photo is None
+    assert leftover.line == HINT_MISS
     parts = write_parts(blank)
-    assert parts.hint_speech == ""
+    assert parts.hint_speech == HINT_MISS
     assert "Here's a hint" not in parts.full
-    assert "No relevant image found" not in parts.full
-    assert parts.full.index(parts.think_speech) < parts.full.index(parts.answer_speech)
+    assert HINT_MISS in parts.full
+    assert parts.full.index(parts.think_speech) < parts.full.index(parts.hint_speech)
+    assert parts.full.index(parts.hint_speech) < parts.full.index(parts.answer_speech)
+
+
+def test_default_hint_is_not_the_sleeping_woman():
+    assert DEFAULT_HINT is None
+    assert DEFAULT_HINT is not TRANCE
+    leftover = match_hint("female")
+    assert leftover.photo is not TRANCE
+    assert leftover.photo is None
+    assert not leftover.close_enough
+    leftover = match_hint("Female bearing pressure")
+    assert leftover.photo is not TRANCE
+    assert leftover.photo is None
+    leftover = match_hint("", clue="Female bearing pressure on field")
+    assert leftover.photo is not None
+    assert leftover.photo.slug == FIELD.slug
+    assert leftover.photo.slug != TRANCE.slug
+    assert leftover.close_enough
+    assert "SPHERE" not in leftover.photo.credit_line
+    assert "sphere" not in leftover.photo.label.lower()
+
+
+def test_sphere_uses_the_field_still_not_trance():
+    from twodown.hints import hint_for_clue, spoken_hint
+    from twodown.pipeline import published_clue
+
+    clue = published_clue("financial-times-18478-5a")
+    assert clue.answer == "SPHERE"
+    assert clue.clue == "Female bearing pressure on field"
+    attached = attach_hint(clue)
+    assert attached.hint_image == f"assets/hints/{FIELD.filename}"
+    assert attached.hint_credit == FIELD.credit_line
+    assert attached.hint_line == HINT_LINE
+    assert hint_for_clue(attached) is not None
+    assert hint_for_clue(attached).slug == FIELD.slug
+    assert hint_for_clue(attached).slug != TRANCE.slug
+    assert spoken_hint(attached) == HINT_LINE
+    assert "SPHERE" not in (attached.hint_credit or "")
+    assert "SPHERE" not in attached.hint_line
+    still = PACKAGE_ROOT / attached.hint_image
+    assert still.is_file()
+    leftover = Clue(
+        source_url=clue.source_url,
+        paper=clue.paper,
+        puzzle_id=clue.puzzle_id,
+        setter=clue.setter,
+        blogger=clue.blogger,
+        number=clue.number,
+        direction=clue.direction,
+        clue=clue.clue,
+        enumeration=clue.enumeration,
+        answer=clue.answer,
+        parse=clue.parse,
+        hint_image=f"assets/hints/{TRANCE.filename}",
+        hint_credit=TRANCE.credit_line,
+        hint_line=HINT_LINE,
+    )
+    repaired = attach_hint(leftover)
+    assert repaired.hint_image == f"assets/hints/{FIELD.filename}"
+    assert hint_for_clue(repaired).slug == FIELD.slug
 
 
 def test_no_cloud_vision_pipeline():

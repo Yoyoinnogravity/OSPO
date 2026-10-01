@@ -65,14 +65,16 @@ def test_draw_photo_card_is_not_newsprint(tmp_path: Path):
 
 
 def test_hint_photo_is_a_definition_still_not_travel_aurora():
-    from twodown.hints import AIM, AUTHOR, BRING, COLE, CROSS, DEFAULT_HINT, FATS, LION, MODEL, MOONLIT, PAPERS, RASTA, SMILES, TRANCE, USA, WELLINGTON, ensure_hint_photo
+    from twodown.hints import AIM, AUTHOR, BRING, COLE, CROSS, DEFAULT_HINT, FATS, FIELD, LION, MODEL, MOONLIT, PAPERS, RASTA, SMILES, TRANCE, USA, WELLINGTON, ensure_hint_photo
 
-    photo = ensure_hint_photo()
+    photo = ensure_hint_photo(TRANCE)
     assert photo.exists()
-    assert DEFAULT_HINT.slug == TRANCE.slug
-    assert DEFAULT_HINT.source == "generated still"
-    assert "DREAMLIKE" not in DEFAULT_HINT.credit_line
-    assert "aurora" not in DEFAULT_HINT.slug
+    assert DEFAULT_HINT is None
+    assert DEFAULT_HINT is not TRANCE
+    assert "DREAMLIKE" not in TRANCE.credit_line
+    assert "aurora" not in TRANCE.slug
+    assert ensure_hint_photo(FIELD).exists()
+    assert "SPHERE" not in FIELD.credit_line
     assert MOONLIT.commons_file == "Moonlit Moments (Unsplash).jpg"
     assert MOONLIT.source == "Linda Xu"
     assert ensure_hint_photo(RASTA).exists()

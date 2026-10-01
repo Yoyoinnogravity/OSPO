@@ -9,7 +9,7 @@ from urllib.parse import quote
 import requests
 from PIL import Image, ImageDraw, ImageFilter
 
-from twodown.config import HINT_LINE, PACKAGE_ROOT, USER_AGENT
+from twodown.config import HINT_LINE, HINT_MISS, PACKAGE_ROOT, USER_AGENT
 from twodown.models import Clue
 
 HINTS_DIR = PACKAGE_ROOT / "assets" / "hints"
@@ -42,6 +42,26 @@ _STOP = frozenset(
         "be",
         "another",
         "such",
+    }
+)
+# Surface gender words are not a definition. They must never pick TRANCE / sleep.
+_GENDER = frozenset(
+    {
+        "female",
+        "male",
+        "woman",
+        "women",
+        "lady",
+        "ladies",
+        "girl",
+        "girls",
+        "man",
+        "men",
+        "she",
+        "her",
+        "hers",
+        "him",
+        "his",
     }
 )
 
@@ -80,17 +100,19 @@ class HintPhoto:
 
 @dataclass(frozen=True)
 class MatchedHint:
-    photo: HintPhoto
+    photo: HintPhoto | None
     closeness: float
     close_enough: bool
 
     @property
     def slug(self) -> str:
-        return self.photo.slug
+        return self.photo.slug if self.photo else ""
 
     @property
     def line(self) -> str:
-        return HINT_LINE
+        if self.close_enough and self.photo is not None:
+            return HINT_LINE
+        return HINT_MISS
 
 
 # Sleeping face in soft haze. Reads as trance / dream / as-in-a-trance ~80% of the time.
@@ -410,7 +432,7 @@ FIELD = HintPhoto(
     source="generated still",
     license="generated",
     filename="field-still.webp",
-    keywords=frozenset({"field", "fields", "domain", "area"}),
+    keywords=frozenset({"field", "fields", "domain", "area", "globe", "orb", "realm"}),
 )
 
 
@@ -593,7 +615,9 @@ PHOTOS: dict[str, HintPhoto] = {
     "financial-times-18477-14a": XYZ,
 }
 
-DEFAULT_HINT = TRANCE
+# No leftover still. Trance / the sleeping woman is only for trance or dream clues.
+# Unknown text and the word "female" must not fall back to TRANCE.
+DEFAULT_HINT = None
 
 
 
@@ -608,7 +632,11 @@ def _catalog() -> tuple[HintPhoto, ...]:
 def _tokens(text: str) -> frozenset[str]:
     raw = (text or "").lower()
     words = re.findall(r"[a-z]+", raw)
-    kept = {w for w in words if w not in _STOP and (len(w) > 2 or w in {"x", "y", "z"})}
+    kept = {
+        w
+        for w in words
+        if w not in _STOP and w not in _GENDER and (len(w) > 2 or w in {"x", "y", "z"})
+    }
     for compound in re.findall(r"[a-z]+-[a-z]+", raw):
         kept.add(compound.replace("-", ""))
     stems = set(kept)
@@ -658,21 +686,27 @@ def match_hint(
     clue: str = "",
     parse: str = "",
 ) -> MatchedHint:
-    """Pick a still from definition / clue / parse. 80% close is enough; never refuse AI."""
+    """Pick a still from definition / clue / parse. 80% close is enough; never refuse AI.
+
+    A miss is honest: close_enough is False and photo is None.
+    Never fall back to TRANCE / the sleeping woman. Gender words are ignored.
+    """
     del answer  # Hint the definition, not the light — do not leak the answer.
-    best = DEFAULT_HINT
+    best: HintPhoto | None = None
     score = 0.0
     for text in hint_texts(definition, clue, parse):
         needles = _tokens(text)
         if not needles:
             continue
         for photo in _catalog():
+            if photo.slug == TRANCE.slug and not (needles & photo.keywords):
+                continue
             closeness = _closeness(needles, photo.keywords)
             if closeness > score:
                 best, score = photo, closeness
-    close_enough = score >= CLOSE_ENOUGH
+    close_enough = bool(best is not None and score >= CLOSE_ENOUGH)
     if not close_enough:
-        return MatchedHint(photo=DEFAULT_HINT, closeness=score, close_enough=False)
+        return MatchedHint(photo=None, closeness=score, close_enough=False)
     return MatchedHint(photo=best, closeness=score, close_enough=True)
 
 
@@ -706,33 +740,36 @@ def _matched_photo(clue: Clue) -> HintPhoto | None:
 
 
 def hint_for_clue(clue: Clue) -> HintPhoto | None:
-    """Return a per-clue still, or None so the Short can skip the picture-clue beat."""
+    """Return a per-clue still, or None when nothing relevant matches."""
     attached = attach_hint(clue)
+    if attached.hint_line == HINT_MISS or not attached.hint_image:
+        return None
     if attached.hint_image:
         found = _photo_from_path(attached.hint_image)
-        if found is not None and found.slug != DEFAULT_HINT.slug:
-            return found
-        if found is not None:
+        if found is None:
+            return _matched_photo(attached)
+        if found.slug == TRANCE.slug:
             rematch = match_hint(attached.definition or "", clue=attached.clue, parse=attached.parse)
-            if rematch.close_enough and rematch.photo.slug == found.slug:
+            if rematch.close_enough and rematch.photo is not None and rematch.photo.slug == TRANCE.slug:
                 return found
+            return _matched_photo(attached)
+        return found
     return _matched_photo(attached)
 
 
 def spoken_hint(clue: Clue) -> str:
-    """Speak 'Here's a hint' only when a real still is attached. No miss line."""
-    return HINT_LINE if hint_for_clue(clue) is not None else ""
+    """Speak the offer when a still is attached, otherwise the miss line."""
+    return HINT_LINE if hint_for_clue(clue) is not None else HINT_MISS
 
 
 def attach_hint(clue: Clue) -> Clue:
-    """Attach a distinct still, or clear the hint so the film skips the beat."""
+    """Attach a distinct still, or clear the photo and say no relevant image."""
     photo = _matched_photo(clue)
     if photo is None:
-        if not clue.hint_image and not clue.hint_credit and clue.hint_line == "":
+        wanted = {"hint_image": None, "hint_credit": None, "hint_line": HINT_MISS}
+        if clue.hint_image is None and clue.hint_credit is None and clue.hint_line == HINT_MISS:
             return clue
-        if not clue.hint_image and not clue.hint_credit and clue.hint_line is None:
-            return clue.model_copy(update={"hint_line": ""})
-        return clue.model_copy(update={"hint_image": None, "hint_credit": None, "hint_line": ""})
+        return clue.model_copy(update=wanted)
     wanted = {
         "hint_image": f"assets/hints/{photo.filename}",
         "hint_credit": photo.credit_line,
@@ -1052,13 +1089,15 @@ def _generate_xyz_still(dest: Path) -> Path:
 
 
 def ensure_hint_photo(photo: HintPhoto | None = None) -> Path:
-    resolved = photo or DEFAULT_HINT
-    dest = resolved.path
+    if photo is None:
+        raise ValueError("no hint photo to ensure — DEFAULT is not a leftover still")
+    dest = photo.path
     if dest.exists() and dest.stat().st_size > 0:
         return dest
-    if _fetch_commons(resolved, dest):
+    if _fetch_commons(photo, dest):
         return dest
     generators = {
+        TRANCE.slug: _generate_trance_still,
         RASTA.slug: _generate_rasta_still,
         LION.slug: _generate_rasta_still,
         FATS.slug: _generate_fats_still,
@@ -1083,7 +1122,7 @@ def ensure_hint_photo(photo: HintPhoto | None = None) -> Path:
         PORTER.slug: _generate_porter_still,
         XYZ.slug: _generate_xyz_still,
     }
-    generate = generators.get(resolved.slug)
+    generate = generators.get(photo.slug)
     if generate is not None:
         return generate(dest)
-    return _generate_trance_still(dest)
+    raise FileNotFoundError(f"missing hint still {photo.slug}")

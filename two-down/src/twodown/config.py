@@ -99,6 +99,8 @@ THINK_PROMPT = "Pause here to think about it."
 HINT_OFFER = "Here's a hint."
 HINT_LOOK = "Here's a hint."
 HINT_LINE = "Here's a hint."
+# Spoken and shown when attach_hint has no ~80% match. Do not paste a generic still.
+HINT_MISS = "No relevant image found."
 HINT_VOICE_ALIAS = "croc"
 HINT_HOLD_SECONDS = 2.0
 HINT_PAUSE_SECONDS = 0.8
