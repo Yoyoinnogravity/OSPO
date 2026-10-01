@@ -1212,7 +1212,7 @@ def _earlier_teaser(root: Path, prefix: str = "", skip_date: str | None = None) 
 
 def _films_body(root: Path) -> str:
     return f"""
-    {_croc_hello("", title="Every film on cryptic.fit.", lede="Daily solves, newest first. One spoken version: Ryan invites, then Cryptic Croc presents the clue.")}
+    {_croc_hello("", title="Every film on cryptic.fit.", lede="Daily solves, newest first. Andrew says we are AI, then Cryptic Croc presents the clue.")}
     <h2>Daily pairs.</h2>
     {_playable_daily(root)}
     """
@@ -1480,7 +1480,7 @@ def publish_site(pair: DailyPair, dest: Path | None = None) -> Path:
 
     about = f"""
     <h1>About.</h1>
-    <p class="lede">{BRAND_LINE} {CREDIT_LINE} {CREDIT_WHO[:1].upper()}{CREDIT_WHO[1:]}. The only source is the Independent, the Guardian and the Financial Times. We never invent answers. Cryptic Croc presents the new films. Sonia, Libby, Ryan and Thomas stay on the voice list, and you can still pick a real place as the backdrop. The same Shorts go to YouTube, TikTok, Instagram and Facebook when those accounts are connected. The site is the spoiler-safe home.</p>
+    <p class="lede">{BRAND_LINE} {CREDIT_LINE} {CREDIT_WHO[:1].upper()}{CREDIT_WHO[1:]}. The only source is the Independent, the Guardian and the Financial Times. We never invent answers. Andrew invites, then Cryptic Croc presents the new films. Sonia, Libby, Ryan and Thomas stay on the voice list, and you can still pick a real place as the backdrop. The same Shorts go to YouTube, TikTok, Instagram and Facebook when those accounts are connected. The site is the spoiler-safe home.</p>
     <p>Answers and wordplay belong to the setters and the bloggers. We rewrite for speech and always link the original post.</p>
     <p>Readers can <a href="suggest.html">suggest one homemade clue a day</a>, or ask for a daily clue by email. Both land in Aled’s inbox at <a href="mailto:{_e(SUGGEST_EMAIL)}">{_e(SUGGEST_EMAIL)}</a>.</p>
     <p>When the site has readers, a small labelled ad can sit under the pair — never on the answer. How that works is on <a href="support.html">Support</a>.</p>

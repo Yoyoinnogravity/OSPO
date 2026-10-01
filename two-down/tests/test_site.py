@@ -63,6 +63,7 @@ def test_publish_site_writes_spoiler_pages(tmp_path):
     assert (root / "about.html").exists()
     assert "data-voice-btn" in index
     assert "Cryptic Croc" in index
+    assert "Andrew" in index
     assert "Sonia" in index
     assert "Ryan" in index
     assert "Libby" in index

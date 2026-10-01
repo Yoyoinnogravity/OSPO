@@ -19,7 +19,6 @@ from twodown.config import (
     FONT_SANS_BOLD,
     HINT_LINE,
     INK,
-    INTRO_LINE,
     TAGLINE,
     MUTED,
     OUTRO_LINE,
@@ -31,7 +30,7 @@ from twodown.croc import paste_croc
 from twodown.hints import ensure_hint_photo, hint_for_clue
 from twodown.models import Clue
 from twodown.scenes import DEFAULT_SCENE, Scene, get_scene
-from twodown.script import _spoken_parse
+from twodown.script import _spoken_parse, speak_intro
 
 WIDTH, HEIGHT = 1080, 1920
 PHOTO_INK = (252, 247, 236)
@@ -241,7 +240,7 @@ def _paint_beat(clue: Clue, beat: str) -> Image.Image:
     img, draw = _new_card()
     _draw_wordmark(draw)
     if beat in {"intro", "outro"}:
-        line = INTRO_LINE if beat == "intro" else OUTRO_LINE
+        line = speak_intro(clue) if beat == "intro" else OUTRO_LINE
         line_font = _font(FONT_REGULAR, 64)
         wrapped = _wrap(draw, line.rstrip("."), line_font, WIDTH - 180)
         _center_text(draw, 280, wrapped, line_font, INK, spacing=16)
@@ -667,6 +666,7 @@ def render_video(
         clips = [
             _motion_clip(clue, name, hold, work / name)
             for name, hold in zip(names, holds, strict=True)
+            if hold > 0.05
         ]
         return _concat_motion(clips, audio, dest)
     if clue_hold is None:

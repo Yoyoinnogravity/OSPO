@@ -66,6 +66,11 @@ def test_highlighted_letter_stays_out_of_the_previous_word():
     assert "without then" not in clue.parse
     assert "distinction" in clue.parse
     parts = write_parts(clue)
+    assert parts.intro_speech == (
+        "Hi, here is your daily dose of AI cryptic clues. "
+        "Today's clue is from the Guardian, by Chandler."
+    )
+    assert parts.source_speech == ""
     assert "without then" not in parts.parse_speech
     assert "client" in parts.parse_speech.lower()
     assert "anagram indicator" in parts.parse_speech.lower()
@@ -104,7 +109,7 @@ def test_select_pair_prefers_device_contrast():
     assert pair[0].device != pair[1].device
 
 
-def test_script_credits_the_setter_and_paper():
+def test_script_opens_with_the_paper_and_setter():
     html = (FIXTURES / "independent_detail.html").read_text(encoding="utf-8")
     clue = next(c for c in parse_post(_post(html)) if c.number == "12")
     script = write_script(clue)
@@ -114,7 +119,10 @@ def test_script_credits_the_setter_and_paper():
     assert "Phi" in script
     assert "cryptic.fit" in script
     parts = write_parts(clue)
-    assert parts.intro_speech == "Solve it, I know you can. Here's Cryptic Croc."
+    assert parts.intro_speech == (
+        "Hi, here is your daily dose of AI cryptic clues. "
+        "Today's clue is from the Independent, by Phi."
+    )
     assert parts.clue_speech == f"{clue.clue}."
     assert "The clue:" not in parts.clue_speech
     assert "(" not in parts.clue_speech
@@ -125,9 +133,10 @@ def test_script_credits_the_setter_and_paper():
     assert parts.answer_speech == "It's end result."
     assert "end result" in parts.breakdown
     assert "Fifteen Squared" not in parts.parse_speech
-    assert "Fifteen Squared" not in parts.source_speech
-    assert "Independent" in parts.source_speech
-    assert "Phi" in parts.source_speech
+    assert parts.source_speech == ""
+    assert "That's Phi" not in script
+    assert "Independent" in parts.intro_speech
+    assert "Phi" in parts.intro_speech
     assert parts.outro_speech == "That was cryptic.fit."
     assert script.index(parts.intro_speech) < script.index(parts.clue_speech)
     assert script.index(parts.clue_speech) < script.index(parts.letters_speech)
@@ -139,14 +148,12 @@ def test_script_credits_the_setter_and_paper():
     assert script.index("[pause 2s]") < script.index("[pause 0.8s]")
     assert script.index("[pause 0.8s]") < script.index(parts.answer_speech)
     assert script.index(parts.answer_speech) < script.index(parts.parse_speech)
-    assert script.index(parts.parse_speech) < script.index(parts.source_speech)
-    assert script.index(parts.source_speech) < script.index(parts.outro_speech)
+    assert script.index(parts.parse_speech) < script.index(parts.outro_speech)
     ssml = to_ssml(parts)
     first_800 = ssml.index('break time="800ms"')
     second_800 = ssml.index('break time="800ms"', first_800 + 1)
     third_800 = ssml.index('break time="800ms"', second_800 + 1)
     first_250 = ssml.index('break time="250ms"')
-    second_250 = ssml.index('break time="250ms"', first_250 + 1)
     first_300 = ssml.index('break time="300ms"')
     second_300 = ssml.index('break time="300ms"', first_300 + 1)
     assert ssml.index(parts.intro_speech) < ssml.index(parts.clue_speech)
@@ -158,14 +165,16 @@ def test_script_credits_the_setter_and_paper():
     assert ssml.index(parts.hint_speech) < ssml.index('break time="2000ms"')
     assert ssml.index('break time="2000ms"') < second_800 < ssml.index(parts.answer_speech)
     assert ssml.index(parts.answer_speech) < third_800 < ssml.index(parts.parse_speech)
-    assert ssml.index(parts.parse_speech) < ssml.index(parts.source_speech)
-    assert ssml.index(parts.parse_speech) < second_250 < ssml.index(parts.source_speech)
-    assert ssml.index(parts.source_speech) < second_300 < ssml.index(parts.outro_speech)
-    assert "Fifteen Squared" not in parts.source_speech
-    assert "Independent" in parts.source_speech
+    assert ssml.index(parts.parse_speech) < second_300 < ssml.index(parts.outro_speech)
+    assert "That's Phi" not in ssml
+    assert "Independent" in parts.intro_speech
+    assert ssml.count('break time="250ms"') == 1
 
 
 def test_parse_title_variants():
+    from twodown.models import Clue
+    from twodown.script import speak_intro
+
     assert parse_title("Independent 12458 / Phi") == ("Independent", "12458", "Phi")
     assert parse_title("Financial Times 18,477 by NEO") == ("Financial Times", "18477", "NEO")
     assert parse_title("Guardian Cryptic crossword No 30,108 by Paul") == ("Guardian", "30108", "Paul")
@@ -173,6 +182,25 @@ def test_parse_title_variants():
         "Independent on Sunday",
         "1907",
         "Filbert",
+    )
+    ios = Clue(
+        source_url="https://fifteensquared.net/example/",
+        paper="Independent on Sunday",
+        puzzle_id="1907",
+        setter="Filbert",
+        blogger="tester",
+        number="1",
+        direction="across",
+        clue="Example",
+        enumeration="4",
+        answer="TEST",
+        parse="example",
+        device="unknown",
+        enumeration_ok=True,
+    )
+    assert speak_intro(ios) == (
+        "Hi, here is your daily dose of AI cryptic clues. "
+        "Today's clue is from the Independent on Sunday, by Filbert."
     )
 
 

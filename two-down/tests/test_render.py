@@ -15,7 +15,7 @@ from twodown.render import (
     draw_reveal_card,
     render_video,
 )
-from twodown.script import _spoken_parse, speak_answer, speak_enumeration
+from twodown.script import _spoken_parse, speak_answer, speak_enumeration, speak_intro
 
 
 def _clue() -> Clue:
@@ -112,7 +112,12 @@ def test_clue_card_is_a_solve_along(tmp_path: Path):
     assert img.size == (1080, 1920)
     # Travel photos stay off the Short — the clue is the picture.
     assert img.getpixel((24, 40)) == NEWS_BG
-    assert draw_beat(_clue(), tmp_path / "intro.png", "intro").exists()
+    intro = draw_beat(_clue(), tmp_path / "intro.png", "intro")
+    assert intro.exists()
+    assert speak_intro(_clue()) == (
+        "Hi, here is your daily dose of AI cryptic clues. "
+        "Today's clue is from the Independent, by Eccles."
+    )
     assert draw_beat(_clue(), tmp_path / "outro.png", "outro").exists()
     assert draw_beat(_clue(), tmp_path / "source.png", "source").exists()
     assert draw_beat(_clue(), tmp_path / "only-clue.png", "clue").exists()

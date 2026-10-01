@@ -21,12 +21,12 @@ CRAWL_GAP_SECONDS = 1.0
 
 DAILY_CATEGORY_SLUGS = frozenset({"independent", "ft", "guardian"})
 
-# Cryptic Croc is Jenny: a grown American woman, even and easy to follow.
-# Ryan invites at a normal pace. Maisie stays off.
+# Cryptic Croc is Ava. Andrew invites. Production pair is locked.
 # Sonia, Libby, Ryan and Thomas stay available as alternate voices.
 DEFAULT_VOICE_ALIAS = "croc"
 VOICES = {
-    "croc": "en-US-JennyNeural",
+    "croc": "en-US-AvaNeural",
+    "andrew": "en-US-AndrewNeural",
     "sonia": "en-GB-SoniaNeural",
     "libby": "en-GB-LibbyNeural",
     "ryan": "en-GB-RyanNeural",
@@ -34,6 +34,7 @@ VOICES = {
 }
 VOICE_LABELS = {
     "croc": "Cryptic Croc",
+    "andrew": "Andrew",
     "sonia": "Sonia",
     "libby": "Libby",
     "ryan": "Ryan",
@@ -61,9 +62,9 @@ PARSE_RATE = "-6%"
 PARSE_PITCH = "+0Hz"
 PARSE_ASIDE_PAUSE_SECONDS = 0.35
 TAGLINE = "Solve it, I know you can."
-# Ryan invites, then Cryptic Croc presents the clue.
-INTRO_LINE = f"{TAGLINE} Here's Cryptic Croc."
-INTRO_VOICE_ALIAS = "ryan"
+# Andrew opens as AI. Paper and setter live here, not at the end.
+INTRO_LINE = "Hi, here is your daily dose of AI cryptic clues."
+INTRO_VOICE_ALIAS = "andrew"
 INTRO_RATE = "+0%"
 INTRO_PITCH = "+0Hz"
 INTRO_VOLUME = "+2%"

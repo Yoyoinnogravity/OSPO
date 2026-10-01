@@ -228,39 +228,57 @@ class ScriptParts:
 
     @property
     def full(self) -> str:
-        return (
-            f"{self.intro_speech}\n"
-            f"{self.clue_speech}\n"
-            f"{self.letters_speech}\n"
-            f"[pause {LETTERS_PAUSE_SECONDS:.0f}s]\n"
-            f"{self.think_speech}\n"
-            f"[pause {THINK_PAUSE_SECONDS:.0f}s]\n"
-            f"{self.hint_speech}\n"
-            f"[pause {HINT_HOLD_SECONDS:.0f}s]\n"
-            f"[pause {HINT_PAUSE_SECONDS:.1f}s]\n"
-            f"{self.answer_speech}\n"
-            f"[pause {ANSWER_PAUSE_SECONDS:.0f}s]\n"
-            f"{self.parse_speech}\n"
-            f"[pause {SOURCE_GAP_SECONDS:.2f}s]\n"
-            f"{self.source_speech}\n"
-            f"[pause {OUTRO_GAP_SECONDS:.1f}s]\n"
-            f"{self.outro_speech}"
-        )
+        lines = [
+            self.intro_speech,
+            self.clue_speech,
+            self.letters_speech,
+            f"[pause {LETTERS_PAUSE_SECONDS:.0f}s]",
+            self.think_speech,
+            f"[pause {THINK_PAUSE_SECONDS:.0f}s]",
+            self.hint_speech,
+            f"[pause {HINT_HOLD_SECONDS:.0f}s]",
+            f"[pause {HINT_PAUSE_SECONDS:.1f}s]",
+            self.answer_speech,
+            f"[pause {ANSWER_PAUSE_SECONDS:.0f}s]",
+            self.parse_speech,
+        ]
+        if self.source_speech:
+            lines.append(f"[pause {SOURCE_GAP_SECONDS:.2f}s]")
+            lines.append(self.source_speech)
+        lines.append(f"[pause {OUTRO_GAP_SECONDS:.1f}s]")
+        lines.append(self.outro_speech)
+        return "\n".join(lines)
+
+
+def speak_paper(paper: str) -> str:
+    """Say the paper the way a person would: the Guardian, the Financial Times."""
+    name = (paper or "").strip()
+    if not name:
+        return ""
+    if name.lower().startswith("the "):
+        return name
+    return f"the {name}"
+
+
+def speak_intro(clue: Clue) -> str:
+    """Andrew's invite: we are AI, then the paper and setter once."""
+    paper = speak_paper(clue.paper)
+    setter = (clue.setter or "").strip()
+    if paper and setter:
+        source = f"Today's clue is from {paper}, by {setter}."
+    elif paper:
+        source = f"Today's clue is from {paper}."
+    elif setter:
+        source = f"Today's clue is by {setter}."
+    else:
+        source = "Today's clue is from the papers."
+    return f"{INTRO_LINE} {source}"
 
 
 def speak_source(clue: Clue) -> str:
-    """Credit the setter and the paper."""
-    setter = (clue.setter or "").strip()
-    paper = (clue.paper or "").strip()
-    if setter and paper:
-        credit = f"That's {setter}, in the {paper}."
-    elif setter:
-        credit = f"That's {setter}."
-    elif paper:
-        credit = f"That's the {paper}."
-    else:
-        credit = "That's the setter."
-    return credit
+    """Paper and setter are in the invite. Do not credit them again at the end."""
+    del clue
+    return ""
 
 
 def write_parts(clue: Clue) -> ScriptParts:
@@ -270,7 +288,7 @@ def write_parts(clue: Clue) -> ScriptParts:
         gloss = clue.definition.strip(" .")
         meaning = f" {gloss[0].upper()}{gloss[1:]}."
     return ScriptParts(
-        intro_speech=_strip_site_code(INTRO_LINE),
+        intro_speech=_strip_site_code(speak_intro(clue)),
         clue_speech=_strip_site_code(f"{clue.clue}."),
         letters_speech=_strip_site_code(speak_enumeration(clue.enumeration)),
         think_speech=_strip_site_code(THINK_PROMPT),
@@ -314,7 +332,7 @@ def to_ssml(parts: ScriptParts, pause_seconds: float | None = None) -> str:
     answer_ms = int(ANSWER_PAUSE_SECONDS * 1000)
     source_ms = int(SOURCE_GAP_SECONDS * 1000)
     outro_ms = int(OUTRO_GAP_SECONDS * 1000)
-    return (
+    ssml = (
         '<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="en-GB">'
         f"{html.escape(parts.intro_speech, quote=False)}"
         f'<break time="{intro_ms}ms"/>'
@@ -330,9 +348,15 @@ def to_ssml(parts: ScriptParts, pause_seconds: float | None = None) -> str:
         f"{html.escape(parts.answer_speech, quote=False)}"
         f'<break time="{answer_ms}ms"/>'
         f"{html.escape(parts.parse_speech, quote=False)}"
-        f'<break time="{source_ms}ms"/>'
-        f"{html.escape(parts.source_speech, quote=False)}"
+    )
+    if parts.source_speech:
+        ssml += (
+            f'<break time="{source_ms}ms"/>'
+            f"{html.escape(parts.source_speech, quote=False)}"
+        )
+    ssml += (
         f'<break time="{outro_ms}ms"/>'
         f"{html.escape(parts.outro_speech, quote=False)}"
         "</speak>"
     )
+    return ssml

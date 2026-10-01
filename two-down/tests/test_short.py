@@ -21,6 +21,8 @@ from twodown.pipeline import (
 from twodown.script import (
     speak_answer,
     speak_enumeration,
+    speak_intro,
+    speak_paper,
     speak_parse_asides,
     speak_parse_tokens,
     speak_source,
@@ -31,7 +33,8 @@ from twodown.voice import _speech_sentences, build_short_soundtrack, synthesise,
 
 def test_solver_voice_is_cryptic_croc():
     assert DEFAULT_VOICE_ALIAS == "croc"
-    assert VOICES["croc"] == "en-US-JennyNeural"
+    assert VOICES["croc"] == "en-US-AvaNeural"
+    assert VOICES["andrew"] == "en-US-AndrewNeural"
     assert VOICE_RATE == "+0%"
 
 
@@ -84,7 +87,11 @@ def test_study_clue_is_mass_media():
     assert "struggling" in clue.parse.lower()
     assert "mess" in clue.parse.lower()
     parts = write_parts(clue)
-    assert parts.intro_speech == "Solve it, I know you can. Here's Cryptic Croc."
+    assert parts.intro_speech == (
+        "Hi, here is your daily dose of AI cryptic clues. "
+        "Today's clue is from the Financial Times, by Arrietty."
+    )
+    assert parts.intro_speech == speak_intro(clue)
     assert parts.clue_speech == "Maid struggling with a mess — newspapers etc."
     assert parts.letters_speech == "Four, five."
     assert parts.think_speech == "Have a think."
@@ -93,12 +100,13 @@ def test_study_clue_is_mass_media():
     assert parts.hint_speech.endswith(HINT_LOOK)
     assert parts.hint_speech == "Here's a hint."
     assert HINT_VOICE_ALIAS == "croc"
-    assert INTRO_VOICE_ALIAS == "ryan"
-    assert VOICES[INTRO_VOICE_ALIAS] == "en-GB-RyanNeural"
+    assert INTRO_VOICE_ALIAS == "andrew"
+    assert VOICES[INTRO_VOICE_ALIAS] == "en-US-AndrewNeural"
     assert DEFAULT_VOICE_ALIAS == "croc"
-    assert VOICES["croc"] == "en-US-JennyNeural"
-    assert INTRO_LINE.startswith("Solve it, I know you can.")
-    assert "Here's Cryptic Croc." in INTRO_LINE
+    assert VOICES["croc"] == "en-US-AvaNeural"
+    assert INTRO_LINE == "Hi, here is your daily dose of AI cryptic clues."
+    assert "Here's Cryptic Croc." not in INTRO_LINE
+    assert "Here's Cryptic Croc." not in parts.intro_speech
     assert CLUE_RATE.startswith("-")
     assert CLUE_PITCH == "+0Hz"
     assert INTRO_RATE == "+0%"
@@ -107,8 +115,9 @@ def test_study_clue_is_mass_media():
     assert parts.outro_speech == "That was cryptic.fit."
     assert "Brendan" not in parts.parse_speech
     assert "Fifteen Squared" not in parts.parse_speech
-    assert parts.source_speech == "That's Arrietty, in the Financial Times."
-    assert "Fifteen Squared" not in parts.source_speech
+    assert parts.source_speech == ""
+    assert "That's Arrietty" not in parts.full
+    assert "Fifteen Squared" not in parts.full
     script = parts.full
     assert script.index(parts.intro_speech) < script.index(parts.clue_speech)
     assert script.index(parts.clue_speech) < script.index(parts.letters_speech)
@@ -119,8 +128,10 @@ def test_study_clue_is_mass_media():
     assert script.index("[pause 2s]") < script.index("[pause 0.8s]")
     assert script.index("[pause 0.8s]") < script.index(parts.answer_speech)
     assert script.index(parts.answer_speech) < script.index(parts.parse_speech)
-    assert script.index(parts.parse_speech) < script.index(parts.source_speech)
-    assert script.index(parts.source_speech) < script.index(parts.outro_speech)
+    assert script.index(parts.parse_speech) < script.index(parts.outro_speech)
+    assert "Financial Times" in parts.intro_speech
+    assert "Arrietty" in parts.intro_speech
+    assert script.rstrip().endswith(parts.outro_speech)
 
 
 def test_speak_answer_rasta_is_a_word():
@@ -130,14 +141,26 @@ def test_speak_answer_rasta_is_a_word():
     assert "R-A-S-T-A" not in speak_answer("RASTA")
 
 
-def test_source_credit_is_its_own_line():
+def test_source_credit_is_only_in_the_invite():
     clue = rasta_clue()
-    assert speak_source(clue) == "That's Brendan, in the Guardian."
+    assert speak_paper("Guardian") == "the Guardian"
+    assert speak_paper("Independent") == "the Independent"
+    assert speak_paper("Financial Times") == "the Financial Times"
+    assert speak_paper("Independent on Sunday") == "the Independent on Sunday"
+    assert speak_intro(clue) == (
+        "Hi, here is your daily dose of AI cryptic clues. "
+        "Today's clue is from the Guardian, by Brendan."
+    )
+    assert speak_source(clue) == ""
     assert SOURCE_VOICE_ALIAS == "croc"
     parts = write_parts(clue)
+    assert parts.source_speech == ""
     assert parts.source_speech == speak_source(clue)
+    assert "That's Brendan" not in parts.full
     assert "Fifteen Squared" not in parts.parse_speech
     assert parts.outro_speech == "That was cryptic.fit."
+    assert "Guardian" in parts.intro_speech
+    assert "Brendan" in parts.intro_speech
 
 
 def test_spoken_parse_says_mass_media_as_words():
