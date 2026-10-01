@@ -87,6 +87,64 @@ def test_letter_spans_rejoin():
     assert _smart_strings(node) == "clie"
 
 
+def test_parse_fts_group_blocks():
+    html = (FIXTURES / "independent_fts.html").read_text(encoding="utf-8")
+    clues = parse_post(_post(html, paper="Independent", puzzle_id="12475", setter="Umpire"))
+    by_slug = {c.slug: c for c in clues}
+    monarchs = by_slug["independent-12475-1a"]
+    assert monarchs.answer == "MONARCHS"
+    assert monarchs.enumeration == "8"
+    assert monarchs.enumeration_ok
+    assert monarchs.direction == "across"
+    assert monarchs.definition == "butterflies"
+    assert "NHS" in monarchs.parse
+    assert monarchs.skipped_reason is None
+    oatmeal = by_slug["independent-12475-2d"]
+    assert oatmeal.answer == "OATMEAL"
+    assert oatmeal.direction == "down"
+    assert oatmeal.definition == "breakfast"
+
+
+def test_parse_paragraph_clues():
+    html = (FIXTURES / "guardian_paragraphs.html").read_text(encoding="utf-8")
+    clues = parse_post(_post(html, paper="Guardian", puzzle_id="30125", setter="Imogen"))
+    by_num = {(c.number, c.direction): c for c in clues}
+    cassava = by_num[("1", "across")]
+    assert cassava.answer == "CASSAVA"
+    assert cassava.enumeration == "7"
+    assert cassava.enumeration_ok
+    assert cassava.definition == "Starch"
+    assert "CAVA" in cassava.parse
+    assert cassava.skipped_reason is None
+    shakers = by_num[("5", "across")]
+    assert shakers.answer == "SHAKERS"
+    assert shakers.device == "double_def"
+    cut = by_num[("1", "down")]
+    assert cut.answer == "CUT UP"
+    assert cut.enumeration == "3,2"
+    assert cut.enumeration_ok
+
+
+def test_parse_inline_enum_and_parse_in_same_cell():
+    html = """
+    <table><tbody>
+    <tr><td colspan="3">ACROSS</td></tr>
+    <tr>
+      <td>1</td>
+      <td>CRISIS</td>
+      <td>Plight of conflicted Republican heads leading double lives (6) First letters</td>
+    </tr>
+    </tbody></table>
+    """
+    clue = next(c for c in parse_post(_post(html, paper="Guardian", puzzle_id="30123", setter="Brummie")))
+    assert clue.answer == "CRISIS"
+    assert clue.enumeration == "6"
+    assert clue.enumeration_ok
+    assert clue.clue == "Plight of conflicted Republican heads leading double lives"
+    assert clue.parse == "First letters"
+    assert clue.skipped_reason is None
+
+
 def test_parse_three_column_skips_see_n():
     html = (FIXTURES / "guardian_three_col.html").read_text(encoding="utf-8")
     clues = parse_post(_post(html, paper="Guardian", puzzle_id="30108", setter="Paul"))

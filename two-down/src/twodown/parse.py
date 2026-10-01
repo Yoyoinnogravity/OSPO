@@ -135,6 +135,31 @@ def _split_enumeration(clue: str) -> tuple[str, str]:
     return _clean(clue[: match.start()]), match.group(1).replace(" ", "")
 
 
+def _split_clue_and_rest(text: str) -> tuple[str, str, str]:
+    """Clue, enumeration, leftover parse when the enum sits mid-cell."""
+    match = FIRST_ENUM.search(text)
+    if not match:
+        return _clean(text), "", ""
+    return (
+        _clean(text[: match.start()]),
+        match.group(1).replace(" ", ""),
+        _clean(text[match.end() :]),
+    )
+
+
+def _has_class(node: Tag | None, name: str) -> bool:
+    if node is None:
+        return False
+    return name in (node.get("class") or [])
+
+
+def _numbered_lead(text: str) -> tuple[str, str] | None:
+    match = re.match(r"^(\d+[a-zA-Z]?)\.?\s+", text)
+    if not match:
+        return None
+    return match.group(1), text[match.end() :]
+
+
 def _enumeration_ok(answer: str, enumeration: str) -> bool:
     parts = [int(p) for p in re.findall(r"\d+", enumeration)]
     words = [w for w in re.split(r"[ \-]+", answer.upper()) if w]
@@ -235,6 +260,10 @@ def parse_post(post: PuzzlePost) -> list[Clue]:
     clues: list[Clue] = []
     for table in soup.find_all("table"):
         clues.extend(_parse_table(post, table))
+    if not clues:
+        clues.extend(_parse_fts_blocks(post, soup))
+    if not clues:
+        clues.extend(_parse_paragraph_clues(post, soup))
     return clues
 
 
@@ -259,15 +288,18 @@ def _parse_table(post: PuzzlePost, table: Tag) -> list[Clue]:
             i += 1
             continue
 
-        # Format B: number | ANSWER | clue, parse on the following row.
+        # Format B: number | ANSWER | clue, parse on the following row
+        # or leftover after the enumeration in the same cell.
         if len(cells) >= 3 and _is_number(texts[0]) and _looks_like_answer(texts[1]):
-            clue_text, enumeration = _split_enumeration(texts[2])
-            parse = ""
+            clue_text, enumeration, leftover = _split_clue_and_rest(texts[2])
+            parse = leftover
             if i + 1 < len(rows):
                 nxt = rows[i + 1].find_all(["td", "th"], recursive=False)
                 nxt_text = [_cell_text(c) for c in nxt]
                 if not (nxt_text and _is_number(nxt_text[0])):
-                    parse = nxt_text[-1] if nxt_text else ""
+                    following = nxt_text[-1] if nxt_text else ""
+                    if following:
+                        parse = following
                     i += 1
             definition = _underlined(cells[2])
             clues.append(
@@ -304,6 +336,95 @@ def _parse_table(post: PuzzlePost, table: Tag) -> list[Clue]:
             continue
 
         i += 1
+    return clues
+
+
+def _parse_fts_blocks(post: PuzzlePost, soup: BeautifulSoup) -> list[Clue]:
+    """Independent / FT blogs that list clues in fts-group / fts-subgroup divs."""
+    clues: list[Clue] = []
+    direction = "across"
+    for group in soup.select("div.fts-group"):
+        subgroups = [
+            child
+            for child in group.find_all("div", recursive=False)
+            if _has_class(child, "fts-subgroup")
+        ]
+        if not subgroups:
+            heading = _cell_text(group)
+            direction = _direction_from(heading, direction)
+            continue
+        if len(subgroups) < 2:
+            continue
+        lead = _numbered_lead(_cell_text(subgroups[0]))
+        if lead is None:
+            continue
+        number, rest = lead
+        clue_text, enumeration, leftover = _split_clue_and_rest(rest)
+        if not enumeration:
+            clue_text, enumeration = _split_enumeration(rest)
+            leftover = ""
+        answer = _clean(_cell_text(subgroups[1])).upper()
+        parse = _cell_text(subgroups[2]) if len(subgroups) > 2 else leftover
+        clues.append(
+            _make_clue(
+                post,
+                number=number,
+                direction=direction,
+                clue=clue_text,
+                enumeration=enumeration,
+                answer=answer,
+                definition=_underlined(subgroups[0]),
+                parse=parse,
+            )
+        )
+    return clues
+
+
+def _parse_paragraph_clues(post: PuzzlePost, soup: BeautifulSoup) -> list[Clue]:
+    """Guardian / IoS blogs that put number, clue, answer and parse in one <p>."""
+    clues: list[Clue] = []
+    direction = "across"
+    for para in soup.find_all("p"):
+        text = _cell_text(para)
+        if not text:
+            continue
+        if text.lower() in SECTION_NAMES:
+            direction = text.lower()
+            continue
+        lead = _numbered_lead(text)
+        if lead is None:
+            continue
+        number, rest = lead
+        answer = None
+        for strong in para.find_all("strong"):
+            candidate = _clean(strong.get_text(" ", strip=True)).upper()
+            if _looks_like_answer(candidate):
+                answer = candidate
+                break
+        if not answer:
+            continue
+        idx = rest.upper().find(answer)
+        if idx < 0:
+            continue
+        clue_part = rest[:idx]
+        parse = rest[idx + len(answer) :]
+        clue_text, enumeration, leftover = _split_clue_and_rest(clue_part)
+        if leftover:
+            parse = f"{leftover} {parse}".strip()
+        if not enumeration:
+            clue_text, enumeration = _split_enumeration(clue_part)
+        clues.append(
+            _make_clue(
+                post,
+                number=number,
+                direction=direction,
+                clue=clue_text,
+                enumeration=enumeration,
+                answer=answer,
+                definition=_underlined(para),
+                parse=parse,
+            )
+        )
     return clues
 
 
