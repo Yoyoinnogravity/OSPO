@@ -119,44 +119,48 @@ def test_script_credits_the_setter_and_paper():
     assert "The clue:" not in parts.clue_speech
     assert "(" not in parts.clue_speech
     assert parts.letters_speech == speak_enumeration(clue.enumeration)
-    assert parts.think_speech == "Go on. Think. I can wait."
-    assert parts.hint_speech == "Stuck already? Look at this."
+    assert parts.think_speech == "Have a think."
+    assert parts.hint_speech == "Here's a hint."
     assert parts.answer_speech == speak_answer(clue.answer)
-    assert parts.answer_speech == "Obviously it's end result."
+    assert parts.answer_speech == "It's end result."
     assert "end result" in parts.breakdown
     assert "Fifteen Squared" not in parts.parse_speech
     assert "Fifteen Squared" not in parts.source_speech
     assert "Independent" in parts.source_speech
     assert "Phi" in parts.source_speech
-    assert parts.outro_speech == "That was cryptic.fit. Try to keep up."
+    assert parts.outro_speech == "That was cryptic.fit."
     assert script.index(parts.intro_speech) < script.index(parts.clue_speech)
     assert script.index(parts.clue_speech) < script.index(parts.letters_speech)
     assert script.index(parts.letters_speech) < script.index("[pause 1s]")
     assert script.index("[pause 1s]") < script.index(parts.think_speech)
-    assert script.index(parts.think_speech) < script.index("[pause 7s]")
-    assert script.index("[pause 7s]") < script.index(parts.hint_speech)
-    assert script.index(parts.hint_speech) < script.index("[pause 4s]")
-    assert script.index("[pause 4s]") < script.index("[pause 2.5s]")
-    assert script.index("[pause 2.5s]") < script.index(parts.answer_speech)
+    assert script.index(parts.think_speech) < script.index("[pause 3s]")
+    assert script.index("[pause 3s]") < script.index(parts.hint_speech)
+    assert script.index(parts.hint_speech) < script.index("[pause 2s]")
+    assert script.index("[pause 2s]") < script.index("[pause 0.8s]")
+    assert script.index("[pause 0.8s]") < script.index(parts.answer_speech)
     assert script.index(parts.answer_speech) < script.index(parts.parse_speech)
     assert script.index(parts.parse_speech) < script.index(parts.source_speech)
     assert script.index(parts.source_speech) < script.index(parts.outro_speech)
     ssml = to_ssml(parts)
+    first_800 = ssml.index('break time="800ms"')
+    second_800 = ssml.index('break time="800ms"', first_800 + 1)
+    third_800 = ssml.index('break time="800ms"', second_800 + 1)
+    first_250 = ssml.index('break time="250ms"')
+    second_250 = ssml.index('break time="250ms"', first_250 + 1)
+    first_300 = ssml.index('break time="300ms"')
+    second_300 = ssml.index('break time="300ms"', first_300 + 1)
     assert ssml.index(parts.intro_speech) < ssml.index(parts.clue_speech)
-    assert ssml.index(parts.clue_speech) < ssml.index('break time="350ms"')
-    assert ssml.index('break time="350ms"') < ssml.index(parts.letters_speech)
-    assert ssml.index(parts.letters_speech) < ssml.index('break time="1000ms"')
-    assert ssml.index('break time="1000ms"') < ssml.index(parts.think_speech)
-    assert ssml.index(parts.think_speech) < ssml.index('break time="7000ms"')
-    assert ssml.index('break time="7000ms"') < ssml.index(parts.hint_speech)
-    assert ssml.index(parts.hint_speech) < ssml.index('break time="4000ms"')
-    assert ssml.index('break time="4000ms"') < ssml.index('break time="2500ms"')
-    assert ssml.index('break time="2500ms"') < ssml.index(parts.answer_speech)
-    assert ssml.index(parts.answer_speech) < ssml.index('break time="1200ms"')
-    assert ssml.index('break time="1200ms"') < ssml.index(parts.parse_speech)
+    assert ssml.index(parts.intro_speech) < first_300 < ssml.index(parts.clue_speech)
+    assert ssml.index(parts.clue_speech) < first_250 < ssml.index(parts.letters_speech)
+    assert ssml.index(parts.letters_speech) < first_800 < ssml.index(parts.think_speech)
+    assert ssml.index(parts.think_speech) < ssml.index('break time="3000ms"')
+    assert ssml.index('break time="3000ms"') < ssml.index(parts.hint_speech)
+    assert ssml.index(parts.hint_speech) < ssml.index('break time="2000ms"')
+    assert ssml.index('break time="2000ms"') < second_800 < ssml.index(parts.answer_speech)
+    assert ssml.index(parts.answer_speech) < third_800 < ssml.index(parts.parse_speech)
     assert ssml.index(parts.parse_speech) < ssml.index(parts.source_speech)
-    assert ssml.index(parts.source_speech) < ssml.index('break time="400ms"')
-    assert ssml.index('break time="400ms"') < ssml.index(parts.outro_speech)
+    assert ssml.index(parts.parse_speech) < second_250 < ssml.index(parts.source_speech)
+    assert ssml.index(parts.source_speech) < second_300 < ssml.index(parts.outro_speech)
     assert "Fifteen Squared" not in parts.source_speech
     assert "Independent" in parts.source_speech
 

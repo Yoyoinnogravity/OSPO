@@ -21,12 +21,12 @@ CRAWL_GAP_SECONDS = 1.0
 
 DAILY_CATEGORY_SLUGS = frozenset({"independent", "ft", "guardian"})
 
-# Cryptic Croc is a grown woman: Emma’s clear American read, Friends-plain,
-# with a quicker South Park snap. Maisie stays off — she sounded like a child.
+# Cryptic Croc is Jenny: a grown American woman, even and easy to follow.
+# Ryan invites at a normal pace. Maisie stays off.
 # Sonia, Libby, Ryan and Thomas stay available as alternate voices.
 DEFAULT_VOICE_ALIAS = "croc"
 VOICES = {
-    "croc": "en-US-EmmaNeural",
+    "croc": "en-US-JennyNeural",
     "sonia": "en-GB-SoniaNeural",
     "libby": "en-GB-LibbyNeural",
     "ryan": "en-GB-RyanNeural",
@@ -39,59 +39,57 @@ VOICE_LABELS = {
     "ryan": "Ryan",
     "thomas": "Thomas",
 }
-# Punchier than a sitcom read, still slow enough to catch every word.
-VOICE_RATE = "+8%"
-VOICE_PITCH = "+4Hz"
-VOICE_VOLUME = "+7%"
-# She presents the clue with a bit more snap.
-CLUE_RATE = "+12%"
-CLUE_PITCH = "+6Hz"
-CLUE_VOLUME = "+8%"
-LETTERS_RATE = "+4%"
-LETTERS_PITCH = "+4Hz"
-THINK_RATE = "+2%"
+# Conversational. No snap, no raised pitch.
+VOICE_RATE = "+0%"
+VOICE_PITCH = "+0Hz"
+VOICE_VOLUME = "+2%"
+# The clue is a little slower so it can be written down.
+CLUE_RATE = "-5%"
+CLUE_PITCH = "+0Hz"
+CLUE_VOLUME = "+2%"
+LETTERS_RATE = "-2%"
+LETTERS_PITCH = "+0Hz"
+THINK_RATE = "-4%"
 THINK_PITCH = "+0Hz"
-HINT_RATE = "+10%"
-HINT_PITCH = "+6Hz"
-HINT_VOLUME = "+8%"
-ANSWER_RATE = "+8%"
-ANSWER_PITCH = "+4Hz"
-# Parse stays a touch slower so the wordplay lands.
-PARSE_RATE = "+0%"
-PARSE_PITCH = "+2Hz"
-PARSE_ASIDE_PAUSE_SECONDS = 0.7
+HINT_RATE = "+0%"
+HINT_PITCH = "+0Hz"
+HINT_VOLUME = "+2%"
+ANSWER_RATE = "+0%"
+ANSWER_PITCH = "+0Hz"
+# Parse stays slower so the wordplay lands.
+PARSE_RATE = "-6%"
+PARSE_PITCH = "+0Hz"
+PARSE_ASIDE_PAUSE_SECONDS = 0.35
 TAGLINE = "Solve it, I know you can."
-# Ryan invites, upbeat. Cryptic Croc then presents the clue.
+# Ryan invites, then Cryptic Croc presents the clue.
 INTRO_LINE = f"{TAGLINE} Here's Cryptic Croc."
 INTRO_VOICE_ALIAS = "ryan"
-INTRO_RATE = "+10%"
-INTRO_PITCH = "+8Hz"
-INTRO_VOLUME = "+8%"
-INTRO_GAP_SECONDS = 0.45
-OUTRO_LINE = "That was cryptic.fit. Try to keep up."
+INTRO_RATE = "+0%"
+INTRO_PITCH = "+0Hz"
+INTRO_VOLUME = "+2%"
+INTRO_GAP_SECONDS = 0.3
+OUTRO_LINE = "That was cryptic.fit."
 OUTRO_VOICE_ALIAS = "croc"
 OUTRO_RATE = "+0%"
 OUTRO_PITCH = "+0Hz"
-OUTRO_VOLUME = "+4%"
-OUTRO_GAP_SECONDS = 0.4
-# She names the setter too, a little steadier than the solve.
+OUTRO_VOLUME = "+2%"
+OUTRO_GAP_SECONDS = 0.3
 SOURCE_VOICE_ALIAS = "croc"
-SOURCE_RATE = "-2%"
-SOURCE_PITCH = "+2Hz"
-SOURCE_VOLUME = "+4%"
-SOURCE_GAP_SECONDS = 0.35
-THINK_PAUSE_SECONDS = 7.0
-CLUE_LETTERS_GAP_SECONDS = 0.35
-LETTERS_PAUSE_SECONDS = 1.0
-ANSWER_PAUSE_SECONDS = 1.2
-THINK_PROMPT = "Go on. Think. I can wait."
-# Cryptic Croc offers a clue, then points at the picture.
-HINT_OFFER = "Stuck already?"
-HINT_LOOK = "Look at this."
-HINT_LINE = f"{HINT_OFFER} {HINT_LOOK}"
+SOURCE_RATE = "-4%"
+SOURCE_PITCH = "+0Hz"
+SOURCE_VOLUME = "+2%"
+SOURCE_GAP_SECONDS = 0.25
+THINK_PAUSE_SECONDS = 3.0
+CLUE_LETTERS_GAP_SECONDS = 0.25
+LETTERS_PAUSE_SECONDS = 0.8
+ANSWER_PAUSE_SECONDS = 0.8
+THINK_PROMPT = "Have a think."
+HINT_OFFER = "Here's a hint."
+HINT_LOOK = "Here's a hint."
+HINT_LINE = "Here's a hint."
 HINT_VOICE_ALIAS = "croc"
-HINT_HOLD_SECONDS = 4.0
-HINT_PAUSE_SECONDS = 2.5
+HINT_HOLD_SECONDS = 2.0
+HINT_PAUSE_SECONDS = 0.8
 CLUES_PER_DAY = 2
 # Lock the spoken beat on this constructed study clue before touching the others.
 # MASS MEDIA is FT 18483 1 across; twodown short rebuilds this clue only.

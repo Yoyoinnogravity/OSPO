@@ -27,8 +27,8 @@ from twodown.voice import _speech_sentences
 
 def test_solver_voice_is_cryptic_croc():
     assert DEFAULT_VOICE_ALIAS == "croc"
-    assert VOICES["croc"] == "en-US-EmmaNeural"
-    assert VOICE_RATE == "+8%"
+    assert VOICES["croc"] == "en-US-JennyNeural"
+    assert VOICE_RATE == "+0%"
 
 
 def test_parse_is_split_into_spoken_sentences():
@@ -56,9 +56,9 @@ def test_study_clue_is_mass_media():
     assert clue.blogger == "Turbolegs"
     assert clue.definition == "newspapers, the press"
     assert clue.hint_line == HINT_LINE
-    assert HINT_OFFER == "Stuck already?"
-    assert HINT_LOOK == "Look at this."
-    assert clue.hint_line == "Stuck already? Look at this."
+    assert HINT_OFFER == "Here's a hint."
+    assert HINT_LOOK == "Here's a hint."
+    assert clue.hint_line == "Here's a hint."
     assert clue.hint_image == "assets/hints/papers-still.webp"
     assert clue.source_url == (
         "https://fifteensquared.net/2026/09/18/financial-times-18483-by-arrietty/"
@@ -68,45 +68,45 @@ def test_study_clue_is_mass_media():
     parts = write_parts(clue)
     assert parts.intro_speech == "Solve it, I know you can. Here's Cryptic Croc."
     assert parts.clue_speech == "Maid struggling with a mess — newspapers etc."
-    assert parts.letters_speech == "Four, five. Do try to count."
-    assert parts.think_speech == "Go on. Think. I can wait."
+    assert parts.letters_speech == "Four, five."
+    assert parts.think_speech == "Have a think."
     assert parts.hint_speech == HINT_LINE
     assert parts.hint_speech.startswith(HINT_OFFER)
     assert parts.hint_speech.endswith(HINT_LOOK)
-    assert parts.hint_speech == "Stuck already? Look at this."
+    assert parts.hint_speech == "Here's a hint."
     assert HINT_VOICE_ALIAS == "croc"
     assert INTRO_VOICE_ALIAS == "ryan"
     assert VOICES[INTRO_VOICE_ALIAS] == "en-GB-RyanNeural"
     assert DEFAULT_VOICE_ALIAS == "croc"
-    assert VOICES["croc"] == "en-US-EmmaNeural"
+    assert VOICES["croc"] == "en-US-JennyNeural"
     assert INTRO_LINE.startswith("Solve it, I know you can.")
     assert "Here's Cryptic Croc." in INTRO_LINE
-    assert CLUE_RATE.startswith("+")
-    assert CLUE_PITCH.startswith("+")
-    assert INTRO_RATE.startswith("+")
-    assert parts.answer_speech == "Obviously it's mass media."
+    assert CLUE_RATE.startswith("-")
+    assert CLUE_PITCH == "+0Hz"
+    assert INTRO_RATE == "+0%"
+    assert parts.answer_speech == "It's mass media."
     assert parts.answer_speech == speak_answer(clue.answer)
-    assert parts.outro_speech == "That was cryptic.fit. Try to keep up."
+    assert parts.outro_speech == "That was cryptic.fit."
     assert "Brendan" not in parts.parse_speech
     assert "Fifteen Squared" not in parts.parse_speech
-    assert parts.source_speech == "That's Arrietty, in the Financial Times. You're welcome."
+    assert parts.source_speech == "That's Arrietty, in the Financial Times."
     assert "Fifteen Squared" not in parts.source_speech
     script = parts.full
     assert script.index(parts.intro_speech) < script.index(parts.clue_speech)
     assert script.index(parts.clue_speech) < script.index(parts.letters_speech)
     assert script.index(parts.letters_speech) < script.index(parts.think_speech)
-    assert script.index(parts.think_speech) < script.index("[pause 7s]")
-    assert script.index("[pause 7s]") < script.index(parts.hint_speech)
-    assert script.index(parts.hint_speech) < script.index("[pause 4s]")
-    assert script.index("[pause 4s]") < script.index("[pause 2.5s]")
-    assert script.index("[pause 2.5s]") < script.index(parts.answer_speech)
+    assert script.index(parts.think_speech) < script.index("[pause 3s]")
+    assert script.index("[pause 3s]") < script.index(parts.hint_speech)
+    assert script.index(parts.hint_speech) < script.index("[pause 2s]")
+    assert script.index("[pause 2s]") < script.index("[pause 0.8s]")
+    assert script.index("[pause 0.8s]") < script.index(parts.answer_speech)
     assert script.index(parts.answer_speech) < script.index(parts.parse_speech)
     assert script.index(parts.parse_speech) < script.index(parts.source_speech)
     assert script.index(parts.source_speech) < script.index(parts.outro_speech)
 
 
 def test_speak_answer_rasta_is_a_word():
-    assert speak_answer("RASTA") == "Obviously it's rasta."
+    assert speak_answer("RASTA") == "It's rasta."
     assert speak_answer("RASTA") != "The answer is R-A-S-T-A."
     assert "rasta" in speak_answer("RASTA")
     assert "R-A-S-T-A" not in speak_answer("RASTA")
@@ -114,12 +114,12 @@ def test_speak_answer_rasta_is_a_word():
 
 def test_source_credit_is_its_own_line():
     clue = rasta_clue()
-    assert speak_source(clue) == "That's Brendan, in the Guardian. You're welcome."
+    assert speak_source(clue) == "That's Brendan, in the Guardian."
     assert SOURCE_VOICE_ALIAS == "croc"
     parts = write_parts(clue)
     assert parts.source_speech == speak_source(clue)
     assert "Fifteen Squared" not in parts.parse_speech
-    assert parts.outro_speech == "That was cryptic.fit. Try to keep up."
+    assert parts.outro_speech == "That was cryptic.fit."
 
 
 def test_spoken_parse_says_mass_media_as_words():
@@ -140,8 +140,8 @@ def test_spoken_parse_says_mass_media_as_words():
 def test_five_three_letters():
     clue = davis_cup_clue()
     assert clue.enumeration == "5,3"
-    assert speak_enumeration("5,3") == "Five, three. Do try to count."
-    assert speak_enumeration(clue.enumeration) == "Five, three. Do try to count."
+    assert speak_enumeration("5,3") == "Five, three."
+    assert speak_enumeration(clue.enumeration) == "Five, three."
 
 
 def test_spoken_parse_says_aimlessly_as_a_word():
@@ -267,8 +267,8 @@ def test_dreamlike_stays_constructable():
     clue = dreamlike_clue()
     assert clue.answer == "DREAMLIKE"
     assert clue.slug == "guardian-30115-12a"
-    assert speak_answer("DREAMLIKE") == "Obviously it's dreamlike."
-    assert speak_enumeration("9") == "Nine letters. Do try to count."
+    assert speak_answer("DREAMLIKE") == "It's dreamlike."
+    assert speak_enumeration("9") == "Nine letters."
     parts = write_parts(clue)
     assert "armed" in parts.parse_speech
     assert "like" in parts.parse_speech

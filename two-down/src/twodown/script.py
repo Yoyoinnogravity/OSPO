@@ -86,8 +86,8 @@ def speak_enumeration(enumeration: str) -> str:
     text = " ".join(spoken).replace(" ,", ",")
     count = text[:1].upper() + text[1:].lower()
     if len(numbers) == 1 and "-" not in raw and "," not in raw:
-        return f"{count} letters. Do try to count."
-    return f"{count}. Do try to count."
+        return f"{count} letters."
+    return f"{count}."
 
 
 # ALL-CAPS crossword lights/fodder (PIN-UP, PUP, END RESULT). Leave numbers
@@ -105,7 +105,7 @@ def speak_answer(answer: str) -> str:
     spoken = speak_construction(answer)
     if not spoken:
         return "Work it out."
-    return f"Obviously it's {spoken}."
+    return f"It's {spoken}."
 
 
 def speak_parse_tokens(text: str) -> str:
@@ -260,7 +260,7 @@ def speak_source(clue: Clue) -> str:
         credit = f"That's the {paper}."
     else:
         credit = "That's the setter."
-    return f"{credit} You're welcome."
+    return credit
 
 
 def write_parts(clue: Clue) -> ScriptParts:
