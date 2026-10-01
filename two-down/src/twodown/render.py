@@ -504,7 +504,8 @@ def _motion_clip(clue: Clue, beat: str, seconds: float, folder: Path) -> Path:
     if not ffmpeg:
         raise RuntimeError("ffmpeg is required to build the Short")
     seconds = max(float(seconds), 0.24)
-    frames = max(4, int(round(seconds * 6)))
+    fps = 6
+    frames = max(4, int(round(seconds * fps)))
     if folder.exists():
         shutil.rmtree(folder)
     folder.mkdir(parents=True, exist_ok=True)
@@ -519,11 +520,17 @@ def _motion_clip(clue: Clue, beat: str, seconds: float, folder: Path) -> Path:
             ffmpeg,
             "-y",
             "-framerate",
-            f"{frames / seconds:.5f}",
+            str(fps),
             "-i",
             str(folder / "%04d.png"),
             "-frames:v",
             str(frames),
+            "-t",
+            f"{seconds:.5f}",
+            "-r",
+            str(fps),
+            "-video_track_timescale",
+            "6000",
             "-c:v",
             "libx264",
             "-pix_fmt",
@@ -541,28 +548,44 @@ def _motion_clip(clue: Clue, beat: str, seconds: float, folder: Path) -> Path:
 
 
 def _concat_motion(clips: list[Path], audio: Path, dest: Path) -> Path:
+    """Join croc clips on a shared clock so the picture matches the voice.
+
+    The concat demuxer ignores per-clip duration when timebases differ, and
+    the picture then overruns the soundtrack. Filter concat keeps each hold.
+    """
     ffmpeg = shutil.which("ffmpeg")
     if not ffmpeg:
         raise RuntimeError("ffmpeg is required to build the Short")
-    listing = dest.with_suffix(".concat.txt")
-    listing.write_text("".join(f"file '{path}'\n" for path in clips), encoding="utf-8")
+    if not clips:
+        raise ValueError("need motion clips to build the Short")
     hold = max(_ffprobe_seconds(audio), 1.0)
-    subprocess.run(
+    listing = dest.with_suffix(".concat.txt")
+    lines: list[str] = []
+    for path in clips:
+        clip_hold = max(_ffprobe_seconds(path), 0.2)
+        lines.append(f"file '{path}'\n")
+        lines.append(f"duration {clip_hold:.5f}\n")
+        lines.append(f"outpoint {clip_hold:.5f}\n")
+    listing.write_text("".join(lines), encoding="utf-8")
+    cmd: list[str] = [ffmpeg, "-y"]
+    filters: list[str] = []
+    for i, path in enumerate(clips):
+        cmd.extend(["-i", str(path)])
+        filters.append(
+            f"[{i}:v]fps=30,scale=1080:1920,setsar=1,format=yuv420p,setpts=PTS-STARTPTS[v{i}]"
+        )
+    audio_i = len(clips)
+    cmd.extend(["-i", str(audio)])
+    concat = "".join(f"[v{i}]" for i in range(len(clips))) + f"concat=n={len(clips)}:v=1:a=0[v]"
+    cmd.extend(
         [
-            ffmpeg,
-            "-y",
-            "-f",
-            "concat",
-            "-safe",
-            "0",
-            "-i",
-            str(listing),
-            "-i",
-            str(audio),
             "-filter_complex",
-            f"[1:a]aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo,{AUDIO_LOUDNESS}[a]",
+            ";".join(filters)
+            + ";"
+            + concat
+            + f";[{audio_i}:a]aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo,{AUDIO_LOUDNESS}[a]",
             "-map",
-            "0:v",
+            "[v]",
             "-map",
             "[a]",
             "-c:v",
@@ -592,10 +615,9 @@ def _concat_motion(clips: list[Path], audio: Path, dest: Path) -> Path:
             "-t",
             f"{hold:.3f}",
             str(dest),
-        ],
-        check=True,
-        capture_output=True,
+        ]
     )
+    subprocess.run(cmd, check=True, capture_output=True)
     return dest
 
 
