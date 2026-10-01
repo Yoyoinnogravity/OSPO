@@ -11,6 +11,7 @@ from bs4 import BeautifulSoup
 from PIL import Image
 
 from twodown.ads import ads_enabled, ads_txt, adsense_client, adsense_slot
+from twodown.audio import looks_like_media, publish_short_to_media
 from twodown.banner import write_site_croc, write_youtube_picture
 from twodown.config import BRAND, BRAND_LINE, CREDIT_LINE, CREDIT_WHO, DEFAULT_VOICE_ALIAS, SITE_HOST, SITE_ORIGIN, SITE_ROOT, SPONSOR_EMAIL, SUGGEST_EMAIL, TAGLINE, VOICE_LABELS, VOICES, follow_profiles
 from twodown.models import DailyPair, SpokenClue
@@ -365,10 +366,18 @@ function applyVoice(alias, persist) {
     audio.addEventListener("loadedmetadata", resume, { once: true });
     const video = article.querySelector("video");
     if (video) video.muted = alias !== filmVoice(video);
-    audio.addEventListener("error", () => {
+    const onAudioError = () => {
+      const sidecar = prefix + slug + ".mp3";
+      if (slug && audio.dataset.sidecarTried !== "1") {
+        audio.dataset.sidecarTried = "1";
+        audio.src = sidecar;
+        return;
+      }
+      audio.removeEventListener("error", onAudioError);
       const fallback = filmVoice(video);
       if (audio.dataset.voice !== fallback) applyVoice(fallback, false);
-    }, { once: true });
+    };
+    audio.addEventListener("error", onAudioError);
   });
 }
 
@@ -1007,7 +1016,11 @@ def _copy_media(pair: DailyPair, dest: Path) -> None:
     media.mkdir(parents=True, exist_ok=True)
     for item in pair.clues:
         if item.video_path:
-            _copy_file(item.video_path, media / f"{item.clue.slug}.mp4")
+            source = Path(item.video_path)
+            dest = media / f"{item.clue.slug}.mp4"
+            if source.exists() and looks_like_media(source):
+                publish_short_to_media(source, dest)
+            # Dummy or mute files stay off site/media. HTML can still point at the slug.
         if item.thumbnail_path:
             _copy_poster(item.thumbnail_path, media / f"{item.clue.slug}-poster.webp")
         for alias, path in item.voice_paths.items():

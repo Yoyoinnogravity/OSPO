@@ -9,6 +9,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 from dataclasses import dataclass
 
+from twodown.audio import SITE_AUDIO_ENCODE, SITE_MOVFLAGS, finish_short_audio
 from twodown.config import (
     BRAND,
     CREAM,
@@ -509,18 +510,8 @@ def _encode_clips(clips: list[tuple[Path, float]], audio: Path, dest: Path) -> P
             "veryfast",
             "-crf",
             "20",
-            "-c:a",
-            "aac",
-            "-profile:a",
-            "aac_low",
-            "-b:a",
-            "192k",
-            "-ar",
-            "44100",
-            "-ac",
-            "2",
-            "-movflags",
-            "+faststart",
+            *SITE_AUDIO_ENCODE,
+            *SITE_MOVFLAGS,
             "-shortest",
             str(dest),
         ]
@@ -631,18 +622,8 @@ def _concat_motion(clips: list[Path], audio: Path, dest: Path) -> Path:
             "veryfast",
             "-crf",
             "20",
-            "-c:a",
-            "aac",
-            "-profile:a",
-            "aac_low",
-            "-b:a",
-            "192k",
-            "-ar",
-            "44100",
-            "-ac",
-            "2",
-            "-movflags",
-            "+faststart",
+            *SITE_AUDIO_ENCODE,
+            *SITE_MOVFLAGS,
             "-t",
             f"{hold:.3f}",
             str(dest),
@@ -703,11 +684,15 @@ def render_video(
                 clips.append(intro_bumper_path())
             else:
                 clips.append(_motion_clip(clue, name, hold, work / name))
-        return _concat_motion(clips, audio, dest)
+        _concat_motion(clips, audio, dest)
+        finish_short_audio(dest)
+        return dest
     if clue_hold is None:
         clue_secs = max(7.0, min(duration * 0.42, duration - 6.0))
     else:
         clue_secs = max(4.0, min(clue_hold, duration - 4.0))
     reveal_secs = max(4.0, duration - clue_secs + 0.4)
-    return _encode_clips([(clue_card, clue_secs), (reveal_card, reveal_secs)], audio, dest)
+    _encode_clips([(clue_card, clue_secs), (reveal_card, reveal_secs)], audio, dest)
+    finish_short_audio(dest)
+    return dest
 

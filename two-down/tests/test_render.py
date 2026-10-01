@@ -562,7 +562,7 @@ def test_render_video_is_browser_playable(tmp_path: Path):
             "-f",
             "lavfi",
             "-i",
-            "anullsrc=r=24000:cl=mono",
+            "sine=frequency=440:sample_rate=24000",
             "-t",
             "3",
             str(audio),
@@ -579,7 +579,8 @@ def test_render_video_is_browser_playable(tmp_path: Path):
     assert abs(video_d - audio_d) < 0.4
     assert _probe(dest, "stream=sample_rate") == "44100"
     assert _probe(dest, "stream=width,height").splitlines()[0] == "1080"
-    assert "aac" in _probe(dest, "stream=codec_name")
+    assert "mp3" in _probe(dest, "stream=codec_name")
+    assert dest.with_suffix(".mp3").exists()
     assert "loudnorm" in AUDIO_LOUDNESS
     assert "volume=" in AUDIO_LOUDNESS
 

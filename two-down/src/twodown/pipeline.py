@@ -22,6 +22,7 @@ from twodown.hints import attach_hint
 from twodown.ingest import LONDON, fetch_daily_posts, posts_for_london_date
 from twodown.models import Clue, DailyPair, SpokenClue
 from twodown.parse import parse_post
+from twodown.audio import publish_short_to_media
 from twodown.render import draw_beat, draw_clue_card, draw_reveal_card, render_video, write_thumbnail
 from twodown.scenes import pick_scenes
 from twodown.script import write_parts
@@ -465,7 +466,7 @@ def render_one_short(
     if publish:
         media = SITE_ROOT / "media"
         media.mkdir(parents=True, exist_ok=True)
-        copy2(movie, media / f"{clue.slug}.mp4")
+        publish_short_to_media(movie, media / f"{clue.slug}.mp4")
         for alias, path in paths.items():
             copy2(path, media / f"{clue.slug}-{alias}.mp3")
     return item
