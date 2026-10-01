@@ -406,20 +406,23 @@ def test_unmatched_hint_says_no_relevant_image(tmp_path: Path):
     from twodown.pipeline import resolve_clue
     from twodown.script import write_parts
 
-    clue = resolve_clue("guardian-30124-9a")
-    assert clue.answer == "ELICIT"
-    assert clue.hint_line == HINT_MISS
-    assert hint_for_clue(clue) is None
-    parts = write_parts(clue)
-    assert parts.hint_speech == HINT_MISS
-    path = draw_beat(clue, tmp_path / "elicit-miss.png", "hint")
-    img = Image.open(path)
-    assert img.size == (1080, 1920)
-    assert img.getpixel((24, 40)) == NEWS_BG
-    # No leftover default still pasted into the photo band.
-    band = img.crop((140, 1040, 940, 1580))
-    newsprint = sum(1 for pixel in band.get_flattened_data() if pixel == NEWS_BG)
-    assert newsprint > 200_000
+    for slug, answer, name in (
+        ("guardian-30124-9a", "ELICIT", "elicit-miss.png"),
+        ("independent-12473-1a", "CHICAGO", "chicago-miss.png"),
+    ):
+        clue = resolve_clue(slug)
+        assert clue.answer == answer
+        assert clue.hint_line == HINT_MISS
+        assert hint_for_clue(clue) is None
+        parts = write_parts(clue)
+        assert parts.hint_speech == HINT_MISS
+        path = draw_beat(clue, tmp_path / name, "hint")
+        img = Image.open(path)
+        assert img.size == (1080, 1920)
+        assert img.getpixel((24, 40)) == NEWS_BG
+        band = img.crop((140, 1040, 940, 1580))
+        newsprint = sum(1 for pixel in band.get_flattened_data() if pixel == NEWS_BG)
+        assert newsprint > 200_000
 
 
 def test_dreamlike_parse_fits_under_the_answer(tmp_path: Path):

@@ -553,6 +553,7 @@ def run_today(
     scene_slugs = pick_scenes(stamp, len(pair_clues), scene)
     spoken: list[SpokenClue] = []
     for clue, scene_slug in zip(pair_clues, scene_slugs, strict=True):
+        clue = attach_hint(clue)
         parts = write_parts(clue)
         item = SpokenClue(clue=clue, script=parts.full, voice=resolved_voice, scene=scene_slug)
         slot = dest_root / clue.slug

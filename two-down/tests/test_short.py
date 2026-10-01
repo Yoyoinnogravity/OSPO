@@ -2,7 +2,7 @@ import inspect
 
 import pytest
 
-from twodown.config import CLUE_PITCH, CLUE_RATE, DEFAULT_VOICE_ALIAS, HINT_LINE, HINT_LOOK, HINT_OFFER, HINT_VOICE_ALIAS, INTRO_LINE, INTRO_RATE, INTRO_VOICE_ALIAS, OUTRO_LINE, OUTRO_VOICE_ALIAS, PINUP_SLUG, SOURCE_VOICE_ALIAS, STUDY_SLUG, THINK_PAUSE_SECONDS, THINK_PROMPT, VOICE_RATE, VOICES, WISDOM_LINES, pick_wisdom
+from twodown.config import CLUE_PITCH, CLUE_RATE, DEFAULT_VOICE_ALIAS, HINT_LINE, HINT_LOOK, HINT_MISS, HINT_OFFER, HINT_VOICE_ALIAS, INTRO_LINE, INTRO_RATE, INTRO_VOICE_ALIAS, OUTRO_LINE, OUTRO_VOICE_ALIAS, PINUP_SLUG, SOURCE_VOICE_ALIAS, STUDY_SLUG, THINK_PAUSE_SECONDS, THINK_PROMPT, VOICE_RATE, VOICES, WISDOM_LINES, pick_wisdom
 from twodown.models import Clue
 from twodown.pipeline import (
     dreamlike_clue,
@@ -445,3 +445,19 @@ def test_speech_uses_the_clue_and_the_solution_not_a_web_address():
     assert "speak version" not in spoken
     assert "<speak" not in spoken
     assert "xmlns" not in spoken
+
+
+def test_todays_pair_speaks_no_relevant_image_found():
+    from twodown.hints import attach_hint
+
+    elicit = attach_hint(published_clue("guardian-30124-9a"))
+    chicago = attach_hint(published_clue("independent-12473-1a"))
+    assert HINT_MISS == "No relevant image found."
+    elicit_parts = write_parts(elicit)
+    chicago_parts = write_parts(chicago)
+    assert elicit_parts.hint_speech == HINT_MISS
+    assert chicago_parts.hint_speech == HINT_MISS
+    assert "Here's a hint." not in elicit_parts.hint_speech
+    assert "Here's a hint." not in chicago_parts.hint_speech
+    assert "Fifteen Squared" not in elicit_parts.full
+    assert "Fifteen Squared" not in chicago_parts.full

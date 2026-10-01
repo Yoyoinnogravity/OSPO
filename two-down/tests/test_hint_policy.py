@@ -166,13 +166,18 @@ def test_published_clues_have_optional_hint_fields():
 
 def test_unmatched_published_clue_says_no_relevant_image():
     elicit = attach_hint(published_clue("guardian-30124-9a"))
+    chicago = attach_hint(published_clue("independent-12473-1a"))
     assert elicit.answer == "ELICIT"
-    assert elicit.hint_line == HINT_MISS
+    assert chicago.answer == "CHICAGO"
     assert HINT_MISS == "No relevant image found."
+    assert elicit.hint_line == HINT_MISS
+    assert chicago.hint_line == HINT_MISS
     assert not elicit.hint_image
+    assert not chicago.hint_image
     assert not elicit.hint_credit
-    matched = match_hint(elicit.definition or elicit.clue)
-    assert not matched.close_enough
+    assert not chicago.hint_credit
+    assert not match_hint(elicit.definition or elicit.clue).close_enough
+    assert not match_hint(chicago.definition or chicago.clue).close_enough
 
 
 def test_no_cloud_vision_pipeline():

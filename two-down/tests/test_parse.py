@@ -132,7 +132,7 @@ def test_script_opens_with_the_paper_and_setter():
     assert parts.think_speech == THINK_PROMPT
     assert parts.think_speech == "Pause here to think about it."
     assert "Have a think." not in script
-    assert parts.hint_speech == "Here's a hint."
+    assert parts.hint_speech == "No relevant image found."
     assert parts.answer_speech == speak_answer(clue.answer)
     assert parts.answer_speech == "It's end result."
     assert "end result" in parts.breakdown
