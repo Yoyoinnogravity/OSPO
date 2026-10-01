@@ -1123,17 +1123,10 @@ def _earlier_teaser(root: Path, prefix: str = "", skip_date: str | None = None) 
 
 
 def _films_body(root: Path) -> str:
-    films = legacy_videos(root)
-    if films:
-        grid = "<section class='pair'>" + "\n".join(_legacy_article(path) for path in films) + "</section>"
-    else:
-        grid = "<p>Study cuts will sit here once their films are in the site media folder.</p>"
     return f"""
-    {_croc_hello("", title="Every film on cryptic.fit.", lede="Daily solves, newest first. The study cuts are underneath, for when you are stuck.")}
+    {_croc_hello("", title="Every film on cryptic.fit.", lede="Daily solves, newest first. One spoken version: Ryan invites, then Cryptic Croc presents the clue.")}
     <h2>Daily pairs.</h2>
     {_playable_daily(root)}
-    <h2>Study cuts.</h2>
-    {grid}
     """
 
 
@@ -1240,7 +1233,7 @@ def publish_films(root: Path) -> Path:
             _films_body(root),
             PageSeo(
                 title=f"Films — {BRAND}",
-                description="Every cryptic.fit Short, including earlier daily pairs and the study cuts. Have a go before you tap solve.",
+                description="Every cryptic.fit Short. Have a go before you tap solve.",
                 path="/films.html",
                 json_ld=website_ld(),
             ),

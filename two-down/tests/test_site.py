@@ -206,16 +206,11 @@ def test_films_page_serves_legacy_videos_from_the_site(tmp_path):
     )
     publish_films(tmp_path)
     films = (tmp_path / "films.html").read_text(encoding="utf-8")
-    assert 'src="media/rasta-libby.mp4"' in films
-    assert 'src="media/rasta-libby.mp3"' in films
+    assert "Study cuts" not in films
+    assert "rasta-libby" not in films
     assert "jsdelivr" not in films
-    assert "One emperor backing follower of another" in films
     assert 'href="d/2026-09-11/"' in films
     assert "independent-12458-11a.mp4" not in films
-    poster = media / "rasta-libby-poster.webp"
-    assert poster.exists()
-    assert poster.read_bytes()[:4] == b"RIFF"
-    assert 'poster="media/rasta-libby-poster.webp"' in films
     studio_html = studio.read_text(encoding="utf-8")
     assert "media/rasta-libby.mp4" in studio_html
     assert 'poster="media/rasta-libby-poster.webp"' in studio_html
