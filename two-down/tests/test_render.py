@@ -128,6 +128,49 @@ def test_clue_card_is_a_solve_along(tmp_path: Path):
     assert draw_beat(_clue(), tmp_path / "solved.png", "answer").exists()
 
 
+def test_intro_and_letters_show_unsolved_clue_and_empty_lights(tmp_path: Path):
+    """The first beat is the unsolved clue and blank cells, not a title card."""
+    from twodown.config import CREAM, INK
+
+    intro = Image.open(draw_beat(_clue(), tmp_path / "intro.png", "intro")).convert("RGB")
+    letters = Image.open(draw_beat(_clue(), tmp_path / "letters.png", "letters")).convert("RGB")
+    think = Image.open(draw_beat(_clue(), tmp_path / "think.png", "think")).convert("RGB")
+    answer = Image.open(draw_beat(_clue(), tmp_path / "answer.png", "answer")).convert("RGB")
+    outro = Image.open(draw_beat(_clue(), tmp_path / "outro.png", "outro")).convert("RGB")
+
+    clue_box = (80, 200, 1000, 580)
+    intro_clue = list(_rgb_pixels(intro.crop(clue_box)))
+    letters_clue = list(_rgb_pixels(letters.crop(clue_box)))
+    think_clue = list(_rgb_pixels(think.crop(clue_box)))
+    outro_clue = list(_rgb_pixels(outro.crop(clue_box)))
+    assert intro_clue.count(INK) > 400
+    assert abs(intro_clue.count(INK) - letters_clue.count(INK)) < 80
+    assert abs(intro_clue.count(INK) - think_clue.count(INK)) < 80
+    # Outro is "That was cryptic.fit.", not the clue text.
+    assert abs(intro_clue.count(INK) - outro_clue.count(INK)) > 200
+
+    lights = (80, 610, 1000, 740)
+    intro_lights = list(_rgb_pixels(intro.crop(lights)))
+    letters_lights = list(_rgb_pixels(letters.crop(lights)))
+    think_lights = list(_rgb_pixels(think.crop(lights)))
+    answer_lights = list(_rgb_pixels(answer.crop(lights)))
+    assert intro_lights.count(CREAM) > 400
+    assert abs(intro_lights.count(CREAM) - letters_lights.count(CREAM)) < 80
+    assert abs(intro_lights.count(CREAM) - think_lights.count(CREAM)) < 80
+    assert answer_lights.count(CREAM) < intro_lights.count(CREAM)
+
+    raw = (tmp_path / "intro.png").read_bytes()
+    assert b"PIN-UP" not in raw
+    assert b"PINUP" not in raw
+
+    def reddish(img: Image.Image, box: tuple[int, int, int, int]) -> int:
+        return sum(1 for r, g, b in _rgb_pixels(img.crop(box)) if r > 140 and g < 80 and b < 90)
+
+    # The crimson PIN-UP headline sits under the lights only on the answer card.
+    assert reddish(answer, (80, 730, 1000, 880)) > reddish(intro, (80, 730, 1000, 880)) + 200
+    assert reddish(letters, (80, 730, 1000, 880)) < reddish(answer, (80, 730, 1000, 880))
+
+
 def test_answer_footer_credits_setter_and_paper():
     clue = _clue()
     assert _source_footer(clue) == "Eccles in the Independent"

@@ -30,7 +30,7 @@ from twodown.croc import paste_croc
 from twodown.hints import ensure_hint_photo, hint_for_clue
 from twodown.models import Clue
 from twodown.scenes import DEFAULT_SCENE, Scene, get_scene
-from twodown.script import _spoken_parse, speak_intro
+from twodown.script import _spoken_parse
 
 WIDTH, HEIGHT = 1080, 1920
 PHOTO_INK = (252, 247, 236)
@@ -236,29 +236,30 @@ def _new_card() -> tuple[Image.Image, ImageDraw.ImageDraw]:
 
 
 def _paint_beat(clue: Clue, beat: str) -> Image.Image:
-    """The card without Cryptic Croc, so each animation frame can reuse it."""
+    """The card without Cryptic Croc, so each animation frame can reuse it.
+
+    Intro through think (and hint) paint the written clue and empty lights
+    so the pattern is on screen from the first second. Do not fill the
+    answer until the reveal beats.
+    """
     img, draw = _new_card()
     _draw_wordmark(draw)
-    if beat in {"intro", "outro"}:
-        line = speak_intro(clue) if beat == "intro" else OUTRO_LINE
+    if beat == "outro":
         line_font = _font(FONT_REGULAR, 64)
-        wrapped = _wrap(draw, line.rstrip("."), line_font, WIDTH - 180)
+        wrapped = _wrap(draw, OUTRO_LINE.rstrip("."), line_font, WIDTH - 180)
         _center_text(draw, 280, wrapped, line_font, INK, spacing=16)
         _footer(draw, "")
         return img
     _draw_kicker(draw, clue)
-    show_lights = beat != "clue"
     filled = beat in {"answer", "parse", "source"}
     show_answer = beat in {"answer", "parse", "source"}
     show_parse = beat in {"answer", "parse", "source"}
-    bottom = _draw_clue(draw, clue, y=240 if beat == "clue" else 210)
-    lights_bottom = bottom
-    if show_lights:
-        lights_y = min(max(bottom + 44, 620), 880)
-        lights_bottom = _draw_lights(draw, clue, lights_y, filled=filled)
-        if clue.enumeration and beat == "letters":
-            enum_font = _font(FONT_SANS_BOLD, 36)
-            _center_text(draw, lights_bottom + 28, clue.enumeration, enum_font, CRIMSON)
+    bottom = _draw_clue(draw, clue, y=210)
+    lights_y = min(max(bottom + 44, 620), 880)
+    lights_bottom = _draw_lights(draw, clue, lights_y, filled=filled)
+    if clue.enumeration and beat == "letters":
+        enum_font = _font(FONT_SANS_BOLD, 36)
+        _center_text(draw, lights_bottom + 28, clue.enumeration, enum_font, CRIMSON)
     prompt_y = min(lights_bottom + 80, 1180)
     prompt = _font(FONT_SANS, 34)
     if beat == "think":
@@ -303,7 +304,7 @@ def compose_beat(clue: Clue, beat: str = "think", frame: int = 0) -> Image.Image
 
 
 def draw_beat(clue: Clue, dest: Path, beat: str = "think") -> Path:
-    """One visual beat of the Short. Scene never appears — the clue is the picture."""
+    """One visual beat of the Short. The written clue is the picture from intro on."""
     dest.parent.mkdir(parents=True, exist_ok=True)
     compose_beat(clue, beat, 0).save(dest, "PNG")
     return dest
