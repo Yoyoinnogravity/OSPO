@@ -38,10 +38,18 @@ function applyVoice(alias, persist) {
     audio.addEventListener("loadedmetadata", resume, { once: true });
     const video = article.querySelector("video");
     if (video) video.muted = alias !== filmVoice(video);
-    audio.addEventListener("error", () => {
+    const onAudioError = () => {
+      const sidecar = prefix + slug + ".mp3";
+      if (slug && audio.dataset.sidecarTried !== "1") {
+        audio.dataset.sidecarTried = "1";
+        audio.src = sidecar;
+        return;
+      }
+      audio.removeEventListener("error", onAudioError);
       const fallback = filmVoice(video);
       if (audio.dataset.voice !== fallback) applyVoice(fallback, false);
-    }, { once: true });
+    };
+    audio.addEventListener("error", onAudioError);
   });
 }
 
