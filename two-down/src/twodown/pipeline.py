@@ -349,6 +349,9 @@ _ELICIT_SOURCE = (
 _CHICAGO_SOURCE = (
     "https://fifteensquared.net/2026/09/29/independent-12473-bard/"
 )
+_SPHERE_SOURCE = (
+    "https://fifteensquared.net/2026/09/14/financial-times-18478-by-leonidas/"
+)
 
 
 def elicit_clue() -> Clue:
@@ -395,14 +398,39 @@ def chicago_clue() -> Clue:
     )
 
 
+def sphere_clue() -> Clue:
+    """FT 18478 5a SPHERE. Field / globe is the definition, not Female / sleep."""
+    return attach_hint(
+        Clue(
+            source_url=_SPHERE_SOURCE,
+            paper="Financial Times",
+            puzzle_id="18478",
+            setter="Leonidas",
+            blogger="Pete Maclean",
+            number="5",
+            direction="across",
+            clue="Female bearing pressure on field",
+            enumeration="6",
+            answer="SPHERE",
+            definition="field",
+            parse="P (pressure) in (bearing) SHE (female) + RE (on)",
+            device="charade",
+            enumeration_ok=True,
+        )
+    )
+
+
 def live_pair_clues() -> dict[str, Clue]:
     elicit = elicit_clue()
     chicago = chicago_clue()
+    sphere = sphere_clue()
     return {
         elicit.slug: elicit,
         chicago.slug: chicago,
+        sphere.slug: sphere,
         elicit.answer.lower(): elicit,
         chicago.answer.lower(): chicago,
+        sphere.answer.lower(): sphere,
     }
 
 

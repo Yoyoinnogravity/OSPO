@@ -410,6 +410,7 @@ def match_hint(definition: str, answer: str | None = None) -> MatchedHint:
     """Pick a still from the definition text. 80% close is enough; never refuse AI.
 
     A miss keeps close_enough False. Callers must not paste DEFAULT_HINT.
+    The leftover sleeping-woman / trance still is never a match by default.
     """
     del answer  # Hint the definition, not the light — do not leak the answer.
     needles = _tokens(definition)
@@ -434,6 +435,25 @@ def get_hint_photo(slug: str | None = None) -> HintPhoto:
     return matched.photo if matched.close_enough else DEFAULT_HINT
 
 
+def _trance_from_definition(definition: str) -> bool:
+    """The sleeping-woman still is only for a trance / sleep definition."""
+    return _closeness(_tokens(definition), TRANCE.keywords) >= CLOSE_ENOUGH
+
+
+def _usable_match(clue: Clue, matched: MatchedHint) -> MatchedHint:
+    """Refuse leftover generic stills. Wordplay surface is not the definition."""
+    if not matched.close_enough:
+        return matched
+    # Trance / sleep / default still: only when the stored definition says so.
+    # "Female bearing pressure on field" must never attach the sleeping woman.
+    if matched.photo.slug == TRANCE.slug and not _trance_from_definition(clue.definition or ""):
+        return MatchedHint(photo=matched.photo, closeness=matched.closeness, close_enough=False)
+    # Papers is a newspapers still, not a leftover for any published clue.
+    if matched.photo.slug == PAPERS.slug and not clue.definition:
+        return MatchedHint(photo=matched.photo, closeness=matched.closeness, close_enough=False)
+    return matched
+
+
 def hint_for_clue(clue: Clue) -> HintPhoto | None:
     """Return a matching still, or None when nothing is close enough."""
     attached = attach_hint(clue)
@@ -442,12 +462,16 @@ def hint_for_clue(clue: Clue) -> HintPhoto | None:
     if attached.hint_image:
         found = PHOTOS.get(attached.hint_image)
         if found is not None:
+            if found.slug == TRANCE.slug and not _trance_from_definition(attached.definition or ""):
+                return None
             return found
         name = Path(attached.hint_image).name
         for photo in _catalog():
             if photo.filename == name or photo.slug == attached.hint_image:
+                if photo.slug == TRANCE.slug and not _trance_from_definition(attached.definition or ""):
+                    return None
                 return photo
-    matched = match_hint(attached.definition or attached.clue or "")
+    matched = _usable_match(attached, match_hint(attached.definition or ""))
     if matched.close_enough:
         return matched.photo
     return None
@@ -455,7 +479,12 @@ def hint_for_clue(clue: Clue) -> HintPhoto | None:
 
 def attach_hint(clue: Clue) -> Clue:
     """Carry a still only when the definition is ~80% close. Otherwise say so."""
-    matched = match_hint(clue.definition or clue.clue or "")
+    # Prefer the stored definition. The clue surface includes wordplay (Female,
+    # bearing, pressure) and must not pick a leftover trance / default still.
+    text = clue.definition or clue.clue or ""
+    if clue.definition:
+        text = clue.definition
+    matched = _usable_match(clue, match_hint(text))
     updates: dict[str, str | None] = {}
     if matched.close_enough:
         if not clue.hint_image:

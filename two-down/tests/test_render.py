@@ -406,7 +406,11 @@ def test_unmatched_hint_says_no_relevant_image(tmp_path: Path):
     from twodown.pipeline import resolve_clue
     from twodown.script import write_parts
 
-    for slug, answer in (("guardian-30124-9a", "ELICIT"), ("independent-12473-1a", "CHICAGO")):
+    for slug, answer in (
+        ("guardian-30124-9a", "ELICIT"),
+        ("independent-12473-1a", "CHICAGO"),
+        ("financial-times-18478-5a", "SPHERE"),
+    ):
         clue = resolve_clue(slug)
         assert clue.answer == answer
         assert clue.hint_line == HINT_MISS

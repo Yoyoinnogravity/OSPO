@@ -3,7 +3,7 @@ from pathlib import Path
 from twodown.config import HINT_LINE, HINT_MISS, PACKAGE_ROOT, PINUP_SLUG, STUDY_SLUG
 from twodown.hints import AIM, CLOSE_ENOUGH, COLE, DAVIS, DEFAULT_HINT, FATS, PAPERS, RASTA, SMILES, TRANCE, WELLINGTON, attach_hint, match_hint
 from twodown.models import Clue
-from twodown.pipeline import aimlessly_clue, chicago_clue, cole_clue, davis_cup_clue, dreamlike_clue, elicit_clue, fats_clue, mass_media_clue, published_clue, rasta_clue, smiles_clue, study_clue, wellington_clue
+from twodown.pipeline import aimlessly_clue, chicago_clue, cole_clue, davis_cup_clue, dreamlike_clue, elicit_clue, fats_clue, mass_media_clue, published_clue, rasta_clue, smiles_clue, sphere_clue, study_clue, wellington_clue
 
 
 def test_study_slug_and_hint_fields_are_mass_media():
@@ -192,17 +192,85 @@ def test_default_still_does_not_attach_without_a_real_match():
     for clue in (
         elicit_clue(),
         chicago_clue(),
+        sphere_clue(),
         attach_hint(published_clue("guardian-30124-9a")),
         attach_hint(published_clue("independent-12473-1a")),
+        attach_hint(published_clue("financial-times-18478-5a")),
         attach_hint(published_clue(PINUP_SLUG)),
     ):
         assert clue.hint_line == HINT_MISS
         assert clue.hint_image is None
         assert clue.hint_image not in banned
         assert clue.hint_credit is None
-    for text in ("Bring out", "place in the USA", "obtain", "final analysis", ""):
+    for text in (
+        "Bring out",
+        "place in the USA",
+        "obtain",
+        "final analysis",
+        "Female",
+        "Female bearing pressure on field",
+        "field",
+        "",
+    ):
         matched = match_hint(text)
         assert matched.close_enough is False
+
+
+def test_sphere_female_bearing_does_not_get_trance_or_sleep_still():
+    from twodown.hints import hint_for_clue
+    from twodown.pipeline import resolve_clue
+    from twodown.script import write_parts
+
+    surface = "Female bearing pressure on field"
+    leftover = match_hint(surface)
+    assert leftover.closeness < CLOSE_ENOUGH
+    assert not leftover.close_enough
+    # Even the leftover .photo must not be treated as a sleep / trance match.
+    assert leftover.photo.slug != TRANCE.slug or not leftover.close_enough
+    female = match_hint("Female")
+    assert not female.close_enough
+    assert female.photo.slug != TRANCE.slug or not female.close_enough
+
+    published = published_clue("financial-times-18478-5a")
+    assert published.answer == "SPHERE"
+    assert published.clue == surface
+    attached = attach_hint(published)
+    assert attached.hint_line == HINT_MISS
+    assert not attached.hint_image
+    assert not attached.hint_credit
+    assert hint_for_clue(attached) is None
+    assert "trance" not in (attached.hint_credit or "").lower()
+    assert "sleep" not in (attached.hint_credit or "").lower()
+
+    resolved = resolve_clue("financial-times-18478-5a")
+    assert resolved.answer == "SPHERE"
+    assert resolved.hint_line == HINT_MISS
+    assert not resolved.hint_image
+    assert hint_for_clue(resolved) is None
+    parts = write_parts(resolved)
+    assert parts.hint_speech == HINT_MISS
+    assert "Here's a hint" not in parts.hint_speech
+
+    # A stored definition of field / globe still must not pick the sleeping woman.
+    fielded = attach_hint(
+        Clue(
+            source_url="https://fifteensquared.net/example/",
+            paper="Financial Times",
+            puzzle_id="18478",
+            setter="Leonidas",
+            blogger="Pete Maclean",
+            number="5",
+            direction="across",
+            clue=surface,
+            enumeration="6",
+            answer="SPHERE",
+            definition="field",
+            parse="P (pressure) in (bearing) SHE (female) + RE (on)",
+        )
+    )
+    assert fielded.hint_line == HINT_MISS
+    assert not fielded.hint_image
+    assert hint_for_clue(fielded) is None
 
 
 def test_no_cloud_vision_pipeline():
