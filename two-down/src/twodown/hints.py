@@ -634,13 +634,9 @@ def _edge_phrases(text: str) -> tuple[str, ...]:
 
 
 def hint_texts(definition: str, clue: str = "", parse: str = "") -> tuple[str, ...]:
-    """Definition first, then clue/parse edges. Never the printed answer."""
-    texts: list[str] = []
-    for block in (definition, clue, parse):
-        if block:
-            texts.extend(_edge_phrases(block))
+    """Score whole definition / clue / parse blocks. Do not let two edge words fake 80%."""
     seen: list[str] = []
-    for text in texts:
+    for text in (definition, clue, parse):
         if text and text not in seen:
             seen.append(text)
     return tuple(seen)
@@ -719,7 +715,7 @@ def hint_for_clue(clue: Clue) -> HintPhoto | None:
     matched = match_hint(attached.definition or "", clue=attached.clue, parse=attached.parse)
     if matched.close_enough:
         return matched.photo
-    return PHOTOS.get(attached.slug)
+    return None
 
 
 def attach_hint(clue: Clue) -> Clue:
@@ -729,7 +725,7 @@ def attach_hint(clue: Clue) -> Clue:
     "No relevant image found."
     """
     matched = match_hint(clue.definition or "", clue=clue.clue, parse=clue.parse)
-    photo = matched.photo if matched.close_enough else PHOTOS.get(clue.slug)
+    photo = matched.photo if matched.close_enough else None
     if photo is None:
         updates: dict[str, str | None] = {}
         if clue.hint_image:

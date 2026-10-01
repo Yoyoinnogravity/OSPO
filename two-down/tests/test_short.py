@@ -458,7 +458,7 @@ def test_chicago_speaks_andrew_ava_pause_and_wisdom():
     assert "Independent" in parts.intro_speech
     assert "Bard" in parts.intro_speech
     assert parts.think_speech == THINK_PROMPT
-    assert parts.hint_speech == HINT_LINE
+    assert parts.hint_speech == HINT_MISS
     assert "chicago" not in parts.hint_speech.lower()
     assert parts.source_speech == ""
     wisdom = pick_wisdom(chicago.slug)

@@ -326,19 +326,19 @@ def test_hint_beat_does_not_spoil_rasta(tmp_path: Path):
 def test_published_pair_hint_beats_use_different_stills(tmp_path: Path):
     from PIL import Image
 
-    from twodown.hints import BRING, USA
+    from twodown.config import HINT_MISS, NEWS_BG, NEWS_GRID
     from twodown.pipeline import published_clue
 
     elicit = published_clue("guardian-30124-9a")
     chicago = published_clue("independent-12473-1a")
-    assert elicit.hint_image == f"assets/hints/{BRING.filename}"
-    assert chicago.hint_image == f"assets/hints/{USA.filename}"
+    assert elicit.hint_image is None
+    assert chicago.hint_image is None
+    assert elicit.hint_line == HINT_MISS
+    assert chicago.hint_line == HINT_MISS
     elicit_hint = Image.open(draw_beat(elicit, tmp_path / "elicit-hint.png", "hint"))
     chicago_hint = Image.open(draw_beat(chicago, tmp_path / "chicago-hint.png", "hint"))
-    elicit_photo = list(elicit_hint.crop((140, 1040, 940, 1580)).get_flattened_data())
-    chicago_photo = list(chicago_hint.crop((140, 1040, 940, 1580)).get_flattened_data())
-    assert elicit_photo != chicago_photo
-    assert elicit_hint.getpixel((540, 1200)) != chicago_hint.getpixel((540, 1200))
+    for img in (elicit_hint, chicago_hint):
+        assert img.getpixel((540, 1200)) in {NEWS_BG, NEWS_GRID}
     raw_elicit = (tmp_path / "elicit-hint.png").read_bytes()
     raw_chicago = (tmp_path / "chicago-hint.png").read_bytes()
     assert b"ELICIT" not in raw_elicit
@@ -373,8 +373,8 @@ def test_hint_beat_says_no_relevant_image_when_unmatched(tmp_path: Path):
     assert miss.getpixel((24, 40)) == NEWS_BG
     band = miss.getpixel((540, 1200))
     assert band in {NEWS_BG, NEWS_GRID}
-    assert chicago.hint_image
-    assert chicago_hint.getpixel((540, 1200)) not in {NEWS_BG, NEWS_GRID}
+    assert chicago.hint_image is None
+    assert chicago_hint.getpixel((540, 1200)) in {NEWS_BG, NEWS_GRID}
     miss_lights = list(miss.crop((80, 610, 1000, 740)).get_flattened_data())
     think_lights = list(think.crop((80, 610, 1000, 740)).get_flattened_data())
     assert miss_lights.count(CREAM) > 400
