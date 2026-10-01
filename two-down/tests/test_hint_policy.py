@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from twodown.config import HINT_LINE, HINT_MISS, PACKAGE_ROOT, PINUP_SLUG, STUDY_SLUG
-from twodown.hints import AIM, AUTHOR, BRING, CLOSE_ENOUGH, COLE, CROSS, DAVIS, DEFAULT_HINT, FATS, FIELD, MODEL, PAPERS, PORTER, RASTA, SMILES, TRANCE, USA, WELLINGTON, attach_hint, match_hint
+from twodown.hints import AIM, AUTHOR, BRING, CLOSE_ENOUGH, COLE, CROSS, DAVIS, DEFAULT_HINT, FATS, FIELD, GLOBE, MODEL, PAPERS, PORTER, RASTA, SMILES, TRANCE, USA, WELLINGTON, attach_hint, match_hint
 from twodown.models import Clue
 from twodown.pipeline import aimlessly_clue, cole_clue, davis_cup_clue, dreamlike_clue, fats_clue, mass_media_clue, published_clue, rasta_clue, smiles_clue, study_clue, wellington_clue
 
@@ -293,7 +293,7 @@ def test_default_hint_is_not_the_sleeping_woman():
     assert leftover.line == HINT_MISS
 
 
-def test_sphere_misses_when_catalog_has_no_globe():
+def test_sphere_uses_the_globe_still():
     from twodown.hints import hint_for_clue, spoken_hint
     from twodown.pipeline import published_clue
 
@@ -301,17 +301,22 @@ def test_sphere_misses_when_catalog_has_no_globe():
     assert clue.answer == "SPHERE"
     assert clue.clue == "Female bearing pressure on field"
     attached = attach_hint(clue)
-    assert attached.hint_image is None
-    assert attached.hint_credit is None
-    assert attached.hint_line == HINT_MISS
-    assert hint_for_clue(attached) is None
-    assert spoken_hint(attached) == HINT_MISS
+    assert attached.hint_image == f"assets/hints/{GLOBE.filename}"
+    assert attached.hint_credit == GLOBE.credit_line
+    assert attached.hint_line == HINT_LINE
+    assert hint_for_clue(attached).slug == GLOBE.slug
+    assert spoken_hint(attached) == HINT_LINE
+    assert spoken_hint(attached) != HINT_MISS
     assert "SPHERE" not in attached.hint_line
+    assert "SPHERE" not in (attached.hint_credit or "")
+    assert "trance" not in (attached.hint_credit or "").lower()
+    assert "field" not in (attached.hint_credit or "").lower()
     globe = match_hint("globe / orb / ball / domain")
+    assert globe.photo.slug == GLOBE.slug
+    assert globe.closeness >= CLOSE_ENOUGH
+    assert globe.close_enough
     assert globe.photo is not TRANCE
     assert globe.photo is not FIELD
-    assert not globe.close_enough
-    assert globe.photo is None
     leftover = Clue(
         source_url=clue.source_url,
         paper=clue.paper,
@@ -329,9 +334,44 @@ def test_sphere_misses_when_catalog_has_no_globe():
         hint_line=HINT_LINE,
     )
     repaired = attach_hint(leftover)
-    assert repaired.hint_image is None
-    assert repaired.hint_line == HINT_MISS
-    assert hint_for_clue(repaired) is None
+    assert repaired.hint_image == f"assets/hints/{GLOBE.filename}"
+    assert repaired.hint_line == HINT_LINE
+    assert hint_for_clue(repaired).slug == GLOBE.slug
+    still = PACKAGE_ROOT / attached.hint_image
+    assert still.is_file()
+    assert still.stat().st_size > 20_000
+
+
+def test_published_slugs_do_not_share_one_stock_photo():
+    from twodown.pipeline import published_clue
+
+    slugs = [
+        "independent-12458-11a",
+        "financial-times-18477-14a",
+        "independent-12459-8a",
+        "independent-12459-12a",
+        "independent-on-sunday-1907-1a",
+        "independent-on-sunday-1907-9a",
+        "financial-times-18478-1a",
+        "financial-times-18478-5a",
+        "guardian-30112-1a",
+        "guardian-30112-5a",
+        "independent-12462-6a",
+        "guardian-30113-9a",
+        "guardian-30124-9a",
+        "independent-12473-1a",
+    ]
+    images: list[str] = []
+    for slug in slugs:
+        clue = published_clue(slug)
+        assert clue.hint_line == HINT_LINE
+        assert clue.hint_image
+        assert clue.hint_image != f"assets/hints/{TRANCE.filename}"
+        assert clue.hint_image != f"assets/hints/{FIELD.filename}"
+        images.append(clue.hint_image)
+    assert len(images) == len(set(images))
+    assert f"assets/hints/{GLOBE.filename}" in images
+    assert f"assets/hints/{PORTER.filename}" in images
 
 
 def test_no_cloud_vision_pipeline():

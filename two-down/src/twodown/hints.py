@@ -359,7 +359,7 @@ BRING = HintPhoto(
 )
 
 
-# Definition still for CHICAGO: a place in the USA. Generic skyline. Never print CHICAGO.
+# Definition still for CHICAGO: a place in the USA. A diner, not a skyline. Never print CHICAGO.
 USA = HintPhoto(
     slug="usa-still",
     label="A place in the USA",
@@ -426,7 +426,7 @@ CAPSULE = HintPhoto(
 
 
 # A grassy field. That is not the definition of SPHERE (globe / orb / ball).
-# Do not map SPHERE or "female" here. The catalog has no globe still.
+# Do not map SPHERE or "female" here. The globe still is GLOBE.
 FIELD = HintPhoto(
     slug="field-still",
     label="A field",
@@ -434,6 +434,31 @@ FIELD = HintPhoto(
     license="generated",
     filename="field-still.webp",
     keywords=frozenset({"field", "fields", "meadow", "pasture", "grassland"}),
+)
+
+
+# Definition still for SPHERE: a globe / orb / ball. Never print SPHERE.
+# Generated still (AI matching allowed). Not a meadow, not the sleeping woman.
+GLOBE = HintPhoto(
+    slug="globe-still",
+    label="A globe",
+    source="generated still",
+    license="generated",
+    filename="globe-still.webp",
+    keywords=frozenset(
+        {
+            "globe",
+            "globes",
+            "orb",
+            "orbs",
+            "sphere",
+            "spheres",
+            "ball",
+            "balls",
+            "domain",
+            "domains",
+        }
+    ),
 )
 
 
@@ -534,6 +559,7 @@ PHOTOS: dict[str, HintPhoto] = {
     CRASH.slug: CRASH,
     CAPSULE.slug: CAPSULE,
     FIELD.slug: FIELD,
+    GLOBE.slug: GLOBE,
     WEEKLY.slug: WEEKLY,
     CROSS.slug: CROSS,
     UPROOT.slug: UPROOT,
@@ -595,6 +621,10 @@ PHOTOS: dict[str, HintPhoto] = {
     "capsule": CAPSULE,
     "financial-times-18478-1a": CAPSULE,
     "field": FIELD,
+    "globe": GLOBE,
+    "orb": GLOBE,
+    "sphere": GLOBE,
+    "financial-times-18478-5a": GLOBE,
     "weekly": WEEKLY,
     "spectator": WEEKLY,
     "independent-on-sunday-1907-1a": WEEKLY,
@@ -627,7 +657,7 @@ DEFAULT_HINT = None
 def _catalog() -> tuple[HintPhoto, ...]:
     return (
         TRANCE, MOONLIT, RASTA, FATS, WELLINGTON, COLE, SMILES, DAVIS, AIM, PAPERS,
-        BRING, USA, MODEL, AUTHOR, MAKEUP, CRASH, CAPSULE, FIELD, WEEKLY, CROSS,
+        BRING, USA, MODEL, AUTHOR, MAKEUP, CRASH, CAPSULE, FIELD, GLOBE, WEEKLY, CROSS,
         UPROOT, TIPS, PORTER, XYZ, LION,
     )
 
@@ -744,8 +774,9 @@ def _photo_from_path(name: str) -> HintPhoto | None:
 def _matched_photo(clue: Clue) -> HintPhoto | None:
     """80% definition match, else a slug-mapped still. Never the leftover default.
 
-    A slug map is not a green-field stand-in for SPHERE, and never TRANCE
-    unless the definition itself is trance / dream.
+    A slug map may attach the globe still for SPHERE. Never TRANCE
+    unless the definition itself is trance / dream. Never a grassy field
+    unless the definition itself is a field / meadow.
     """
     matched = match_hint(clue.definition or "", clue=clue.clue, parse=clue.parse)
     if matched.close_enough:
@@ -1050,6 +1081,18 @@ def _generate_field_still(dest: Path) -> Path:
     return dest
 
 
+def _generate_globe_still(dest: Path) -> Path:
+    """Last-resort globe / orb if the file is missing. No answer text."""
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    img = Image.new("RGB", (1280, 720), (4, 6, 12))
+    draw = ImageDraw.Draw(img)
+    draw.ellipse((360, 80, 920, 640), fill=(28, 72, 148))
+    draw.ellipse((420, 160, 700, 400), fill=(48, 112, 64))
+    draw.ellipse((620, 360, 860, 560), fill=(36, 96, 56))
+    img.save(dest, "WEBP", quality=82, method=6)
+    return dest
+
+
 def _generate_weekly_still(dest: Path) -> Path:
     dest.parent.mkdir(parents=True, exist_ok=True)
     img = Image.new("RGB", (1280, 720), (36, 32, 28))
@@ -1142,6 +1185,7 @@ def ensure_hint_photo(photo: HintPhoto | None = None) -> Path:
         CRASH.slug: _generate_crash_still,
         CAPSULE.slug: _generate_capsule_still,
         FIELD.slug: _generate_field_still,
+        GLOBE.slug: _generate_globe_still,
         WEEKLY.slug: _generate_weekly_still,
         CROSS.slug: _generate_cross_still,
         UPROOT.slug: _generate_uproot_still,
