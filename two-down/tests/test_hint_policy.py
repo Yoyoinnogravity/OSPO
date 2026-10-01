@@ -172,8 +172,8 @@ def test_published_pair_gets_distinct_definition_stills():
     assert elicit.hint_image != chicago.hint_image
     assert "ELICIT" not in (elicit.hint_credit or "")
     assert "CHICAGO" not in (chicago.hint_credit or "")
-    bring = match_hint("", clue=elicit.clue, parse=elicit.parse)
-    usa = match_hint("", clue=chicago.clue, parse=chicago.parse)
+    bring = match_hint("Bring out")
+    usa = match_hint("place in the USA")
     assert bring.photo.slug == BRING.slug
     assert bring.closeness >= CLOSE_ENOUGH
     assert usa.photo.slug == USA.slug
@@ -190,12 +190,12 @@ def test_aled_bring_out_and_usa_match_at_80_percent():
     assert leftover.photo.slug == USA.slug
     assert leftover.closeness >= CLOSE_ENOUGH
     leftover = match_hint(
-        "",
+        "Bring out",
         clue="Bring out client I fancy with no end of distinction",
     )
     assert leftover.photo.slug == BRING.slug
     leftover = match_hint(
-        "",
+        "place in the USA",
         clue="Trendy adult board game place in the USA",
         parse="CHIC (elegant and fashionable; trendy) + A (adult) + GO (a board game)",
     )
@@ -248,15 +248,13 @@ def test_default_hint_is_not_the_sleeping_woman():
     assert leftover.photo is not TRANCE
     assert leftover.photo is None
     leftover = match_hint("", clue="Female bearing pressure on field")
-    assert leftover.photo is not None
-    assert leftover.photo.slug == FIELD.slug
-    assert leftover.photo.slug != TRANCE.slug
-    assert leftover.close_enough
-    assert "SPHERE" not in leftover.photo.credit_line
-    assert "sphere" not in leftover.photo.label.lower()
+    assert leftover.photo is not TRANCE
+    assert leftover.photo is None
+    assert not leftover.close_enough
+    assert leftover.line == HINT_MISS
 
 
-def test_sphere_uses_the_field_still_not_trance():
+def test_sphere_misses_when_catalog_has_no_globe():
     from twodown.hints import hint_for_clue, spoken_hint
     from twodown.pipeline import published_clue
 
@@ -264,17 +262,17 @@ def test_sphere_uses_the_field_still_not_trance():
     assert clue.answer == "SPHERE"
     assert clue.clue == "Female bearing pressure on field"
     attached = attach_hint(clue)
-    assert attached.hint_image == f"assets/hints/{FIELD.filename}"
-    assert attached.hint_credit == FIELD.credit_line
-    assert attached.hint_line == HINT_LINE
-    assert hint_for_clue(attached) is not None
-    assert hint_for_clue(attached).slug == FIELD.slug
-    assert hint_for_clue(attached).slug != TRANCE.slug
-    assert spoken_hint(attached) == HINT_LINE
-    assert "SPHERE" not in (attached.hint_credit or "")
+    assert attached.hint_image is None
+    assert attached.hint_credit is None
+    assert attached.hint_line == HINT_MISS
+    assert hint_for_clue(attached) is None
+    assert spoken_hint(attached) == HINT_MISS
     assert "SPHERE" not in attached.hint_line
-    still = PACKAGE_ROOT / attached.hint_image
-    assert still.is_file()
+    globe = match_hint("globe / orb / ball / domain")
+    assert globe.photo is not TRANCE
+    assert globe.photo is not FIELD
+    assert not globe.close_enough
+    assert globe.photo is None
     leftover = Clue(
         source_url=clue.source_url,
         paper=clue.paper,
@@ -292,8 +290,9 @@ def test_sphere_uses_the_field_still_not_trance():
         hint_line=HINT_LINE,
     )
     repaired = attach_hint(leftover)
-    assert repaired.hint_image == f"assets/hints/{FIELD.filename}"
-    assert hint_for_clue(repaired).slug == FIELD.slug
+    assert repaired.hint_image is None
+    assert repaired.hint_line == HINT_MISS
+    assert hint_for_clue(repaired) is None
 
 
 def test_no_cloud_vision_pipeline():

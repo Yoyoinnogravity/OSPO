@@ -425,14 +425,15 @@ CAPSULE = HintPhoto(
 )
 
 
-# Definition still for SPHERE: a field, not she / pressure.
+# A grassy field. That is not the definition of SPHERE (globe / orb / ball).
+# Do not map SPHERE or "female" here. The catalog has no globe still.
 FIELD = HintPhoto(
     slug="field-still",
     label="A field",
     source="generated still",
     license="generated",
     filename="field-still.webp",
-    keywords=frozenset({"field", "fields", "domain", "area", "globe", "orb", "realm"}),
+    keywords=frozenset({"field", "fields", "meadow", "pasture", "grassland"}),
 )
 
 
@@ -593,8 +594,6 @@ PHOTOS: dict[str, HintPhoto] = {
     "capsule": CAPSULE,
     "financial-times-18478-1a": CAPSULE,
     "field": FIELD,
-    "sphere": FIELD,
-    "financial-times-18478-5a": FIELD,
     "weekly": WEEKLY,
     "spectator": WEEKLY,
     "independent-on-sunday-1907-1a": WEEKLY,
@@ -662,11 +661,17 @@ def _edge_phrases(text: str) -> tuple[str, ...]:
 
 
 def hint_texts(definition: str, clue: str = "", parse: str = "") -> tuple[str, ...]:
-    """Definition first, then clue/parse edges. Never the printed answer."""
+    """Definition first. Never the printed answer.
+
+    Score the whole clue or parse only as a block. A leftover surface word
+    such as "field" is wordplay or the wrong sense, not an 80% still.
+    """
     texts: list[str] = []
-    for block in (definition, clue, parse):
+    if definition:
+        texts.extend(_edge_phrases(definition))
+    for block in (clue, parse):
         if block:
-            texts.extend(_edge_phrases(block))
+            texts.append(block)
     seen: list[str] = []
     for text in texts:
         if text and text not in seen:
@@ -686,10 +691,11 @@ def match_hint(
     clue: str = "",
     parse: str = "",
 ) -> MatchedHint:
-    """Pick a still from definition / clue / parse. 80% close is enough; never refuse AI.
+    """Pick a still from the definition. 80% close is enough; never refuse AI.
 
     A miss is honest: close_enough is False and photo is None.
     Never fall back to TRANCE / the sleeping woman. Gender words are ignored.
+    Do not treat a leftover surface word as the definition of the answer.
     """
     del answer  # Hint the definition, not the light — do not leak the answer.
     best: HintPhoto | None = None
@@ -732,11 +738,28 @@ def _photo_from_path(name: str) -> HintPhoto | None:
 
 
 def _matched_photo(clue: Clue) -> HintPhoto | None:
-    """80% definition match, else a slug-mapped still. Never the leftover default."""
+    """80% definition match, else a slug-mapped still. Never the leftover default.
+
+    A slug map is not a green-field stand-in for SPHERE, and never TRANCE
+    unless the definition itself is trance / dream.
+    """
     matched = match_hint(clue.definition or "", clue=clue.clue, parse=clue.parse)
     if matched.close_enough:
         return matched.photo
-    return PHOTOS.get(clue.slug)
+    mapped = PHOTOS.get(clue.slug)
+    if mapped is None:
+        return None
+    if mapped.slug == TRANCE.slug:
+        rematch = match_hint(clue.definition or "", clue=clue.clue, parse=clue.parse)
+        if rematch.close_enough and rematch.photo is not None and rematch.photo.slug == TRANCE.slug:
+            return mapped
+        return None
+    if mapped.slug == FIELD.slug:
+        field = match_hint(clue.definition or "")
+        if field.close_enough and field.photo is not None and field.photo.slug == FIELD.slug:
+            return mapped
+        return None
+    return mapped
 
 
 def hint_for_clue(clue: Clue) -> HintPhoto | None:
