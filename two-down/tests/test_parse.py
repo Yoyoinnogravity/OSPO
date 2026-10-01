@@ -153,13 +153,15 @@ def test_script_opens_with_the_paper_and_setter():
     assert script.index(parts.letters_speech) < script.index("[pause 1s]")
     assert script.index("[pause 1s]") < script.index(parts.think_speech)
     assert script.index(parts.think_speech) < script.index("[pause 3s]")
-    assert script.index("[pause 3s]") < script.index(parts.answer_speech)
-    assert "[pause 2s]" not in script
+    assert script.index("[pause 3s]") < script.index(parts.hint_speech)
+    assert script.index(parts.hint_speech) < script.index("[pause 2s]")
+    assert script.index("[pause 2s]") < script.index(parts.answer_speech)
     assert script.index(parts.answer_speech) < script.index(parts.parse_speech)
     assert script.index(parts.parse_speech) < script.index(parts.outro_speech)
     ssml = to_ssml(parts)
     first_800 = ssml.index('break time="800ms"')
     second_800 = ssml.index('break time="800ms"', first_800 + 1)
+    third_800 = ssml.index('break time="800ms"', second_800 + 1)
     first_250 = ssml.index('break time="250ms"')
     first_300 = ssml.index('break time="300ms"')
     second_300 = ssml.index('break time="300ms"', first_300 + 1)
@@ -168,10 +170,12 @@ def test_script_opens_with_the_paper_and_setter():
     assert ssml.index(parts.clue_speech) < first_250 < ssml.index(parts.letters_speech)
     assert ssml.index(parts.letters_speech) < first_800 < ssml.index(parts.think_speech)
     assert ssml.index(parts.think_speech) < ssml.index('break time="3000ms"')
-    assert ssml.index('break time="3000ms"') < ssml.index(parts.answer_speech)
+    assert ssml.index('break time="3000ms"') < ssml.index(parts.hint_speech)
+    assert ssml.index(parts.hint_speech) < ssml.index('break time="2000ms"')
+    assert ssml.index(parts.hint_speech) < second_800 < ssml.index(parts.answer_speech)
     assert "Here's a hint" not in ssml
-    assert 'break time="2000ms"' not in ssml
-    assert ssml.index(parts.answer_speech) < second_800 < ssml.index(parts.parse_speech)
+    assert "No relevant image found" in ssml
+    assert ssml.index(parts.answer_speech) < third_800 < ssml.index(parts.parse_speech)
     assert ssml.index(parts.parse_speech) < second_300 < ssml.index(parts.outro_speech)
     assert "That's Phi" not in ssml
     assert "Independent" in parts.intro_speech
