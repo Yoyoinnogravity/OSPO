@@ -16,6 +16,8 @@ from twodown.pipeline import (
     smiles_clue,
     davis_cup_clue,
     aimlessly_clue,
+    chicago_clue,
+    elicit_clue,
     mass_media_clue,
 )
 from twodown.script import (
@@ -448,10 +450,8 @@ def test_speech_uses_the_clue_and_the_solution_not_a_web_address():
 
 
 def test_todays_pair_speaks_no_relevant_image_found():
-    from twodown.hints import attach_hint
-
-    elicit = attach_hint(published_clue("guardian-30124-9a"))
-    chicago = attach_hint(published_clue("independent-12473-1a"))
+    elicit = elicit_clue()
+    chicago = chicago_clue()
     assert HINT_MISS == "No relevant image found."
     elicit_parts = write_parts(elicit)
     chicago_parts = write_parts(chicago)
@@ -459,5 +459,7 @@ def test_todays_pair_speaks_no_relevant_image_found():
     assert chicago_parts.hint_speech == HINT_MISS
     assert "Here's a hint." not in elicit_parts.hint_speech
     assert "Here's a hint." not in chicago_parts.hint_speech
+    assert elicit.hint_image is None
+    assert chicago.hint_image is None
     assert "Fifteen Squared" not in elicit_parts.full
     assert "Fifteen Squared" not in chicago_parts.full

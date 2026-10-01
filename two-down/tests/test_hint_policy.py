@@ -1,9 +1,9 @@
 from pathlib import Path
 
 from twodown.config import HINT_LINE, HINT_MISS, PACKAGE_ROOT, PINUP_SLUG, STUDY_SLUG
-from twodown.hints import AIM, CLOSE_ENOUGH, COLE, DAVIS, FATS, PAPERS, RASTA, SMILES, TRANCE, WELLINGTON, attach_hint, match_hint
+from twodown.hints import AIM, CLOSE_ENOUGH, COLE, DAVIS, DEFAULT_HINT, FATS, PAPERS, RASTA, SMILES, TRANCE, WELLINGTON, attach_hint, match_hint
 from twodown.models import Clue
-from twodown.pipeline import aimlessly_clue, cole_clue, davis_cup_clue, dreamlike_clue, fats_clue, mass_media_clue, published_clue, rasta_clue, smiles_clue, study_clue, wellington_clue
+from twodown.pipeline import aimlessly_clue, chicago_clue, cole_clue, davis_cup_clue, dreamlike_clue, elicit_clue, fats_clue, mass_media_clue, published_clue, rasta_clue, smiles_clue, study_clue, wellington_clue
 
 
 def test_study_slug_and_hint_fields_are_mass_media():
@@ -176,8 +176,33 @@ def test_unmatched_published_clue_says_no_relevant_image():
     assert not chicago.hint_image
     assert not elicit.hint_credit
     assert not chicago.hint_credit
-    assert not match_hint(elicit.definition or elicit.clue).close_enough
-    assert not match_hint(chicago.definition or chicago.clue).close_enough
+    leftover = match_hint(elicit.definition or elicit.clue)
+    assert leftover.close_enough is False
+    leftover = match_hint(chicago.definition or chicago.clue)
+    assert leftover.close_enough is False
+
+
+def test_default_still_does_not_attach_without_a_real_match():
+    """The leftover trance / papers still must not ride along on a miss."""
+    banned = {
+        f"assets/hints/{DEFAULT_HINT.filename}",
+        f"assets/hints/{TRANCE.filename}",
+        f"assets/hints/{PAPERS.filename}",
+    }
+    for clue in (
+        elicit_clue(),
+        chicago_clue(),
+        attach_hint(published_clue("guardian-30124-9a")),
+        attach_hint(published_clue("independent-12473-1a")),
+        attach_hint(published_clue(PINUP_SLUG)),
+    ):
+        assert clue.hint_line == HINT_MISS
+        assert clue.hint_image is None
+        assert clue.hint_image not in banned
+        assert clue.hint_credit is None
+    for text in ("Bring out", "place in the USA", "obtain", "final analysis", ""):
+        matched = match_hint(text)
+        assert matched.close_enough is False
 
 
 def test_no_cloud_vision_pipeline():

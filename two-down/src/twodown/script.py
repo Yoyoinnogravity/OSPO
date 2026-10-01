@@ -9,6 +9,7 @@ from twodown.config import (
     CLUE_LETTERS_GAP_SECONDS,
     HINT_HOLD_SECONDS,
     HINT_LINE,
+    HINT_MISS,
     HINT_PAUSE_SECONDS,
     INTRO_GAP_SECONDS,
     INTRO_LINE,
@@ -303,7 +304,9 @@ def write_parts(clue: Clue) -> ScriptParts:
         clue_speech=_strip_site_code(f"{clue.clue}."),
         letters_speech=_strip_site_code(speak_enumeration(clue.enumeration)),
         think_speech=_strip_site_code(THINK_PROMPT),
-        hint_speech=_strip_site_code(clue.hint_line or HINT_LINE),
+        hint_speech=_strip_site_code(
+            clue.hint_line or (HINT_LINE if clue.hint_image else HINT_MISS)
+        ),
         answer_speech=_strip_site_code(speak_answer(clue.answer)),
         parse_speech=_strip_site_code(
             speak_parse_asides(speak_parse_tokens(f"{parse}{meaning}".strip()))

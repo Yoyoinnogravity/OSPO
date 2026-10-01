@@ -407,25 +407,31 @@ def _closeness(needles: frozenset[str], keywords: frozenset[str]) -> float:
 
 
 def match_hint(definition: str, answer: str | None = None) -> MatchedHint:
-    """Pick a still from the definition text. 80% close is enough; never refuse AI."""
+    """Pick a still from the definition text. 80% close is enough; never refuse AI.
+
+    A miss keeps close_enough False. Callers must not paste DEFAULT_HINT.
+    """
     del answer  # Hint the definition, not the light — do not leak the answer.
     needles = _tokens(definition)
-    best = DEFAULT_HINT
-    score = _closeness(needles, best.keywords)
+    best: HintPhoto | None = None
+    score = 0.0
     for photo in _catalog():
         closeness = _closeness(needles, photo.keywords)
         if closeness > score:
             best, score = photo, closeness
-    return MatchedHint(photo=best, closeness=score, close_enough=score >= CLOSE_ENOUGH)
+    if best is None or score < CLOSE_ENOUGH:
+        return MatchedHint(photo=DEFAULT_HINT, closeness=score, close_enough=False)
+    return MatchedHint(photo=best, closeness=score, close_enough=True)
 
 
 def get_hint_photo(slug: str | None = None) -> HintPhoto:
-    """Resolve a still by slug. Unknown slugs auto-match. AI stills are allowed."""
+    """Resolve a still by slug. Unmatched slugs do not attach the leftover default."""
     if slug in PHOTOS:
         return PHOTOS[slug]
     if not slug:
         return DEFAULT_HINT
-    return match_hint(slug).photo
+    matched = match_hint(slug)
+    return matched.photo if matched.close_enough else DEFAULT_HINT
 
 
 def hint_for_clue(clue: Clue) -> HintPhoto | None:

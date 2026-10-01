@@ -343,6 +343,69 @@ def mass_media_clue() -> Clue:
     )
 
 
+_ELICIT_SOURCE = (
+    "https://fifteensquared.net/2026/09/29/guardian-cryptic-crossword-no-30124-by-chandler/"
+)
+_CHICAGO_SOURCE = (
+    "https://fifteensquared.net/2026/09/29/independent-12473-bard/"
+)
+
+
+def elicit_clue() -> Clue:
+    """Guardian 30124 9a ELICIT. Bring out / obtain has no matching still."""
+    return attach_hint(
+        Clue(
+            source_url=_ELICIT_SOURCE,
+            paper="Guardian",
+            puzzle_id="30124",
+            setter="Chandler",
+            blogger="manehi",
+            number="9",
+            direction="across",
+            clue="Bring out client I fancy with no end of distinction",
+            enumeration="6",
+            answer="ELICIT",
+            definition="Bring out",
+            parse='anagram/"fancy" of (client I)*, without the n ("no end of distinction ")',
+            device="anagram",
+            enumeration_ok=True,
+        )
+    )
+
+
+def chicago_clue() -> Clue:
+    """Independent 12473 1a CHICAGO. Place in the USA has no matching still."""
+    return attach_hint(
+        Clue(
+            source_url=_CHICAGO_SOURCE,
+            paper="Independent",
+            puzzle_id="12473",
+            setter="Bard",
+            blogger="duncanshiell",
+            number="1",
+            direction="across",
+            clue="Trendy adult board game place in the USA",
+            enumeration="7",
+            answer="CHICAGO",
+            definition="place in the USA",
+            parse="CHIC (elegant and fashionable; trendy) + A (adult) + GO (a board game) CHIC A GO",
+            device="charade",
+            enumeration_ok=True,
+        )
+    )
+
+
+def live_pair_clues() -> dict[str, Clue]:
+    elicit = elicit_clue()
+    chicago = chicago_clue()
+    return {
+        elicit.slug: elicit,
+        chicago.slug: chicago,
+        elicit.answer.lower(): elicit,
+        chicago.answer.lower(): chicago,
+    }
+
+
 def study_clues() -> dict[str, Clue]:
     """MASS MEDIA is the study default. Earlier study clues stay constructable."""
     dreamlike = dreamlike_clue()
@@ -406,7 +469,7 @@ def resolve_clue(slug: str, site_root: Path | None = None, clue: Clue | None = N
     """Prefer a passed Clue, then a constructed study clue, then published site HTML."""
     if clue is not None:
         return attach_hint(clue)
-    constructed = study_clue(slug)
+    constructed = study_clue(slug) or live_pair_clues().get(slug or "")
     if constructed is not None:
         return constructed
     return attach_hint(published_clue(slug, site_root))
