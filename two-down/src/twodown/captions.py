@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from twodown.config import BRAND, BRAND_PROMISE, CREDIT_LINE, SITE_ORIGIN, THINK_PROMPT
+from twodown.config import BRAND, BRAND_PROMISE, CREDIT_LINE, SITE_ORIGIN, TAGLINE, THINK_PROMPT
 from twodown.models import Clue, SpokenClue
 from twodown.scenes import get_scene
 
@@ -40,16 +40,16 @@ def facebook_title(clue: Clue) -> str:
 
 
 def youtube_description(item: SpokenClue) -> str:
+    """Studio / API blurb. Clue only — never the answer, never the source blog."""
     clue = item.clue
     page = item.site_path or SITE_ORIGIN
     return (
         f"{SOCIAL_HANDLE} — {BRAND_PROMISE}.\n"
-        f"{CREDIT_LINE}\n\n"
-        f"{clue_line(clue)}\n"
-        f"Answer: {clue.answer}\n\n"
+        f"{CREDIT_LINE}\n"
+        f"{TAGLINE}\n\n"
+        f"{clue_line(clue)}\n\n"
         f"{page}\n"
         f"Support: {SITE_ORIGIN}/support.html\n"
-        f"Parse: {clue.source_url}\n"
         f"{clue.paper} {clue.puzzle_id} by {clue.setter}. "
         f"Blogged by {clue.blogger}.\n"
         f"{get_scene(item.scene).youtube_credit}\n"

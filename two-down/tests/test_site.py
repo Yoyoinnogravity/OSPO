@@ -136,6 +136,10 @@ def test_publish_site_writes_spoiler_pages(tmp_path):
     assert "https://cryptic.fit/media/independent-12458-12a.mp4" in upload_page
     assert "Open YouTube Studio" in upload_page
     assert "Fifteen Squared" not in upload_page
+    assert "fifteensquared.net" not in upload_page
+    assert "Answer:" not in upload_page
+    assert "END RESULT" not in upload_page
+    assert "Solve it, I know you can." in upload_page
     assert "adsbygoogle" not in upload_page
     assert "All the Shorts" in index
     assert "Solve it, I know you can." in index
@@ -415,8 +419,12 @@ def test_youtube_titles_use_cryptic_fun_channel():
     assert "https://cryptic.fit/support.html" in youtube_description(_item())
     assert "unique cryptic crossword clues and solutions" in youtube_description(_item())
     assert "We credit all" in youtube_description(_item())
+    assert "Solve it, I know you can." in youtube_description(_item())
     assert "Fifteen Squared" not in youtube_description(_item())
+    assert "fifteensquared.net" not in youtube_description(_item())
     assert "Blogged by" in youtube_description(_item())
+    assert "Answer:" not in youtube_description(_item())
+    assert "END RESULT" not in youtube_description(_item())
 
 
 def test_ads_on_writes_ads_txt_and_unit(tmp_path, monkeypatch):

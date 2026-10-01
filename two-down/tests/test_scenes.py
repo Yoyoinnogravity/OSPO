@@ -124,3 +124,7 @@ def test_youtube_description_credits_the_photograph():
     assert scene.photographer in text
     assert scene.license in text
     assert "Wikimedia" in text
+    assert "BELLHOP" not in text
+    assert "Answer:" not in text
+    assert "fifteensquared.net" not in text
+    assert "Solve it, I know you can." in text
