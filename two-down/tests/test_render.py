@@ -423,17 +423,43 @@ def test_hint_card_keeps_empty_lights(tmp_path: Path):
     assert any(pixel != NEWS_BG for pixel in photo.get_flattened_data())
 
 
-def test_sphere_hint_beat_says_no_relevant_image(tmp_path: Path):
+def test_bellhop_hint_beat_uses_generated_hotel_worker_still(tmp_path: Path):
     from PIL import Image
 
-    from twodown.config import CREAM, HINT_MISS, NEWS_BG
-    from twodown.hints import FIELD, TRANCE, hint_for_clue
+    from twodown.config import HINT_LINE, NEWS_BG
+    from twodown.hints import PORTER, TRANCE, hint_for_clue
+    from twodown.pipeline import published_clue
+
+    clue = published_clue("independent-12458-11a")
+    assert clue.answer == "BELLHOP"
+    assert hint_for_clue(clue).slug == PORTER.slug
+    assert clue.hint_line == HINT_LINE
+    assert clue.hint_image == f"assets/hints/{PORTER.filename}"
+    path = draw_beat(clue, tmp_path / "bellhop-hint.png", "hint")
+    img = Image.open(path)
+    assert img.size == (1080, 1920)
+    assert img.getpixel((24, 40)) == NEWS_BG
+    raw = path.read_bytes()
+    assert b"BELLHOP" not in raw
+    assert b"bellhop" not in raw.lower()
+    photo = img.crop((140, 1040, 940, 1580))
+    assert any(pixel != NEWS_BG for pixel in photo.get_flattened_data())
+    trance = Image.open(TRANCE.path).convert("RGB")
+    assert img.getpixel((540, 1200)) != trance.getpixel((trance.size[0] // 2, trance.size[1] // 2))
+
+
+def test_sphere_hint_beat_uses_the_globe_still(tmp_path: Path):
+    from PIL import Image
+
+    from twodown.config import CREAM, HINT_LINE, NEWS_BG
+    from twodown.hints import FIELD, GLOBE, TRANCE, hint_for_clue
     from twodown.pipeline import published_clue
 
     clue = published_clue("financial-times-18478-5a")
     assert clue.answer == "SPHERE"
-    assert hint_for_clue(clue) is None
-    assert clue.hint_line == HINT_MISS
+    assert hint_for_clue(clue).slug == GLOBE.slug
+    assert clue.hint_line == HINT_LINE
+    assert clue.hint_image == f"assets/hints/{GLOBE.filename}"
     path = draw_beat(clue, tmp_path / "sphere-hint.png", "hint")
     img = Image.open(path)
     assert img.size == (1080, 1920)
@@ -445,11 +471,17 @@ def test_sphere_hint_beat_says_no_relevant_image(tmp_path: Path):
     assert b"sphere" not in raw.lower()
     band = img.crop((140, 1040, 940, 1580))
     newsprint = sum(1 for pixel in band.get_flattened_data() if pixel == NEWS_BG)
-    assert newsprint > 200_000
+    assert newsprint < 80_000
+    inset = img.getpixel((540, 1200))
     trance = Image.open(TRANCE.path).convert("RGB")
     field = Image.open(FIELD.path).convert("RGB")
-    assert img.getpixel((540, 1200)) != trance.getpixel((trance.size[0] // 2, trance.size[1] // 2))
-    assert img.getpixel((540, 1200)) != field.getpixel((field.size[0] // 2, field.size[1] // 2))
+    globe = Image.open(GLOBE.path).convert("RGB")
+    assert inset != trance.getpixel((trance.size[0] // 2, trance.size[1] // 2))
+    assert inset != field.getpixel((field.size[0] // 2, field.size[1] // 2))
+    assert inset != NEWS_BG
+    # Globe still is a dark orb on black, not a green meadow.
+    assert inset[1] < 140 or inset[2] > inset[1]
+    assert globe.size[0] >= 640
 
 
 def test_unmatched_hint_beat_has_empty_lights_and_no_photo(tmp_path: Path):

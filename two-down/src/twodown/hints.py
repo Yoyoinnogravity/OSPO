@@ -481,13 +481,14 @@ TIPS = HintPhoto(
 )
 
 
-# Definition still for BELLHOP: hotel worker, not guts / work.
+# Definition still for BELLHOP: a hotel worker, not guts / work.
+# Generated unique still (AI matching allowed). Never print BELLHOP.
 PORTER = HintPhoto(
-    slug="porter-still",
+    slug="hotel-worker-still",
     label="Hotel worker",
     source="generated still",
     license="generated",
-    filename="porter-still.webp",
+    filename="hotel-worker-still.webp",
     keywords=frozenset({"hotel", "worker", "porter", "bell", "page"}),
 )
 
@@ -607,7 +608,10 @@ PHOTOS: dict[str, HintPhoto] = {
     "extremities": TIPS,
     "independent-12459-12a": TIPS,
     "porter": PORTER,
+    "porter-still": PORTER,
     "bellhop": PORTER,
+    "hotel-worker": PORTER,
+    "hotel-worker-still": PORTER,
     "independent-12458-11a": PORTER,
     "xyz": XYZ,
     "axes": XYZ,
