@@ -1017,9 +1017,9 @@ def _copy_media(pair: DailyPair, dest: Path) -> None:
     for item in pair.clues:
         if item.video_path:
             source = Path(item.video_path)
-            dest = media / f"{item.clue.slug}.mp4"
+            film = media / f"{item.clue.slug}.mp4"
             if source.exists() and looks_like_media(source):
-                publish_short_to_media(source, dest)
+                publish_short_to_media(source, film)
             # Dummy or mute files stay off site/media. HTML can still point at the slug.
         if item.thumbnail_path:
             _copy_poster(item.thumbnail_path, media / f"{item.clue.slug}-poster.webp")
