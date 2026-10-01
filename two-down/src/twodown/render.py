@@ -505,6 +505,8 @@ def _motion_clip(clue: Clue, beat: str, seconds: float, folder: Path) -> Path:
         raise RuntimeError("ffmpeg is required to build the Short")
     seconds = max(float(seconds), 0.24)
     frames = max(4, int(round(seconds * 6)))
+    if folder.exists():
+        shutil.rmtree(folder)
     folder.mkdir(parents=True, exist_ok=True)
     base = _paint_beat(clue, beat)
     for index in range(frames):
@@ -544,6 +546,7 @@ def _concat_motion(clips: list[Path], audio: Path, dest: Path) -> Path:
         raise RuntimeError("ffmpeg is required to build the Short")
     listing = dest.with_suffix(".concat.txt")
     listing.write_text("".join(f"file '{path}'\n" for path in clips), encoding="utf-8")
+    hold = max(_ffprobe_seconds(audio), 1.0)
     subprocess.run(
         [
             ffmpeg,
@@ -586,7 +589,8 @@ def _concat_motion(clips: list[Path], audio: Path, dest: Path) -> Path:
             "2",
             "-movflags",
             "+faststart",
-            "-shortest",
+            "-t",
+            f"{hold:.3f}",
             str(dest),
         ],
         check=True,
@@ -607,7 +611,9 @@ def render_video(
     dest.parent.mkdir(parents=True, exist_ok=True)
     duration = _ffprobe_seconds(audio)
     if clue is not None:
-        work = Path("/tmp/twodown-beats") / dest.stem
+        work = Path("/tmp/twodown-beats") / dest.parent.name / dest.stem
+        if work.exists():
+            shutil.rmtree(work)
         work.mkdir(parents=True, exist_ok=True)
         if timings is None:
             slice_ = max(0.6, duration / 8)

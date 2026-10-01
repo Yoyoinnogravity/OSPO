@@ -53,7 +53,9 @@ from twodown.config import (
     VOICES,
 )
 from twodown.render import AUDIO_LOUDNESS, ShortTimings, audio_seconds
-from twodown.script import ScriptParts, to_ssml
+from twodown.script import ScriptParts
+
+_SSML_MARKUP = re.compile(r"<\s*speak\b|2001/10/synthesis", re.I)
 
 
 def resolve_voice(name: str | None) -> str:
@@ -78,8 +80,10 @@ async def _synth(
     volume: str = VOICE_VOLUME,
 ) -> None:
     dest.parent.mkdir(parents=True, exist_ok=True)
-    # Plain speech only. Full <speak> documents get escaped by edge-tts and
-    # the voice starts reading the markup.
+    # Plain speech only. A full <speak> document is escaped by edge-tts and
+    # the voice reads "speak version" plus the xmlns out loud.
+    if _SSML_MARKUP.search(script or ""):
+        raise ValueError("plain speech only; SSML is read aloud as markup")
     communicate = edge_tts.Communicate(
         script, voice=voice, rate=rate, pitch=pitch, volume=volume
     )
@@ -114,8 +118,10 @@ def synthesise_parts(
     voice: str | None = None,
     pause_seconds: float | None = None,
 ) -> Path:
-    ssml = to_ssml(parts, pause_seconds) if pause_seconds is not None else to_ssml(parts)
-    return synthesise(ssml, dest, voice)
+    """Speak the beats as plain lines. Never send SSML to the voice."""
+    del pause_seconds
+    build_short_soundtrack(parts, dest, voice)
+    return dest
 
 
 def _speech_sentences(text: str) -> list[str]:
@@ -177,7 +183,9 @@ def synthesise_spoken_paragraph(
 def build_short_soundtrack(parts: ScriptParts, dest: Path, voice: str | None = None) -> ShortTimings:
     """Speak each beat, then stitch the pauses so the picture can follow the voice."""
     dest.parent.mkdir(parents=True, exist_ok=True)
-    work = Path("/tmp/twodown-beats") / dest.stem
+    work = Path("/tmp/twodown-beats") / dest.parent.name / dest.stem
+    if work.exists():
+        shutil.rmtree(work)
     work.mkdir(parents=True, exist_ok=True)
     clips = {
         "intro": synthesise(

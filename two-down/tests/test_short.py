@@ -1,3 +1,7 @@
+import inspect
+
+import pytest
+
 from twodown.config import CLUE_PITCH, CLUE_RATE, DEFAULT_VOICE_ALIAS, HINT_LINE, HINT_LOOK, HINT_OFFER, HINT_VOICE_ALIAS, INTRO_LINE, INTRO_RATE, INTRO_VOICE_ALIAS, PINUP_SLUG, SOURCE_VOICE_ALIAS, STUDY_SLUG, VOICE_RATE, VOICES
 from twodown.models import Clue
 from twodown.pipeline import (
@@ -22,13 +26,27 @@ from twodown.script import (
     speak_source,
     write_parts,
 )
-from twodown.voice import _speech_sentences
+from twodown.voice import _speech_sentences, build_short_soundtrack, synthesise, synthesise_parts
 
 
 def test_solver_voice_is_cryptic_croc():
     assert DEFAULT_VOICE_ALIAS == "croc"
     assert VOICES["croc"] == "en-US-JennyNeural"
     assert VOICE_RATE == "+0%"
+
+
+def test_voice_refuses_ssml_markup(tmp_path):
+    dest = tmp_path / "markup.mp3"
+    with pytest.raises(ValueError, match="plain speech"):
+        synthesise(
+            '<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis">Hello.</speak>',
+            dest,
+        )
+    assert not dest.exists()
+    source = inspect.getsource(synthesise_parts)
+    assert "to_ssml" not in source
+    assert "build_short_soundtrack" in source
+    assert inspect.getsource(build_short_soundtrack).count("synthesise(") >= 8
 
 
 def test_parse_is_split_into_spoken_sentences():
@@ -340,3 +358,6 @@ def test_speech_uses_the_clue_and_the_solution_not_a_web_address():
     assert "uproots" in parts.answer_speech
     assert "Troops in disarray" in parts.clue_speech
     assert "cryptic.fit" in parts.outro_speech
+    assert "speak version" not in spoken
+    assert "<speak" not in spoken
+    assert "xmlns" not in spoken
