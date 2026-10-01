@@ -27,7 +27,7 @@ from twodown.config import (
     pick_wisdom,
 )
 from twodown.croc import paste_croc
-from twodown.hints import ensure_hint_photo, hint_for_clue
+from twodown.hints import attach_hint, ensure_hint_photo, hint_for_clue
 from twodown.models import Clue
 from twodown.scenes import DEFAULT_SCENE, Scene, get_scene
 from twodown.script import _spoken_parse
@@ -212,6 +212,7 @@ def _draw_hint_photo(
     clue: Clue,
 ) -> int:
     """Inset a credited hint still. Never a full-bleed travel photo."""
+    clue = attach_hint(clue)
     matched = hint_for_clue(clue)
     photo = Image.open(ensure_hint_photo(matched)).convert("RGB")
     frame_w, frame_h = 900, 560
@@ -301,6 +302,7 @@ def _paint_beat(clue: Clue, beat: str) -> Image.Image:
 
 def compose_beat(clue: Clue, beat: str = "think", frame: int = 0) -> Image.Image:
     """One frame of a beat, with Cryptic Croc in that pose."""
+    clue = attach_hint(clue)
     img = _paint_beat(clue, beat)
     paste_croc(img, beat, frame)
     return img

@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from twodown.config import HINT_LINE, PACKAGE_ROOT, PINUP_SLUG, STUDY_SLUG
-from twodown.hints import AIM, CLOSE_ENOUGH, COLE, DAVIS, FATS, PAPERS, RASTA, SMILES, TRANCE, WELLINGTON, attach_hint, match_hint
+from twodown.hints import AIM, AUTHOR, BRING, CLOSE_ENOUGH, COLE, CROSS, DAVIS, FATS, MODEL, PAPERS, RASTA, SMILES, TRANCE, USA, WELLINGTON, attach_hint, match_hint
 from twodown.models import Clue
 from twodown.pipeline import aimlessly_clue, cole_clue, davis_cup_clue, dreamlike_clue, fats_clue, mass_media_clue, published_clue, rasta_clue, smiles_clue, study_clue, wellington_clue
 
@@ -137,11 +137,12 @@ def test_ai_matching_is_allowed():
     assert attached.hint_line == HINT_LINE
 
 
-def test_published_clues_have_optional_hint_fields():
+def test_published_clues_attach_a_definition_hint():
     pinup = published_clue(PINUP_SLUG)
-    assert pinup.hint_image is None
-    assert pinup.hint_credit is None
-    assert pinup.hint_line is None
+    assert pinup.hint_image == f"assets/hints/{MODEL.filename}"
+    assert pinup.hint_credit == MODEL.credit_line
+    assert pinup.hint_line == HINT_LINE
+    assert "PIN-UP" not in (pinup.hint_credit or "")
     blank = Clue(
         source_url="https://fifteensquared.net/example/",
         paper="Independent",
@@ -156,12 +157,50 @@ def test_published_clues_have_optional_hint_fields():
         parse="PUP containing IN",
     )
     assert blank.hint_image is None
-    assert blank.hint_credit is None
-    assert blank.hint_line is None
     attached = attach_hint(blank)
     assert attached.hint_line == HINT_LINE
-    assert attached.hint_image
-    assert attached.hint_credit
+    assert attached.hint_image == f"assets/hints/{MODEL.filename}"
+
+
+def test_published_pair_gets_distinct_definition_stills():
+    elicit = published_clue("guardian-30124-9a")
+    chicago = published_clue("independent-12473-1a")
+    assert elicit.answer == "ELICIT"
+    assert chicago.answer == "CHICAGO"
+    assert elicit.hint_image == f"assets/hints/{BRING.filename}"
+    assert chicago.hint_image == f"assets/hints/{USA.filename}"
+    assert elicit.hint_image != chicago.hint_image
+    assert "ELICIT" not in (elicit.hint_credit or "")
+    assert "CHICAGO" not in (chicago.hint_credit or "")
+    bring = match_hint("", clue=elicit.clue, parse=elicit.parse)
+    usa = match_hint("", clue=chicago.clue, parse=chicago.parse)
+    assert bring.photo.slug == BRING.slug
+    assert bring.closeness >= CLOSE_ENOUGH
+    assert usa.photo.slug == USA.slug
+    assert usa.closeness >= CLOSE_ENOUGH
+    assert (PACKAGE_ROOT / elicit.hint_image).is_file()
+    assert (PACKAGE_ROOT / chicago.hint_image).is_file()
+
+
+def test_aled_bring_out_and_usa_match_at_80_percent():
+    leftover = match_hint("Bring out")
+    assert leftover.photo.slug == BRING.slug
+    assert leftover.closeness >= CLOSE_ENOUGH
+    leftover = match_hint("place in the USA")
+    assert leftover.photo.slug == USA.slug
+    assert leftover.closeness >= CLOSE_ENOUGH
+    leftover = match_hint(
+        "",
+        clue="Bring out client I fancy with no end of distinction",
+    )
+    assert leftover.photo.slug == BRING.slug
+    leftover = match_hint(
+        "",
+        clue="Trendy adult board game place in the USA",
+        parse="CHIC (elegant and fashionable; trendy) + A (adult) + GO (a board game)",
+    )
+    assert leftover.photo.slug == USA.slug
+
 
 
 def test_no_cloud_vision_pipeline():

@@ -323,6 +323,28 @@ def test_hint_beat_does_not_spoil_rasta(tmp_path: Path):
     assert b"rasta" not in raw.lower()
 
 
+def test_published_pair_hint_beats_use_different_stills(tmp_path: Path):
+    from PIL import Image
+
+    from twodown.hints import BRING, USA
+    from twodown.pipeline import published_clue
+
+    elicit = published_clue("guardian-30124-9a")
+    chicago = published_clue("independent-12473-1a")
+    assert elicit.hint_image == f"assets/hints/{BRING.filename}"
+    assert chicago.hint_image == f"assets/hints/{USA.filename}"
+    elicit_hint = Image.open(draw_beat(elicit, tmp_path / "elicit-hint.png", "hint"))
+    chicago_hint = Image.open(draw_beat(chicago, tmp_path / "chicago-hint.png", "hint"))
+    elicit_photo = list(elicit_hint.crop((140, 1040, 940, 1580)).get_flattened_data())
+    chicago_photo = list(chicago_hint.crop((140, 1040, 940, 1580)).get_flattened_data())
+    assert elicit_photo != chicago_photo
+    assert elicit_hint.getpixel((540, 1200)) != chicago_hint.getpixel((540, 1200))
+    raw_elicit = (tmp_path / "elicit-hint.png").read_bytes()
+    raw_chicago = (tmp_path / "chicago-hint.png").read_bytes()
+    assert b"ELICIT" not in raw_elicit
+    assert b"CHICAGO" not in raw_chicago
+
+
 def test_hint_beat_does_not_spoil_dreamlike(tmp_path: Path):
     from PIL import Image
 

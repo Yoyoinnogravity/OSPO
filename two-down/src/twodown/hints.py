@@ -324,6 +324,162 @@ COLE = HintPhoto(
 )
 
 
+
+# Definition still for ELICIT: bring out / draw forth.
+# Generated still (AI matching allowed). Never print ELICIT.
+BRING = HintPhoto(
+    slug="bring-still",
+    label="Bring out",
+    source="generated still",
+    license="generated",
+    filename="bring-still.webp",
+    keywords=frozenset({"bring", "out", "draw", "extract", "evoke", "obtain", "educe"}),
+)
+
+
+# Definition still for CHICAGO: a place in the USA. Generic skyline. Never print CHICAGO.
+USA = HintPhoto(
+    slug="usa-still",
+    label="A place in the USA",
+    source="generated still",
+    license="generated",
+    filename="usa-still.webp",
+    keywords=frozenset({"place", "usa", "city", "america", "american", "states"}),
+)
+
+
+# Definition still for PIN-UP: a model, not pup / in.
+MODEL = HintPhoto(
+    slug="model-still",
+    label="A model",
+    source="generated still",
+    license="generated",
+    filename="model-still.webp",
+    keywords=frozenset({"model", "models", "pose", "glamour", "portrait"}),
+)
+
+
+# Definition still for SELF: this author / Will, not sell / fiction.
+AUTHOR = HintPhoto(
+    slug="author-still",
+    label="This author",
+    source="generated still",
+    license="generated",
+    filename="author-still.webp",
+    keywords=frozenset({"will", "author", "writer", "novelist", "book"}),
+)
+
+
+# Definition still for MASCARA: make-up, not old ladies / artist.
+MAKEUP = HintPhoto(
+    slug="makeup-still",
+    label="Make-up",
+    source="generated still",
+    license="generated",
+    filename="makeup-still.webp",
+    keywords=frozenset({"makeup", "make", "cosmetic", "cosmetics", "paint"}),
+)
+
+
+# Definition still for SMASH-UP: a car crash, not sabbath / remix.
+CRASH = HintPhoto(
+    slug="crash-still",
+    label="A car crash",
+    source="generated still",
+    license="generated",
+    filename="crash-still.webp",
+    keywords=frozenset({"car", "crash", "smash", "wreck", "collision"}),
+)
+
+
+# Definition still for CAPSULE: space unit / life-supporting. Never print CAPSULE.
+CAPSULE = HintPhoto(
+    slug="capsule-still",
+    label="Space unit",
+    source="generated still",
+    license="generated",
+    filename="capsule-still.webp",
+    keywords=frozenset({"space", "unit", "life", "supporting", "craft"}),
+)
+
+
+# Definition still for SPHERE: a field, not she / pressure.
+FIELD = HintPhoto(
+    slug="field-still",
+    label="A field",
+    source="generated still",
+    license="generated",
+    filename="field-still.webp",
+    keywords=frozenset({"field", "fields", "domain", "area"}),
+)
+
+
+# Definition still for THE SPECTATOR: a weekly, not the title.
+WEEKLY = HintPhoto(
+    slug="weekly-still",
+    label="A weekly",
+    source="generated still",
+    license="generated",
+    filename="weekly-still.webp",
+    keywords=frozenset({"weekly", "magazine", "periodical", "journal"}),
+)
+
+
+# Definition still for FUMING: cross / angry, not a Manchu dynasty.
+CROSS = HintPhoto(
+    slug="cross-still",
+    label="Cross",
+    source="generated still",
+    license="generated",
+    filename="cross-still.webp",
+    keywords=frozenset({"cross", "angry", "anger", "annoyed", "ire"}),
+)
+
+
+# Definition still for UPROOTS: pulls out completely.
+UPROOT = HintPhoto(
+    slug="uproot-still",
+    label="Pulls out completely",
+    source="generated still",
+    license="generated",
+    filename="uproot-still.webp",
+    keywords=frozenset({"pull", "pulls", "completely", "uproot", "remove"}),
+)
+
+
+# Definition still for EXTREMITIES: ties and tails (hands and feet).
+TIPS = HintPhoto(
+    slug="tips-still",
+    label="Ties and tails",
+    source="generated still",
+    license="generated",
+    filename="tips-still.webp",
+    keywords=frozenset({"ties", "tails", "hands", "feet", "ends"}),
+)
+
+
+# Definition still for BELLHOP: hotel worker, not guts / work.
+PORTER = HintPhoto(
+    slug="porter-still",
+    label="Hotel worker",
+    source="generated still",
+    license="generated",
+    filename="porter-still.webp",
+    keywords=frozenset({"hotel", "worker", "porter", "bell", "page"}),
+)
+
+
+# Definition still for AXES: X, Y and Z. Never print AXES.
+XYZ = HintPhoto(
+    slug="xyz-still",
+    label="X, Y and Z",
+    source="generated still",
+    license="generated",
+    filename="xyz-still.webp",
+    keywords=frozenset({"x", "y", "z"}),
+)
+
+
 # Commons alternate: imperial Ethiopian / Rastafari Lion of Judah flag.
 LION = HintPhoto(
     slug="lion-of-judah",
@@ -346,6 +502,20 @@ PHOTOS: dict[str, HintPhoto] = {
     DAVIS.slug: DAVIS,
     AIM.slug: AIM,
     PAPERS.slug: PAPERS,
+    BRING.slug: BRING,
+    USA.slug: USA,
+    MODEL.slug: MODEL,
+    AUTHOR.slug: AUTHOR,
+    MAKEUP.slug: MAKEUP,
+    CRASH.slug: CRASH,
+    CAPSULE.slug: CAPSULE,
+    FIELD.slug: FIELD,
+    WEEKLY.slug: WEEKLY,
+    CROSS.slug: CROSS,
+    UPROOT.slug: UPROOT,
+    TIPS.slug: TIPS,
+    PORTER.slug: PORTER,
+    XYZ.slug: XYZ,
     LION.slug: LION,
     "dreamlike": TRANCE,
     "trance": TRANCE,
@@ -379,18 +549,68 @@ PHOTOS: dict[str, HintPhoto] = {
     "mass media": PAPERS,
     "financial-times-18483-1a": PAPERS,
     "study-mass-media-4-5": PAPERS,
+    "bring": BRING,
+    "elicit": BRING,
+    "guardian-30124-9a": BRING,
+    "usa": USA,
+    "chicago": USA,
+    "independent-12473-1a": USA,
+    "model": MODEL,
+    "pin-up": MODEL,
+    "pinup": MODEL,
+    "independent-12462-6a": MODEL,
+    "author": AUTHOR,
+    "self": AUTHOR,
+    "guardian-30113-9a": AUTHOR,
+    "makeup": MAKEUP,
+    "mascara": MAKEUP,
+    "guardian-30112-1a": MAKEUP,
+    "crash": CRASH,
+    "smash-up": CRASH,
+    "guardian-30112-5a": CRASH,
+    "capsule": CAPSULE,
+    "financial-times-18478-1a": CAPSULE,
+    "field": FIELD,
+    "sphere": FIELD,
+    "financial-times-18478-5a": FIELD,
+    "weekly": WEEKLY,
+    "spectator": WEEKLY,
+    "independent-on-sunday-1907-1a": WEEKLY,
+    "cross": CROSS,
+    "fuming": CROSS,
+    "independent-on-sunday-1907-9a": CROSS,
+    "uproot": UPROOT,
+    "uproots": UPROOT,
+    "independent-12459-8a": UPROOT,
+    "tips": TIPS,
+    "extremities": TIPS,
+    "independent-12459-12a": TIPS,
+    "porter": PORTER,
+    "bellhop": PORTER,
+    "independent-12458-11a": PORTER,
+    "xyz": XYZ,
+    "axes": XYZ,
+    "financial-times-18477-14a": XYZ,
 }
 
 DEFAULT_HINT = TRANCE
 
 
+
 def _catalog() -> tuple[HintPhoto, ...]:
-    return (TRANCE, MOONLIT, RASTA, FATS, WELLINGTON, COLE, SMILES, DAVIS, AIM, PAPERS, LION)
+    return (
+        TRANCE, MOONLIT, RASTA, FATS, WELLINGTON, COLE, SMILES, DAVIS, AIM, PAPERS,
+        BRING, USA, MODEL, AUTHOR, MAKEUP, CRASH, CAPSULE, FIELD, WEEKLY, CROSS,
+        UPROOT, TIPS, PORTER, XYZ, LION,
+    )
 
 
 def _tokens(text: str) -> frozenset[str]:
-    words = re.findall(r"[a-z]+", (text or "").lower())
-    kept = {w for w in words if w not in _STOP and len(w) > 2}
+    raw = (text or "").lower()
+    words = re.findall(r"[a-z]+", raw)
+    kept = {w for w in words if w not in _STOP and (len(w) > 2 or w in {"x", "y", "z"})}
+    for compound in re.findall(r"[a-z]+-[a-z]+", raw):
+        kept.add(compound.replace("-", ""))
     stems = set(kept)
     for word in kept:
         for suffix in ("ing", "ed", "es", "like", "y", "s"):
@@ -400,23 +620,60 @@ def _tokens(text: str) -> frozenset[str]:
     return frozenset(stems)
 
 
+def _edge_phrases(text: str) -> tuple[str, ...]:
+    """First and last few words — the usual home of a cryptic definition."""
+    words = re.findall(r"[A-Za-z]+(?:-[A-Za-z]+)?", text or "")
+    if not words:
+        return ()
+    phrases = [text]
+    for n in range(1, 5):
+        if len(words) >= n:
+            phrases.append(" ".join(words[:n]))
+            phrases.append(" ".join(words[-n:]))
+    return tuple(phrases)
+
+
+def hint_texts(definition: str, clue: str = "", parse: str = "") -> tuple[str, ...]:
+    """Definition first, then clue/parse edges. Never the printed answer."""
+    texts: list[str] = []
+    for block in (definition, clue, parse):
+        if block:
+            texts.extend(_edge_phrases(block))
+    seen: list[str] = []
+    for text in texts:
+        if text and text not in seen:
+            seen.append(text)
+    return tuple(seen)
+
+
 def _closeness(needles: frozenset[str], keywords: frozenset[str]) -> float:
     if not needles:
         return 0.0
     return len(needles & keywords) / len(needles)
 
 
-def match_hint(definition: str, answer: str | None = None) -> MatchedHint:
-    """Pick a still from the definition text. 80% close is enough; never refuse AI."""
+def match_hint(
+    definition: str,
+    answer: str | None = None,
+    clue: str = "",
+    parse: str = "",
+) -> MatchedHint:
+    """Pick a still from definition / clue / parse. 80% close is enough; never refuse AI."""
     del answer  # Hint the definition, not the light — do not leak the answer.
-    needles = _tokens(definition)
     best = DEFAULT_HINT
-    score = _closeness(needles, best.keywords)
-    for photo in _catalog():
-        closeness = _closeness(needles, photo.keywords)
-        if closeness > score:
-            best, score = photo, closeness
-    return MatchedHint(photo=best, closeness=score, close_enough=score >= CLOSE_ENOUGH)
+    score = 0.0
+    for text in hint_texts(definition, clue, parse):
+        needles = _tokens(text)
+        if not needles:
+            continue
+        for photo in _catalog():
+            closeness = _closeness(needles, photo.keywords)
+            if closeness > score:
+                best, score = photo, closeness
+    close_enough = score >= CLOSE_ENOUGH
+    if not close_enough:
+        return MatchedHint(photo=DEFAULT_HINT, closeness=score, close_enough=False)
+    return MatchedHint(photo=best, closeness=score, close_enough=True)
 
 
 def get_hint_photo(slug: str | None = None) -> HintPhoto:
@@ -428,22 +685,34 @@ def get_hint_photo(slug: str | None = None) -> HintPhoto:
     return match_hint(slug).photo
 
 
+def _photo_from_path(name: str) -> HintPhoto | None:
+    found = PHOTOS.get(name)
+    if found is not None:
+        return found
+    stem = Path(name).name
+    for photo in _catalog():
+        if photo.filename == stem or photo.slug == name:
+            return photo
+    return None
+
+
 def hint_for_clue(clue: Clue) -> HintPhoto:
-    if clue.hint_image:
-        found = PHOTOS.get(clue.hint_image)
+    """Always match from definition / parse / clue, not a leftover default still."""
+    attached = attach_hint(clue)
+    if attached.hint_image:
+        found = _photo_from_path(attached.hint_image)
         if found is not None:
             return found
-        name = Path(clue.hint_image).name
-        for photo in _catalog():
-            if photo.filename == name or photo.slug == clue.hint_image:
-                return photo
-    return match_hint(clue.definition or "").photo
+    matched = match_hint(attached.definition or "", clue=attached.clue, parse=attached.parse)
+    if matched.close_enough:
+        return matched.photo
+    return PHOTOS.get(attached.slug, DEFAULT_HINT)
 
 
 def attach_hint(clue: Clue) -> Clue:
-    """Study helper: carry hint_image + hint_line matched to the definition (~80%)."""
-    matched = match_hint(clue.definition or "")
-    photo = matched.photo
+    """Carry hint_image + hint_line matched to the definition (~80%)."""
+    matched = match_hint(clue.definition or "", clue=clue.clue, parse=clue.parse)
+    photo = matched.photo if matched.close_enough else PHOTOS.get(clue.slug, DEFAULT_HINT)
     updates: dict[str, str] = {}
     if not clue.hint_image:
         updates["hint_image"] = f"assets/hints/{photo.filename}"
@@ -596,6 +865,168 @@ def _generate_papers_still(dest: Path) -> Path:
     return dest
 
 
+
+def _generate_bring_still(dest: Path) -> Path:
+    """Last-resort draw-forth still if the file is missing. No answer text."""
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    img = Image.new("RGB", (1280, 720), (28, 22, 18))
+    draw = ImageDraw.Draw(img)
+    draw.rectangle((80, 160, 620, 600), fill=(48, 36, 28))
+    draw.polygon([(520, 240), (1120, 160), (1180, 400), (560, 520)], fill=(232, 168, 48))
+    draw.polygon([(700, 280), (1040, 220), (1080, 360), (740, 420)], fill=(252, 220, 140))
+    img.save(dest, "WEBP", quality=82, method=6)
+    return dest
+
+
+def _generate_usa_still(dest: Path) -> Path:
+    """Last-resort US-city still if the file is missing. No answer text."""
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    img = Image.new("RGB", (1280, 720), (28, 56, 112))
+    draw = ImageDraw.Draw(img)
+    draw.rectangle((0, 0, 1280, 280), fill=(184, 28, 41))
+    draw.rectangle((0, 480, 1280, 720), fill=(236, 236, 240))
+    for left, top, right, bottom in (
+        (80, 300, 200, 520),
+        (220, 240, 360, 520),
+        (380, 180, 520, 520),
+        (540, 220, 700, 520),
+        (720, 160, 880, 520),
+        (900, 260, 1040, 520),
+        (1060, 200, 1200, 520),
+    ):
+        draw.rectangle((left, top, right, bottom), fill=(20, 28, 48))
+    img.save(dest, "WEBP", quality=82, method=6)
+    return dest
+
+
+def _generate_model_still(dest: Path) -> Path:
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    img = Image.new("RGB", (1280, 720), (64, 40, 48))
+    draw = ImageDraw.Draw(img)
+    draw.ellipse((460, 40, 820, 500), fill=(232, 196, 176))
+    draw.rectangle((520, 420, 760, 700), fill=(40, 24, 28))
+    img.save(dest, "WEBP", quality=82, method=6)
+    return dest
+
+
+def _generate_author_still(dest: Path) -> Path:
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    img = Image.new("RGB", (1280, 720), (52, 40, 28))
+    draw = ImageDraw.Draw(img)
+    draw.rectangle((280, 80, 1000, 640), fill=(243, 234, 214))
+    draw.rectangle((340, 140, 940, 180), fill=(26, 21, 16))
+    draw.rectangle((340, 220, 860, 248), fill=(92, 78, 64))
+    img.save(dest, "WEBP", quality=82, method=6)
+    return dest
+
+
+def _generate_makeup_still(dest: Path) -> Path:
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    img = Image.new("RGB", (1280, 720), (248, 228, 220))
+    draw = ImageDraw.Draw(img)
+    draw.ellipse((420, 80, 860, 640), fill=(232, 188, 168))
+    draw.ellipse((500, 220, 600, 280), fill=(80, 40, 36))
+    draw.ellipse((680, 220, 780, 280), fill=(80, 40, 36))
+    draw.arc((520, 360, 760, 520), start=20, end=160, fill=(168, 32, 48), width=22)
+    img.save(dest, "WEBP", quality=82, method=6)
+    return dest
+
+
+def _generate_crash_still(dest: Path) -> Path:
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    img = Image.new("RGB", (1280, 720), (72, 76, 80))
+    draw = ImageDraw.Draw(img)
+    draw.polygon([(80, 420), (520, 260), (640, 420), (200, 560)], fill=(184, 28, 41))
+    draw.polygon([(560, 480), (1100, 240), (1200, 400), (700, 620)], fill=(40, 44, 48))
+    img.save(dest, "WEBP", quality=82, method=6)
+    return dest
+
+
+def _generate_capsule_still(dest: Path) -> Path:
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    img = Image.new("RGB", (1280, 720), (12, 16, 32))
+    draw = ImageDraw.Draw(img)
+    draw.ellipse((360, 80, 920, 640), fill=(188, 196, 208))
+    draw.ellipse((520, 220, 760, 460), fill=(80, 140, 196))
+    img.save(dest, "WEBP", quality=82, method=6)
+    return dest
+
+
+def _generate_field_still(dest: Path) -> Path:
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    img = Image.new("RGB", (1280, 720), (120, 168, 72))
+    draw = ImageDraw.Draw(img)
+    draw.rectangle((0, 0, 1280, 260), fill=(140, 196, 232))
+    draw.polygon([(0, 260), (1280, 260), (1280, 720), (0, 520)], fill=(72, 120, 40))
+    img.save(dest, "WEBP", quality=82, method=6)
+    return dest
+
+
+def _generate_weekly_still(dest: Path) -> Path:
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    img = Image.new("RGB", (1280, 720), (36, 32, 28))
+    draw = ImageDraw.Draw(img)
+    draw.rectangle((300, 40, 980, 680), fill=(252, 247, 236))
+    draw.rectangle((360, 80, 920, 200), fill=(184, 28, 41))
+    draw.rectangle((360, 240, 820, 270), fill=(26, 21, 16))
+    img.save(dest, "WEBP", quality=82, method=6)
+    return dest
+
+
+def _generate_cross_still(dest: Path) -> Path:
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    img = Image.new("RGB", (1280, 720), (88, 28, 28))
+    draw = ImageDraw.Draw(img)
+    draw.ellipse((400, 40, 880, 640), fill=(220, 96, 64))
+    draw.line((500, 200, 600, 280), fill=(32, 16, 16), width=18)
+    draw.line((780, 200, 680, 280), fill=(32, 16, 16), width=18)
+    draw.arc((500, 380, 780, 560), start=200, end=340, fill=(32, 16, 16), width=18)
+    img.save(dest, "WEBP", quality=82, method=6)
+    return dest
+
+
+def _generate_uproot_still(dest: Path) -> Path:
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    img = Image.new("RGB", (1280, 720), (92, 64, 36))
+    draw = ImageDraw.Draw(img)
+    draw.ellipse((480, 80, 800, 360), fill=(48, 96, 40))
+    draw.polygon([(560, 340), (720, 340), (820, 680), (460, 680)], fill=(96, 52, 24))
+    img.save(dest, "WEBP", quality=82, method=6)
+    return dest
+
+
+def _generate_tips_still(dest: Path) -> Path:
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    img = Image.new("RGB", (1280, 720), (236, 220, 200))
+    draw = ImageDraw.Draw(img)
+    draw.ellipse((160, 160, 520, 560), fill=(216, 176, 140))
+    draw.ellipse((760, 160, 1120, 560), fill=(216, 176, 140))
+    img.save(dest, "WEBP", quality=82, method=6)
+    return dest
+
+
+def _generate_porter_still(dest: Path) -> Path:
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    img = Image.new("RGB", (1280, 720), (36, 40, 72))
+    draw = ImageDraw.Draw(img)
+    draw.rectangle((0, 0, 1280, 160), fill=(184, 28, 41))
+    draw.ellipse((500, 80, 780, 400), fill=(232, 196, 160))
+    draw.rectangle((520, 380, 760, 680), fill=(20, 24, 48))
+    img.save(dest, "WEBP", quality=82, method=6)
+    return dest
+
+
+def _generate_xyz_still(dest: Path) -> Path:
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    img = Image.new("RGB", (1280, 720), (243, 234, 214))
+    draw = ImageDraw.Draw(img)
+    draw.line((200, 560, 640, 200), fill=(184, 28, 41), width=18)
+    draw.line((200, 560, 1080, 560), fill=(26, 21, 16), width=18)
+    draw.line((200, 560, 360, 120), fill=(40, 88, 160), width=18)
+    img.save(dest, "WEBP", quality=82, method=6)
+    return dest
+
+
 def ensure_hint_photo(photo: HintPhoto | None = None) -> Path:
     resolved = photo or DEFAULT_HINT
     dest = resolved.path
@@ -603,20 +1034,32 @@ def ensure_hint_photo(photo: HintPhoto | None = None) -> Path:
         return dest
     if _fetch_commons(resolved, dest):
         return dest
-    if resolved.slug in {RASTA.slug, LION.slug, "rasta"}:
-        return _generate_rasta_still(dest)
-    if resolved.slug in {FATS.slug, "fats"}:
-        return _generate_fats_still(dest)
-    if resolved.slug in {WELLINGTON.slug, "wellington"}:
-        return _generate_wellington_still(dest)
-    if resolved.slug in {COLE.slug, "cole"}:
-        return _generate_cole_still(dest)
-    if resolved.slug in {SMILES.slug, "smiles"}:
-        return _generate_smiles_still(dest)
-    if resolved.slug in {DAVIS.slug, "davis", "davis-cup"}:
-        return _generate_davis_still(dest)
-    if resolved.slug in {AIM.slug, "aim", "aimlessly"}:
-        return _generate_aim_still(dest)
-    if resolved.slug in {PAPERS.slug, "papers", "newspapers", "mass-media"}:
-        return _generate_papers_still(dest)
+    generators = {
+        RASTA.slug: _generate_rasta_still,
+        LION.slug: _generate_rasta_still,
+        FATS.slug: _generate_fats_still,
+        WELLINGTON.slug: _generate_wellington_still,
+        COLE.slug: _generate_cole_still,
+        SMILES.slug: _generate_smiles_still,
+        DAVIS.slug: _generate_davis_still,
+        AIM.slug: _generate_aim_still,
+        PAPERS.slug: _generate_papers_still,
+        BRING.slug: _generate_bring_still,
+        USA.slug: _generate_usa_still,
+        MODEL.slug: _generate_model_still,
+        AUTHOR.slug: _generate_author_still,
+        MAKEUP.slug: _generate_makeup_still,
+        CRASH.slug: _generate_crash_still,
+        CAPSULE.slug: _generate_capsule_still,
+        FIELD.slug: _generate_field_still,
+        WEEKLY.slug: _generate_weekly_still,
+        CROSS.slug: _generate_cross_still,
+        UPROOT.slug: _generate_uproot_still,
+        TIPS.slug: _generate_tips_still,
+        PORTER.slug: _generate_porter_still,
+        XYZ.slug: _generate_xyz_still,
+    }
+    generate = generators.get(resolved.slug)
+    if generate is not None:
+        return generate(dest)
     return _generate_trance_still(dest)
