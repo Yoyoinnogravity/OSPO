@@ -16,6 +16,7 @@ from twodown.config import BRAND, BRAND_LINE, CREDIT_LINE, CREDIT_WHO, DEFAULT_V
 from twodown.models import DailyPair, SpokenClue
 from twodown.render import opening_frame_poster, write_share_card, write_thumbnail
 from twodown.scenes import DEFAULT_SCENE, get_scene, list_scenes
+from twodown.captions import youtube_description
 from twodown.seo import (
     FAVICON_SVG,
     PageSeo,
@@ -32,6 +33,13 @@ from twodown.seo import (
     rss_xml,
     sitemap_xml,
     website_ld,
+)
+from twodown.youtube import (
+    YOUTUBE_CHANNEL_URL,
+    YOUTUBE_STUDIO,
+    short_mp4_url,
+    video_title,
+    video_title_from_line,
 )
 
 CSS = """
@@ -266,6 +274,35 @@ a.action {
   text-decoration: none;
   font-size: 0.95rem;
 }
+a.action.ghost {
+  background: transparent;
+  color: var(--crimson) !important;
+  border: 1px solid var(--crimson);
+}
+.youtube-upload {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin: 14px 0 8px;
+}
+.youtube-title, .youtube-copy {
+  font-family: "Liberation Sans", sans-serif;
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin: 0 0 10px;
+}
+.youtube-title code, .youtube-copy pre {
+  display: block;
+  color: var(--ink);
+  background: var(--cream);
+  border: 1px solid var(--rule);
+  padding: 8px 10px;
+  margin-top: 4px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.youtube-copy summary { cursor: pointer; color: var(--crimson); }
 ul.archive { list-style: none; padding: 0; margin: 0 0 16px; }
 ul.archive li { margin: 0 0 8px; }
 aside.ad {
@@ -790,6 +827,94 @@ def _page(body: str, seo: PageSeo, depth: int = 0, show_ads: bool = False) -> st
 """
 
 
+def _root_prefix(media_prefix: str) -> str:
+    if media_prefix.endswith("media/"):
+        return media_prefix[: -len("media/")]
+    return ""
+
+
+def _youtube_upload_block(
+    slug: str,
+    title: str,
+    *,
+    description: str | None = None,
+    kit_href: str | None = None,
+) -> str:
+    """Download the Short, open Studio, paste the ready title."""
+    mp4 = short_mp4_url(slug)
+    desc = ""
+    if description:
+        desc = (
+            '<details class="youtube-copy">'
+            "<summary>YouTube description</summary>"
+            f"<pre>{_e(description)}</pre>"
+            "</details>"
+        )
+    kit = ""
+    if kit_href:
+        kit = f'<a href="{_e(kit_href)}">Upload kit</a>'
+    return f"""
+      <div class="youtube-upload" data-youtube-upload="{_e(slug)}">
+        <a class="action" href="{_e(mp4)}" download="{_e(slug)}.mp4">Get this Short for YouTube</a>
+        <a class="action ghost" href="{_e(YOUTUBE_STUDIO)}" target="_blank" rel="noopener">Open YouTube Studio</a>
+        {kit}
+      </div>
+      <p class="youtube-title">YouTube title for <a href="{_e(YOUTUBE_CHANNEL_URL)}" target="_blank" rel="noopener">@crypticfit</a><code>{_e(title)}</code></p>
+      {desc}
+    """
+
+
+def attach_youtube_upload(html_text: str, kit_prefix: str = "") -> str:
+    """Add a YouTube upload control to each film article that is missing one."""
+    page_h1 = ""
+    heading = re.search(r"<h1>([^<]+)</h1>", html_text)
+    if heading:
+        page_h1 = html.unescape(heading.group(1)).strip()
+
+    def _one(match: re.Match[str]) -> str:
+        open_tag, body, close = match.group(1), match.group(2), match.group(3)
+        if "data-youtube-upload" in body or "data-youtube-upload" in open_tag:
+            return match.group(0)
+        if not re.search(r"<video\b", body, flags=re.I) and 'data-slug="' not in open_tag:
+            return match.group(0)
+        slug = ""
+        slug_m = re.search(r'data-slug="([^"]+)"', open_tag)
+        if slug_m:
+            slug = slug_m.group(1)
+        else:
+            src_m = re.search(r'\bsrc="([^"]+\.mp4)"', body)
+            if src_m:
+                slug = Path(src_m.group(1)).stem
+        if not slug:
+            return match.group(0)
+        clue_m = re.search(r'<p class="clue-text">([^<]*)</p>', body)
+        clue_line = html.unescape(clue_m.group(1)).strip() if clue_m else page_h1 or slug
+        block = _youtube_upload_block(
+            slug,
+            video_title_from_line(clue_line),
+            kit_href=f"{kit_prefix}upload.html#{slug}",
+        )
+        if re.search(r'<div class="spoiler"', body):
+            updated, n = re.subn(
+                r'(<div class="spoiler"[^>]*>)(.*?)(</div>)(\s*)$',
+                lambda inner: f"{inner.group(1)}{inner.group(2)}{block}{inner.group(3)}{inner.group(4)}",
+                body,
+                count=1,
+                flags=re.S,
+            )
+            body = updated if n else body + block
+        else:
+            body = body + block
+        return f"{open_tag}{body}{close}"
+
+    return re.sub(
+        r'(<article\b[^>]*\bclass="[^"]*\bclue\b[^"]*"[^>]*>)(.*?)(</article>)',
+        _one,
+        html_text,
+        flags=re.S | re.I,
+    )
+
+
 def _article(
     item: SpokenClue,
     media_prefix: str,
@@ -816,6 +941,14 @@ def _article(
     )
     enum = f" ({_e(clue.enumeration)})" if clue.enumeration else ""
     clue_block = f'<p class="clue-text">{_e(clue.clue)}{enum}</p>' if show_clue_text else ""
+    if not item.site_path:
+        item.site_path = f"{SITE_ORIGIN}/c/{clue.slug}/"
+    upload = _youtube_upload_block(
+        clue.slug,
+        video_title(clue),
+        description=youtube_description(item),
+        kit_href=f"{_root_prefix(media_prefix)}upload.html#{clue.slug}",
+    )
     return f"""
     <article class="clue{opened}" data-slug="{_e(clue.slug)}">
       <p class="kicker">{_e(clue.paper)} {_e(clue.puzzle_id)} · {_e(clue.setter)} · {_e(clue.number)} {_e(clue.direction)} · {_e(clue.device)}</p>
@@ -827,6 +960,7 @@ def _article(
         <p class="answer">{_e(clue.answer)}</p>
         <p class="parse">{_e(clue.parse)}</p>
         <p class="credit">Parse via <a href="{_e(clue.source_url)}">{_e(clue.blogger)}</a></p>
+        {upload}
       </div>
     </article>
     """
@@ -1146,6 +1280,14 @@ def _playable_daily(root: Path) -> str:
             )
         opener = ""
         slug_attr = ""
+        slug = film.slug or (Path(film.video).stem if film.video else "")
+        upload = ""
+        if slug:
+            upload = _youtube_upload_block(
+                slug,
+                video_title_from_line(film.clue),
+                kit_href=f"upload.html#{slug}",
+            )
         if film.slug:
             opener = f'<p class="credit"><a href="c/{_e(film.slug)}/#play">Open this clue</a></p>'
             slug_attr = f' data-slug="{_e(film.slug)}" id="{_e(film.slug)}"'
@@ -1156,7 +1298,7 @@ def _playable_daily(root: Path) -> str:
             f'<article class="clue"{slug_attr}>'
             f'<p class="kicker">{_e(film.pretty)}</p>'
             f'<p class="clue-text">{_e(film.clue)}</p>'
-            f"{player}{opener}"
+            f"{player}{upload}{opener}"
             "</article>"
         )
     if not blocks:
@@ -1216,6 +1358,46 @@ def _films_body(root: Path) -> str:
     <h2>Daily pairs.</h2>
     {_playable_daily(root)}
     """
+
+def _upload_spoken(clue) -> SpokenClue:
+    item = SpokenClue(clue=clue, script="", voice=DEFAULT_VOICE_ALIAS)
+    item.site_path = f"{SITE_ORIGIN}/c/{clue.slug}/"
+    return item
+
+
+def _upload_body(root: Path) -> str:
+    blocks = []
+    for film in solved_films(root):
+        slug = film.slug or (Path(film.video).stem if film.video else "")
+        if not slug:
+            continue
+        title = video_title_from_line(film.clue)
+        description = None
+        try:
+            from twodown.pipeline import published_clue
+
+            clue = published_clue(slug, root)
+            title = video_title(clue)
+            description = youtube_description(_upload_spoken(clue))
+        except (FileNotFoundError, ValueError):
+            pass
+        opener = ""
+        if film.slug:
+            opener = f'<p class="credit"><a href="c/{_e(film.slug)}/#play">Open this clue</a></p>'
+        blocks.append(
+            f'<article class="panel" id="{_e(slug)}">'
+            f'<p class="kicker">{_e(film.pretty)}</p>'
+            f"<h2>{_e(film.clue)}</h2>"
+            f"{_youtube_upload_block(slug, title, description=description)}"
+            f"{opener}"
+            "</article>"
+        )
+    listing = "".join(blocks) if blocks else "<p>No films on the site yet.</p>"
+    return f"""
+    {_croc_hello("", title="Upload these Shorts to YouTube.", lede="Download the film, open YouTube Studio for @crypticfit, paste the title. We do not upload for you.")}
+    {listing}
+    """
+
 
 
 _STUDY_POSTER = {
@@ -1316,6 +1498,7 @@ def publish_films(root: Path) -> Path:
     root = Path(root)
     assets = root / "assets"
     assets.mkdir(parents=True, exist_ok=True)
+    (assets / "style.css").write_text(CSS, encoding="utf-8")
     (assets / "app.js").write_text(JS, encoding="utf-8")
     ensure_safe_posters(root)
     page = root / "films.html"
@@ -1331,6 +1514,19 @@ def publish_films(root: Path) -> Path:
         ),
         encoding="utf-8",
     )
+    upload_page = root / "upload.html"
+    upload_page.write_text(
+        _page(
+            _upload_body(root),
+            PageSeo(
+                title=f"Upload Shorts to YouTube — {BRAND}",
+                description="Download each cryptic.fit Short and open YouTube Studio for @crypticfit.",
+                path="/upload.html",
+                json_ld=website_ld(),
+            ),
+        ),
+        encoding="utf-8",
+    )
     index = root / "index.html"
     if index.exists():
         text = index.read_text(encoding="utf-8")
@@ -1341,14 +1537,16 @@ def publish_films(root: Path) -> Path:
             text = text.replace("<aside class=\"teaser\">", teaser + "\n    <aside class=\"teaser\">", 1)
         index.write_text(_ensure_films_nav(text), encoding="utf-8")
     for html_path in root.rglob("*.html"):
-        if html_path == page:
+        if html_path in {page, upload_page}:
             continue
         original = html_path.read_text(encoding="utf-8")
-        updated = retarget_cdn(original, _media_prefix(html_path, root))
+        prefix = _media_prefix(html_path, root)
+        updated = retarget_cdn(original, prefix)
         updated = attach_video_posters(updated)
         updated = retarget_play_links(updated)
         if html_path.parent.parent.name == "c":
             updated = attach_play_anchor(updated)
+        updated = attach_youtube_upload(updated, kit_prefix=prefix)
         updated = _ensure_films_nav(updated)
         updated = _ensure_profile(updated, picture_panel=html_path.name == "follow.html")
         if updated != original:
@@ -1357,18 +1555,23 @@ def publish_films(root: Path) -> Path:
     return page
 
 
-def _ensure_sitemap_films(root: Path) -> None:
-    path = root / "sitemap.xml"
-    if not path.exists():
+def _ensure_sitemap_loc(root: Path, path: str) -> None:
+    sitemap = root / "sitemap.xml"
+    if not sitemap.exists():
         return
-    text = path.read_text(encoding="utf-8")
-    loc = f"{SITE_ORIGIN}/films.html"
+    text = sitemap.read_text(encoding="utf-8")
+    loc = f"{SITE_ORIGIN}{path}"
     if loc in text:
         return
     days = earlier_days(root)
     lastmod = days[0][0] if days else datetime.now().date().isoformat()
     entry = f"  <url>\n    <loc>{loc}</loc>\n    <lastmod>{lastmod}</lastmod>\n  </url>\n"
-    path.write_text(text.replace("</urlset>", entry + "</urlset>", 1), encoding="utf-8")
+    sitemap.write_text(text.replace("</urlset>", entry + "</urlset>", 1), encoding="utf-8")
+
+
+def _ensure_sitemap_films(root: Path) -> None:
+    _ensure_sitemap_loc(root, "/films.html")
+    _ensure_sitemap_loc(root, "/upload.html")
 
 
 def publish_site(pair: DailyPair, dest: Path | None = None) -> Path:

@@ -4,15 +4,33 @@ import json
 from pathlib import Path
 
 from twodown.captions import youtube_description
-from twodown.config import BRAND, CLUES_PER_DAY
+from twodown.config import BRAND, CLUES_PER_DAY, SITE_ORIGIN
 from twodown.models import Clue, DailyPair, SpokenClue
 from twodown.render import write_thumbnail
 from twodown.tokens import secret_text
 
 YOUTUBE_CHANNEL = BRAND
+YOUTUBE_CHANNEL_URL = "https://www.youtube.com/@crypticfit"
+YOUTUBE_STUDIO = "https://www.youtube.com/upload"
 SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
 TOKEN_ENV = "TWODOWN_YOUTUBE_TOKEN"
 CLIENT_ENV = "TWODOWN_YOUTUBE_CLIENT_SECRET"
+
+
+def short_mp4_url(slug: str) -> str:
+    """Public file Aled downloads, then drops on YouTube Studio."""
+    return f"{SITE_ORIGIN}/media/{slug}.mp4"
+
+
+def video_title_from_line(clue_line: str) -> str:
+    """Same 100-character Short title as video_title, from an already-joined clue line."""
+    line = (clue_line or "").strip()
+    title = f"{YOUTUBE_CHANNEL} · {line} #Shorts"
+    if len(title) <= 100:
+        return title
+    room = 100 - len(f"{YOUTUBE_CHANNEL} ·  #Shorts")
+    clipped = line[: max(10, room - 1)].rstrip() + "…"
+    return f"{YOUTUBE_CHANNEL} · {clipped} #Shorts"[:100]
 
 
 def youtube_ready() -> bool:

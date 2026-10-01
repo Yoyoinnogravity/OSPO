@@ -6,6 +6,7 @@ from twodown.site import (
     _solved_shelf,
     attach_play_anchor,
     attach_video_posters,
+    attach_youtube_upload,
     earlier_days,
     legacy_videos,
     publish_films,
@@ -14,7 +15,16 @@ from twodown.site import (
     retarget_play_links,
     solved_films,
 )
-from twodown.youtube import YOUTUBE_CHANNEL, thumbnail_file, upload_short, video_title
+from twodown.youtube import (
+    YOUTUBE_CHANNEL,
+    YOUTUBE_CHANNEL_URL,
+    YOUTUBE_STUDIO,
+    short_mp4_url,
+    thumbnail_file,
+    upload_short,
+    video_title,
+    video_title_from_line,
+)
 
 
 def _item(answer: str = "END RESULT", number: str = "12") -> SpokenClue:
@@ -107,7 +117,26 @@ def test_publish_site_writes_spoiler_pages(tmp_path):
     assert "youtube.com/@crypticfit" in follow
     assert "https://cryptic.fit/follow.html" in (tmp_path / "sitemap.xml").read_text(encoding="utf-8")
     assert "https://cryptic.fit/films.html" in (tmp_path / "sitemap.xml").read_text(encoding="utf-8")
+    assert "https://cryptic.fit/upload.html" in (tmp_path / "sitemap.xml").read_text(encoding="utf-8")
+    assert (tmp_path / "upload.html").exists()
     assert 'href="films.html">Films</a>' in index
+    films_page = (tmp_path / "films.html").read_text(encoding="utf-8")
+    assert "Get this Short for YouTube" in films_page
+    assert "https://cryptic.fit/media/independent-12458-12a.mp4" in films_page
+    assert "Get this Short for YouTube" in index
+    assert "https://cryptic.fit/media/independent-12458-12a.mp4" in index
+    assert "https://www.youtube.com/upload" in index
+    assert "@crypticfun" not in index
+    pair_html = index.split("Today’s pair.", 1)[1].split("Keep the pair coming", 1)[0]
+    assert pair_html.find("Solve") < pair_html.find("Get this Short for YouTube")
+    first_before_spoiler = pair_html.split('class="spoiler"', 1)[0]
+    assert "END RESULT" not in first_before_spoiler
+    assert "Get this Short for YouTube" not in first_before_spoiler
+    upload_page = (tmp_path / "upload.html").read_text(encoding="utf-8")
+    assert "https://cryptic.fit/media/independent-12458-12a.mp4" in upload_page
+    assert "Open YouTube Studio" in upload_page
+    assert "Fifteen Squared" not in upload_page
+    assert "adsbygoogle" not in upload_page
     assert "All the Shorts" in index
     assert "Solve it, I know you can." in index
     assert "croc-hello" in index
@@ -120,6 +149,10 @@ def test_publish_site_writes_spoiler_pages(tmp_path):
     assert "never sit on the answer" in support
     clue_page = (tmp_path / "c" / "independent-12458-12a" / "index.html").read_text(encoding="utf-8")
     assert "adsbygoogle" not in clue_page
+    assert "Get this Short for YouTube" in clue_page
+    assert "https://cryptic.fit/media/independent-12458-12a.mp4" in clue_page
+    assert "https://www.youtube.com/upload" in clue_page
+    assert "cryptic.fit · Rioting led unrest" in clue_page
     assert (tmp_path / "robots.txt").exists()
     css = (tmp_path / "assets" / "style.css").read_text(encoding="utf-8")
     assert "body.scene-photo header a" in css
@@ -190,6 +223,22 @@ def test_solved_shelf_hides_the_answer(tmp_path):
     assert 'href="c/independent-12462-6a/#play"' in played
     assert 'id="independent-12462-6a"' in played
     assert 'data-slug="independent-12462-6a"' in played
+    assert "https://cryptic.fit/media/independent-12462-6a.mp4" in played
+    assert "Get this Short for YouTube" in played
+    assert "Open YouTube Studio" in played
+    assert "youtube.com/@crypticfit" in played
+    publish_films(tmp_path)
+    films_html = (tmp_path / "films.html").read_text(encoding="utf-8")
+    assert "https://cryptic.fit/media/independent-12462-6a.mp4" in films_html
+    assert "Get this Short for YouTube" in films_html
+    assert "PIN-UP" not in films_html
+    kit = (tmp_path / "upload.html").read_text(encoding="utf-8")
+    assert "https://cryptic.fit/media/independent-12462-6a.mp4" in kit
+    assert "Open YouTube Studio" in kit
+    assert ".youtube-upload" in (tmp_path / "assets" / "style.css").read_text(encoding="utf-8")
+    day_html = (day / "index.html").read_text(encoding="utf-8")
+    assert "Get this Short for YouTube" in day_html
+    assert "https://cryptic.fit/media/independent-12462-6a.mp4" in day_html
 
 
 def test_thumbnail_links_skip_the_solve_gate():
@@ -226,6 +275,8 @@ def test_publish_site_opens_a_clue_page_at_the_player(tmp_path):
     assert 'id="play"' in clue_page
     assert ">Solve<" in clue_page
     assert "is-open" not in clue_page
+    assert "Get this Short for YouTube" in clue_page
+    assert "https://cryptic.fit/media/independent-12458-12a.mp4" in clue_page
     index = (root / "index.html").read_text(encoding="utf-8")
     pair_html = index.split("Today’s pair.", 1)[1].split("Keep the pair coming", 1)[0]
     assert ">Solve<" in pair_html
@@ -354,7 +405,12 @@ def test_youtube_titles_use_cryptic_fun_channel():
     title = video_title(clue)
     assert title.startswith("cryptic.fit · ")
     assert title.endswith("#Shorts")
+    assert "END RESULT" not in title
     assert YOUTUBE_CHANNEL == "cryptic.fit"
+    assert YOUTUBE_CHANNEL_URL == "https://www.youtube.com/@crypticfit"
+    assert YOUTUBE_STUDIO == "https://www.youtube.com/upload"
+    assert short_mp4_url("guardian-30124-9a") == "https://cryptic.fit/media/guardian-30124-9a.mp4"
+    assert video_title_from_line("Bring out client I fancy with no end of distinction (6)").startswith("cryptic.fit · ")
     assert len(title) <= 100
     assert "https://cryptic.fit/support.html" in youtube_description(_item())
     assert "unique cryptic crossword clues and solutions" in youtube_description(_item())
@@ -378,4 +434,37 @@ def test_ads_on_writes_ads_txt_and_unit(tmp_path, monkeypatch):
     clue_page = (root / "c" / "independent-12458-12a" / "index.html").read_text(encoding="utf-8")
     assert "adsbygoogle" not in clue_page
     assert "pagead2.googlesyndication.com" not in clue_page
+
+def test_attach_youtube_upload_is_idempotent_and_lands_on_the_mp4():
+    page = """
+    <h1>Bring out client I fancy with no end of distinction (6)</h1>
+    <article class="clue" data-slug="guardian-30124-9a">
+      <p class="clue-text">Bring out client I fancy with no end of distinction (6)</p>
+      <button class="reveal" type="button">Solve</button>
+      <div class="spoiler" data-nosnippet>
+        <video class="short" src="../../media/guardian-30124-9a.mp4"></video>
+        <p class="answer">ELICIT</p>
+      </div>
+    </article>
+    """
+    once = attach_youtube_upload(page, kit_prefix="../../")
+    assert once.count("data-youtube-upload") == 1
+    assert "https://cryptic.fit/media/guardian-30124-9a.mp4" in once
+    assert 'download="guardian-30124-9a.mp4"' in once
+    assert "https://www.youtube.com/upload" in once
+    assert "upload.html#guardian-30124-9a" in once
+    assert once.find("Solve") < once.find("Get this Short for YouTube")
+    spoiler = once.split('class="spoiler"', 1)[1].split("</article>", 1)[0]
+    assert "Get this Short for YouTube" in spoiler
+    assert attach_youtube_upload(once, kit_prefix="../../") == once
+    films = """
+    <article class="clue" data-slug="guardian-30124-9a" id="guardian-30124-9a">
+      <p class="clue-text">Bring out client I fancy with no end of distinction (6)</p>
+      <video class="short" src="media/guardian-30124-9a.mp4"></video>
+    </article>
+    """
+    filmed = attach_youtube_upload(films)
+    assert "https://cryptic.fit/media/guardian-30124-9a.mp4" in filmed
+    assert "Open YouTube Studio" in filmed
+    assert "ELICIT" not in filmed
 

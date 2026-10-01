@@ -199,6 +199,7 @@ def collect_sitemap_urls(root: Path, pair: DailyPair) -> list[tuple[str, str]]:
         ("/suggest.html", today),
         ("/privacy.html", today),
         ("/films.html", today),
+        ("/upload.html", today),
         (f"/d/{pair.date}/", today),
     ]
     for item in pair.clues:
