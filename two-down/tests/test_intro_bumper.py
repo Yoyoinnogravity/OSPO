@@ -4,7 +4,8 @@ from twodown.config import INTRO_BUMPER, INTRO_LINE
 from twodown.pipeline import mass_media_clue
 from twodown.render import audio_seconds, intro_bumper_path, intro_bumper_seconds
 from twodown.script import speak_intro, write_parts
-from twodown.voice import build_short_soundtrack, extract_intro_bumper_audio, synthesise
+from twodown import voice
+from twodown.voice import build_short_soundtrack, extract_intro_bumper_audio
 
 
 def test_intro_bumper_is_the_recorded_invite():
@@ -37,7 +38,8 @@ def test_intro_bumper_audio_is_not_ssml(tmp_path):
     assert "extract_intro_bumper_audio" in source
     assert "parts.intro_speech" not in source
     assert inspect.getsource(extract_intro_bumper_audio).count("synthesise(") == 0
-    assert inspect.getsource(synthesise).count("plain speech") >= 1
+    assert "plain speech only" in inspect.getsource(voice)
+    assert "SSML is read aloud as markup" in inspect.getsource(voice)
 
 
 def test_recorded_invite_does_not_stack_andrew_daily_dose():
