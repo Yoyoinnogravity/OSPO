@@ -444,9 +444,9 @@ def test_sphere_hint_beat_uses_the_globe_still(tmp_path: Path):
     raw = path.read_bytes()
     assert b"SPHERE" not in raw
     assert b"sphere" not in raw.lower()
-    band = img.crop((140, 1040, 940, 1580))
+    band = img.crop((140, 900, 940, 1280))
     newsprint = sum(1 for pixel in band.get_flattened_data() if pixel == NEWS_BG)
-    assert newsprint < 80_000
+    assert newsprint < 20_000
     inset = img.getpixel((540, 1200))
     trance = Image.open(TRANCE.path).convert("RGB")
     field = Image.open(FIELD.path).convert("RGB")
