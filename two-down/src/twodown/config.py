@@ -1,4 +1,5 @@
 from pathlib import Path
+import hashlib
 import os
 
 BRAND = "cryptic.fit"
@@ -70,6 +71,16 @@ INTRO_PITCH = "+0Hz"
 INTRO_VOLUME = "+2%"
 INTRO_GAP_SECONDS = 0.3
 OUTRO_LINE = "That was cryptic.fit."
+# Ava signs off with one of these, then the site name. Same slug, same closer.
+WISDOM_LINES = (
+    "A good clue hides in daylight.",
+    "If it looks too obvious, read it again.",
+    "The grid forgives anyone who stays with it.",
+    "The setter left you a way in.",
+    "Every light starts as a blank.",
+    "Trust the surface, then look twice.",
+    "One letter in, the rest will follow.",
+)
 OUTRO_VOICE_ALIAS = "croc"
 OUTRO_RATE = "+0%"
 OUTRO_PITCH = "+0Hz"
@@ -84,7 +95,7 @@ THINK_PAUSE_SECONDS = 3.0
 CLUE_LETTERS_GAP_SECONDS = 0.25
 LETTERS_PAUSE_SECONDS = 0.8
 ANSWER_PAUSE_SECONDS = 0.8
-THINK_PROMPT = "Have a think."
+THINK_PROMPT = "Pause here to think about it."
 HINT_OFFER = "Here's a hint."
 HINT_LOOK = "Here's a hint."
 HINT_LINE = "Here's a hint."
@@ -119,6 +130,15 @@ YOUTUBE_FOLLOW = os.environ.get("TWODOWN_YOUTUBE_URL", "https://www.youtube.com/
 TIKTOK_FOLLOW = os.environ.get("TWODOWN_TIKTOK_URL", "").strip()
 INSTAGRAM_FOLLOW = os.environ.get("TWODOWN_INSTAGRAM_URL", "").strip()
 FACEBOOK_FOLLOW = os.environ.get("TWODOWN_FACEBOOK_URL", "").strip()
+
+
+def pick_wisdom(slug: str, lines: tuple[str, ...] | None = None) -> str:
+    """Pick one closer from the pool. Stable for a clue slug so a recut says the same line."""
+    pool = lines if lines is not None else WISDOM_LINES
+    if not pool:
+        return ""
+    digest = hashlib.sha256((slug or "").encode("utf-8")).hexdigest()
+    return pool[int(digest, 16) % len(pool)]
 
 
 def follow_profiles() -> list[tuple[str, str, str]]:

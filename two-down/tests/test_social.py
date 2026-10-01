@@ -99,6 +99,8 @@ def test_social_caption_does_not_spoil_the_answer():
     text = social_caption(_item())
     assert "BELLHOP" not in text
     assert "Hotel worker" in text
+    assert "Pause here to think about it." in text
+    assert "Have a think." not in text
     assert "#crypticfit" in text
     assert "cryptic.fit" in text
 

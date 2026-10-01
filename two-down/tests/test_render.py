@@ -146,7 +146,7 @@ def test_intro_and_letters_show_unsolved_clue_and_empty_lights(tmp_path: Path):
     assert intro_clue.count(INK) > 400
     assert abs(intro_clue.count(INK) - letters_clue.count(INK)) < 80
     assert abs(intro_clue.count(INK) - think_clue.count(INK)) < 80
-    # Outro is "That was cryptic.fit.", not the clue text.
+    # Outro is the wisdom closer, not the clue text.
     assert abs(intro_clue.count(INK) - outro_clue.count(INK)) > 200
 
     lights = (80, 610, 1000, 740)

@@ -5,7 +5,8 @@ from twodown.devices import classify_device
 from twodown.ingest import LONDON, parse_title
 from twodown.models import PuzzlePost
 from twodown.parse import parse_post, usable
-from twodown.script import speak_answer, speak_enumeration, to_ssml, write_parts, write_script
+from twodown.config import OUTRO_LINE, THINK_PROMPT, WISDOM_LINES, pick_wisdom
+from twodown.script import speak_answer, speak_enumeration, speak_outro, to_ssml, write_parts, write_script
 from twodown.select import select_pair
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -127,7 +128,10 @@ def test_script_opens_with_the_paper_and_setter():
     assert "The clue:" not in parts.clue_speech
     assert "(" not in parts.clue_speech
     assert parts.letters_speech == speak_enumeration(clue.enumeration)
-    assert parts.think_speech == "Have a think."
+    assert THINK_PROMPT == "Pause here to think about it."
+    assert parts.think_speech == THINK_PROMPT
+    assert parts.think_speech == "Pause here to think about it."
+    assert "Have a think." not in script
     assert parts.hint_speech == "Here's a hint."
     assert parts.answer_speech == speak_answer(clue.answer)
     assert parts.answer_speech == "It's end result."
@@ -137,7 +141,11 @@ def test_script_opens_with_the_paper_and_setter():
     assert "That's Phi" not in script
     assert "Independent" in parts.intro_speech
     assert "Phi" in parts.intro_speech
-    assert parts.outro_speech == "That was cryptic.fit."
+    assert parts.outro_speech == speak_outro(clue)
+    assert parts.outro_speech == f"{pick_wisdom(clue.slug)} {OUTRO_LINE}"
+    assert pick_wisdom(clue.slug) in WISDOM_LINES
+    assert parts.outro_speech.endswith(OUTRO_LINE)
+    assert "That's Phi" not in parts.outro_speech
     assert script.index(parts.intro_speech) < script.index(parts.clue_speech)
     assert script.index(parts.clue_speech) < script.index(parts.letters_speech)
     assert script.index(parts.letters_speech) < script.index("[pause 1s]")

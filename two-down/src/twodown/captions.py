@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from twodown.config import BRAND, BRAND_PROMISE, CREDIT_LINE, SITE_ORIGIN
+from twodown.config import BRAND, BRAND_PROMISE, CREDIT_LINE, SITE_ORIGIN, THINK_PROMPT
 from twodown.models import Clue, SpokenClue
 from twodown.scenes import get_scene
 
@@ -20,7 +20,7 @@ def social_caption(item: SpokenClue, *, spoil: bool = False) -> str:
     lines = [
         f"{SOCIAL_HANDLE} · {clue_line(clue)}",
         "",
-        "Have a think. The parse is in the video.",
+        f"{THINK_PROMPT} The parse is in the video.",
     ]
     if spoil:
         lines.append(f"Answer: {clue.answer}")

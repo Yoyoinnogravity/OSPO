@@ -2,7 +2,7 @@ import inspect
 
 import pytest
 
-from twodown.config import CLUE_PITCH, CLUE_RATE, DEFAULT_VOICE_ALIAS, HINT_LINE, HINT_LOOK, HINT_OFFER, HINT_VOICE_ALIAS, INTRO_LINE, INTRO_RATE, INTRO_VOICE_ALIAS, PINUP_SLUG, SOURCE_VOICE_ALIAS, STUDY_SLUG, VOICE_RATE, VOICES
+from twodown.config import CLUE_PITCH, CLUE_RATE, DEFAULT_VOICE_ALIAS, HINT_LINE, HINT_LOOK, HINT_OFFER, HINT_VOICE_ALIAS, INTRO_LINE, INTRO_RATE, INTRO_VOICE_ALIAS, OUTRO_LINE, OUTRO_VOICE_ALIAS, PINUP_SLUG, SOURCE_VOICE_ALIAS, STUDY_SLUG, THINK_PAUSE_SECONDS, THINK_PROMPT, VOICE_RATE, VOICES, WISDOM_LINES, pick_wisdom
 from twodown.models import Clue
 from twodown.pipeline import (
     dreamlike_clue,
@@ -22,6 +22,7 @@ from twodown.script import (
     speak_answer,
     speak_enumeration,
     speak_intro,
+    speak_outro,
     speak_paper,
     speak_parse_asides,
     speak_parse_tokens,
@@ -36,6 +37,55 @@ def test_solver_voice_is_cryptic_croc():
     assert VOICES["croc"] == "en-US-AvaNeural"
     assert VOICES["andrew"] == "en-US-AndrewNeural"
     assert VOICE_RATE == "+0%"
+
+
+def test_signoff_is_stable_wisdom_then_the_site():
+    """Ava closes with one line from the pool. Same slug, same closer. Not a roast."""
+    assert OUTRO_VOICE_ALIAS == "croc"
+    assert VOICES[OUTRO_VOICE_ALIAS] == "en-US-AvaNeural"
+    assert OUTRO_LINE == "That was cryptic.fit."
+    assert 5 <= len(WISDOM_LINES) <= 8
+    seen = set()
+    for line in WISDOM_LINES:
+        words = line.split()
+        assert 1 <= len(words) <= 12
+        assert line.endswith(".")
+        assert line[0].isupper()
+        lowered = line.lower()
+        assert "obviously" not in lowered
+        assert "idiot" not in lowered
+        seen.add(line)
+    assert len(seen) == len(WISDOM_LINES)
+    elicit = "guardian-30124-9a"
+    chicago = "independent-12473-1a"
+    assert pick_wisdom(elicit) == pick_wisdom(elicit)
+    assert pick_wisdom(elicit) in WISDOM_LINES
+    assert pick_wisdom(chicago) in WISDOM_LINES
+    empty = Clue(
+        source_url="https://fifteensquared.net/example/",
+        paper="Guardian",
+        puzzle_id="30124",
+        setter="Chandler",
+        blogger="manehi",
+        number="9",
+        direction="across",
+        clue="Bring out client I fancy with no end of distinction",
+        enumeration="6",
+        answer="ELICIT",
+        parse="anagram of client I",
+        device="anagram",
+        enumeration_ok=True,
+    )
+    parts = write_parts(empty)
+    wisdom = pick_wisdom(empty.slug)
+    assert empty.slug == elicit
+    assert parts.outro_speech == f"{wisdom} {OUTRO_LINE}"
+    assert parts.outro_speech == speak_outro(empty)
+    assert parts.outro_speech.count("cryptic.fit") == 1
+    assert "Chandler" not in parts.outro_speech
+    assert "Guardian" not in parts.outro_speech
+    assert "manehi" not in parts.outro_speech
+    assert speak_outro(empty) == speak_outro(empty)
 
 
 def test_voice_refuses_ssml_markup(tmp_path):
@@ -94,7 +144,11 @@ def test_study_clue_is_mass_media():
     assert parts.intro_speech == speak_intro(clue)
     assert parts.clue_speech == "Maid struggling with a mess — newspapers etc."
     assert parts.letters_speech == "Four, five."
-    assert parts.think_speech == "Have a think."
+    assert THINK_PROMPT == "Pause here to think about it."
+    assert parts.think_speech == THINK_PROMPT
+    assert parts.think_speech == "Pause here to think about it."
+    assert "Have a think." not in parts.full
+    assert THINK_PAUSE_SECONDS == 3.0
     assert parts.hint_speech == HINT_LINE
     assert parts.hint_speech.startswith(HINT_OFFER)
     assert parts.hint_speech.endswith(HINT_LOOK)
@@ -112,7 +166,11 @@ def test_study_clue_is_mass_media():
     assert INTRO_RATE == "+0%"
     assert parts.answer_speech == "It's mass media."
     assert parts.answer_speech == speak_answer(clue.answer)
-    assert parts.outro_speech == "That was cryptic.fit."
+    assert parts.outro_speech == speak_outro(clue)
+    assert parts.outro_speech == f"{pick_wisdom(clue.slug)} {OUTRO_LINE}"
+    assert pick_wisdom(clue.slug) in WISDOM_LINES
+    assert parts.outro_speech.endswith(OUTRO_LINE)
+    assert "That's Arrietty" not in parts.outro_speech
     assert "Brendan" not in parts.parse_speech
     assert "Fifteen Squared" not in parts.parse_speech
     assert parts.source_speech == ""
@@ -158,7 +216,10 @@ def test_source_credit_is_only_in_the_invite():
     assert parts.source_speech == speak_source(clue)
     assert "That's Brendan" not in parts.full
     assert "Fifteen Squared" not in parts.parse_speech
-    assert parts.outro_speech == "That was cryptic.fit."
+    assert parts.outro_speech == speak_outro(clue)
+    assert parts.outro_speech.endswith(OUTRO_LINE)
+    assert pick_wisdom(clue.slug) in parts.outro_speech
+    assert "That's Brendan" not in parts.outro_speech
     assert "Guardian" in parts.intro_speech
     assert "Brendan" in parts.intro_speech
 

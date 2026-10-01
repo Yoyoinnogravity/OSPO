@@ -21,10 +21,10 @@ from twodown.config import (
     INK,
     TAGLINE,
     MUTED,
-    OUTRO_LINE,
     NEWS_BG,
     NEWS_GRID,
     THINK_PROMPT,
+    pick_wisdom,
 )
 from twodown.croc import paste_croc
 from twodown.hints import ensure_hint_photo, hint_for_clue
@@ -245,9 +245,12 @@ def _paint_beat(clue: Clue, beat: str) -> Image.Image:
     img, draw = _new_card()
     _draw_wordmark(draw)
     if beat == "outro":
+        wisdom = pick_wisdom(clue.slug) or BRAND
         line_font = _font(FONT_REGULAR, 64)
-        wrapped = _wrap(draw, OUTRO_LINE.rstrip("."), line_font, WIDTH - 180)
-        _center_text(draw, 280, wrapped, line_font, INK, spacing=16)
+        wrapped = _wrap(draw, wisdom.rstrip("."), line_font, WIDTH - 180)
+        y = _center_text(draw, 360, wrapped, line_font, INK, spacing=16)
+        brand_font = _font(FONT_SANS, 36)
+        _center_text(draw, y + 28, BRAND, brand_font, MUTED)
         _footer(draw, "")
         return img
     _draw_kicker(draw, clue)

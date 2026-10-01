@@ -19,6 +19,7 @@ from twodown.config import (
     SOURCE_GAP_SECONDS,
     THINK_PAUSE_SECONDS,
     THINK_PROMPT,
+    pick_wisdom,
 )
 from twodown.models import Clue
 
@@ -281,6 +282,14 @@ def speak_source(clue: Clue) -> str:
     return ""
 
 
+def speak_outro(clue: Clue) -> str:
+    """Ava's closer: one piece of wisdom, then the site name once."""
+    wisdom = pick_wisdom(clue.slug)
+    if wisdom:
+        return f"{wisdom} {OUTRO_LINE}"
+    return OUTRO_LINE
+
+
 def write_parts(clue: Clue) -> ScriptParts:
     parse = speak_parse_tokens(_spoken_parse(clue.parse, clue.answer))
     meaning = ""
@@ -298,7 +307,7 @@ def write_parts(clue: Clue) -> ScriptParts:
             speak_parse_asides(speak_parse_tokens(f"{parse}{meaning}".strip()))
         ),
         source_speech=_strip_site_code(speak_source(clue)),
-        outro_speech=_strip_site_code(OUTRO_LINE),
+        outro_speech=_strip_site_code(speak_outro(clue)),
     )
 
 
