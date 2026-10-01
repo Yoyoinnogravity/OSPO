@@ -230,6 +230,35 @@ a.action {
   text-decoration: none;
   font-size: 0.95rem;
 }
+a.action.ghost {
+  background: transparent;
+  color: var(--crimson) !important;
+  border: 1px solid var(--crimson);
+}
+.youtube-upload {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin: 14px 0 8px;
+}
+.youtube-title, .youtube-copy {
+  font-family: "Liberation Sans", sans-serif;
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin: 0 0 10px;
+}
+.youtube-title code, .youtube-copy pre {
+  display: block;
+  color: var(--ink);
+  background: var(--cream);
+  border: 1px solid var(--rule);
+  padding: 8px 10px;
+  margin-top: 4px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.youtube-copy summary { cursor: pointer; color: var(--crimson); }
 ul.archive { list-style: none; padding: 0; margin: 0 0 16px; }
 ul.archive li { margin: 0 0 8px; }
 aside.ad {
