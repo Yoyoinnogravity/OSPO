@@ -210,14 +210,6 @@ def build_short_soundtrack(parts: ScriptParts, dest: Path, voice: str | None = N
         "think": synthesise(
             parts.think_speech, work / "think.mp3", voice, rate=THINK_RATE, pitch=THINK_PITCH
         ),
-        "hint": synthesise(
-            parts.hint_speech,
-            work / "hint.mp3",
-            HINT_VOICE_ALIAS,
-            rate=HINT_RATE,
-            pitch=HINT_PITCH,
-            volume=HINT_VOLUME,
-        ),
         "answer": synthesise(
             parts.answer_speech, work / "answer.mp3", voice, rate=ANSWER_RATE, pitch=ANSWER_PITCH
         ),
@@ -237,6 +229,16 @@ def build_short_soundtrack(parts: ScriptParts, dest: Path, voice: str | None = N
             volume=OUTRO_VOLUME,
         ),
     }
+    include_hint = bool((parts.hint_speech or "").strip())
+    if include_hint:
+        clips["hint"] = synthesise(
+            parts.hint_speech,
+            work / "hint.mp3",
+            HINT_VOICE_ALIAS,
+            rate=HINT_RATE,
+            pitch=HINT_PITCH,
+            volume=HINT_VOLUME,
+        )
     credit_end = bool((parts.source_speech or "").strip())
     if credit_end:
         clips["source"] = synthesise(
@@ -251,7 +253,7 @@ def build_short_soundtrack(parts: ScriptParts, dest: Path, voice: str | None = N
     clue_d = audio_seconds(clips["clue"])
     letters_d = audio_seconds(clips["letters"])
     think_d = audio_seconds(clips["think"])
-    hint_d = audio_seconds(clips["hint"])
+    hint_d = audio_seconds(clips["hint"]) if include_hint else 0.0
     answer_d = audio_seconds(clips["answer"])
     parse_d = audio_seconds(clips["parse"])
     source_d = audio_seconds(clips["source"]) if credit_end else 0.0
@@ -259,47 +261,60 @@ def build_short_soundtrack(parts: ScriptParts, dest: Path, voice: str | None = N
     ffmpeg = shutil.which("ffmpeg")
     if not ffmpeg:
         raise RuntimeError("ffmpeg is required to build the Short soundtrack")
-    keys = ("intro", "clue", "letters", "think", "hint", "answer", "parse")
+    keys = ["intro", "clue", "letters", "think"]
+    if include_hint:
+        keys.append("hint")
+    keys.extend(["answer", "parse"])
     if credit_end:
-        keys += ("source",)
-    keys += ("outro",)
+        keys.append("source")
+    keys.append("outro")
     cmd = [ffmpeg, "-y"]
     for key in keys:
         cmd.extend(["-i", str(clips[key])])
     formats = "".join(
         f"[{i}:a]aformat=sample_rates=24000:channel_layouts=mono[c{i}];" for i in range(len(keys))
     )
-    if credit_end:
-        gaps = (
-            f"anullsrc=r=24000:cl=mono:d={INTRO_GAP_SECONDS:.2f}[g0];"
-            f"anullsrc=r=24000:cl=mono:d={CLUE_LETTERS_GAP_SECONDS:.2f}[g];"
-            f"anullsrc=r=24000:cl=mono:d={LETTERS_PAUSE_SECONDS:.2f}[p1];"
-            f"anullsrc=r=24000:cl=mono:d={THINK_PAUSE_SECONDS:.2f}[p2];"
+    gaps = (
+        f"anullsrc=r=24000:cl=mono:d={INTRO_GAP_SECONDS:.2f}[g0];"
+        f"anullsrc=r=24000:cl=mono:d={CLUE_LETTERS_GAP_SECONDS:.2f}[g];"
+        f"anullsrc=r=24000:cl=mono:d={LETTERS_PAUSE_SECONDS:.2f}[p1];"
+        f"anullsrc=r=24000:cl=mono:d={THINK_PAUSE_SECONDS:.2f}[p2];"
+    )
+    if include_hint:
+        gaps += (
             f"anullsrc=r=24000:cl=mono:d={HINT_HOLD_SECONDS:.2f}[h1];"
             f"anullsrc=r=24000:cl=mono:d={HINT_PAUSE_SECONDS:.2f}[h2];"
-            f"anullsrc=r=24000:cl=mono:d={ANSWER_PAUSE_SECONDS:.2f}[p3];"
-            f"anullsrc=r=24000:cl=mono:d={SOURCE_GAP_SECONDS:.2f}[g2];"
-            f"anullsrc=r=24000:cl=mono:d={OUTRO_GAP_SECONDS:.2f}[g1];"
         )
-        chain = "[c0][g0][c1][g][c2][p1][c3][p2][c4][h1][h2][c5][p3][c6][g2][c7][g1][c8]"
-        n = 18
+    gaps += f"anullsrc=r=24000:cl=mono:d={ANSWER_PAUSE_SECONDS:.2f}[p3];"
+    if credit_end:
+        gaps += f"anullsrc=r=24000:cl=mono:d={SOURCE_GAP_SECONDS:.2f}[g2];"
+    gaps += f"anullsrc=r=24000:cl=mono:d={OUTRO_GAP_SECONDS:.2f}[g1];"
+    idx = 0
+    chain = f"[c{idx}][g0]"
+    idx += 1
+    chain += f"[c{idx}][g]"
+    idx += 1
+    chain += f"[c{idx}][p1]"
+    idx += 1
+    chain += f"[c{idx}][p2]"
+    idx += 1
+    if include_hint:
+        chain += f"[c{idx}][h1][h2]"
+        idx += 1
+    chain += f"[c{idx}][p3]"
+    idx += 1
+    chain += f"[c{idx}]"
+    idx += 1
+    if credit_end:
+        chain += f"[g2][c{idx}]"
+        idx += 1
         parse_hold = SOURCE_GAP_SECONDS
         source_hold = source_d + OUTRO_GAP_SECONDS
     else:
-        gaps = (
-            f"anullsrc=r=24000:cl=mono:d={INTRO_GAP_SECONDS:.2f}[g0];"
-            f"anullsrc=r=24000:cl=mono:d={CLUE_LETTERS_GAP_SECONDS:.2f}[g];"
-            f"anullsrc=r=24000:cl=mono:d={LETTERS_PAUSE_SECONDS:.2f}[p1];"
-            f"anullsrc=r=24000:cl=mono:d={THINK_PAUSE_SECONDS:.2f}[p2];"
-            f"anullsrc=r=24000:cl=mono:d={HINT_HOLD_SECONDS:.2f}[h1];"
-            f"anullsrc=r=24000:cl=mono:d={HINT_PAUSE_SECONDS:.2f}[h2];"
-            f"anullsrc=r=24000:cl=mono:d={ANSWER_PAUSE_SECONDS:.2f}[p3];"
-            f"anullsrc=r=24000:cl=mono:d={OUTRO_GAP_SECONDS:.2f}[g1];"
-        )
-        chain = "[c0][g0][c1][g][c2][p1][c3][p2][c4][h1][h2][c5][p3][c6][g1][c7]"
-        n = 16
         parse_hold = OUTRO_GAP_SECONDS
         source_hold = 0.0
+    chain += f"[g1][c{idx}]"
+    n = chain.count("[")
     cmd.extend(
         [
             "-filter_complex",
@@ -326,7 +341,7 @@ def build_short_soundtrack(parts: ScriptParts, dest: Path, voice: str | None = N
         clue=clue_d + CLUE_LETTERS_GAP_SECONDS,
         letters=letters_d + LETTERS_PAUSE_SECONDS,
         think=think_d + THINK_PAUSE_SECONDS,
-        hint=hint_d + HINT_HOLD_SECONDS + HINT_PAUSE_SECONDS,
+        hint=(hint_d + HINT_HOLD_SECONDS + HINT_PAUSE_SECONDS) if include_hint else 0.0,
         answer=answer_d + ANSWER_PAUSE_SECONDS,
         parse=parse_d + parse_hold,
         source=source_hold,

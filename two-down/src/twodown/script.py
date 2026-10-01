@@ -8,7 +8,6 @@ from twodown.config import (
     ANSWER_PAUSE_SECONDS,
     CLUE_LETTERS_GAP_SECONDS,
     HINT_HOLD_SECONDS,
-    HINT_LINE,
     HINT_PAUSE_SECONDS,
     INTRO_GAP_SECONDS,
     INTRO_LINE,
@@ -21,6 +20,7 @@ from twodown.config import (
     THINK_PROMPT,
     pick_wisdom,
 )
+from twodown.hints import attach_hint, spoken_hint
 from twodown.models import Clue
 
 DEVICE_LINE = {
@@ -236,13 +236,22 @@ class ScriptParts:
             f"[pause {LETTERS_PAUSE_SECONDS:.0f}s]",
             self.think_speech,
             f"[pause {THINK_PAUSE_SECONDS:.0f}s]",
-            self.hint_speech,
-            f"[pause {HINT_HOLD_SECONDS:.0f}s]",
-            f"[pause {HINT_PAUSE_SECONDS:.1f}s]",
-            self.answer_speech,
-            f"[pause {ANSWER_PAUSE_SECONDS:.0f}s]",
-            self.parse_speech,
         ]
+        if self.hint_speech:
+            lines.extend(
+                [
+                    self.hint_speech,
+                    f"[pause {HINT_HOLD_SECONDS:.0f}s]",
+                    f"[pause {HINT_PAUSE_SECONDS:.1f}s]",
+                ]
+            )
+        lines.extend(
+            [
+                self.answer_speech,
+                f"[pause {ANSWER_PAUSE_SECONDS:.0f}s]",
+                self.parse_speech,
+            ]
+        )
         if self.source_speech:
             lines.append(f"[pause {SOURCE_GAP_SECONDS:.2f}s]")
             lines.append(self.source_speech)
@@ -291,6 +300,7 @@ def speak_outro(clue: Clue) -> str:
 
 
 def write_parts(clue: Clue) -> ScriptParts:
+    clue = attach_hint(clue)
     parse = speak_parse_tokens(_spoken_parse(clue.parse, clue.answer))
     meaning = ""
     if clue.definition:
@@ -301,7 +311,7 @@ def write_parts(clue: Clue) -> ScriptParts:
         clue_speech=_strip_site_code(f"{clue.clue}."),
         letters_speech=_strip_site_code(speak_enumeration(clue.enumeration)),
         think_speech=_strip_site_code(THINK_PROMPT),
-        hint_speech=_strip_site_code(clue.hint_line or HINT_LINE),
+        hint_speech=_strip_site_code(spoken_hint(clue)),
         answer_speech=_strip_site_code(speak_answer(clue.answer)),
         parse_speech=_strip_site_code(
             speak_parse_asides(speak_parse_tokens(f"{parse}{meaning}".strip()))
@@ -351,9 +361,14 @@ def to_ssml(parts: ScriptParts, pause_seconds: float | None = None) -> str:
         f'<break time="{letters_ms}ms"/>'
         f"{html.escape(parts.think_speech, quote=False)}"
         f'<break time="{think_ms}ms"/>'
-        f"{html.escape(parts.hint_speech, quote=False)}"
-        f'<break time="{hint_hold_ms}ms"/>'
-        f'<break time="{hint_ms}ms"/>'
+    )
+    if parts.hint_speech:
+        ssml += (
+            f"{html.escape(parts.hint_speech, quote=False)}"
+            f'<break time="{hint_hold_ms}ms"/>'
+            f'<break time="{hint_ms}ms"/>'
+        )
+    ssml += (
         f"{html.escape(parts.answer_speech, quote=False)}"
         f'<break time="{answer_ms}ms"/>'
         f"{html.escape(parts.parse_speech, quote=False)}"

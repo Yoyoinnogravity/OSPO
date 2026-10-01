@@ -203,7 +203,40 @@ def test_aled_bring_out_and_usa_match_at_80_percent():
 
 
 
+def test_unmatched_clue_skips_the_picture_clue_beat():
+    from twodown.hints import DEFAULT_HINT, hint_for_clue, spoken_hint
+    from twodown.script import write_parts
+
+    blank = Clue(
+        source_url="https://fifteensquared.net/example/",
+        paper="Independent",
+        puzzle_id="99999",
+        setter="Phi",
+        blogger="tester",
+        number="12",
+        direction="across",
+        clue="Rioting led unrest in the final analysis",
+        enumeration="3,6",
+        answer="END RESULT",
+        parse="Anagram of LED UNREST",
+    )
+    attached = attach_hint(blank)
+    assert attached.hint_image is None
+    assert not attached.hint_line
+    assert hint_for_clue(attached) is None
+    assert spoken_hint(attached) == ""
+    leftover = match_hint(blank.definition or "", clue=blank.clue, parse=blank.parse)
+    assert not leftover.close_enough
+    assert leftover.photo.slug == DEFAULT_HINT.slug
+    parts = write_parts(blank)
+    assert parts.hint_speech == ""
+    assert "Here's a hint" not in parts.full
+    assert "No relevant image found" not in parts.full
+    assert parts.full.index(parts.think_speech) < parts.full.index(parts.answer_speech)
+
+
 def test_no_cloud_vision_pipeline():
+
     root = Path(__file__).resolve().parents[1] / "src" / "twodown"
     forbidden = (
         "clip_embed",

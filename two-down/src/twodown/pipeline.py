@@ -69,6 +69,7 @@ def published_clue(slug: str, site_root: Path | None = None) -> Clue:
         if not match or not clue_match:
             raise ValueError(f"Could not parse published clue {slug}")
         blogger = credit.get_text(" ", strip=True).split("·", 1)[-1].strip()
+        definition = (article.get("data-definition") or "").strip() or None
         return attach_hint(
             Clue(
                 source_url=str(credit["href"]),
@@ -81,6 +82,7 @@ def published_clue(slug: str, site_root: Path | None = None) -> Clue:
                 clue=clue_match["clue"],
                 enumeration=clue_match["enum"],
                 answer=answer.get_text(" ", strip=True),
+                definition=definition,
                 parse=htmlmod.unescape(parse.get_text(" ", strip=True)),
                 device=match["device"],
                 enumeration_ok=True,

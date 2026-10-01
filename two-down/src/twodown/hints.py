@@ -676,13 +676,14 @@ def match_hint(
     return MatchedHint(photo=best, closeness=score, close_enough=True)
 
 
-def get_hint_photo(slug: str | None = None) -> HintPhoto:
-    """Resolve a still by slug. Unknown slugs auto-match. AI stills are allowed."""
+def get_hint_photo(slug: str | None = None) -> HintPhoto | None:
+    """Resolve a still by slug. Unknown slugs auto-match when close enough."""
     if slug in PHOTOS:
         return PHOTOS[slug]
     if not slug:
-        return DEFAULT_HINT
-    return match_hint(slug).photo
+        return None
+    matched = match_hint(slug)
+    return matched.photo if matched.close_enough else PHOTOS.get(slug)
 
 
 def _photo_from_path(name: str) -> HintPhoto | None:
@@ -696,31 +697,54 @@ def _photo_from_path(name: str) -> HintPhoto | None:
     return None
 
 
-def hint_for_clue(clue: Clue) -> HintPhoto:
-    """Always match from definition / parse / clue, not a leftover default still."""
+def _matched_photo(clue: Clue) -> HintPhoto | None:
+    """80% definition match, else a slug-mapped still. Never the leftover default."""
+    matched = match_hint(clue.definition or "", clue=clue.clue, parse=clue.parse)
+    if matched.close_enough:
+        return matched.photo
+    return PHOTOS.get(clue.slug)
+
+
+def hint_for_clue(clue: Clue) -> HintPhoto | None:
+    """Return a per-clue still, or None so the Short can skip the picture-clue beat."""
     attached = attach_hint(clue)
     if attached.hint_image:
         found = _photo_from_path(attached.hint_image)
-        if found is not None:
+        if found is not None and found.slug != DEFAULT_HINT.slug:
             return found
-    matched = match_hint(attached.definition or "", clue=attached.clue, parse=attached.parse)
-    if matched.close_enough:
-        return matched.photo
-    return PHOTOS.get(attached.slug, DEFAULT_HINT)
+        if found is not None:
+            rematch = match_hint(attached.definition or "", clue=attached.clue, parse=attached.parse)
+            if rematch.close_enough and rematch.photo.slug == found.slug:
+                return found
+    return _matched_photo(attached)
+
+
+def spoken_hint(clue: Clue) -> str:
+    """Speak 'Here's a hint' only when a real still is attached. No miss line."""
+    return HINT_LINE if hint_for_clue(clue) is not None else ""
 
 
 def attach_hint(clue: Clue) -> Clue:
-    """Carry hint_image + hint_line matched to the definition (~80%)."""
-    matched = match_hint(clue.definition or "", clue=clue.clue, parse=clue.parse)
-    photo = matched.photo if matched.close_enough else PHOTOS.get(clue.slug, DEFAULT_HINT)
-    updates: dict[str, str] = {}
-    if not clue.hint_image:
-        updates["hint_image"] = f"assets/hints/{photo.filename}"
-    if not clue.hint_credit:
-        updates["hint_credit"] = photo.credit_line
-    if not clue.hint_line:
-        updates["hint_line"] = HINT_LINE
-    return clue.model_copy(update=updates) if updates else clue
+    """Attach a distinct still, or clear the hint so the film skips the beat."""
+    photo = _matched_photo(clue)
+    if photo is None:
+        if not clue.hint_image and not clue.hint_credit and clue.hint_line == "":
+            return clue
+        if not clue.hint_image and not clue.hint_credit and clue.hint_line is None:
+            return clue.model_copy(update={"hint_line": ""})
+        return clue.model_copy(update={"hint_image": None, "hint_credit": None, "hint_line": ""})
+    wanted = {
+        "hint_image": f"assets/hints/{photo.filename}",
+        "hint_credit": photo.credit_line,
+        "hint_line": HINT_LINE,
+    }
+    if (
+        clue.hint_image == wanted["hint_image"]
+        and clue.hint_credit == wanted["hint_credit"]
+        and clue.hint_line == wanted["hint_line"]
+    ):
+        return clue
+    return clue.model_copy(update=wanted)
 
 
 def _headers() -> dict[str, str]:

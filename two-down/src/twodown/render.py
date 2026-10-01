@@ -214,6 +214,8 @@ def _draw_hint_photo(
     """Inset a credited hint still. Never a full-bleed travel photo."""
     clue = attach_hint(clue)
     matched = hint_for_clue(clue)
+    if matched is None:
+        return y
     photo = Image.open(ensure_hint_photo(matched)).convert("RGB")
     frame_w, frame_h = 900, 560
     left = (WIDTH - frame_w) // 2
@@ -271,6 +273,10 @@ def _paint_beat(clue: Clue, beat: str) -> Image.Image:
         _center_text(draw, prompt_y, wrapped, prompt, CRIMSON, spacing=8)
     if beat == "hint":
         # Empty lights stay; the picture is the hint. Never fill or print the answer.
+        # No still → no picture-clue beat. Do not paste the leftover default photo.
+        if hint_for_clue(clue) is None:
+            _footer(draw, "")
+            return img
         prompt_y = min(lights_bottom + 36, 980)
         line = (clue.hint_line or HINT_LINE).rstrip(".")
         wrapped = _wrap(draw, line, prompt, WIDTH - 160)

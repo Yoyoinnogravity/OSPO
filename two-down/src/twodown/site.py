@@ -949,8 +949,12 @@ def _article(
         description=youtube_description(item),
         kit_href=f"{_root_prefix(media_prefix)}upload.html#{clue.slug}",
     )
+    extras: list[str] = []
+    if clue.definition:
+        extras.append(f'data-definition="{_e(clue.definition)}"')
+    extra_attrs = (" " + " ".join(extras)) if extras else ""
     return f"""
-    <article class="clue{opened}" data-slug="{_e(clue.slug)}">
+    <article class="clue{opened}" data-slug="{_e(clue.slug)}"{extra_attrs}>
       <p class="kicker">{_e(clue.paper)} {_e(clue.puzzle_id)} · {_e(clue.setter)} · {_e(clue.number)} {_e(clue.direction)} · {_e(clue.device)}</p>
       {clue_block}
       <button class="reveal" type="button">Solve</button>
