@@ -162,6 +162,7 @@ def test_publish_site_writes_spoiler_pages(tmp_path):
     assert "is-solved" in app
     assert "playFromHash" in app
     assert "wantsPlay" in app
+    assert "sidecarTried" in app
     assert 'rel="canonical"' in index
     assert 'property="og:title"' in index
     assert "application/ld+json" in index
