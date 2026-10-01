@@ -529,6 +529,50 @@ XYZ = HintPhoto(
 )
 
 
+# Definition still for PHLEGM: humour (the old medical sense). Never print PHLEGM.
+HUMOUR = HintPhoto(
+    slug="humour-still",
+    label="Humour",
+    source="generated still",
+    license="generated",
+    filename="humour-still.webp",
+    keywords=frozenset({"humour", "humor", "humoral", "humours", "humors"}),
+)
+
+
+# Definition still for EDDO: a vegetable. Never print EDDO.
+VEGETABLE = HintPhoto(
+    slug="vegetable-still",
+    label="Vegetable",
+    source="generated still",
+    license="generated",
+    filename="vegetable-still.webp",
+    keywords=frozenset({"vegetable", "vegetables", "veg", "produce"}),
+)
+
+
+# Definition still for SILICON: a semiconductor. Never print SILICON.
+SEMICONDUCTOR = HintPhoto(
+    slug="semiconductor-still",
+    label="A semiconductor",
+    source="generated still",
+    license="generated",
+    filename="semiconductor-still.webp",
+    keywords=frozenset({"semiconductor", "semiconductors", "wafer"}),
+)
+
+
+# Definition still for STATUS: standing / rank. Never print STATUS.
+STANDING = HintPhoto(
+    slug="standing-still",
+    label="Standing",
+    source="generated still",
+    license="generated",
+    filename="standing-still.webp",
+    keywords=frozenset({"standing", "stand", "stature", "rank", "dignity"}),
+)
+
+
 # Commons alternate: imperial Ethiopian / Rastafari Lion of Judah flag.
 LION = HintPhoto(
     slug="lion-of-judah",
@@ -566,6 +610,10 @@ PHOTOS: dict[str, HintPhoto] = {
     TIPS.slug: TIPS,
     PORTER.slug: PORTER,
     XYZ.slug: XYZ,
+    HUMOUR.slug: HUMOUR,
+    VEGETABLE.slug: VEGETABLE,
+    SEMICONDUCTOR.slug: SEMICONDUCTOR,
+    STANDING.slug: STANDING,
     LION.slug: LION,
     "dreamlike": TRANCE,
     "trance": TRANCE,
@@ -646,6 +694,19 @@ PHOTOS: dict[str, HintPhoto] = {
     "xyz": XYZ,
     "axes": XYZ,
     "financial-times-18477-14a": XYZ,
+    "humour": HUMOUR,
+    "humor": HUMOUR,
+    "phlegm": HUMOUR,
+    "independent-12474-1a": HUMOUR,
+    "vegetable": VEGETABLE,
+    "eddo": VEGETABLE,
+    "independent-12474-9a": VEGETABLE,
+    "semiconductor": SEMICONDUCTOR,
+    "silicon": SEMICONDUCTOR,
+    "financial-times-18494-5a": SEMICONDUCTOR,
+    "standing": STANDING,
+    "status": STANDING,
+    "guardian-30126-5a": STANDING,
 }
 
 # No leftover still. Trance / the sleeping woman is only for trance or dream clues.
@@ -658,7 +719,7 @@ def _catalog() -> tuple[HintPhoto, ...]:
     return (
         TRANCE, MOONLIT, RASTA, FATS, WELLINGTON, COLE, SMILES, DAVIS, AIM, PAPERS,
         BRING, USA, MODEL, AUTHOR, MAKEUP, CRASH, CAPSULE, FIELD, GLOBE, WEEKLY, CROSS,
-        UPROOT, TIPS, PORTER, XYZ, LION,
+        UPROOT, TIPS, PORTER, XYZ, HUMOUR, VEGETABLE, SEMICONDUCTOR, STANDING, LION,
     )
 
 
@@ -1158,6 +1219,54 @@ def _generate_xyz_still(dest: Path) -> Path:
     return dest
 
 
+def _generate_humour_still(dest: Path) -> Path:
+    """Last-resort humoral flasks if the file is missing. No answer text."""
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    img = Image.new("RGB", (1280, 720), (36, 24, 18))
+    draw = ImageDraw.Draw(img)
+    draw.rectangle((80, 420, 1200, 680), fill=(72, 48, 32))
+    for left, colour in ((160, (140, 28, 32)), (400, (212, 176, 48)), (640, (48, 64, 36)), (880, (232, 220, 196))):
+        draw.rectangle((left, 180, left + 180, 500), fill=colour)
+        draw.polygon([(left + 40, 180), (left + 140, 180), (left + 120, 80), (left + 60, 80)], fill=(188, 196, 204))
+    img.save(dest, "WEBP", quality=82, method=6)
+    return dest
+
+
+def _generate_vegetable_still(dest: Path) -> Path:
+    """Last-resort vegetable pile if the file is missing. No answer text."""
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    img = Image.new("RGB", (1280, 720), (88, 56, 32))
+    draw = ImageDraw.Draw(img)
+    draw.ellipse((180, 160, 520, 520), fill=(48, 120, 52))
+    draw.ellipse((460, 220, 860, 620), fill=(212, 96, 40))
+    draw.ellipse((780, 120, 1140, 500), fill=(232, 220, 80))
+    img.save(dest, "WEBP", quality=82, method=6)
+    return dest
+
+
+def _generate_semiconductor_still(dest: Path) -> Path:
+    """Last-resort wafer if the file is missing. No answer text."""
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    img = Image.new("RGB", (1280, 720), (16, 24, 40))
+    draw = ImageDraw.Draw(img)
+    draw.ellipse((360, 80, 920, 640), fill=(188, 204, 220))
+    draw.rectangle((560, 280, 720, 440), fill=(40, 72, 120))
+    img.save(dest, "WEBP", quality=82, method=6)
+    return dest
+
+
+def _generate_standing_still(dest: Path) -> Path:
+    """Last-resort podium figure if the file is missing. No answer text."""
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    img = Image.new("RGB", (1280, 720), (48, 40, 36))
+    draw = ImageDraw.Draw(img)
+    draw.rectangle((480, 480, 800, 680), fill=(168, 152, 132))
+    draw.ellipse((540, 80, 740, 300), fill=(216, 184, 152))
+    draw.rectangle((560, 280, 720, 520), fill=(32, 28, 28))
+    img.save(dest, "WEBP", quality=82, method=6)
+    return dest
+
+
 def ensure_hint_photo(photo: HintPhoto | None = None) -> Path:
     if photo is None:
         raise ValueError("no hint photo to ensure — DEFAULT is not a leftover still")
@@ -1192,6 +1301,10 @@ def ensure_hint_photo(photo: HintPhoto | None = None) -> Path:
         TIPS.slug: _generate_tips_still,
         PORTER.slug: _generate_porter_still,
         XYZ.slug: _generate_xyz_still,
+        HUMOUR.slug: _generate_humour_still,
+        VEGETABLE.slug: _generate_vegetable_still,
+        SEMICONDUCTOR.slug: _generate_semiconductor_still,
+        STANDING.slug: _generate_standing_still,
     }
     generate = generators.get(photo.slug)
     if generate is not None:

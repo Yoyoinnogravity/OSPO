@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from twodown.config import HINT_LINE, HINT_MISS, PACKAGE_ROOT, PINUP_SLUG, STUDY_SLUG
-from twodown.hints import AIM, AUTHOR, BRING, CLOSE_ENOUGH, COLE, CROSS, DAVIS, DEFAULT_HINT, FATS, FIELD, GLOBE, MODEL, PAPERS, PORTER, RASTA, SMILES, TRANCE, USA, WELLINGTON, attach_hint, match_hint
+from twodown.hints import AIM, AUTHOR, BRING, CLOSE_ENOUGH, COLE, CROSS, DAVIS, DEFAULT_HINT, FATS, FIELD, GLOBE, HUMOUR, MODEL, PAPERS, PORTER, RASTA, SEMICONDUCTOR, SMILES, STANDING, TRANCE, USA, VEGETABLE, WELLINGTON, attach_hint, match_hint
 from twodown.models import Clue
 from twodown.pipeline import aimlessly_clue, cole_clue, davis_cup_clue, dreamlike_clue, fats_clue, mass_media_clue, published_clue, rasta_clue, smiles_clue, study_clue, wellington_clue
 
@@ -340,6 +340,30 @@ def test_sphere_uses_the_globe_still():
     still = PACKAGE_ROOT / attached.hint_image
     assert still.is_file()
     assert still.stat().st_size > 20_000
+
+
+def test_new_daily_definitions_get_unique_generated_stills():
+    pairs = (
+        ("humour", HUMOUR, "PHLEGM"),
+        ("vegetable", VEGETABLE, "EDDO"),
+        ("a semiconductor", SEMICONDUCTOR, "SILICON"),
+        ("Standing", STANDING, "STATUS"),
+    )
+    images = []
+    for definition, photo, answer in pairs:
+        leftover = match_hint(definition)
+        assert leftover.photo is not None
+        assert leftover.photo.slug == photo.slug
+        assert leftover.closeness >= CLOSE_ENOUGH
+        assert leftover.close_enough
+        assert leftover.photo is not TRANCE
+        still = PACKAGE_ROOT / "assets" / "hints" / photo.filename
+        assert still.is_file()
+        assert still.stat().st_size > 20_000
+        assert answer.lower() not in photo.label.lower()
+        assert answer not in photo.credit_line
+        images.append(photo.filename)
+    assert len(images) == len(set(images))
 
 
 def test_published_slugs_do_not_share_one_stock_photo():
