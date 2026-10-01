@@ -24,10 +24,6 @@ from twodown.config import (
     HINT_VOICE_ALIAS,
     HINT_VOLUME,
     INTRO_GAP_SECONDS,
-    INTRO_PITCH,
-    INTRO_RATE,
-    INTRO_VOICE_ALIAS,
-    INTRO_VOLUME,
     LETTERS_PAUSE_SECONDS,
     LETTERS_PITCH,
     LETTERS_RATE,
@@ -52,7 +48,7 @@ from twodown.config import (
     VOICE_VOLUME,
     VOICES,
 )
-from twodown.render import AUDIO_LOUDNESS, ShortTimings, audio_seconds
+from twodown.render import AUDIO_LOUDNESS, ShortTimings, audio_seconds, intro_bumper_path
 from twodown.script import ScriptParts
 
 _SSML_MARKUP = re.compile(r"<\s*speak\b|2001/10/synthesis", re.I)
@@ -180,6 +176,42 @@ def synthesise_spoken_paragraph(
     return dest
 
 
+def extract_intro_bumper_audio(dest: Path) -> Path:
+    """Copy the recorded invite. Never send the bumper wording through TTS/SSML."""
+    dest = Path(dest)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    src = intro_bumper_path()
+    if not src.exists():
+        raise FileNotFoundError(f"missing intro bumper {src}")
+    ffmpeg = shutil.which("ffmpeg")
+    if not ffmpeg:
+        raise RuntimeError("ffmpeg is required to extract the intro bumper")
+    result = subprocess.run(
+        [
+            ffmpeg,
+            "-y",
+            "-i",
+            str(src),
+            "-vn",
+            "-c:a",
+            "mp3",
+            "-b:a",
+            "192k",
+            "-ar",
+            "44100",
+            "-ac",
+            "2",
+            str(dest),
+        ],
+        check=True,
+        capture_output=True,
+    )
+    del result
+    if audio_seconds(dest) <= 0:
+        raise RuntimeError(f"intro bumper has no audio: {src}")
+    return dest
+
+
 def build_short_soundtrack(parts: ScriptParts, dest: Path, voice: str | None = None) -> ShortTimings:
     """Speak each beat, then stitch the pauses so the picture can follow the voice."""
     dest.parent.mkdir(parents=True, exist_ok=True)
@@ -188,14 +220,7 @@ def build_short_soundtrack(parts: ScriptParts, dest: Path, voice: str | None = N
         shutil.rmtree(work)
     work.mkdir(parents=True, exist_ok=True)
     clips = {
-        "intro": synthesise(
-            parts.intro_speech,
-            work / "intro.mp3",
-            INTRO_VOICE_ALIAS,
-            rate=INTRO_RATE,
-            pitch=INTRO_PITCH,
-            volume=INTRO_VOLUME,
-        ),
+        "intro": extract_intro_bumper_audio(work / "intro.mp3"),
         "clue": synthesise(
             parts.clue_speech,
             work / "clue.mp3",

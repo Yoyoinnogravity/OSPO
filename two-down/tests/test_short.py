@@ -2,7 +2,7 @@ import inspect
 
 import pytest
 
-from twodown.config import CLUE_PITCH, CLUE_RATE, DEFAULT_VOICE_ALIAS, HINT_LINE, HINT_LOOK, HINT_OFFER, HINT_VOICE_ALIAS, INTRO_LINE, INTRO_RATE, INTRO_VOICE_ALIAS, OUTRO_LINE, OUTRO_VOICE_ALIAS, PINUP_SLUG, SOURCE_VOICE_ALIAS, STUDY_SLUG, THINK_PAUSE_SECONDS, THINK_PROMPT, VOICE_RATE, VOICES, WISDOM_LINES, pick_wisdom
+from twodown.config import CLUE_PITCH, CLUE_RATE, DEFAULT_VOICE_ALIAS, HINT_LINE, HINT_LOOK, HINT_OFFER, HINT_VOICE_ALIAS, INTRO_LINE, INTRO_RATE, OUTRO_LINE, OUTRO_VOICE_ALIAS, PINUP_SLUG, SOURCE_VOICE_ALIAS, STUDY_SLUG, THINK_PAUSE_SECONDS, THINK_PROMPT, VOICE_RATE, VOICES, WISDOM_LINES, pick_wisdom
 from twodown.models import Clue
 from twodown.pipeline import (
     dreamlike_clue,
@@ -99,7 +99,11 @@ def test_voice_refuses_ssml_markup(tmp_path):
     source = inspect.getsource(synthesise_parts)
     assert "to_ssml" not in source
     assert "build_short_soundtrack" in source
-    assert inspect.getsource(build_short_soundtrack).count("synthesise(") >= 8
+    soundtrack = inspect.getsource(build_short_soundtrack)
+    assert "to_ssml" not in soundtrack
+    assert "extract_intro_bumper_audio" in soundtrack
+    assert "parts.intro_speech" not in soundtrack
+    assert soundtrack.count("synthesise(") >= 6
 
 
 def test_parse_is_split_into_spoken_sentences():
@@ -137,11 +141,11 @@ def test_study_clue_is_mass_media():
     assert "struggling" in clue.parse.lower()
     assert "mess" in clue.parse.lower()
     parts = write_parts(clue)
-    assert parts.intro_speech == (
-        "Hi, here is your daily dose of AI cryptic clues. "
-        "Today's clue is from the Financial Times, by Arrietty."
-    )
+    assert parts.intro_speech == INTRO_LINE
     assert parts.intro_speech == speak_intro(clue)
+    assert parts.intro_speech == "Hello, here is your daily dose of AI cryptic crossword."
+    assert "Hi, here is your daily dose of AI cryptic clues." not in parts.intro_speech
+    assert "Today's clue is from" not in parts.intro_speech
     assert parts.clue_speech == "Maid struggling with a mess — newspapers etc."
     assert parts.letters_speech == "Four, five."
     assert THINK_PROMPT == "Pause here to think about it."
@@ -154,13 +158,12 @@ def test_study_clue_is_mass_media():
     assert parts.hint_speech.endswith(HINT_LOOK)
     assert parts.hint_speech == "Here's a hint."
     assert HINT_VOICE_ALIAS == "croc"
-    assert INTRO_VOICE_ALIAS == "andrew"
-    assert VOICES[INTRO_VOICE_ALIAS] == "en-US-AndrewNeural"
     assert DEFAULT_VOICE_ALIAS == "croc"
     assert VOICES["croc"] == "en-US-AvaNeural"
-    assert INTRO_LINE == "Hi, here is your daily dose of AI cryptic clues."
+    assert INTRO_LINE == "Hello, here is your daily dose of AI cryptic crossword."
     assert "Here's Cryptic Croc." not in INTRO_LINE
     assert "Here's Cryptic Croc." not in parts.intro_speech
+    assert "Hi, here is your daily dose of AI cryptic clues." not in INTRO_LINE
     assert CLUE_RATE.startswith("-")
     assert CLUE_PITCH == "+0Hz"
     assert INTRO_RATE == "+0%"
@@ -187,8 +190,8 @@ def test_study_clue_is_mass_media():
     assert script.index("[pause 0.8s]") < script.index(parts.answer_speech)
     assert script.index(parts.answer_speech) < script.index(parts.parse_speech)
     assert script.index(parts.parse_speech) < script.index(parts.outro_speech)
-    assert "Financial Times" in parts.intro_speech
-    assert "Arrietty" in parts.intro_speech
+    assert "Financial Times" not in parts.intro_speech
+    assert "Arrietty" not in parts.intro_speech
     assert script.rstrip().endswith(parts.outro_speech)
 
 
@@ -205,10 +208,9 @@ def test_source_credit_is_only_in_the_invite():
     assert speak_paper("Independent") == "the Independent"
     assert speak_paper("Financial Times") == "the Financial Times"
     assert speak_paper("Independent on Sunday") == "the Independent on Sunday"
-    assert speak_intro(clue) == (
-        "Hi, here is your daily dose of AI cryptic clues. "
-        "Today's clue is from the Guardian, by Brendan."
-    )
+    assert speak_intro(clue) == INTRO_LINE
+    assert speak_intro(clue) == "Hello, here is your daily dose of AI cryptic crossword."
+    assert "Today's clue is from" not in speak_intro(clue)
     assert speak_source(clue) == ""
     assert SOURCE_VOICE_ALIAS == "croc"
     parts = write_parts(clue)
@@ -220,8 +222,8 @@ def test_source_credit_is_only_in_the_invite():
     assert parts.outro_speech.endswith(OUTRO_LINE)
     assert pick_wisdom(clue.slug) in parts.outro_speech
     assert "That's Brendan" not in parts.outro_speech
-    assert "Guardian" in parts.intro_speech
-    assert "Brendan" in parts.intro_speech
+    assert "Guardian" not in parts.intro_speech
+    assert "Brendan" not in parts.intro_speech
 
 
 def test_spoken_parse_says_mass_media_as_words():

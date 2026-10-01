@@ -67,10 +67,8 @@ def test_highlighted_letter_stays_out_of_the_previous_word():
     assert "without then" not in clue.parse
     assert "distinction" in clue.parse
     parts = write_parts(clue)
-    assert parts.intro_speech == (
-        "Hi, here is your daily dose of AI cryptic clues. "
-        "Today's clue is from the Guardian, by Chandler."
-    )
+    assert parts.intro_speech == "Hello, here is your daily dose of AI cryptic crossword."
+    assert "Today's clue is from" not in parts.intro_speech
     assert parts.source_speech == ""
     assert "without then" not in parts.parse_speech
     assert "client" in parts.parse_speech.lower()
@@ -117,13 +115,11 @@ def test_script_opens_with_the_paper_and_setter():
     assert "Fifteen Squared" not in script
     assert clue.answer == "END RESULT"
     assert "end result" in script
-    assert "Phi" in script
     assert "cryptic.fit" in script
     parts = write_parts(clue)
-    assert parts.intro_speech == (
-        "Hi, here is your daily dose of AI cryptic clues. "
-        "Today's clue is from the Independent, by Phi."
-    )
+    assert parts.intro_speech == "Hello, here is your daily dose of AI cryptic crossword."
+    assert "Today's clue is from" not in parts.intro_speech
+    assert "Hi, here is your daily dose of AI cryptic clues." not in parts.intro_speech
     assert parts.clue_speech == f"{clue.clue}."
     assert "The clue:" not in parts.clue_speech
     assert "(" not in parts.clue_speech
@@ -141,8 +137,8 @@ def test_script_opens_with_the_paper_and_setter():
     assert "Fifteen Squared" not in parts.parse_speech
     assert parts.source_speech == ""
     assert "That's Phi" not in script
-    assert "Independent" in parts.intro_speech
-    assert "Phi" in parts.intro_speech
+    assert "Independent" not in parts.intro_speech
+    assert "Phi" not in parts.intro_speech
     assert parts.outro_speech == speak_outro(clue)
     assert parts.outro_speech == f"{pick_wisdom(clue.slug)} {OUTRO_LINE}"
     assert pick_wisdom(clue.slug) in WISDOM_LINES
@@ -163,10 +159,10 @@ def test_script_opens_with_the_paper_and_setter():
     second_800 = ssml.index('break time="800ms"', first_800 + 1)
     third_800 = ssml.index('break time="800ms"', second_800 + 1)
     first_250 = ssml.index('break time="250ms"')
+    first_80 = ssml.index('break time="80ms"')
     first_300 = ssml.index('break time="300ms"')
-    second_300 = ssml.index('break time="300ms"', first_300 + 1)
     assert ssml.index(parts.intro_speech) < ssml.index(parts.clue_speech)
-    assert ssml.index(parts.intro_speech) < first_300 < ssml.index(parts.clue_speech)
+    assert ssml.index(parts.intro_speech) < first_80 < ssml.index(parts.clue_speech)
     assert ssml.index(parts.clue_speech) < first_250 < ssml.index(parts.letters_speech)
     assert ssml.index(parts.letters_speech) < first_800 < ssml.index(parts.think_speech)
     assert ssml.index(parts.think_speech) < ssml.index('break time="3000ms"')
@@ -176,9 +172,9 @@ def test_script_opens_with_the_paper_and_setter():
     assert "Here's a hint" not in ssml
     assert "No relevant image found" in ssml
     assert ssml.index(parts.answer_speech) < third_800 < ssml.index(parts.parse_speech)
-    assert ssml.index(parts.parse_speech) < second_300 < ssml.index(parts.outro_speech)
+    assert ssml.index(parts.parse_speech) < first_300 < ssml.index(parts.outro_speech)
     assert "That's Phi" not in ssml
-    assert "Independent" in parts.intro_speech
+    assert "Independent" not in parts.intro_speech
     assert ssml.count('break time="250ms"') == 1
 
 
@@ -209,10 +205,8 @@ def test_parse_title_variants():
         device="unknown",
         enumeration_ok=True,
     )
-    assert speak_intro(ios) == (
-        "Hi, here is your daily dose of AI cryptic clues. "
-        "Today's clue is from the Independent on Sunday, by Filbert."
-    )
+    assert speak_intro(ios) == "Hello, here is your daily dose of AI cryptic crossword."
+    assert "Today's clue is from" not in speak_intro(ios)
 
 
 def test_classify_anagram():

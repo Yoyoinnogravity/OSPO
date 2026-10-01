@@ -114,10 +114,8 @@ def test_clue_card_is_a_solve_along(tmp_path: Path):
     assert img.getpixel((24, 40)) == NEWS_BG
     intro = draw_beat(_clue(), tmp_path / "intro.png", "intro")
     assert intro.exists()
-    assert speak_intro(_clue()) == (
-        "Hi, here is your daily dose of AI cryptic clues. "
-        "Today's clue is from the Independent, by Eccles."
-    )
+    assert speak_intro(_clue()) == "Hello, here is your daily dose of AI cryptic crossword."
+    assert "Today's clue is from" not in speak_intro(_clue())
     assert draw_beat(_clue(), tmp_path / "outro.png", "outro").exists()
     assert draw_beat(_clue(), tmp_path / "source.png", "source").exists()
     assert draw_beat(_clue(), tmp_path / "only-clue.png", "clue").exists()
