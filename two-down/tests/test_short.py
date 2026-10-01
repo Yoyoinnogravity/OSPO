@@ -2,7 +2,7 @@ import inspect
 
 import pytest
 
-from twodown.config import CLUE_PITCH, CLUE_RATE, DEFAULT_VOICE_ALIAS, HINT_LINE, HINT_LOOK, HINT_OFFER, HINT_VOICE_ALIAS, INTRO_LINE, INTRO_RATE, INTRO_VOICE_ALIAS, PINUP_SLUG, SOURCE_VOICE_ALIAS, STUDY_SLUG, VOICE_RATE, VOICES
+from twodown.config import CLUE_PITCH, CLUE_RATE, DEFAULT_VOICE_ALIAS, HINT_LINE, HINT_LOOK, HINT_OFFER, HINT_VOICE_ALIAS, INTRO_LINE, INTRO_RATE, INTRO_VOICE_ALIAS, PINUP_SLUG, SOURCE_VOICE_ALIAS, STUDY_SLUG, TRIAL_INTRO_VOICE_ALIAS, TRIAL_PRESENTER_VOICE_ALIAS, TRIAL_VOICE_LABELS, TRIAL_VOICES, VOICE_LABELS, VOICE_RATE, VOICES
 from twodown.models import Clue
 from twodown.pipeline import (
     dreamlike_clue,
@@ -18,6 +18,7 @@ from twodown.pipeline import (
     aimlessly_clue,
     mass_media_clue,
 )
+from twodown.trial_voices import ELICIT_ANSWER, ELICIT_SLUG
 from twodown.script import (
     speak_answer,
     speak_enumeration,
@@ -26,13 +27,48 @@ from twodown.script import (
     speak_source,
     write_parts,
 )
-from twodown.voice import _speech_sentences, build_short_soundtrack, synthesise, synthesise_parts
+from twodown.voice import _speech_sentences, build_short_soundtrack, list_trial_voices, list_voices, resolve_voice, synthesise, synthesise_parts
 
 
 def test_solver_voice_is_cryptic_croc():
     assert DEFAULT_VOICE_ALIAS == "croc"
     assert VOICES["croc"] == "en-US-JennyNeural"
     assert VOICE_RATE == "+0%"
+
+
+def test_trial_voices_stay_unused_until_a_pick():
+    assert VOICES["croc"] == "en-US-JennyNeural"
+    assert VOICES[INTRO_VOICE_ALIAS] == "en-GB-RyanNeural"
+    assert "ava" not in VOICES
+    assert "andrew" not in VOICES
+    assert "ava" not in VOICE_LABELS
+    assert "andrew" not in VOICE_LABELS
+    assert list_voices() == dict(VOICES)
+    assert TRIAL_VOICES["ava"] == "en-US-AvaNeural"
+    assert TRIAL_VOICES["andrew"] == "en-US-AndrewNeural"
+    assert TRIAL_VOICE_LABELS["ava"] == "Ava"
+    assert TRIAL_VOICE_LABELS["andrew"] == "Andrew"
+    assert TRIAL_INTRO_VOICE_ALIAS == "andrew"
+    assert TRIAL_PRESENTER_VOICE_ALIAS == "ava"
+    assert resolve_voice("ava") == "en-US-AvaNeural"
+    assert resolve_voice("andrew") == "en-US-AndrewNeural"
+    assert list_trial_voices() == dict(TRIAL_VOICES)
+    assert "Maisie" not in "".join(TRIAL_VOICES.values())
+    source = inspect.getsource(build_short_soundtrack)
+    assert "intro_alias" in source
+    assert "presenter_alias" in source
+
+
+def test_elicit_trial_reuses_the_published_clue():
+    clue = published_clue(ELICIT_SLUG)
+    assert clue.slug == "guardian-30124-9a"
+    assert clue.answer == ELICIT_ANSWER
+    assert clue.answer == "ELICIT"
+    parts = write_parts(clue)
+    assert "elicit" in parts.answer_speech
+    assert "Fifteen Squared" not in parts.full
+    assert "speak version" not in parts.full
+    assert "<speak" not in parts.full
 
 
 def test_voice_refuses_ssml_markup(tmp_path):
