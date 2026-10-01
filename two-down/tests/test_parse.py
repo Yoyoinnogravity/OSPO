@@ -5,7 +5,7 @@ from twodown.devices import classify_device
 from twodown.ingest import LONDON, parse_title
 from twodown.models import PuzzlePost
 from twodown.parse import parse_post, usable
-from twodown.config import OUTRO_LINE, THINK_PROMPT, WISDOM_LINES, pick_wisdom
+from twodown.config import HINT_MISS, OUTRO_LINE, THINK_PROMPT, WISDOM_LINES, pick_wisdom
 from twodown.script import speak_answer, speak_enumeration, speak_outro, to_ssml, write_parts, write_script
 from twodown.select import select_pair
 
@@ -132,6 +132,7 @@ def test_script_opens_with_the_paper_and_setter():
     assert parts.think_speech == THINK_PROMPT
     assert parts.think_speech == "Pause here to think about it."
     assert "Have a think." not in script
+    assert parts.hint_speech == HINT_MISS
     assert parts.hint_speech == "No relevant image found."
     assert parts.answer_speech == speak_answer(clue.answer)
     assert parts.answer_speech == "It's end result."

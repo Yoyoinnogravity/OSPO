@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 import shutil
 import subprocess
+import tempfile
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
@@ -643,10 +644,7 @@ def render_video(
     dest.parent.mkdir(parents=True, exist_ok=True)
     duration = _ffprobe_seconds(audio)
     if clue is not None:
-        work = Path("/tmp/twodown-beats") / dest.parent.name / dest.stem
-        if work.exists():
-            shutil.rmtree(work)
-        work.mkdir(parents=True, exist_ok=True)
+        work = Path(tempfile.mkdtemp(prefix=f"twodown-beats-{dest.parent.name}-"))
         if timings is None:
             slice_ = max(0.6, duration / 8)
             timings = ShortTimings(
