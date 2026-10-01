@@ -39,6 +39,18 @@ VOICE_LABELS = {
     "ryan": "Ryan",
     "thomas": "Thomas",
 }
+# Unused listen-along trial only. Do not wire these into DEFAULT/INTRO/HINT
+# or the site voice bar until Aled picks. Maisie stays off.
+TRIAL_VOICES = {
+    "ava": "en-US-AvaNeural",
+    "andrew": "en-US-AndrewNeural",
+}
+TRIAL_VOICE_LABELS = {
+    "ava": "Ava",
+    "andrew": "Andrew",
+}
+TRIAL_INTRO_VOICE_ALIAS = "andrew"
+TRIAL_PRESENTER_VOICE_ALIAS = "ava"
 # Conversational. No snap, no raised pitch.
 VOICE_RATE = "+0%"
 VOICE_PITCH = "+0Hz"

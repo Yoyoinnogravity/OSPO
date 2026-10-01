@@ -51,6 +51,7 @@ from twodown.config import (
     VOICE_RATE,
     VOICE_VOLUME,
     VOICES,
+    TRIAL_VOICES,
 )
 from twodown.render import AUDIO_LOUDNESS, ShortTimings, audio_seconds
 from twodown.script import ScriptParts
@@ -64,11 +65,17 @@ def resolve_voice(name: str | None) -> str:
     key = name.strip().lower()
     if key in VOICES:
         return VOICES[key]
+    if key in TRIAL_VOICES:
+        return TRIAL_VOICES[key]
     return name
 
 
 def list_voices() -> dict[str, str]:
     return dict(VOICES)
+
+
+def list_trial_voices() -> dict[str, str]:
+    return dict(TRIAL_VOICES)
 
 
 async def _synth(
@@ -180,18 +187,31 @@ def synthesise_spoken_paragraph(
     return dest
 
 
-def build_short_soundtrack(parts: ScriptParts, dest: Path, voice: str | None = None) -> ShortTimings:
+def build_short_soundtrack(
+    parts: ScriptParts,
+    dest: Path,
+    voice: str | None = None,
+    *,
+    intro_alias: str | None = None,
+    presenter_alias: str | None = None,
+) -> ShortTimings:
     """Speak each beat, then stitch the pauses so the picture can follow the voice."""
     dest.parent.mkdir(parents=True, exist_ok=True)
     work = Path("/tmp/twodown-beats") / dest.parent.name / dest.stem
     if work.exists():
         shutil.rmtree(work)
     work.mkdir(parents=True, exist_ok=True)
+    intro = intro_alias or INTRO_VOICE_ALIAS
+    presenter = presenter_alias or DEFAULT_VOICE_ALIAS
+    hint = presenter_alias or HINT_VOICE_ALIAS
+    source = presenter_alias or SOURCE_VOICE_ALIAS
+    outro = presenter_alias or OUTRO_VOICE_ALIAS
+    body = presenter if voice is None else voice
     clips = {
         "intro": synthesise(
             parts.intro_speech,
             work / "intro.mp3",
-            INTRO_VOICE_ALIAS,
+            intro,
             rate=INTRO_RATE,
             pitch=INTRO_PITCH,
             volume=INTRO_VOLUME,
@@ -199,39 +219,39 @@ def build_short_soundtrack(parts: ScriptParts, dest: Path, voice: str | None = N
         "clue": synthesise(
             parts.clue_speech,
             work / "clue.mp3",
-            DEFAULT_VOICE_ALIAS,
+            presenter,
             rate=CLUE_RATE,
             pitch=CLUE_PITCH,
             volume=CLUE_VOLUME,
         ),
         "letters": synthesise(
-            parts.letters_speech, work / "letters.mp3", voice, rate=LETTERS_RATE, pitch=LETTERS_PITCH
+            parts.letters_speech, work / "letters.mp3", body, rate=LETTERS_RATE, pitch=LETTERS_PITCH
         ),
         "think": synthesise(
-            parts.think_speech, work / "think.mp3", voice, rate=THINK_RATE, pitch=THINK_PITCH
+            parts.think_speech, work / "think.mp3", body, rate=THINK_RATE, pitch=THINK_PITCH
         ),
         "hint": synthesise(
             parts.hint_speech,
             work / "hint.mp3",
-            HINT_VOICE_ALIAS,
+            hint,
             rate=HINT_RATE,
             pitch=HINT_PITCH,
             volume=HINT_VOLUME,
         ),
         "answer": synthesise(
-            parts.answer_speech, work / "answer.mp3", voice, rate=ANSWER_RATE, pitch=ANSWER_PITCH
+            parts.answer_speech, work / "answer.mp3", body, rate=ANSWER_RATE, pitch=ANSWER_PITCH
         ),
         "parse": synthesise_spoken_paragraph(
             parts.parse_speech,
             work / "parse.mp3",
-            voice,
+            body,
             rate=PARSE_RATE,
             pitch=PARSE_PITCH,
         ),
         "source": synthesise(
             parts.source_speech,
             work / "source.mp3",
-            SOURCE_VOICE_ALIAS,
+            source,
             rate=SOURCE_RATE,
             pitch=SOURCE_PITCH,
             volume=SOURCE_VOLUME,
@@ -239,7 +259,7 @@ def build_short_soundtrack(parts: ScriptParts, dest: Path, voice: str | None = N
         "outro": synthesise(
             parts.outro_speech,
             work / "outro.mp3",
-            OUTRO_VOICE_ALIAS,
+            outro,
             rate=OUTRO_RATE,
             pitch=OUTRO_PITCH,
             volume=OUTRO_VOLUME,

@@ -65,6 +65,8 @@ def test_publish_site_writes_spoiler_pages(tmp_path):
     assert "Ryan" in index
     assert "Libby" in index
     assert "Thomas" in index
+    assert 'data-voice="ava"' not in index
+    assert 'data-voice="andrew"' not in index
     assert "parse-voice" in index
     assert "data-scene-btn" in index
     assert "Machu Picchu" in index
