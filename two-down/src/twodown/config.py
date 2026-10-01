@@ -63,13 +63,15 @@ PARSE_RATE = "-6%"
 PARSE_PITCH = "+0Hz"
 PARSE_ASIDE_PAUSE_SECONDS = 0.35
 TAGLINE = "Solve it, I know you can."
-# Andrew opens as AI. Paper and setter live here, not at the end.
-INTRO_LINE = "Hi, here is your daily dose of AI cryptic clues."
+# Recorded open from Aled's YouTube Short 8D8XTzkgNLE (dictionary ident +
+# Ryan). The bumper already invites. Do not stack Andrew's daily-dose line.
+INTRO_LINE = "Hello, here is your daily dose of AI cryptic crossword."
 INTRO_VOICE_ALIAS = "andrew"
 INTRO_RATE = "+0%"
 INTRO_PITCH = "+0Hz"
 INTRO_VOLUME = "+2%"
-INTRO_GAP_SECONDS = 0.3
+# The bumper already holds a breath after the invite. Keep the splice tiny.
+INTRO_GAP_SECONDS = 0.08
 OUTRO_LINE = "That was cryptic.fit."
 # Ava signs off with one of these, then the site name. Same slug, same closer.
 WISDOM_LINES = (
@@ -113,6 +115,7 @@ PINUP_SLUG = "independent-12462-6a"
 PACKAGE_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_OUTPUT = PACKAGE_ROOT / "output"
 SITE_ROOT = PACKAGE_ROOT / "site"
+INTRO_BUMPER = PACKAGE_ROOT / "assets" / "intro" / "aled-daily-dose.mp4"
 
 # Newsprint + crimson. Definition-red is the 15² convention made into a brand.
 NEWS_BG = (243, 234, 214)

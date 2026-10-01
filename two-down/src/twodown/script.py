@@ -271,18 +271,9 @@ def speak_paper(paper: str) -> str:
 
 
 def speak_intro(clue: Clue) -> str:
-    """Andrew's invite: we are AI, then the paper and setter once."""
-    paper = speak_paper(clue.paper)
-    setter = (clue.setter or "").strip()
-    if paper and setter:
-        source = f"Today's clue is from {paper}, by {setter}."
-    elif paper:
-        source = f"Today's clue is from {paper}."
-    elif setter:
-        source = f"Today's clue is by {setter}."
-    else:
-        source = "Today's clue is from the papers."
-    return f"{INTRO_LINE} {source}"
+    """Wording already on the recorded bumper. Do not add a second invite."""
+    del clue
+    return INTRO_LINE
 
 
 def speak_source(clue: Clue) -> str:

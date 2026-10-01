@@ -20,6 +20,7 @@ from twodown.config import (
     HINT_LINE,
     HINT_MISS,
     INK,
+    INTRO_BUMPER,
     TAGLINE,
     MUTED,
     NEWS_BG,
@@ -440,6 +441,22 @@ def audio_seconds(path: Path) -> float:
     return _ffprobe_seconds(path)
 
 
+def intro_bumper_path() -> Path:
+    """Aled's recorded dictionary ident. Picture plus his spoken invite."""
+    return INTRO_BUMPER
+
+
+def intro_bumper_seconds() -> float:
+    """Duration of the recorded bumper. Must be > 0 for every Short."""
+    path = intro_bumper_path()
+    if not path.exists():
+        raise FileNotFoundError(f"missing intro bumper {path}")
+    hold = _ffprobe_seconds(path)
+    if hold <= 0:
+        raise RuntimeError(f"intro bumper has no duration: {path}")
+    return hold
+
+
 @dataclass(frozen=True)
 class ShortTimings:
     intro: float
@@ -678,11 +695,14 @@ def render_video(
             timings.source,
             timings.outro,
         )
-        clips = [
-            _motion_clip(clue, name, hold, work / name)
-            for name, hold in zip(names, holds, strict=True)
-            if hold > 0.05
-        ]
+        clips = []
+        for name, hold in zip(names, holds, strict=True):
+            if hold <= 0.05:
+                continue
+            if name == "intro" and intro_bumper_path().exists():
+                clips.append(intro_bumper_path())
+            else:
+                clips.append(_motion_clip(clue, name, hold, work / name))
         return _concat_motion(clips, audio, dest)
     if clue_hold is None:
         clue_secs = max(7.0, min(duration * 0.42, duration - 6.0))
