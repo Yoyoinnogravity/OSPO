@@ -7,6 +7,7 @@ from twodown.models import Clue
 from twodown.render import (
     AUDIO_LOUDNESS,
     ShortTimings,
+    _concat_motion,
     _encode_clips,
     _source_footer,
     draw_beat,
@@ -409,11 +410,98 @@ def test_render_video_is_browser_playable(tmp_path: Path):
     render_video(clue_card, reveal, audio, dest, clue_hold=1.4, clue=clue)
     data = dest.read_bytes()
     assert 0 < data.find(b"moov") < data.find(b"mdat")
+    video_d = float(_probe(dest, "format=duration"))
+    audio_d = float(_probe(audio, "format=duration"))
+    assert abs(video_d - audio_d) < 0.4
     assert _probe(dest, "stream=sample_rate") == "44100"
     assert _probe(dest, "stream=width,height").splitlines()[0] == "1080"
     assert "aac" in _probe(dest, "stream=codec_name")
     assert "loudnorm" in AUDIO_LOUDNESS
     assert "volume=" in AUDIO_LOUDNESS
+
+
+def _solid_clip(path: Path, seconds: float, fps: float, colour: str) -> Path:
+    subprocess.run(
+        [
+            "ffmpeg",
+            "-y",
+            "-f",
+            "lavfi",
+            "-i",
+            f"color=c={colour}:s=1080x1920:r={fps}",
+            "-t",
+            f"{seconds:.3f}",
+            "-c:v",
+            "libx264",
+            "-pix_fmt",
+            "yuv420p",
+            "-preset",
+            "ultrafast",
+            str(path),
+        ],
+        check=True,
+        capture_output=True,
+    )
+    return path
+
+
+def _frame_rgb(video: Path, at: float, dest: Path) -> tuple[int, int, int]:
+    subprocess.run(
+        [
+            "ffmpeg",
+            "-y",
+            "-ss",
+            f"{at:.3f}",
+            "-i",
+            str(video),
+            "-frames:v",
+            "1",
+            str(dest),
+        ],
+        check=True,
+        capture_output=True,
+    )
+    return Image.open(dest).convert("RGB").getpixel((20, 20))
+
+
+def test_concat_motion_keeps_clip_holds(tmp_path: Path):
+    """Uneven timebases must not stretch the picture past the voice."""
+    clips = [
+        _solid_clip(tmp_path / "intro.mp4", 1.00, 6.02176, "red"),
+        _solid_clip(tmp_path / "parse.mp4", 1.60, 5.88643, "green"),
+        _solid_clip(tmp_path / "outro.mp4", 0.80, 5.87017, "blue"),
+    ]
+    audio = tmp_path / "voice.mp3"
+    subprocess.run(
+        [
+            "ffmpeg",
+            "-y",
+            "-f",
+            "lavfi",
+            "-i",
+            "sine=frequency=440:sample_rate=44100",
+            "-t",
+            "3.4",
+            str(audio),
+        ],
+        check=True,
+        capture_output=True,
+    )
+    dest = tmp_path / "short.mp4"
+    _concat_motion(clips, audio, dest)
+    video_d = float(_probe(dest, "format=duration"))
+    audio_d = float(_probe(audio, "format=duration"))
+    assert abs(video_d - audio_d) < 0.35
+    listing = dest.with_suffix(".concat.txt").read_text(encoding="utf-8")
+    assert "duration " in listing
+    assert "outpoint " in listing
+    red = _frame_rgb(dest, 0.25, tmp_path / "at-intro.png")
+    green = _frame_rgb(dest, 1.70, tmp_path / "at-parse.png")
+    blue = _frame_rgb(dest, 3.00, tmp_path / "at-outro.png")
+    assert red[0] > 180 and red[1] < 40 and red[2] < 40
+    assert green[1] > 100 and green[0] < 40 and green[2] < 40
+    assert blue[2] > 180 and blue[0] < 40 and blue[1] < 40
+    assert _probe(dest, "stream=codec_type").splitlines()[-1] == "audio"
 
 
 def test_encode_maps_loud_audio(tmp_path: Path):
