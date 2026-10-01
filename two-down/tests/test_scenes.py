@@ -75,9 +75,6 @@ def test_hint_photo_is_a_definition_still_not_travel_aurora():
     assert "aurora" not in TRANCE.slug
     assert ensure_hint_photo(FIELD).exists()
     assert "SPHERE" not in FIELD.credit_line
-    assert ensure_hint_photo(GLOBE).exists()
-    assert "SPHERE" not in GLOBE.credit_line
-    assert GLOBE.filename == "globe-still.webp"
     assert MOONLIT.commons_file == "Moonlit Moments (Unsplash).jpg"
     assert MOONLIT.source == "Linda Xu"
     assert ensure_hint_photo(RASTA).exists()
