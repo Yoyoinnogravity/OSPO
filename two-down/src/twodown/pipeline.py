@@ -472,6 +472,23 @@ def render_one_short(
     return item
 
 
+def render_extra_shorts(
+    clues: list[Clue],
+    date: str,
+    dest: Path | None = None,
+    publish: bool = True,
+) -> list[SpokenClue]:
+    """Cut more Shorts from already-parsed clues. Does not recut live films."""
+    spoken: list[SpokenClue] = []
+    for clue in clues:
+        spoken.append(render_one_short(clue.slug, dest=dest, publish=False, clue=clue))
+    if publish:
+        from twodown.site import publish_extra_items
+
+        publish_extra_items(spoken, date, dest=SITE_ROOT)
+    return spoken
+
+
 def published_date(site_root: Path | None, date: str) -> bool:
     """True when today's archive page is already on the static site."""
     root = Path(site_root or SITE_ROOT)

@@ -9,6 +9,7 @@ from twodown.site import (
     attach_youtube_upload,
     earlier_days,
     legacy_videos,
+    publish_extra_items,
     publish_films,
     publish_site,
     retarget_cdn,
@@ -190,6 +191,29 @@ def test_publish_site_writes_spoiler_pages(tmp_path):
     assert 'class="channel-picture"' in follow
     assert ".wordmark .profile" in css
     assert "application/rss+xml" in index
+
+
+def test_publish_extra_items_leaves_todays_pair(tmp_path):
+    pair = DailyPair(date="2026-10-01", voice="en-GB-SoniaNeural", clues=[_item(), _item(answer="AXES", number="14")])
+    root = publish_site(pair, tmp_path)
+    extra = _item(answer="MARTINI", number="1")
+    extra.clue.puzzle_id = "18494"
+    extra.clue.paper = "Financial Times"
+    extra.clue.clue = "Cocktail skirt full of style"
+    extra.clue.enumeration = "7"
+    extra.clue.definition = "Cocktail"
+    extra.clue.parse = "MINI full of ART"
+    publish_extra_items([extra], "2026-10-01", dest=root)
+    homepage = (root / "index.html").read_text(encoding="utf-8")
+    pair_html = homepage.split("Today’s pair.", 1)[1].split("Keep the pair coming", 1)[0]
+    assert 'data-slug="independent-12458-12a"' in pair_html
+    assert 'data-slug="independent-12458-14a"' in pair_html
+    assert "financial-times-18494-1a" not in pair_html
+    day = (root / "d" / "2026-10-01" / "index.html").read_text(encoding="utf-8")
+    assert 'data-slug="financial-times-18494-1a"' in day
+    assert (root / "c" / "financial-times-18494-1a" / "index.html").exists()
+    assert "https://cryptic.fit/c/financial-times-18494-1a/" in (root / "sitemap.xml").read_text(encoding="utf-8")
+    assert extra.clue.answer not in (root / "c" / "financial-times-18494-1a" / "index.html").read_text(encoding="utf-8").split('class="spoiler"', 1)[0]
 
 
 def test_solved_shelf_hides_the_answer(tmp_path):

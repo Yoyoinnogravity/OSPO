@@ -1891,3 +1891,85 @@ def publish_site(pair: DailyPair, dest: Path | None = None) -> Path:
     (root / "sitemap.xml").write_text(sitemap_xml(collect_sitemap_urls(root, pair)), encoding="utf-8")
     pair.site_index = f"{SITE_ORIGIN}/"
     return root
+
+
+def _append_day_articles(day_page: Path, items: list[SpokenClue]) -> None:
+    """Add extra clue articles to an existing day page. Do not rewrite Today’s pair."""
+    text = day_page.read_text(encoding="utf-8")
+    start = text.find("<section class='pair'>")
+    if start < 0:
+        start = text.find('<section class="pair">')
+    if start < 0:
+        raise ValueError(f"No pair section on {day_page}")
+    close = text.find("</section>", start)
+    if close < 0:
+        raise ValueError(f"Unclosed pair section on {day_page}")
+    extra = []
+    for item in items:
+        if f'data-slug="{item.clue.slug}"' in text:
+            continue
+        extra.append(_article(item, "../../media/"))
+    if not extra:
+        return
+    day_page.write_text(text[:close] + "".join(extra) + text[close:], encoding="utf-8")
+
+
+def publish_extra_items(items: list[SpokenClue], date: str, dest: Path | None = None) -> Path:
+    """Publish more films onto an existing day. Leaves the homepage pair alone."""
+    if not items:
+        raise ValueError("No extra films to publish")
+    root = Path(dest or SITE_ROOT)
+    pair = DailyPair(date=date, voice=items[0].voice, clues=items, source_site=items[0].clue.source_url)
+    _copy_media(pair, root)
+    pretty = datetime.strptime(date, "%Y-%m-%d").strftime("%A %-d %B %Y")
+    for item in items:
+        page_dir = root / "c" / item.clue.slug
+        page_dir.mkdir(parents=True, exist_ok=True)
+        enum = f" ({_e(item.clue.enumeration)})" if item.clue.enumeration else ""
+        body = (
+            f'<p class="kicker">One clue.</p>'
+            f"<h1>{_e(item.clue.clue)}{enum}</h1>"
+            f"{_article(item, '../../media/', open_by_default=False, show_clue_text=False, play_anchor=True)}"
+        )
+        (page_dir / "index.html").write_text(
+            _page(
+                body,
+                PageSeo(
+                    title=clue_share_title(item.clue),
+                    description=clue_description(item.clue),
+                    path=f"/c/{item.clue.slug}/",
+                    og_type="article",
+                    json_ld=article_ld(item.clue, canonical=f"{SITE_ORIGIN}/c/{item.clue.slug}/", published=date),
+                    published=date,
+                ),
+                depth=2,
+            ),
+            encoding="utf-8",
+        )
+        item.site_path = f"{SITE_ORIGIN}/c/{item.clue.slug}/"
+    day_dir = root / "d" / date
+    day_dir.mkdir(parents=True, exist_ok=True)
+    day_page = day_dir / "index.html"
+    if day_page.exists():
+        _append_day_articles(day_page, items)
+    else:
+        day_articles = "\n".join(_article(item, "../../media/") for item in items)
+        day_page.write_text(
+            _page(
+                f"<h1>{_e(pretty)}</h1><section class='pair'>{day_articles}</section>{_keep_free_teaser('../../')}",
+                PageSeo(
+                    title=f"Two cryptic clues · {pretty} — {BRAND}",
+                    description=homepage_description(pretty),
+                    path=f"/d/{date}/",
+                    og_type="article",
+                    json_ld=item_list_ld(pair),
+                    published=date,
+                ),
+                depth=2,
+                show_ads=True,
+            ),
+            encoding="utf-8",
+        )
+    publish_films(root)
+    (root / "sitemap.xml").write_text(sitemap_xml(collect_sitemap_urls(root, pair)), encoding="utf-8")
+    return root

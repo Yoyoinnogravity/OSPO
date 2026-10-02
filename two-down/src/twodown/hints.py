@@ -573,6 +573,50 @@ STANDING = HintPhoto(
 )
 
 
+# Definition still for MONARCHS: butterflies. Never print MONARCHS.
+BUTTERFLY = HintPhoto(
+    slug="butterfly-still",
+    label="Butterflies",
+    source="generated still",
+    license="generated",
+    filename="butterfly-still.webp",
+    keywords=frozenset({"butterfly", "butterflies", "butterfli", "butterflie"}),
+)
+
+
+# Definition still for CASSAVA: starch. Never print CASSAVA.
+STARCH = HintPhoto(
+    slug="starch-still",
+    label="Starch",
+    source="generated still",
+    license="generated",
+    filename="starch-still.webp",
+    keywords=frozenset({"starch", "starchy"}),
+)
+
+
+# Definition still for MOUSSE: pudding. Never print MOUSSE.
+PUDDING = HintPhoto(
+    slug="pudding-still",
+    label="Pudding",
+    source="generated still",
+    license="generated",
+    filename="pudding-still.webp",
+    keywords=frozenset({"pudding", "dessert", "pudd"}),
+)
+
+
+# Definition still for MARTINI: a cocktail. Never print MARTINI.
+COCKTAIL = HintPhoto(
+    slug="cocktail-still",
+    label="Cocktail",
+    source="generated still",
+    license="generated",
+    filename="cocktail-still.webp",
+    keywords=frozenset({"cocktail", "cocktails"}),
+)
+
+
 # Commons alternate: imperial Ethiopian / Rastafari Lion of Judah flag.
 LION = HintPhoto(
     slug="lion-of-judah",
@@ -614,6 +658,10 @@ PHOTOS: dict[str, HintPhoto] = {
     VEGETABLE.slug: VEGETABLE,
     SEMICONDUCTOR.slug: SEMICONDUCTOR,
     STANDING.slug: STANDING,
+    BUTTERFLY.slug: BUTTERFLY,
+    STARCH.slug: STARCH,
+    PUDDING.slug: PUDDING,
+    COCKTAIL.slug: COCKTAIL,
     LION.slug: LION,
     "dreamlike": TRANCE,
     "trance": TRANCE,
@@ -707,6 +755,21 @@ PHOTOS: dict[str, HintPhoto] = {
     "standing": STANDING,
     "status": STANDING,
     "guardian-30126-5a": STANDING,
+    "butterfly": BUTTERFLY,
+    "butterflies": BUTTERFLY,
+    "monarchs": BUTTERFLY,
+    "independent-12475-1a": BUTTERFLY,
+    "starch": STARCH,
+    "cassava": STARCH,
+    "guardian-30125-1a": STARCH,
+    "pudding": PUDDING,
+    "dessert": PUDDING,
+    "mousse": PUDDING,
+    "financial-times-18493-9a": PUDDING,
+    "cocktail": COCKTAIL,
+    "cocktails": COCKTAIL,
+    "martini": COCKTAIL,
+    "financial-times-18494-1a": COCKTAIL,
 }
 
 # No leftover still. Trance / the sleeping woman is only for trance or dream clues.
@@ -719,7 +782,8 @@ def _catalog() -> tuple[HintPhoto, ...]:
     return (
         TRANCE, MOONLIT, RASTA, FATS, WELLINGTON, COLE, SMILES, DAVIS, AIM, PAPERS,
         BRING, USA, MODEL, AUTHOR, MAKEUP, CRASH, CAPSULE, FIELD, GLOBE, WEEKLY, CROSS,
-        UPROOT, TIPS, PORTER, XYZ, HUMOUR, VEGETABLE, SEMICONDUCTOR, STANDING, LION,
+        UPROOT, TIPS, PORTER, XYZ, HUMOUR, VEGETABLE, SEMICONDUCTOR, STANDING,
+        BUTTERFLY, STARCH, PUDDING, COCKTAIL, LION,
     )
 
 
@@ -1267,6 +1331,51 @@ def _generate_standing_still(dest: Path) -> Path:
     return dest
 
 
+def _generate_butterfly_still(dest: Path) -> Path:
+    """Last-resort butterfly colours if the file is missing. No answer text."""
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    img = Image.new("RGB", (1280, 720), (88, 140, 64))
+    draw = ImageDraw.Draw(img)
+    draw.ellipse((220, 180, 520, 420), fill=(216, 96, 32))
+    draw.ellipse((360, 180, 660, 420), fill=(184, 64, 24))
+    draw.ellipse((700, 240, 980, 480), fill=(232, 156, 48))
+    img.save(dest, "WEBP", quality=82, method=6)
+    return dest
+
+
+def _generate_starch_still(dest: Path) -> Path:
+    """Last-resort starch bowl if the file is missing. No answer text."""
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    img = Image.new("RGB", (1280, 720), (168, 140, 108))
+    draw = ImageDraw.Draw(img)
+    draw.ellipse((360, 200, 920, 620), fill=(252, 248, 236))
+    draw.ellipse((440, 160, 840, 420), fill=(244, 240, 228))
+    img.save(dest, "WEBP", quality=82, method=6)
+    return dest
+
+
+def _generate_pudding_still(dest: Path) -> Path:
+    """Last-resort pudding coupe if the file is missing. No answer text."""
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    img = Image.new("RGB", (1280, 720), (72, 44, 32))
+    draw = ImageDraw.Draw(img)
+    draw.ellipse((420, 220, 860, 620), fill=(96, 48, 28))
+    draw.ellipse((480, 160, 800, 360), fill=(232, 220, 200))
+    img.save(dest, "WEBP", quality=82, method=6)
+    return dest
+
+
+def _generate_cocktail_still(dest: Path) -> Path:
+    """Last-resort cocktail glass if the file is missing. No answer text."""
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    img = Image.new("RGB", (1280, 720), (24, 20, 28))
+    draw = ImageDraw.Draw(img)
+    draw.polygon([(420, 200), (860, 200), (680, 420), (600, 420)], fill=(232, 220, 196))
+    draw.rectangle((620, 420, 660, 620), fill=(220, 208, 184))
+    img.save(dest, "WEBP", quality=82, method=6)
+    return dest
+
+
 def ensure_hint_photo(photo: HintPhoto | None = None) -> Path:
     if photo is None:
         raise ValueError("no hint photo to ensure — DEFAULT is not a leftover still")
@@ -1305,6 +1414,10 @@ def ensure_hint_photo(photo: HintPhoto | None = None) -> Path:
         VEGETABLE.slug: _generate_vegetable_still,
         SEMICONDUCTOR.slug: _generate_semiconductor_still,
         STANDING.slug: _generate_standing_still,
+        BUTTERFLY.slug: _generate_butterfly_still,
+        STARCH.slug: _generate_starch_still,
+        PUDDING.slug: _generate_pudding_still,
+        COCKTAIL.slug: _generate_cocktail_still,
     }
     generate = generators.get(photo.slug)
     if generate is not None:
