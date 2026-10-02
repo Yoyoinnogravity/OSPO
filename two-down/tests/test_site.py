@@ -214,6 +214,20 @@ def test_publish_extra_items_leaves_todays_pair(tmp_path):
     assert (root / "c" / "financial-times-18494-1a" / "index.html").exists()
     assert "https://cryptic.fit/c/financial-times-18494-1a/" in (root / "sitemap.xml").read_text(encoding="utf-8")
     assert extra.clue.answer not in (root / "c" / "financial-times-18494-1a" / "index.html").read_text(encoding="utf-8").split('class="spoiler"', 1)[0]
+    earlier = _item(answer="CASSAVA", number="1")
+    earlier.clue.paper = "Guardian"
+    earlier.clue.puzzle_id = "30125"
+    earlier.clue.clue = "Starch silly person dropped into sparkling wine"
+    earlier.clue.enumeration = "7"
+    earlier.clue.definition = "Starch"
+    earlier.clue.parse = "ASS in CAVA"
+    publish_extra_items([earlier], "2026-09-30", dest=root)
+    homepage = (root / "index.html").read_text(encoding="utf-8")
+    pair_html = homepage.split("Today’s pair.", 1)[1].split("Keep the pair coming", 1)[0]
+    assert "financial-times-18494-1a" not in pair_html
+    assert "guardian-30125-1a" not in pair_html
+    assert "guardian-30125-1a" in homepage
+    assert "Starch silly person dropped into sparkling wine" in homepage
 
 
 def test_solved_shelf_hides_the_answer(tmp_path):

@@ -1972,4 +1972,25 @@ def publish_extra_items(items: list[SpokenClue], date: str, dest: Path | None = 
         )
     publish_films(root)
     (root / "sitemap.xml").write_text(sitemap_xml(collect_sitemap_urls(root, pair)), encoding="utf-8")
+    refresh_solved_shelf(root)
     return root
+
+
+def refresh_solved_shelf(root: Path, skip_date: str | None = None) -> None:
+    """Rebuild the homepage Solved shelf. Leaves Today’s pair untouched."""
+    index = root / "index.html"
+    if not index.exists():
+        return
+    text = index.read_text(encoding="utf-8")
+    start = text.find('<section class="solved">')
+    if start < 0:
+        return
+    end = text.find("</section>", start)
+    if end < 0:
+        return
+    end += len("</section>")
+    if skip_date is None:
+        days = earlier_days(root)
+        skip_date = days[0][0] if days else None
+    shelf = _solved_shelf(root, skip_date=skip_date).strip()
+    index.write_text(text[:start] + shelf + text[end:], encoding="utf-8")

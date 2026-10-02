@@ -481,7 +481,9 @@ def render_extra_shorts(
     """Cut more Shorts from already-parsed clues. Does not recut live films."""
     spoken: list[SpokenClue] = []
     for clue in clues:
-        spoken.append(render_one_short(clue.slug, dest=dest, publish=False, clue=clue))
+        spoken.append(
+            render_one_short(clue.slug, dest=dest, voices=list(VOICES), publish=False, clue=clue)
+        )
     if publish:
         from twodown.site import publish_extra_items
 
