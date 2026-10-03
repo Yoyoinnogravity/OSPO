@@ -112,9 +112,12 @@ vm.runInContext(`
   else { const _t = showToast; showToast = function(){}; }
 `, ctx);
 
-assert(/app\.js\?v=17\.38/.test(html), 'app.js cache bump 17.38 missing');
-assert(src.includes('function _crossLineWidthM'), '3D sq km must use preplot line separation');
-assert(src.includes('full-fold area uses adjacent sail-line separation'), 'sq km lock comment missing');
+assert(/app\.js\?v=17\.39/.test(html), 'app.js cache bump 17.39 missing');
+assert(src.includes('function _crossLineWidthM'), '3D sq km helper missing');
+assert(src.includes('Sq km formula Aled set'), 'sq km lock comment missing');
+assert(src.includes('(n * sep) / 2'), 'sq km must use (numStreamers × streamerSeparation / 2)');
+assert(!src.includes('full-fold area uses adjacent sail-line separation'),
+  'sq km must not use preplot grid spacing');
 assert(/id="val-turn-radius">3\.5km/.test(html), 'toolbar RADIUS default must be 3.5km not 5.1');
 assert(/id="input-turn-radius" value="3500"/.test(html), 'turn-radius input default must be 3500 m');
 assert(!/value="5100"/.test(html), 'HTML must not default min turn radius to 5100');
@@ -462,18 +465,20 @@ const area = vm.runInContext(`
     state.settings.numStreamers = 8;
     state.settings.streamerSeparation = 100;
     state.settings.spInterval = 25;
-    const w = _crossLineWidthM(lines);
+    const w = _crossLineWidthM();
     const streamerW = (8 * 100) / 2;
+    const gridW = _medianLineSpacingM(lines);
     let foldM = 0;
     lines.forEach(l => { foldM += lineFullFoldM(l, 25); });
-    return { w, streamerW, foldM, sqKm: foldM * w / 1000000 };
+    return { w, streamerW, gridW, foldM, sqKm: foldM * w / 1000000 };
   })()
 `, ctx);
-assert(Math.abs(area.w - 250) < 8, 'sq km width must be preplot spacing 250 m, got ' + area.w);
+assert(Math.abs(area.w - 400) < 1, 'sq km width must be (8×100)/2 = 400 m, got ' + area.w);
 assert(Math.abs(area.streamerW - 400) < 1, 'streamer formula sanity, got ' + area.streamerW);
-assert(Math.abs(area.w - area.streamerW) > 50, 'sq km must not use (streamers × sep)/2');
-assert(area.sqKm > 48 && area.sqKm < 52,
-  '10 × ~20 km × 250 m must be ~50 km2, got ' + area.sqKm);
+assert(Math.abs(area.gridW - 250) < 8, 'grid spacing sanity 250 m, got ' + area.gridW);
+assert(Math.abs(area.w - area.gridW) > 50, 'sq km must not use preplot grid spacing');
+assert(area.sqKm > 78 && area.sqKm < 82,
+  '10 × ~20 km × 400 m must be ~80 km2, got ' + area.sqKm);
 
 const turnGeom = vm.runInContext(`
   (function() {
@@ -732,7 +737,7 @@ assert(vm.runInContext('globalThis.__autoNs', ctx) === '6',
 
 console.log(JSON.stringify({
   ok: true,
-  cache: '17.38',
+  cache: '17.39',
   rule: '2D skip-k; 3D swath shooting (adjacent monopass, locked heading, stadium returns)',
   kNom,
   nn: { visit: nn.nVisit, mode: nn.stats.mode, ms: nn.ms },

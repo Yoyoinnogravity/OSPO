@@ -169,7 +169,7 @@ assert(/id="map-swath-picker"/.test(html), 'hard-coded map swath picker missing'
 assert(/id="map-hard-num-swaths"/.test(html), 'hard-coded number of swaths input missing');
 assert(src.includes('function _syncHardMapSwathPicker'), '3D map swath picker must show/hide with survey type');
 assert(/id="layer-toggle-swaths"[^>]*onchange/.test(html), 'Layers menu 3D Swaths checkbox missing');
-assert(/app\.js\?v=17\.38/.test(html), 'app.js cache bump 17.38 missing');
+assert(/app\.js\?v=17\.39/.test(html), 'app.js cache bump 17.39 missing');
 assert(/style\.min\.css\?v=3\.34/.test(html), 'style.min.css cache bump 3.34 missing');
 assert(/id="btn-plan-route"/.test(html), 'ROUTE PLANNING needs an id');
 assert(html.includes('btn-plan-route'), 'ROUTE PLANNING must use the prominent plan-route class');

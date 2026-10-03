@@ -23,5 +23,9 @@ Guard: `node _live_deploy/test-route-solver.mjs` and `node _live_deploy/test-rou
 
 ## Full-fold sq km
 
-3D Prime Full Fold area is line km × **preplot line separation** (adjacent sail
-lines on the grid). Do not use `(streamers × sep) / 2` or swath width.
+3D Prime Full Fold area is full-fold length × **(numStreamers × streamerSeparation / 2)**.
+Aled already set this. Do not substitute preplot line spacing (adjacent sail-line
+separation) or swath width. Line Separation in the summary is display / offline
+only; it must not feed sq km.
+
+Always-on Cursor rule: `.cursor/rules/sq-km-formula.mdc`
