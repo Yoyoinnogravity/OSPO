@@ -2671,7 +2671,9 @@ function _ppgEditUpdateStats() {
  const isObn = dimension === 'OBN';
  const nStreamers = (is2D || isObn) ? 1 : (parseInt(document.getElementById('ppg-streamers')?.value) || 1);
  const strSepVal = (is2D || isObn) ? 0 : (parseFloat(document.getElementById('ppg-streamer-sep')?.value) || 100);
- const crossLineM = (nStreamers * strSepVal) / 2;
+ const crossLineM = (is2D || isObn) ? 0 : (typeof _crossLineWidthM === 'function'
+  ? _crossLineWidthM(_ppgEditLines)
+  : (spacing > 0 ? spacing : (nStreamers * strSepVal) / 2));
  const sqKm = (is2D || isObn) ? 0 : fullFoldM * crossLineM / 1000000;
  const fold = isObn ? NaN : _ppgEditFold();
  // Bounding polygon: the AOI when one was used, otherwise the convex hull of
@@ -3701,7 +3703,7 @@ function _ppgDoExportP190() {
  });
  const totalFullFoldKm = totalFullFoldM / 1000;
  const avgLineKm = exportLines.length > 0 ? totalFullFoldKm / exportLines.length : 0;
- const sqKm = totalFullFoldM * (nStreamers * strSep / 2) / 1000000;
+ const sqKm = totalFullFoldM * _crossLineWidthM(exportLines) / 1000000;
  const exportIs2D = (document.getElementById('ppg-dimension')?.value === '2D')
   || ((state.settings.surveyType || '3d') === '2d');
 
@@ -8743,7 +8745,7 @@ function updateSurveySummary(extraStats) {
  var nStr = state.settings.numStreamers || 6;
  var strSep = state.settings.streamerSeparation || 100;
  var spInt = state.settings.spInterval || 12.5;
- var crossLineM = (nStr * strSep) / 2;
+ var crossLineM = _crossLineWidthM(allLines);
 
  // Per-line: SP count from the preplot'SP records (see lineSpCount),
  // coverage = numSP x spInt (CMP bins). Separate prime and infill
@@ -8791,15 +8793,8 @@ function updateSurveySummary(extraStats) {
  var remainingKm = remainingM / 1000;
  var avgLineKm = primeCount > 0 ? primeKm / primeCount : 0;
 
- // Line separation (detect from midpoints of adjacent prime lines)
  var primeLines = allLines.filter(function(l) { return !l._infill; });
- var lineSepM = 0;
- if (primeLines.length >= 2) {
- var mids = primeLines.map(function(l) { return [(l.start[0]+l.end[0])/2, (l.start[1]+l.end[1])/2]; });
- var sepSum = 0, sepCnt = 0;
- for (var si = 1; si < mids.length; si++) { sepSum += haversine(mids[si-1], mids[si]); sepCnt++; }
- lineSepM = sepCnt > 0 ? Math.round(sepSum / sepCnt) : 0;
- }
+ var lineSepM = getPreplotLineSeparationM();
 
  // Line bearing (grid and geographic) from first prime line
  var gridBrg = 0, geoBrg = 0;
@@ -8861,7 +8856,7 @@ function updateSurveySummary(extraStats) {
  '<div style="border-top:1px solid #1a1a2e;margin-top:4px;padding-top:4px;"></div>' +
  (is3D ? '<div><span style="color:#8a9bb0;">Prime Full Fold Area:</span> <strong style="color:#00ff88;">' + sqKmPrime.toFixed(4) + ' km2</strong></div>' : '') +
  (is3D && sqKmInfill > 0 ? '<div><span style="color:#8a9bb0;">Infill Full Fold Area:</span> <strong style="color:#ff44ff;">' + sqKmInfill.toFixed(4) + ' km2</strong> <span style="color:#666;font-size:9px;">(' + infillPctArea + '% of prime)</span></div>' : '') +
- (is3D ? '<div style="color:#666;font-size:9px;margin-left:4px;">' + primeSP.toLocaleString() + ' SP x ' + spInt + 'm CMP bins x (' + nStr + 'x' + strSep + 'm)/2</div>' : '') +
+ (is3D ? '<div style="color:#666;font-size:9px;margin-left:4px;">' + primeKm.toFixed(3) + ' km x ' + lineSepM + ' m line sep</div>' : '') +
  (is3D ? '<div><span style="color:#8a9bb0;">Total Area (incl run-outs):</span> <strong>' + sqKmProd.toFixed(4) + ' km2</strong></div>' : '');
  // Acquired vs Remaining breakdown (only shown when there'acquisition data)
  if (hasAcquisition) {
@@ -9392,23 +9387,22 @@ function segmentClearOfAllObstructions(a, b) {
  return true;
 }
 
-// Preplot line separation (m): average adjacent prime-line midpoint distance.
-// Do NOT use settings.lineSpacing here — it used to be overwritten with
-// swath width; always measure adjacent prime-line separation instead.
+// 3D full-fold area uses adjacent sail-line separation from the preplot grid.
+// Do NOT use (streamers × sep) / 2, and do NOT use settings.lineSpacing /
+// swath width. Those made Prime Full Fold sq km disagree with line km × sep.
+function _crossLineWidthM(lines) {
+ const pool = lines || ((state._allLines && state._allLines.length) ? state._allLines : (state.lines || []));
+ const prime = pool.filter(l => l && !l._infill && l.start && l.end);
+ if (prime.length >= 2 && typeof _medianLineSpacingM === 'function') {
+  return Math.max(1, _medianLineSpacingM(prime));
+ }
+ const nStr = (state.settings && state.settings.numStreamers) || 6;
+ const strSep = (state.settings && state.settings.streamerSeparation) || 100;
+ return Math.max(1, (nStr * strSep) / 2);
+}
+
 function getPreplotLineSeparationM() {
- const lines = ((state._allLines || state.lines) || []).filter(l => !l._infill);
- if (lines.length >= 2) {
- const mids = lines.map(l => [(l.start[0] + l.end[0]) / 2, (l.start[1] + l.end[1]) / 2]);
- let sepSum = 0, sepCnt = 0;
- for (let i = 1; i < mids.length; i++) {
- sepSum += haversine(mids[i - 1], mids[i]);
- sepCnt++;
- }
- if (sepCnt > 0) return Math.max(1, Math.round(sepSum / sepCnt));
- }
- const nStr = state.settings.numStreamers || 6;
- const strSep = state.settings.streamerSeparation || 100;
- return Math.max(1, nStr * strSep);
+ return Math.max(1, Math.round(_crossLineWidthM()));
 }
 
 /** Suggested default for offline no-SP threshold (m): half line sep, min 50. */
@@ -15002,7 +14996,7 @@ function showRouteStats(waypoints) {
  const nStr = state.settings.numStreamers || 6;
  const strSep = state.settings.streamerSeparation || 100;
  const spInt = state.settings.spInterval || 12.5;
- const crossLineM = (nStr * strSep) / 2;
+ const crossLineM = _crossLineWidthM(allLines);
 
  // Separate prime from infill and track acquired vs remaining
  let primeM = 0, infillM = 0;
@@ -17513,10 +17507,8 @@ function _refreshCostPanel(dlg) {
  let surveyDays = 0, lineKm = 0, sqKm = 0;
  if (hasRoute) {
  const spInt = s.spInterval || 12.5;
- const nStr = s.numStreamers || 6;
- const strSep = s.streamerSeparation || 100;
- const crossLineM = (nStr * strSep) / 2;
  const allLines = state._allLines || state.lines;
+ const crossLineM = _crossLineWidthM(allLines);
  let totalSP = 0;
  allLines.forEach(l => { totalSP += lineSpCount(l, spInt); });
  const totalCoverageM = totalSP * spInt; // one CMP bin per SP (see lineFullFoldM)
@@ -17580,12 +17572,10 @@ function _refreshCostPanel(dlg) {
  infillCost = (s.costPerLineKm || 0) * infillLineKm;
  } else if (infillMode === 'sqkm') {
  const spInt = s.spInterval || 12.5;
- const nStr = s.numStreamers || 6;
- const strSep = s.streamerSeparation || 100;
- const crossLineM = (nStr * strSep) / 2;
- let infillTotalSP = 0, infillLineCnt = 0;
- allLines.filter(l =>l._infill).forEach(l => { infillTotalSP += lineSpCount(l, spInt); infillLineCnt++; });
- const infillSqKm = (infillTotalSP - infillLineCnt) * spInt * crossLineM / 1000000;
+ const crossLineM = _crossLineWidthM(allLines);
+ let infillFullFoldM = 0;
+ allLines.filter(l => l._infill).forEach(l => { infillFullFoldM += lineFullFoldM(l, spInt); });
+ const infillSqKm = infillFullFoldM * crossLineM / 1000000;
  infillCost = (s.costPerSqKm || 0) * infillSqKm;
  }
  }
@@ -21644,7 +21634,7 @@ function openReportsPanel() {
  const nStr = s.numStreamers || 6;
  const strSep = s.streamerSeparation || 100;
  const spInt = s.spInterval || 12.5;
- const crossLineM = (nStr * strSep) / 2;
+ const crossLineM = _crossLineWidthM(lines);
 
  // Per-line: SP count from the preplot'SP range (fallback: dist / spInt),
  // coverage = spCount x spInt (CMP bins). Separate prime/infill,
@@ -22731,11 +22721,11 @@ async function _doGenerateReport() {
  const fmtDeg = (deg) => { const d = Math.abs(deg); return `${Math.floor(d)} deg ${((d - Math.floor(d)) * 60).toFixed(4)}'`; };
  const fmtCoord = (lat, lon) => `${fmtDeg(lat)} ${lat >= 0 ? 'N' : 'S'}, ${fmtDeg(lon)} ${lon >= 0 ? 'E' : 'W'}`;
 
- // Area = fullFoldLength x crossLineWidth / 1,000,000
+ // Area = fullFoldLength × preplot line separation / 1,000,000
  const nStr = s.numStreamers || 6;
  const strSep = s.streamerSeparation || 100;
  const spInt = s.spInterval || 12.5;
- const crossLineM = (nStr * strSep) / 2;
+ const crossLineM = _crossLineWidthM(lines);
  let totalFullFoldM = 0, totalSP = 0;
  let primeFullFoldM = 0, primeSP = 0, primeLineCount = 0;
  let infillFullFoldM = 0, infillSP = 0, infillLineCount = 0;
