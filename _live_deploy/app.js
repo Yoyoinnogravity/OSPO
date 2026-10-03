@@ -8266,6 +8266,22 @@ function _sortLineIdxForSwaths(lines, progression, lineNumKey, midpoints) {
  return indices;
 }
 
+// Partition adjacent lines into exactly min(N, nLines) non-empty groups.
+// Fixed ceil(n/N) left empty tail slots (12 lines / 5 swaths → 4 bands).
+function _splitIntoSwathCount(sortedIdx, nSw) {
+ const n = sortedIdx.length;
+ const k = Math.max(1, Math.min(nSw, n));
+ const groups = [];
+ let offset = 0;
+ for (let g = 0; g < k; g++) {
+  const sz = Math.ceil((n - offset) / (k - g));
+  const slice = sortedIdx.slice(offset, offset + sz);
+  if (slice.length) groups.push(slice);
+  offset += sz;
+ }
+ return groups;
+}
+
 // Contiguous slices of already-sorted adjacent lines. Never round-robin.
 function _sliceAdjacentSwaths(sortedIdx, lines, opts) {
  opts = opts || {};
@@ -8280,13 +8296,7 @@ function _sliceAdjacentSwaths(sortedIdx, lines, opts) {
   return groups;
  }
  const nSw = Math.max(1, parseInt(opts.numSwaths != null ? opts.numSwaths : (state.settings && state.settings.numSwaths), 10) || 1);
- const groupSize = Math.ceil(sortedIdx.length / nSw);
- const groups = [];
- for (let g = 0; g < nSw; g++) {
-  const slice = sortedIdx.slice(g * groupSize, (g + 1) * groupSize);
-  if (slice.length) groups.push(slice);
- }
- return groups;
+ return _splitIntoSwathCount(sortedIdx, nSw);
 }
 
 // Order in which adjacent-line swaths are acquired. Default / Auto / sequential
@@ -13297,11 +13307,13 @@ function computeRoute() {
  const bandOrder = isCompass
  ? indices.slice()
  : lines.map((_, i) =>i).sort((a, b) =>lineNumKey[a] - lineNumKey[b]);
- const gSize = Math.ceil(bandOrder.length / nSw);
- for (let g = 0; g < nSw; g++) {
+ const bands = (typeof _sliceAdjacentSwaths === 'function')
+  ? _sliceAdjacentSwaths(bandOrder, lines, { numSwaths: nSw })
+  : _splitIntoSwathCount(bandOrder, nSw);
+ for (let g = 0; g < bands.length; g++) {
  const dir = swDirs[g] || defaultSwathDirection(g);
- for (let k = g * gSize; k < Math.min((g + 1) * gSize, bandOrder.length); k++) {
- swathDirOf[bandOrder[k]] = dir;
+ for (let k = 0; k < bands[g].length; k++) {
+ swathDirOf[bands[g][k]] = dir;
  }
  }
  }
