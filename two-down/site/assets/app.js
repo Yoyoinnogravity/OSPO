@@ -279,3 +279,114 @@ if (subscribeForm) {
     lockSuggest(subscribeForm, "Thanks. Your email app should open. We’ll send one clue a day.");
   });
 }
+
+document.querySelectorAll("[data-copy]").forEach((btn) => {
+  btn.addEventListener("click", async () => {
+    const text = btn.getAttribute("data-copy") || "";
+    const label = btn.dataset.copyLabel || "Copy";
+    try {
+      await navigator.clipboard.writeText(text);
+      btn.textContent = "Copied";
+    } catch (err) {
+      btn.textContent = "Copy failed";
+    }
+    window.setTimeout(() => {
+      btn.textContent = label;
+    }, 1600);
+  });
+});
+
+const YT_UPLOADS_KEY = "cryptic-fit-youtube-uploads";
+
+function parseYoutubeId(text) {
+  const raw = String(text || "").trim();
+  if (/^[A-Za-z0-9_-]{11}$/.test(raw)) return raw;
+  try {
+    const url = new URL(raw);
+    const host = url.hostname.replace(/^www\./, "");
+    const parts = url.pathname.split("/").filter(Boolean);
+    if (host === "youtu.be" && parts[0] && /^[A-Za-z0-9_-]{11}$/.test(parts[0])) return parts[0];
+    if ((host === "youtube.com" || host === "m.youtube.com") && parts[0] === "shorts" && parts[1] && /^[A-Za-z0-9_-]{11}$/.test(parts[1])) {
+      return parts[1];
+    }
+    const watch = url.searchParams.get("v");
+    if (watch && /^[A-Za-z0-9_-]{11}$/.test(watch)) return watch;
+  } catch (err) {
+    return "";
+  }
+  return "";
+}
+
+function loadLocalUploads() {
+  try {
+    const data = JSON.parse(localStorage.getItem(YT_UPLOADS_KEY) || "{}");
+    return data && typeof data === "object" ? data : {};
+  } catch (err) {
+    return {};
+  }
+}
+
+function saveLocalUploads(data) {
+  localStorage.setItem(YT_UPLOADS_KEY, JSON.stringify(data));
+}
+
+function youtubeShortsUrl(id) {
+  return "https://www.youtube.com/shorts/" + id;
+}
+
+function showPostedRow(row, id) {
+  const pendingBits = row.querySelector("[data-staging-pending]");
+  const postedBits = row.querySelector("[data-staging-posted]");
+  const link = row.querySelector("[data-shorts-link]");
+  if (pendingBits) pendingBits.hidden = true;
+  if (postedBits) postedBits.hidden = false;
+  if (link && id) {
+    link.href = youtubeShortsUrl(id);
+    link.textContent = "Open on YouTube";
+  }
+  row.dataset.youtubeId = id || "";
+  const list = document.getElementById("on-youtube-list");
+  if (list && row.parentElement && row.parentElement.id !== "on-youtube-list") {
+    list.appendChild(row);
+  }
+  const empty = document.querySelector("[data-on-youtube-empty]");
+  if (empty) empty.hidden = Boolean(list && list.querySelector("[data-staging-row]"));
+}
+
+function applyStagingMarks() {
+  const local = loadLocalUploads();
+  document.querySelectorAll("[data-staging-row]").forEach((row) => {
+    const slug = row.dataset.slug;
+    const rec = slug ? local[slug] : null;
+    const id = (rec && rec.youtube_id) || row.dataset.youtubeId || "";
+    if (id) showPostedRow(row, id);
+  });
+  const list = document.getElementById("on-youtube-list");
+  const empty = document.querySelector("[data-on-youtube-empty]");
+  if (empty) empty.hidden = Boolean(list && list.querySelector("[data-staging-row]"));
+}
+
+document.querySelectorAll("[data-mark-uploaded]").forEach((form) => {
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const slug = form.dataset.slug;
+    const input = form.querySelector("input[name='url']");
+    const status = form.querySelector("[data-mark-status]");
+    const id = parseYoutubeId(input ? input.value : "");
+    if (!slug || !id) {
+      if (status) status.textContent = "Paste a YouTube Shorts or watch URL.";
+      return;
+    }
+    const local = loadLocalUploads();
+    local[slug] = {
+      youtube_id: id,
+      url: youtubeShortsUrl(id),
+      uploaded_at: new Date().toISOString().slice(0, 10),
+    };
+    saveLocalUploads(local);
+    const row = form.closest("[data-staging-row]");
+    if (row) showPostedRow(row, id);
+    if (status) status.textContent = "Saved in this browser. Tell us the URL and we will persist it on the site.";
+  });
+});
+applyStagingMarks();

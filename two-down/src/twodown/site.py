@@ -35,6 +35,23 @@ from twodown.seo import (
     sitemap_xml,
     website_ld,
 )
+from twodown.staging import (
+    CHANNEL_HANDLE,
+    INTRO_YOUTUBE_ID,
+    LOCAL_STORAGE_KEY,
+    NEEDS_UPLOAD_ZIP,
+    STUDIO_DROP_HELP,
+    YOUTUBE_POSTER_NOTE,
+    committed_youtube_id,
+    ensure_uploads_json,
+    is_uploaded,
+    load_uploads,
+    short_download_name,
+    shorts_url,
+    studio_description,
+    videos_by_slug,
+    write_needs_upload_zip,
+)
 from twodown.youtube import (
     YOUTUBE_CHANNEL_URL,
     YOUTUBE_STUDIO,
@@ -304,6 +321,62 @@ a.action.ghost {
   word-break: break-word;
 }
 .youtube-copy summary { cursor: pointer; color: var(--crimson); }
+.youtube-help, .youtube-poster, .youtube-persist {
+  font-family: "Liberation Sans", sans-serif;
+  font-size: 0.9rem;
+  color: var(--muted);
+  margin: 0 0 10px;
+}
+.youtube-zip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin: 18px 0 28px;
+}
+.staging-list { margin: 0 0 36px; }
+.staging-list > h2 { margin: 28px 0 8px; }
+.unsolved-poster {
+  display: block;
+  width: min(100%, 11rem);
+  aspect-ratio: 9 / 16;
+  object-fit: cover;
+  background: #111;
+  border-radius: 8px;
+  margin: 0 0 12px;
+}
+.mark-uploaded {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 12px 0 8px;
+}
+.mark-uploaded label {
+  font-family: "Liberation Sans", sans-serif;
+  font-size: 0.85rem;
+  color: var(--muted);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.mark-uploaded input {
+  font-family: "Liberation Serif", Georgia, serif;
+  font-size: 1.05rem;
+  color: var(--ink);
+  background: var(--cream);
+  border: 1px solid var(--rule);
+  padding: 8px 10px;
+}
+button.copy-field {
+  font-family: "Liberation Sans", sans-serif;
+  background: transparent;
+  border: 1px solid var(--crimson);
+  color: var(--crimson);
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  margin-top: 6px;
+}
 ul.archive { list-style: none; padding: 0; margin: 0 0 16px; }
 ul.archive li { margin: 0 0 8px; }
 aside.ad {
@@ -607,6 +680,117 @@ if (subscribeForm) {
     lockSuggest(subscribeForm, "Thanks. Your email app should open. We’ll send one clue a day.");
   });
 }
+
+document.querySelectorAll("[data-copy]").forEach((btn) => {
+  btn.addEventListener("click", async () => {
+    const text = btn.getAttribute("data-copy") || "";
+    const label = btn.dataset.copyLabel || "Copy";
+    try {
+      await navigator.clipboard.writeText(text);
+      btn.textContent = "Copied";
+    } catch (err) {
+      btn.textContent = "Copy failed";
+    }
+    window.setTimeout(() => {
+      btn.textContent = label;
+    }, 1600);
+  });
+});
+
+const YT_UPLOADS_KEY = "cryptic-fit-youtube-uploads";
+
+function parseYoutubeId(text) {
+  const raw = String(text || "").trim();
+  if (/^[A-Za-z0-9_-]{11}$/.test(raw)) return raw;
+  try {
+    const url = new URL(raw);
+    const host = url.hostname.replace(/^www\\./, "");
+    const parts = url.pathname.split("/").filter(Boolean);
+    if (host === "youtu.be" && parts[0] && /^[A-Za-z0-9_-]{11}$/.test(parts[0])) return parts[0];
+    if ((host === "youtube.com" || host === "m.youtube.com") && parts[0] === "shorts" && parts[1] && /^[A-Za-z0-9_-]{11}$/.test(parts[1])) {
+      return parts[1];
+    }
+    const watch = url.searchParams.get("v");
+    if (watch && /^[A-Za-z0-9_-]{11}$/.test(watch)) return watch;
+  } catch (err) {
+    return "";
+  }
+  return "";
+}
+
+function loadLocalUploads() {
+  try {
+    const data = JSON.parse(localStorage.getItem(YT_UPLOADS_KEY) || "{}");
+    return data && typeof data === "object" ? data : {};
+  } catch (err) {
+    return {};
+  }
+}
+
+function saveLocalUploads(data) {
+  localStorage.setItem(YT_UPLOADS_KEY, JSON.stringify(data));
+}
+
+function youtubeShortsUrl(id) {
+  return "https://www.youtube.com/shorts/" + id;
+}
+
+function showPostedRow(row, id) {
+  const pendingBits = row.querySelector("[data-staging-pending]");
+  const postedBits = row.querySelector("[data-staging-posted]");
+  const link = row.querySelector("[data-shorts-link]");
+  if (pendingBits) pendingBits.hidden = true;
+  if (postedBits) postedBits.hidden = false;
+  if (link && id) {
+    link.href = youtubeShortsUrl(id);
+    link.textContent = "Open on YouTube";
+  }
+  row.dataset.youtubeId = id || "";
+  const list = document.getElementById("on-youtube-list");
+  if (list && row.parentElement && row.parentElement.id !== "on-youtube-list") {
+    list.appendChild(row);
+  }
+  const empty = document.querySelector("[data-on-youtube-empty]");
+  if (empty) empty.hidden = Boolean(list && list.querySelector("[data-staging-row]"));
+}
+
+function applyStagingMarks() {
+  const local = loadLocalUploads();
+  document.querySelectorAll("[data-staging-row]").forEach((row) => {
+    const slug = row.dataset.slug;
+    const rec = slug ? local[slug] : null;
+    const id = (rec && rec.youtube_id) || row.dataset.youtubeId || "";
+    if (id) showPostedRow(row, id);
+  });
+  const list = document.getElementById("on-youtube-list");
+  const empty = document.querySelector("[data-on-youtube-empty]");
+  if (empty) empty.hidden = Boolean(list && list.querySelector("[data-staging-row]"));
+}
+
+document.querySelectorAll("[data-mark-uploaded]").forEach((form) => {
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const slug = form.dataset.slug;
+    const input = form.querySelector("input[name='url']");
+    const status = form.querySelector("[data-mark-status]");
+    const id = parseYoutubeId(input ? input.value : "");
+    if (!slug || !id) {
+      if (status) status.textContent = "Paste a YouTube Shorts or watch URL.";
+      return;
+    }
+    const local = loadLocalUploads();
+    local[slug] = {
+      youtube_id: id,
+      url: youtubeShortsUrl(id),
+      uploaded_at: new Date().toISOString().slice(0, 10),
+    };
+    saveLocalUploads(local);
+    const row = form.closest("[data-staging-row]");
+    if (row) showPostedRow(row, id);
+    if (status) status.textContent = "Saved in this browser. Tell us the URL and we will persist it on the site.";
+  });
+});
+applyStagingMarks();
 """
 
 
@@ -1372,47 +1556,124 @@ def _earlier_teaser(root: Path, prefix: str = "", skip_date: str | None = None) 
 def _films_body(root: Path) -> str:
     return f"""
     {_croc_hello("", title="Every film on cryptic.fit.", lede="Daily solves, newest first. Andrew says we are AI, then Cryptic Croc presents the clue.")}
+    <p class="lede"><a href="upload.html">YouTube staging</a> — what still needs upload vs what is already on {CHANNEL_HANDLE}.</p>
     <h2>Daily pairs.</h2>
     {_playable_daily(root)}
     """
 
-def _upload_spoken(clue) -> SpokenClue:
-    item = SpokenClue(clue=clue, script="", voice=DEFAULT_VOICE_ALIAS)
-    item.site_path = f"{SITE_ORIGIN}/c/{clue.slug}/"
-    return item
+
+def _upload_title(root: Path, slug: str, clue_line: str) -> str:
+    try:
+        from twodown.pipeline import published_clue
+
+        return video_title(published_clue(slug, root))
+    except (FileNotFoundError, ValueError):
+        return video_title_from_line(clue_line)
+
+
+def _staging_poster(film: SolvedFilm) -> str:
+    if not film.poster:
+        return ""
+    return f'<img class="unsolved-poster" src="media/{_e(film.poster)}" alt="Unsolved clue poster">'
+
+
+def _staging_row(root: Path, film: SolvedFilm, record: dict | None) -> str:
+    slug = film.slug or (Path(film.video).stem if film.video else "")
+    if not slug:
+        return ""
+    title = _upload_title(root, slug, film.clue)
+    desc = studio_description()
+    video_id = committed_youtube_id(record)
+    poster = _staging_poster(film)
+    opener = ""
+    if film.slug:
+        opener = f'<p class="credit"><a href="c/{_e(film.slug)}/#play">Open this clue</a></p>'
+    mp4 = short_mp4_url(slug)
+    filename = short_download_name(slug)
+    posted_href = shorts_url(video_id) if video_id else YOUTUBE_CHANNEL_URL
+    pending_hidden = " hidden" if video_id else ""
+    posted_hidden = "" if video_id else " hidden"
+    return f"""
+    <article class="panel" id="{_e(slug)}" data-staging-row data-slug="{_e(slug)}" data-youtube-id="{_e(video_id or "")}">
+      <p class="kicker">{_e(film.pretty)}</p>
+      <h2>{_e(film.clue)}</h2>
+      {poster}
+      <div data-staging-pending{pending_hidden}>
+        <p class="youtube-help">{_e(STUDIO_DROP_HELP)} Unzip if you used the zip.</p>
+        <div class="youtube-upload" data-youtube-upload="{_e(slug)}">
+          <a class="action download-short" href="{_e(mp4)}" download="{_e(filename)}">Download Short</a>
+          <a class="action ghost" href="{_e(YOUTUBE_STUDIO)}" target="_blank" rel="noopener">Open YouTube Studio</a>
+        </div>
+        <p class="youtube-title">YouTube title for <a href="{_e(YOUTUBE_CHANNEL_URL)}" target="_blank" rel="noopener">{_e(CHANNEL_HANDLE)}</a><code>{_e(title)}</code>
+          <button type="button" class="copy-field" data-copy="{_e(title)}" data-copy-label="Copy title">Copy title</button>
+        </p>
+        <p class="youtube-copy">YouTube description<pre>{_e(desc)}</pre>
+          <button type="button" class="copy-field" data-copy="{_e(desc)}" data-copy-label="Copy description">Copy description</button>
+        </p>
+        <p class="youtube-poster">{_e(YOUTUBE_POSTER_NOTE)}</p>
+        <form class="mark-uploaded" data-mark-uploaded data-slug="{_e(slug)}">
+          <label>YouTube Shorts URL
+            <input name="url" type="url" placeholder="https://www.youtube.com/shorts/…" autocomplete="off">
+          </label>
+          <button type="submit" class="reveal">Mark as uploaded</button>
+          <p class="suggest-status" data-mark-status></p>
+        </form>
+        <p class="youtube-persist">This browser remembers the id. Paste the Shorts URL here, or tell us and we will persist it on the site.</p>
+      </div>
+      <div data-staging-posted{posted_hidden}>
+        <p class="kicker">On YouTube</p>
+        <p><a class="action" data-shorts-link href="{_e(posted_href)}" target="_blank" rel="noopener">Open on YouTube</a></p>
+      </div>
+      {opener}
+    </article>
+    """
+
+
+def _needs_upload_zip_bar(root: Path) -> str:
+    zip_path = Path(root) / "media" / NEEDS_UPLOAD_ZIP
+    if not zip_path.is_file():
+        return ""
+    return f"""
+    <p class="youtube-help">{_e(STUDIO_DROP_HELP)} The zip is needs-upload only.</p>
+    <p class="youtube-zip">
+      <a class="action download-all" href="media/{NEEDS_UPLOAD_ZIP}" download="{NEEDS_UPLOAD_ZIP}">Download needs-upload zip</a>
+      <a class="action ghost" href="{_e(YOUTUBE_STUDIO)}" target="_blank" rel="noopener">Open YouTube Studio</a>
+    </p>
+    """
 
 
 def _upload_body(root: Path) -> str:
-    blocks = []
+    data = ensure_uploads_json(root)
+    known = videos_by_slug(data)
+    pending: list[str] = []
+    posted: list[str] = []
     for film in solved_films(root):
         slug = film.slug or (Path(film.video).stem if film.video else "")
         if not slug:
             continue
-        title = video_title_from_line(film.clue)
-        description = None
-        try:
-            from twodown.pipeline import published_clue
-
-            clue = published_clue(slug, root)
-            title = video_title(clue)
-            description = youtube_description(_upload_spoken(clue))
-        except (FileNotFoundError, ValueError):
-            pass
-        opener = ""
-        if film.slug:
-            opener = f'<p class="credit"><a href="c/{_e(film.slug)}/#play">Open this clue</a></p>'
-        blocks.append(
-            f'<article class="panel" id="{_e(slug)}">'
-            f'<p class="kicker">{_e(film.pretty)}</p>'
-            f"<h2>{_e(film.clue)}</h2>"
-            f"{_youtube_upload_block(slug, title, description=description)}"
-            f"{opener}"
-            "</article>"
-        )
-    listing = "".join(blocks) if blocks else "<p>No films on the site yet.</p>"
+        row = _staging_row(root, film, known.get(slug))
+        if is_uploaded(known.get(slug)):
+            posted.append(row)
+        else:
+            pending.append(row)
+    pending_html = "".join(pending) or "<p>Nothing waiting. Every daily Short is on YouTube.</p>"
+    posted_html = "".join(posted)
+    empty_posted = "" if posted_html else '<p data-on-youtube-empty>None of the daily Shorts are on the committed list yet.</p>'
     return f"""
-    {_croc_hello("", title="Upload these Shorts to YouTube.", lede="Download the film, open YouTube Studio for @crypticfit, paste the title. We do not upload for you.")}
-    {listing}
+    {_croc_hello("", title="Upload these Shorts to YouTube.", lede="Two lists for " + CHANNEL_HANDLE + ". Download, unzip if from the zip, drag the mp4 onto Studio — you cannot drag from this page. We do not upload for you.")}
+    <p class="lede" data-yt-uploads-key="{_e(LOCAL_STORAGE_KEY)}">The channel intro Short is already live at <a href="{_e(shorts_url(INTRO_YOUTUBE_ID))}" target="_blank" rel="noopener">YouTube</a>. It is not a daily /c/ film. Daily films stay under Needs upload until a YouTube id is committed or you mark one in this browser.</p>
+    {_needs_upload_zip_bar(root)}
+    <section class="staging-list" id="needs-upload">
+      <h2>Needs upload</h2>
+      <p>Not yet on {CHANNEL_HANDLE}.</p>
+      <div id="needs-upload-list">{pending_html}</div>
+    </section>
+    <section class="staging-list" id="on-youtube">
+      <h2>On YouTube</h2>
+      <p>Already posted. The committed JSON is source of truth when we know the id.</p>
+      {empty_posted}
+      <div id="on-youtube-list">{posted_html}</div>
+    </section>
     """
 
 
@@ -1518,6 +1779,8 @@ def publish_films(root: Path) -> Path:
     (assets / "style.css").write_text(CSS, encoding="utf-8")
     (assets / "app.js").write_text(JS, encoding="utf-8")
     ensure_safe_posters(root)
+    ensure_uploads_json(root)
+    write_needs_upload_zip(root)
     page = root / "films.html"
     page.write_text(
         _page(
