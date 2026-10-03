@@ -135,7 +135,7 @@ assert(/showLabels:\s*false/.test(src), 'state.showLabels default must be false'
 assert(/id="layer-toggle-labels"[^>]*onchange/.test(html), 'Layers menu still has labels checkbox');
 assert(!/id="layer-toggle-labels"\s+checked/.test(html), 'Layers menu labels checkbox must not start checked');
 assert(html.includes('LABELS OFF / ON under the preplot summary') || html.includes('toggleLabels()'), 'map A button still present');
-assert(/app\.js\?v=17\.33/.test(html), 'app.js cache bump missing');
+assert(/app\.js\?v=17\.34/.test(html), 'app.js cache bump missing');
 assert(/value="ocean"[^>]*checked/.test(html), 'Layers default basemap must be ocean / GEBCO');
 assert(!/value="satellite"[^>]*checked/.test(html), 'Layers must not default to satellite');
 
@@ -165,6 +165,9 @@ assert(overlay.innerHTML.includes('3D SWATHS'), 'overlay must show 3D SWATHS');
 assert(overlay.innerHTML.includes('SWATHS OFF') && overlay.innerHTML.includes('SWATHS ON'), 'overlay must show SWATHS OFF/ON tabs');
 assert(overlay.innerHTML.includes('Number of swaths'), 'overlay must show number of swaths control');
 assert(overlay.innerHTML.includes('id="map-num-swaths"'), 'overlay must have map-num-swaths input');
+assert(src.includes('function renderSwathOverlays'), 'on-map swath delimitation renderer missing');
+assert(src.includes("color: '#00d2ff', weight: 2"), 'cyan swath boundary lines missing');
+assert(!src.includes('if (numSwaths < 2) return'), 'overlays must still draw when N was unset');
 assert(/id="layer-toggle-swaths"[^>]*onchange/.test(html), 'Layers menu 3D Swaths checkbox missing');
 assert(/style\.min\.css\?v=3\.33/.test(html), 'style.min.css cache bump 3.33 missing');
 assert(kids.length >= 1, 'overlay must be appended under the summary stack');

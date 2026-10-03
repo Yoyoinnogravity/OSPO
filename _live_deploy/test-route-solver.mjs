@@ -112,11 +112,16 @@ vm.runInContext(`
   else { const _t = showToast; showToast = function(){}; }
 `, ctx);
 
-assert(/app\.js\?v=17\.33/.test(html), 'app.js cache bump 17.33 missing');
+assert(/app\.js\?v=17\.34/.test(html), 'app.js cache bump 17.34 missing');
 assert(src.includes('prioBlocksVisit'), '3D Auto must not visit a later-P swath before an earlier-P swath');
 assert(src.includes('swathPrio'), '3D must pass Line Manager Priority into swath-block order');
 assert(!src.includes('Line priorities override swath interleave order'),
   '3D must not let Priority shred swath blocks');
+assert(!src.includes('if (numSwaths < 2) return'),
+  'unset N must not skip all swath delimitation (live 17.23 bug)');
+assert(src.includes("color: '#00d2ff', weight: 2"),
+  'swath delimitation lines must be cyan dashed, not faint grey');
+assert(src.includes('numSwaths: 2'), 'state.settings.numSwaths must default to 2');
 assert(/id="val-turn-radius">3\.5km/.test(html), 'toolbar RADIUS default must be 3.5km not 5.1');
 assert(/id="input-turn-radius" value="3500"/.test(html), 'turn-radius input default must be 3500 m');
 assert(!/value="5100"/.test(html), 'HTML must not default min turn radius to 5100');
@@ -632,6 +637,26 @@ const nUser = vm.runInContext(`
   })()
 `, ctx);
 assert(nUser === 4, 'user-elected 4 swaths must not be replaced by leftover width, got ' + nUser);
+setup(makeGrid(12), {
+  surveyType: '3d',
+  progression: 'low-high',
+  numSwaths: 4,
+  swathWidth: 50000,
+});
+const nBound = vm.runInContext(`
+  (function() {
+    const lines = state.lines;
+    const idx = lines.map((_, i) => i);
+    return _sliceAdjacentSwaths(idx, lines, { numSwaths: 4 }).length;
+  })()
+`, ctx);
+assert(nBound === 4,
+  'Number of swaths N must delimit even when leftover Auto width is huge, got ' + nBound);
+assert(vm.runInContext('state.settings.numSwaths', ctx) === 4 ||
+  vm.runInContext('(state.settings.numSwaths || 2)', ctx) === 4,
+  'numSwaths must stay bound to N');
+const nGroups = vm.runInContext(`_computeSwathGroups(4, 'low-high').length`, ctx);
+assert(nGroups === 4, 'on-map delimitation must be N=4 bands, got ' + nGroups);
 assert(src.includes('function _persistSwathElection'), 'swath election must persist');
 assert(src.includes('function _restoreSwathElection'), 'swath election must restore after login');
 assert(src.includes('swathCountUserSet'), 'swathCountUserSet flag missing');
@@ -677,7 +702,7 @@ assert(vm.runInContext('globalThis.__autoNs', ctx) === '6',
 
 console.log(JSON.stringify({
   ok: true,
-  cache: '17.33',
+  cache: '17.34',
   rule: '2D skip-k; 3D swath shooting (adjacent monopass, locked heading, stadium returns)',
   kNom,
   nn: { visit: nn.nVisit, mode: nn.stats.mode, ms: nn.ms },

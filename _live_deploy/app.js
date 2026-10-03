@@ -398,6 +398,7 @@ const state = {
  swathDirections: [],
  swathUnit: 'm',
  swathRawValue: 0,
+ surveyType: '3d',
  channelsPerStreamer: 480, // number of channels per streamer
  channelSpacing: 12.5, // channel spacing in metres
  numSources: 2, // number of sources
@@ -8233,15 +8234,11 @@ function renderSurveyLines() {
 // split by Number of Swaths. Never skip-k / every-Nth — a swath is adjacent.
 function _effectiveLinesPerSwath(lines) {
  const s = state.settings || {};
- // User picked Number of Swaths (map spinner or typed in Criteria). That
- // election wins: equal adjacent bands, not a leftover width from Auto.
+ // Number of swaths (map spinner / Survey Criteria) is the delimitation.
+ // Leftover Auto Swath Width in metres must not collapse N bands into one.
  if (s.swathCountUserSet) return 0;
  if (s.swathUnit === 'lines' && s.swathRawValue > 0) {
   return Math.max(1, Math.round(Number(s.swathRawValue)));
- }
- if (s.swathWidth > 0 && lines && lines.length >= 2) {
-  const sp = (typeof _medianLineSpacingM === 'function') ? _medianLineSpacingM(lines) : 0;
-  if (sp > 0) return Math.max(1, Math.round(s.swathWidth / sp));
  }
  return 0;
 }
@@ -8394,14 +8391,18 @@ function _swathBandLatLngs(grp) {
  return [a.start, a.end, bEnd, bStart];
 }
 
-// Draw filled 3D swath bands on the preplot, plus a SWATH n label on each band.
+// Draw filled 3D swath bands plus Survey Criteria N delimitation lines
+// (cyan dashed boundary between consecutive adjacent-line swaths).
 function renderSwathOverlays() {
  if (!layerSwaths) return;
  layerSwaths.clearLayers();
  if (state.showSwaths === false) return;
  const s = state.settings;
  if ((s.surveyType || '3d') !== '3d') return;
- const numSwaths = s.numSwaths || 1;
+ // Bind to Number of swaths (default 2). Never treat unset N as 1 and skip
+ // drawing — that is how live 17.23 lost delimitation entirely.
+ const numSwaths = Math.max(2, parseInt(s.numSwaths, 10) || 2);
+ if (s.numSwaths == null || s.numSwaths < 2) s.numSwaths = numSwaths;
  const progression = s.progression || 'low-high';
  const groups = _computeSwathGroups(numSwaths, progression);
  if (groups.length < 1) return;
@@ -8448,8 +8449,10 @@ function renderSwathOverlays() {
  const ext = dLen * 0.06 + 150;
  const p1 = destinationPoint(dS, (dBrg + 180) % 360, ext);
  const p2 = destinationPoint(dE, dBrg, ext);
+ // August delimitation: cyan dashed boundary between swaths, not a faint grey
+ // hairline that disappears on GEBCO / satellite.
  L.polyline([p1, p2], Object.assign({
-  color: '#e2e8f0', weight: 1.2, opacity: 0.45, dashArray: '10,8', interactive: false
+  color: '#00d2ff', weight: 2, opacity: 0.85, dashArray: '10,8', interactive: false
  }, paneOpts)).addTo(layerSwaths);
  }
 }
