@@ -12801,9 +12801,9 @@ function _monopassSwathSeq(idxs, reversed, visitFlip) {
 //  - finish each swath as a block before the next
 //  - every line in a swath uses that swath's Low→High / High→Low heading
 // Fastest legal plan: adjacent sequential inside the swath (skip-k needs
-// opposite headings). Auto searches every swath-block order + start edge
-// (exact DP, nSwaths <= 10). Explicit Low→High / interleaved keep their
-// visit order and only search start edges. Skip-k racetrack is 2D only.
+// opposite headings). The on-map Number of Swaths bands ARE the route map:
+// Auto does not permute swath-block order for engagement / time. Explicit
+// Low→High / interleaved keep their visit order. Skip-k racetrack is 2D only.
 function _swathOrientations(idxs, headingRev, startIdx, userStartLocked) {
  const flips = [];
  const lockedHere = userStartLocked && startIdx >= 0 && idxs.indexOf(startIdx) >= 0;
@@ -13244,7 +13244,7 @@ function computeRoute() {
   for (let g = 0; g < swaths.length; g++) {
    if (swaths[g].indexOf(startFilteredIdx) >= 0) { forceStartSwath = g; break; }
   }
- } else if (state.settings.startPoint && !is3dAuto) {
+ } else if (state.settings.startPoint) {
   let bestD = Infinity, bestG = -1;
   for (let g = 0; g < swaths.length; g++) {
    if (!swaths[g].length) continue;
@@ -13280,7 +13280,8 @@ function computeRoute() {
   userStartLocked: !!startLineObj,
   forceStartSwath,
   swathOrder,
-  searchSwathOrder: is3dAuto && state.settings.optimizerMode !== 'nn',
+  // The map's N swath bands are the plan. Do not DP-permute them.
+  searchSwathOrder: false,
   depotSec: depotSec3d,
   swathDirs: swaths.map((_, g) => swDirsPlan[g] || defaultSwathDirection(g))
  });
@@ -13320,7 +13321,7 @@ function computeRoute() {
  // on-map swath labels), regardless of the progression direction. Compass
  // progressions band along their (spatial) sort order instead.
  {
- const nSw = state.settings.numSwaths || 1;
+ const nSw = Math.max(2, parseInt(state.settings.numSwaths, 10) || 2);
  const swDirs = state.settings.swathDirections || [];
  const isCompass = (progression === 'west-east' || progression === 'east-west' ||
  progression === 'south-north' || progression === 'north-south');

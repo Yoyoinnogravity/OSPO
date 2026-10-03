@@ -15,7 +15,7 @@ function assert(cond, msg) {
   }
 }
 
-assert(/app\.js\?v=17\.35/.test(html), 'app.js cache bump 17.35 missing');
+assert(/app\.js\?v=17\.36/.test(html), 'app.js cache bump 17.35 missing');
 assert(/const DEFAULT_BASEMAP = 'ocean'/.test(src), 'DEFAULT_BASEMAP must be ocean');
 assert(/GEBCO_basemap_NCEI/.test(src), 'GEBCO NCEI tile service missing');
 assert(/function createGebcoOceanLayer/.test(src), 'createGebcoOceanLayer helper missing');
@@ -80,6 +80,6 @@ console.log(JSON.stringify({
   ok: true,
   defaultBasemap: 'ocean',
   provider: 'GEBCO NCEI',
-  cache: '17.35',
+  cache: '17.36',
 }, null, 2));
 process.exit(0);

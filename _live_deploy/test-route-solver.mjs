@@ -112,7 +112,7 @@ vm.runInContext(`
   else { const _t = showToast; showToast = function(){}; }
 `, ctx);
 
-assert(/app\.js\?v=17\.35/.test(html), 'app.js cache bump 17.35 missing');
+assert(/app\.js\?v=17\.36/.test(html), 'app.js cache bump 17.36 missing');
 assert(src.includes('function _splitIntoSwathCount'), 'Number of Swaths must equal-split into exactly N bands');
 assert(/id="val-turn-radius">3\.5km/.test(html), 'toolbar RADIUS default must be 3.5km not 5.1');
 assert(/id="input-turn-radius" value="3500"/.test(html), 'turn-radius input default must be 3500 m');
@@ -144,7 +144,8 @@ assert(!src.includes('Math.min(iters, 20000)'), 'planner must not accept a 20000
 assert(html.includes('skip-k racetrack'), 'chooser Auto must describe skip-k racetrack');
 assert(html.includes('Acquire per swath'), 'chooser must offer acquire-per-swath plans');
 assert(src.includes("progression = 'low-high'"), '3D Auto bands neighbouring lines by line number');
-assert(src.includes('searchSwathOrder'), '3D Auto must search legal swath-block order');
+assert(src.includes('searchSwathOrder: false'),
+  '3D route must follow the mapped swath bands, not permute them for a faster tour');
 assert(src.includes('one heading per swath'), '3D heading lock must stay in the solver');
 assert(!src.includes('searchHeadings'), '3D must not flip Survey Criteria headings');
 assert(src.includes('acquire each adjacent-line swath as a block'), '3D plan type must say acquire per swath');
@@ -488,8 +489,8 @@ const tPer = plan(grid164, { surveyType: '3d', progression: 'auto', numSwaths: 4
 assert(tPer.nVisit === 164, '3D Auto per-swath must visit all 164');
 assert(tPer.stats && tPer.stats.mode === 'swath-blocks',
   '3D Auto must use swath-blocks, got ' + (tPer.stats && tPer.stats.mode));
-assert(tPer.stats && tPer.stats.solver === 'swath-dp',
-  '3D Auto must use exact swath-block DP, got ' + (tPer.stats && tPer.stats.solver));
+assert(tPer.stats && tPer.stats.solver === 'swath-blocks',
+  '3D Auto must shoot mapped swath blocks, got ' + (tPer.stats && tPer.stats.solver));
 assert(Math.abs(tPer.ranks[1] - tPer.ranks[0]) === 1,
   '3D Auto swath must progress adjacent, hop=' + Math.abs(tPer.ranks[1] - tPer.ranks[0]));
 const perFirst = tPer.ranks.slice(0, gSize4);
@@ -683,7 +684,7 @@ assert(vm.runInContext('globalThis.__autoNs', ctx) === '6',
 
 console.log(JSON.stringify({
   ok: true,
-  cache: '17.35',
+  cache: '17.36',
   rule: '2D skip-k; 3D swath shooting (adjacent monopass, locked heading, stadium returns)',
   kNom,
   nn: { visit: nn.nVisit, mode: nn.stats.mode, ms: nn.ms },
