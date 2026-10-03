@@ -210,7 +210,7 @@ def test_pages_workflow_builds_pk_zip_parts_before_deploy():
     assert "write_needs_upload_zips" in text
     assert "refresh_upload_zip_bar" in text
     assert text.find("write_needs_upload_zips") < text.find("upload-pages-artifact")
-    assert "git-lfs.github.com" not in text
+    assert 'raw[:2] != b"PK"' in text
 
 
 def test_site_media_zips_are_not_git_lfs():
