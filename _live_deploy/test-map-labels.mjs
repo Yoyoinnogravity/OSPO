@@ -169,7 +169,7 @@ assert(/id="map-swath-picker"/.test(html), 'hard-coded map swath picker missing'
 assert(/id="map-hard-num-swaths"/.test(html), 'hard-coded number of swaths input missing');
 assert(src.includes('function _syncHardMapSwathPicker'), '3D map swath picker must show/hide with survey type');
 assert(/id="layer-toggle-swaths"[^>]*onchange/.test(html), 'Layers menu 3D Swaths checkbox missing');
-assert(/app\.js\?v=17\.36/.test(html), 'app.js cache bump 17.35 missing');
+assert(/app\.js\?v=17\.37/.test(html), 'app.js cache bump 17.37 missing');
 assert(/style\.min\.css\?v=3\.33/.test(html), 'style.min.css cache bump 3.33 missing');
 assert(kids.length >= 1, 'overlay must be appended under the summary stack');
 

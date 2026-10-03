@@ -1,0 +1,15 @@
+---
+description: Time-line colour is binding — red at start, green at end
+alwaysApply: true
+---
+
+# Time-line colour is binding
+
+Red at first acquisition, green at last. The planned route overlay and the
+bottom timeline bar must both show that sequence.
+
+Do not flatten transits, run-out, or the timeline to a single yellow/overview
+stroke for "readability", engagement, or ranking. Do not replace per-segment
+timeline colours with an empty bar or a CSS gradient that ignores visit time.
+
+Regression: `node _live_deploy/test-route-draw.mjs`

@@ -14571,7 +14571,10 @@ function computeDubinsTransitDist(waypoints, startIdx, endIdx) {
 }
 
 // ===== RENDER ROUTE =====
-// Sequence colour: placed on time — red at survey start, green at survey end.
+// Time-line colour is BINDING. Red at first acquisition, green at last.
+// Do not flatten the planned route or the bottom timeline to a single
+// yellow/overview stroke for "readability" or engagement. N swaths map the
+// route; this colour is how the route is read in time.
 function timeGradientColor(fraction) {
  const stops = [
  { t: 0.0, r: 255, g: 69, b: 58 }, // #ff453a red (start)
@@ -14607,6 +14610,7 @@ function _routeSegTimeSec(waypoints, i, onlineMs, turnMs) {
 function _routeVisitOrder(waypoints) {
  const byName = new Map();
  const t0ByName = new Map();
+ const tAtIdx = [];
  let n = 0;
  const route = waypoints || state.route || [];
  const onlineKn = (state.settings && state.settings.speed) || 4.5;
@@ -14616,14 +14620,15 @@ function _routeVisitOrder(waypoints) {
  let t = 0;
  for (let i = 0; i < route.length; i++) {
   const w = route[i];
+  tAtIdx[i] = t;
   if (w && w.type === 'lineStart' && w.lineName && !byName.has(w.lineName)) {
-   if (n === 0) t = 0; // colour clock starts at first acquisition, not the approach run-in
+   if (n === 0) { t = 0; tAtIdx[i] = 0; } // colour clock starts at first acquisition, not the approach run-in
    byName.set(w.lineName, n++);
    t0ByName.set(w.lineName, t);
   }
   if (i < route.length - 1) t += _routeSegTimeSec(route, i, onlineMs, turnMs);
  }
- return { byName, n, t0ByName, totalSec: t };
+ return { byName, n, t0ByName, totalSec: t, tAtIdx };
 }
 
 function visitColorForLine(lineName, visit) {
@@ -14634,6 +14639,12 @@ function visitColorForLine(lineName, visit) {
  const i = visit.byName.get(lineName);
  if (i == null) return '#8a9bb0';
  return timeGradientColor(visit.n <= 1 ? 0 : i / (visit.n - 1));
+}
+
+function visitColorAtIdx(visit, i, lineName) {
+ if (lineName) return visitColorForLine(lineName, visit);
+ if (!visit || !(visit.totalSec > 0) || !visit.tAtIdx) return '#8a9bb0';
+ return timeGradientColor((visit.tAtIdx[i] || 0) / visit.totalSec);
 }
 
 function _addRouteArrow(from, to, color, layer, opacity) {
@@ -14706,10 +14717,10 @@ function _bezierSpline(points, segmentsPerCurve) {
 let _routeViewMode = 'overview'; // 'overview' | 'step'
 let _routeHighlight = null; // { startWpIdx, endWpIdx } or null
 
-function _routeTransitOverviewStyle() {
+function _routeTransitOverviewStyle(color) {
  return {
   pane: 'routePane',
-  color: '#ffcc33',
+  color: color || '#ffcc33',
   weight: 2.6,
   opacity: 0.95,
   lineCap: 'round',
@@ -14763,17 +14774,18 @@ function _drawRoutePolyline(latlngs, style) {
  L.polyline(latlngs, Object.assign({ pane: 'routePane' }, style)).addTo(layerRoute);
 }
 
-function _drawFocusedTransit(arcPts) {
+function _drawFocusedTransit(arcPts, color) {
  if (!arcPts || arcPts.length < 2) return;
+ const c = color || '#ffb020';
  _drawRoutePolyline(arcPts, {
   color: '#1a1006', weight: 5, opacity: 0.8,
   lineCap: 'round', lineJoin: 'round', interactive: false
  });
- _drawRoutePolyline(arcPts, _routeTransitFocusStyle());
+ _drawRoutePolyline(arcPts, Object.assign(_routeTransitFocusStyle(), { color: c }));
  if (layerArrows) {
   const midIdx = Math.floor(arcPts.length / 2);
   const endIdx = Math.min(midIdx + 1, arcPts.length - 1);
-  _addRouteArrow(arcPts[midIdx], arcPts[endIdx], '#ffb020', layerArrows, 0.95);
+  _addRouteArrow(arcPts[midIdx], arcPts[endIdx], c, layerArrows, 0.95);
  }
 }
 
@@ -14811,8 +14823,10 @@ function renderRoute(waypoints, opts) {
   if (a.type === 'lineStart' && !startPt) startPt = a.pt;
   if (b.type === 'lineEnd') endPt = b.pt;
 
+  const tColor = visitColorAtIdx(visit, i, a.lineName && a.lineName === b.lineName ? a.lineName : null);
+
   if (a.type === 'lineStart' && b.type === 'lineEnd' && a.lineName === b.lineName) {
-   const acqColor = visitColorForLine(a.lineName, visit);
+   const acqColor = tColor;
    if ((state.obstructions || []).length && findLineObstructionIntersections(a.pt, b.pt).length) {
     state._staleRouteObsHits = (state._staleRouteObsHits || 0) + 1;
     _drawRoutePolyline([a.pt, b.pt], {
@@ -14828,18 +14842,18 @@ function renderRoute(waypoints, opts) {
     _drawRoutePolyline([a.pt, b.pt], { color: acqColor, weight: 2.4, opacity: 0.95, interactive: false });
    }
   } else if (a.type === 'lineEnd' && b.type === 'runOutEnd' && a.lineName === b.lineName) {
-   const acqColor = visitColorForLine(a.lineName, visit);
+   const acqColor = tColor;
    if (focused) {
     _drawRoutePolyline([a.pt, b.pt], { color: acqColor, weight: 2.5, opacity: 0.9, dashArray: '8,4', interactive: false });
     if (layerArrows) _addRouteArrow(a.pt, b.pt, acqColor, layerArrows, 0.9);
    } else {
-    _drawRoutePolyline([a.pt, b.pt], { color: '#ffcc33', weight: 2, opacity: 0.85, dashArray: '8,4', interactive: false });
+    _drawRoutePolyline([a.pt, b.pt], { color: acqColor, weight: 2, opacity: 0.85, dashArray: '8,4', interactive: false });
    }
   } else if (a.type === 'runInStart' && b.type === 'lineStart' && a.lineName === b.lineName) {
    if (focused) {
-    _drawFocusedTransit([a.pt, b.pt]);
+    _drawFocusedTransit([a.pt, b.pt], tColor);
    } else {
-    _drawRoutePolyline([a.pt, b.pt], _routeTransitOverviewStyle());
+    _drawRoutePolyline([a.pt, b.pt], _routeTransitOverviewStyle(tColor));
    }
   } else if ((a.type === 'obsAvoidStart' || a.type === 'obsAvoidance' || a.type === 'obsAvoidEnd') &&
    (b.type === 'obsAvoidStart' || b.type === 'obsAvoidance' || b.type === 'obsAvoidEnd' ||
@@ -14853,10 +14867,10 @@ function renderRoute(waypoints, opts) {
      k++;
     }
     if (focused) {
-     _drawFocusedTransit(obsAvoidPts);
+     _drawFocusedTransit(obsAvoidPts, tColor);
     } else {
      _drawRoutePolyline(obsAvoidPts, {
-      color: '#b89620', weight: 1.15, opacity: 0.85, dashArray: '5,5',
+      color: tColor, weight: 1.15, opacity: 0.85, dashArray: '5,5',
       lineCap: 'round', interactive: false
      });
     }
@@ -14867,22 +14881,22 @@ function renderRoute(waypoints, opts) {
   } else if (a.type === 'detour' || b.type === 'detour' ||
    a.type === 'transit-detour' || b.type === 'transit-detour') {
    if (focused) {
-    _drawFocusedTransit([a.pt, b.pt]);
+    _drawFocusedTransit([a.pt, b.pt], tColor);
    } else {
     _drawRoutePolyline([a.pt, b.pt], {
-     color: '#b89620', weight: 1.15, opacity: 0.85, dashArray: '5,5',
+     color: tColor, weight: 1.15, opacity: 0.85, dashArray: '5,5',
      lineCap: 'round', interactive: false
     });
    }
   } else {
-   // Transit / line turn — always draw on Show All. This is the vessel route.
+   // Transit / line turn — always draw on Show All. Colour follows survey time.
    let arcPts;
    try { arcPts = computeArcTurn(waypoints, i); }
    catch (_) { arcPts = [a.pt, b.pt]; }
    if (focused) {
-    _drawFocusedTransit(arcPts);
+    _drawFocusedTransit(arcPts, tColor);
    } else {
-    _drawRoutePolyline(arcPts, _routeTransitOverviewStyle());
+    _drawRoutePolyline(arcPts, _routeTransitOverviewStyle(tColor));
    }
   }
  }
@@ -15360,15 +15374,15 @@ function showLineSchedulePanel(route) {
 }
 
 // ===== ROUTE TIMELINE BAR =====
-function showRouteTimeline(route) {
- if (!route || route.length < 2) return;
- const s = state.settings;
+// Time-line colour is BINDING. Each bar segment is the same red→green as the
+// map. Do not replace this with a single empty/gradient strip.
+function _buildRouteTimelineSegments(route) {
+ if (!route || route.length < 2) return [];
+ const s = state.settings || {};
  const speed = s.speed ?? 4.5;
  const turnSpeed = s.turnSpeed ?? speed;
  const startTime = s.startTime ? new Date(s.startTime) : new Date();
  let currentTime = new Date(startTime);
-
- // Build segments array: { type, name, hours, startTime, endTime }
  const segments = [];
  let i = 0;
  while (i < route.length) {
@@ -15408,7 +15422,41 @@ function showRouteTimeline(route) {
  }
  i++;
  }
+ const visit = _routeVisitOrder(route);
+ const totalHrs = segments.reduce((sum, seg) => sum + seg.hours, 0) || 1;
+ let elapsed = 0;
+ for (let k = 0; k < segments.length; k++) {
+  const seg = segments[k];
+  if (seg.type === 'line') seg.color = visitColorForLine(seg.name, visit);
+  else seg.color = timeGradientColor(elapsed / totalHrs);
+  elapsed += seg.hours;
+ }
+ return segments;
+}
 
+function _escTimelineAttr(s) {
+ return String(s == null ? '' : s)
+  .replace(/&/g, '&amp;')
+  .replace(/"/g, '&quot;')
+  .replace(/</g, '&lt;');
+}
+
+function _routeTimelineTrackHtml(segments) {
+ let html = '';
+ for (let k = 0; k < segments.length; k++) {
+  const seg = segments[k];
+  const flex = Math.max(Number(seg.hours) || 0, 0.0001);
+  const title = seg.type === 'line' ? (seg.name || 'line') : 'Line change';
+  html += `<div data-timeline-seg="${seg.type}" data-name="${_escTimelineAttr(title)}" style="flex:${flex};background:${seg.color};min-width:1px;height:18px;" title="${_escTimelineAttr(title)}"></div>`;
+ }
+ return html;
+}
+
+function showRouteTimeline(route) {
+ if (!route || route.length < 2) return;
+ const s = state.settings;
+ const startTime = s.startTime ? new Date(s.startTime) : new Date();
+ const segments = _buildRouteTimelineSegments(route);
  if (segments.length === 0) return;
  const totalHrs = segments.reduce((sum, seg) =>sum + seg.hours, 0);
 
@@ -15450,9 +15498,6 @@ function showRouteTimeline(route) {
  document.getElementById('main').appendChild(bar);
  }
 
- // Timeline matches the map: red at start, green at end
- const gradientStops = '#ff453a 0%, #ff9500 35%, #ffd60a 65%, #30d158 100%';
-
  let markersHtml = '';
  dayMarkers.forEach(m => {
  markersHtml += `<div style="position:absolute;left:${m.pct}%;top:0;bottom:0;border-left:1px solid rgba(255,255,255,0.4);pointer-events:none;">
@@ -15463,21 +15508,18 @@ function showRouteTimeline(route) {
  const totalDays = (totalAdjHrs / 24).toFixed(1);
  const fmtStart = fmtDM24(startTime);
  const fmtEnd = fmtDM24(endTime);
+ const trackHtml = _routeTimelineTrackHtml(segments);
 
  bar.innerHTML = `
  <div style="display:flex;justify-content:space-between;align-items:center;padding:2px 8px;font-size:9px;color:#5a6a7a;">
- <span>${fmtStart} start</span>
+ <span style="color:#ff453a;">${fmtStart} start</span>
  <span style="color:#00d2ff;font-weight:600;">${totalDays} days total</span>
- <span>${fmtEnd} end</span>
+ <span style="color:#30d158;">${fmtEnd} end</span>
  </div>
  <div style="position:relative;margin:0 8px 6px;">
- <div style="min-height:18px;height:18px;border-radius:3px;overflow:hidden;opacity:0.9;"
- title="Route timeline: ${totalDays} days"></div>
+ <div id="route-timeline-track" style="display:flex;min-height:18px;height:18px;border-radius:3px;overflow:hidden;opacity:0.95;">${trackHtml}</div>
  ${markersHtml}
  </div>`;
- // Apply gradient via JS property to avoid template literal escaping issues
- const gradBar = bar.querySelector('div[title]');
- if (gradBar) gradBar.style.background = 'linear-gradient(to right, ' + gradientStops + ')';
  bar.style.display = 'block';
 
  // Push bottom-bar and Leaflet scale control above the timeline bar

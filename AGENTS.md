@@ -10,4 +10,13 @@ This is already documented in `_live_deploy/app.js` (comments on `_effectiveLine
 
 Always-on Cursor rule: `.cursor/rules/swath-count-binding.mdc`
 
-Guard: `node _live_deploy/test-route-solver.mjs`
+## Time-line colour
+
+Time-line colour is BINDING. Red at first acquisition, green at last. The
+planned route overlay and the bottom timeline bar must both show that
+sequence. Do not flatten transits, run-out, or the timeline to a single
+yellow/overview stroke for "readability" or engagement.
+
+Always-on Cursor rule: `.cursor/rules/timeline-colours.mdc`
+
+Guard: `node _live_deploy/test-route-solver.mjs` and `node _live_deploy/test-route-draw.mjs`

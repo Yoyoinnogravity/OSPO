@@ -112,7 +112,7 @@ vm.runInContext(`
   else { const _t = showToast; showToast = function(){}; }
 `, ctx);
 
-assert(/app\.js\?v=17\.36/.test(html), 'app.js cache bump 17.36 missing');
+assert(/app\.js\?v=17\.37/.test(html), 'app.js cache bump 17.37 missing');
 assert(src.includes('function _splitIntoSwathCount'), 'Number of Swaths must equal-split into exactly N bands');
 assert(/id="val-turn-radius">3\.5km/.test(html), 'toolbar RADIUS default must be 3.5km not 5.1');
 assert(/id="input-turn-radius" value="3500"/.test(html), 'turn-radius input default must be 3500 m');
@@ -121,6 +121,12 @@ assert(src.includes("createPane('routePane')"), 'planned route must have its own
 assert(src.includes('function _fitMapToPlannedRoute'), 'after a plan the map must fit to the vessel route');
 assert(src.includes('function dubinsMinRadiusFallback'), 'heading-change must not fall back to a straight chord');
 assert(src.includes('colour clock starts at first acquisition'), 'time colour must start at first lineStart t=0');
+assert(src.includes('function visitColorAtIdx'), 'route overlay must colour transits by survey time');
+assert(src.includes('function _buildRouteTimelineSegments'), 'timeline must build per-segment colours');
+assert(src.includes('data-timeline-seg'), 'timeline bar must paint per-segment time colours');
+assert(src.includes('Time-line colour is BINDING'), 'time-line colour lock comment missing');
+assert(!src.includes("color: '#ffcc33', weight: 2, opacity: 0.85"),
+  'unfocused run-out must keep time colour, not flat yellow');
 assert(src.includes(".addTo(layerRoute)"), 'Start/End markers must sit on the route layer');
 assert(!src.includes('else if (!surveyVisible)'), 'Show All must still paint on-line vessel track');
 assert(src.includes('Load a preplot first, then click Route Planning'), 'empty Plan Route must toast, not silent-return');
@@ -426,6 +432,25 @@ assert(col.total > 0 && col.t0 === 0, 'first line must sit at t=0, t0=' + col.t0
 assert(col.tZ > col.t0, 'last line must be later in time than the first');
 assert(col.a === 'rgb(255,69,58)', 'first line in time must be red, got ' + col.a);
 assert(col.z !== col.a, 'last line in time must not match the start colour');
+const tl = vm.runInContext(`
+  (function() {
+    const segs = _buildRouteTimelineSegments(state._lastRoute);
+    const lines = segs.filter(s => s.type === 'line');
+    const html = _routeTimelineTrackHtml(segs);
+    return {
+      n: segs.length,
+      nLines: lines.length,
+      first: lines[0] && lines[0].color,
+      last: lines.length ? lines[lines.length - 1].color : null,
+      htmlHasSeg: html.includes('data-timeline-seg'),
+      htmlHasRgb: /background:rgb\\(/.test(html)
+    };
+  })()
+`, ctx);
+assert(tl.nLines >= 2, 'timeline must have line segments, nLines=' + tl.nLines);
+assert(tl.first === 'rgb(255,69,58)', 'timeline first line must be red, got ' + tl.first);
+assert(tl.last && tl.last !== tl.first, 'timeline last line must not match start colour, got ' + tl.last);
+assert(tl.htmlHasSeg && tl.htmlHasRgb, 'timeline HTML must paint rgb segment colours');
 
 const turnGeom = vm.runInContext(`
   (function() {
@@ -684,7 +709,7 @@ assert(vm.runInContext('globalThis.__autoNs', ctx) === '6',
 
 console.log(JSON.stringify({
   ok: true,
-  cache: '17.36',
+  cache: '17.37',
   rule: '2D skip-k; 3D swath shooting (adjacent monopass, locked heading, stadium returns)',
   kNom,
   nn: { visit: nn.nVisit, mode: nn.stats.mode, ms: nn.ms },

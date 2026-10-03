@@ -114,21 +114,69 @@ assert(ctx._routeSegFocused(1, { startWpIdx: 2, endWpIdx: 5 }) === false, 'befor
 
 assert(!src.includes("color: '#ff9500', weight: 2.5, opacity: 0.85"),
   'old heavy orange transit stroke must be gone');
+assert(!src.includes("color: '#ffcc33', weight: 2, opacity: 0.85"),
+  'unfocused run-out must keep time colour, not flat yellow');
 assert(src.includes("_routeTransitOverviewStyle"), 'overview style helper missing');
+assert(src.includes('function visitColorAtIdx'), 'transits must take survey-time colour');
+assert(src.includes('_routeTransitOverviewStyle(tColor)'), 'overview transits must be passed time colour');
+assert(src.includes('function _buildRouteTimelineSegments'), 'timeline segment builder missing');
+assert(src.includes('data-timeline-seg'), 'timeline bar must paint per-segment colours');
+assert(src.includes('Time-line colour is BINDING'), 'time-line colour lock comment missing');
 assert(src.includes('function _fitMapToPlannedRoute'), 'plan must fit the map to the vessel route');
 assert(src.includes("mode: 'overview'"), 'plan/show-all must request overview drawing');
 assert(src.includes("mode: 'step'"), 'stepper must request step drawing');
 assert(!/const subset = state\.route\.slice/.test(src),
   'stepper must not slice the route (that hid context and still scribbled on Show All)');
 assert(html.includes('id="route-step-all-btn"'), 'Show All button needs an id');
-assert(/app\.js\?v=17\.36/.test(html), 'app.js cache bump missing');
+assert(/app\.js\?v=17\.37/.test(html), 'app.js cache bump missing');
 assert(/style\.min\.css\?v=3\.33/.test(html), 'css cache bump missing');
+
+const timed = ctx._routeTransitOverviewStyle('rgb(255,69,58)');
+assert(timed.color === 'rgb(255,69,58)', 'overview style must accept time colour, got ' + timed.color);
+
+const tlDemo = vm.runInContext(`
+  (function() {
+    state.settings = state.settings || {};
+    state.settings.speed = 4.5;
+    state.settings.turnSpeed = 6;
+    const wps = [
+      { type: 'lineStart', pt: [0, 0], lineName: 'A' },
+      { type: 'lineEnd', pt: [0.2, 0], lineName: 'A' },
+      { type: 'runOutEnd', pt: [0.22, 0], lineName: 'A' },
+      { type: 'runInStart', pt: [0.22, 0.02], lineName: 'B' },
+      { type: 'lineStart', pt: [0.2, 0.02], lineName: 'B' },
+      { type: 'lineEnd', pt: [0, 0.02], lineName: 'B' }
+    ];
+    const segs = _buildRouteTimelineSegments(wps);
+    const html = _routeTimelineTrackHtml(segs);
+    const v = _routeVisitOrder(wps);
+    return {
+      n: segs.length,
+      types: segs.map(s => s.type),
+      first: segs.find(s => s.type === 'line').color,
+      last: segs.filter(s => s.type === 'line').pop().color,
+      html: html,
+      t0: v.t0ByName.get('A'),
+      red: visitColorAtIdx(v, 0, 'A')
+    };
+  })()
+`, ctx);
+assert(tlDemo.types.includes('line') && tlDemo.types.includes('transit'),
+  'timeline must include line and transit segments, types=' + tlDemo.types);
+assert(tlDemo.first === 'rgb(255,69,58)', 'timeline first line must be red, got ' + tlDemo.first);
+assert(tlDemo.last !== tlDemo.first, 'timeline last line must not be the start colour');
+assert(tlDemo.html.includes('data-timeline-seg="line"'), 'timeline HTML missing line segs');
+assert(tlDemo.red === 'rgb(255,69,58)', 'visitColorAtIdx first line must be red, got ' + tlDemo.red);
+assert(tlDemo.t0 === 0, 'colour clock must start at first line, t0=' + tlDemo.t0);
 
 console.log(JSON.stringify({
   ok: true,
   overviewWeight: overview.weight,
   overviewColor: overview.color,
+  timedColor: timed.color,
   focusWeight: focus.weight,
   focusColor: focus.color,
+  timelineFirst: tlDemo.first,
+  timelineLast: tlDemo.last,
 }, null, 2));
 process.exit(0);
