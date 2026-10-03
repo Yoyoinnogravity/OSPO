@@ -10933,8 +10933,8 @@ function applyConfirmedSurveyPlanType(type) {
    state.settings.optimizerMode = state.settings.optimizerMode || 'deep';
   }
  } else {
-  // 3D Auto stays Auto: still swath shooting (adjacent blocks, locked heading),
-  // but the solver is free to pick the fastest swath-block order.
+  // 3D Auto stays Auto: still swath shooting (adjacent blocks, locked heading).
+  // Line Manager Priority and Survey Criteria win over fastest-tour search.
   if (prog === 'auto-nn') {
    prog = 'auto';
    state.settings.optimizerMode = 'nn';
@@ -12805,6 +12805,7 @@ function planSwathBlockRacetracks(lines, swaths, transitTimeSec, opts) {
  const userStartLocked = !!opts.userStartLocked;
  const forceStartSwath = opts.forceStartSwath;
  const swathDirs = opts.swathDirs || [];
+ const swathPrio = Array.isArray(opts.swathPrio) ? opts.swathPrio : null;
  const target = Math.max(1, opts.targetOptions || (typeof getSequenceBudget === 'function' ? getSequenceBudget() : 1500));
  const depotSec = typeof opts.depotSec === 'function' ? opts.depotSec : () => 0;
  const searchSwathOrder = !!opts.searchSwathOrder;
@@ -12817,6 +12818,16 @@ function planSwathBlockRacetracks(lines, swaths, transitTimeSec, opts) {
   for (let i = 0; i < active.length; i++) if (orderG.indexOf(active[i]) < 0) orderG.push(active[i]);
  } else {
   orderG = active.slice();
+ }
+ // Line Manager Priority: lower P acquired first. Keep neighbour blocks —
+ // only the swath visit order changes. An explicit start line still wins.
+ if (swathPrio && swathPrio.length) {
+  orderG.sort((a, b) => {
+   const pa = (typeof swathPrio[a] === 'number' && isFinite(swathPrio[a])) ? swathPrio[a] : 50;
+   const pb = (typeof swathPrio[b] === 'number' && isFinite(swathPrio[b])) ? swathPrio[b] : 50;
+   if (pa !== pb) return pa - pb;
+   return 0;
+  });
  }
  if (!searchSwathOrder && forceStartSwath >= 0 && orderG.indexOf(forceStartSwath) >= 0) {
   const i = orderG.indexOf(forceStartSwath);
@@ -12885,6 +12896,23 @@ function planSwathBlockRacetracks(lines, swaths, transitTimeSec, opts) {
   const nOri = orients.map(o => o.length);
   const INF = 1e18;
   const size = 1 << n;
+  const prioOfActive = (ai) => {
+   if (!swathPrio) return 50;
+   const p = swathPrio[active[ai]];
+   return (typeof p === 'number' && isFinite(p)) ? p : 50;
+  };
+  // Do not visit swath h while a still-unvisited swath has a strictly
+  // better (lower) Line Manager Priority. Equal P: Auto may still search.
+  const prioBlocksVisit = (h, mask) => {
+   if (!swathPrio) return false;
+   const ph = prioOfActive(h);
+   for (let g = 0; g < n; g++) {
+    if (g === h) continue;
+    if (mask & (1 << g)) continue;
+    if (prioOfActive(g) < ph) return true;
+   }
+   return false;
+  };
   const dp = new Array(size);
   const parent = new Array(size);
   for (let m = 0; m < size; m++) {
@@ -12898,6 +12926,7 @@ function planSwathBlockRacetracks(lines, swaths, transitTimeSec, opts) {
   for (let g = 0; g < n; g++) {
    if (forceStartSwath >= 0 && active[g] !== forceStartSwath) continue;
    if (userStartLocked && startIdx >= 0 && swaths[active[g]].indexOf(startIdx) < 0) continue;
+   if (forceStartSwath < 0 && !userStartLocked && prioBlocksVisit(g, 0)) continue;
    for (let o = 0; o < orients[g].length; o++) {
     const cand = orients[g][o];
     dp[1 << g][g][o] = cand.cost + depotSec(cand.first.lineIdx, cand.first.reversed);
@@ -12913,6 +12942,7 @@ function planSwathBlockRacetracks(lines, swaths, transitTimeSec, opts) {
      const last = orients[g][o].last;
      for (let h = 0; h < n; h++) {
       if (mask & (1 << h)) continue;
+      if (prioBlocksVisit(h, mask)) continue;
       const nmask = mask | (1 << h);
       for (let p = 0; p < orients[h].length; p++) {
        const cand = orients[h][p];
@@ -13234,6 +13264,21 @@ function computeRoute() {
    state.settings.startPoint || null);
  }
 
+ // Priority may choose which swath is acquired first (min P in the swath).
+ // Membership stays line-number / adjacent — never pull a P1 line into
+ // another swath. Auto may still search among equal-P swaths.
+ const swathPrio = swaths.map(sw => {
+  let m = 101;
+  for (let k = 0; k < sw.length; k++) {
+   const p = priorities[sw[k]];
+   if (p < m) m = p;
+  }
+  return sw.length ? m : 101;
+ });
+ if (priorities.some(p => p !== 50)) {
+  swathOrder = swathOrder.slice().sort((a, b) => swathPrio[a] - swathPrio[b] || a - b);
+ }
+
  const swDirsPlan = (state.settings.swathDirections || []);
  const model3d = buildTransitTimeModel(lines);
  const depotPt3d = (!startLineObj && state.settings.startPoint) ? state.settings.startPoint : null;
@@ -13250,6 +13295,7 @@ function computeRoute() {
   userStartLocked: !!startLineObj,
   forceStartSwath,
   swathOrder,
+  swathPrio,
   searchSwathOrder: is3dAuto && state.settings.optimizerMode !== 'nn',
   depotSec: depotSec3d,
   swathDirs: swaths.map((_, g) => swDirsPlan[g] || defaultSwathDirection(g))
@@ -13281,7 +13327,11 @@ function computeRoute() {
    capped: false
   };
  } else {
-  for (let g = 0; g < swaths.length; g++) indices.push.apply(indices, swaths[g]);
+  const visit = (swathOrder && swathOrder.length) ? swathOrder : swaths.map((_, g) => g);
+  for (let vi = 0; vi < visit.length; vi++) {
+   const g = visit[vi];
+   if (swaths[g] && swaths[g].length) indices.push.apply(indices, swaths[g]);
+  }
  }
  }
 
@@ -13949,15 +13999,13 @@ function computeRoute() {
  }
  }
 
- // GLOBAL PRIORITY PASS: acquisition priority (1 first ... 100 last, 50 =
- // Neutral) must be honoured in EVERY progression mode. The directional
- // progressions sort priority-first and the auto optimizer regroups, but the
- // 3D interleave optimizer and its round-robin fallback ordered purely by
- // transit time - silently ignoring priorities. Stable regroup here:
- // preserves the planner'order within each priority group, and a
- // user-locked start line / start point stays first.
- if (order.length > 1 && !swathRacetrackFilled && priorities.some(p =>p !== 50)) {
- const before = order.map(o =>o.lineIdx).join(',');
+ // GLOBAL PRIORITY PASS: 2D only. Directional progressions sort
+ // priority-first and Auto regroups into priority buckets. 3D already
+ // honours Line Manager Priority at swath-block level (which swath is
+ // first). Regrouping the whole 3D tour by per-line Priority would pull a
+ // P1 line out of its neighbour swath and break "line next to a line".
+ if (state.settings.surveyType !== '3d' && order.length > 1 &&
+  !swathRacetrackFilled && priorities.some(p =>p !== 50)) {
  const firstEntry = order[0];
  const regrouped = order.slice().sort((a, b) =>priorities[a.lineIdx] - priorities[b.lineIdx]);
  if ((startLineObj || state.settings.startPoint) && regrouped[0] !== firstEntry) {
@@ -13966,10 +14014,6 @@ function computeRoute() {
  }
  order.length = 0;
  order.push(...regrouped);
- if ((progression === 'interleaved' || progression === 'interleaved-reverse') &&
- order.map(o =>o.lineIdx).join(',') !== before) {
- showToast('Line priorities override swath interleave order for prioritized lines', 5000);
- }
  }
 
  // Initial acquisition directions are USER-DEFINED via the Survey Criteria

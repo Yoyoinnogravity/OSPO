@@ -112,7 +112,11 @@ vm.runInContext(`
   else { const _t = showToast; showToast = function(){}; }
 `, ctx);
 
-assert(/app\.js\?v=17\.32/.test(html), 'app.js cache bump 17.32 missing');
+assert(/app\.js\?v=17\.34/.test(html), 'app.js cache bump 17.34 missing');
+assert(src.includes('prioBlocksVisit'), '3D Auto must not visit a later-P swath before an earlier-P swath');
+assert(src.includes('swathPrio'), '3D must pass Line Manager Priority into swath-block order');
+assert(!src.includes('Line priorities override swath interleave order'),
+  '3D must not let Priority shred swath blocks');
 assert(/id="val-turn-radius">3\.5km/.test(html), 'toolbar RADIUS default must be 3.5km not 5.1');
 assert(/id="input-turn-radius" value="3500"/.test(html), 'turn-radius input default must be 3500 m');
 assert(!/value="5100"/.test(html), 'HTML must not default min turn radius to 5100');
@@ -265,6 +269,11 @@ function skipStats(ranks) {
 
 function plan(lines, extra) {
   setup(lines, extra);
+  if (extra && extra.linePriorities) {
+    for (const [id, p] of Object.entries(extra.linePriorities)) {
+      vm.runInContext(`state.lineStatus[${Number(id)}].priority = ${Number(p)}`, ctx);
+    }
+  }
   const t0 = Date.now();
   vm.runInContext('state._lastRoute = computeRoute()', ctx);
   const names = visitNames();
@@ -554,6 +563,59 @@ const tPrio = plan(makeGrid(12), { surveyType: '2d', progression: 'auto' });
 assert(tPrio.nVisit === 12, 'priority Auto must visit all 12');
 assert(src.includes('min="1" max="100"'), 'Line Manager UI 1-100 missing');
 
+function swathBlocksIntact(ranks, n, numSw) {
+  if (!ranks.length) return false;
+  let prev = swathOfRank(ranks[0], numSw, n);
+  const seen = new Set([prev]);
+  for (let i = 1; i < ranks.length; i++) {
+    const s = swathOfRank(ranks[i], numSw, n);
+    if (s === prev) continue;
+    if (seen.has(s)) return false;
+    seen.add(s);
+    prev = s;
+  }
+  return true;
+}
+function adjacentInsideSwath(ranks, n, numSw) {
+  for (let i = 1; i < ranks.length; i++) {
+    if (swathOfRank(ranks[i], numSw, n) !== swathOfRank(ranks[i - 1], numSw, n)) continue;
+    if (Math.abs(ranks[i] - ranks[i - 1]) !== 1) return false;
+  }
+  return true;
+}
+
+// Regression: 0154183 Auto DP searched any swath order and ignored Line Manager
+// Priority. User P1 on a later-swath line must acquire that whole neighbour
+// block first — not the fastest tour, not yanking the P1 line into swath 1.
+const n83 = 83, sw10 = 10;
+const t83 = plan(makeGrid(n83), {
+  surveyType: '3d',
+  progression: 'auto',
+  numSwaths: sw10,
+  linePriorities: { 81: 1 },
+});
+const r83 = t83.ranks;
+assert(r83.length === n83, '3D+priority Auto must visit all 83, got ' + r83.length);
+assert(swathBlocksIntact(r83, sw10, n83),
+  'P1 must not interleave swaths, first12=' + r83.slice(0, 12).join(','));
+assert(adjacentInsideSwath(r83, sw10, n83),
+  'inside a swath still neighbour-to-neighbour with Priority set');
+assert(r83.slice(0, 2).every((r) => swathOfRank(r, sw10, n83) === swathOfRank(81, sw10, n83)),
+  'P1 swath must be acquired first as a block, first=' + r83.slice(0, 4).join(','));
+assert(!(r83[0] === 81 && swathOfRank(r83[1], sw10, n83) === 0),
+  'P1 line 81 must not be yanked out of its swath into swath 1');
+
+const t83Int = plan(makeGrid(n83), {
+  surveyType: '3d',
+  progression: 'interleaved',
+  numSwaths: sw10,
+  linePriorities: { 81: 1 },
+});
+assert(swathBlocksIntact(t83Int.ranks, sw10, n83),
+  'interleaved+P1 must keep swath blocks, first12=' + t83Int.ranks.slice(0, 12).join(','));
+assert(t83Int.ranks.slice(0, 2).every((r) => swathOfRank(r, sw10, n83) === swathOfRank(81, sw10, n83)),
+  'interleaved P1 swath must still be first');
+
 // User-elected swath count must survive leftover Swath Width (map spinner / Criteria).
 setup(makeGrid(12), {
   surveyType: '3d',
@@ -615,7 +677,7 @@ assert(vm.runInContext('globalThis.__autoNs', ctx) === '6',
 
 console.log(JSON.stringify({
   ok: true,
-  cache: '17.32',
+  cache: '17.34',
   rule: '2D skip-k; 3D swath shooting (adjacent monopass, locked heading, stadium returns)',
   kNom,
   nn: { visit: nn.nVisit, mode: nn.stats.mode, ms: nn.ms },
