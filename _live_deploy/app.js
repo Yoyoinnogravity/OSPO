@@ -394,6 +394,7 @@ const state = {
  streamerSeparation: 100, // metres between streamers
  swathWidth: 0, // metres (0 = auto-detect from line spacing)
  numSwaths: 2,
+ // User-requested Number of Swaths is BINDING. Engagement/ranking MUST NOT rewrite N.
  swathCountUserSet: false, // true once the user picks a swath count; Auto must not clobber it
  swathDirections: [],
  swathUnit: 'm',
@@ -8247,6 +8248,7 @@ function renderSurveyLines() {
 // split by Number of Swaths. Never skip-k / every-Nth — a swath is adjacent.
 function _effectiveLinesPerSwath(lines) {
  const s = state.settings || {};
+ // User-requested Number of Swaths is BINDING. Engagement/ranking MUST NOT rewrite N.
  // User picked Number of Swaths (map spinner or typed in Criteria). That
  // election wins: equal adjacent bands, not a leftover width from Auto.
  if (s.swathCountUserSet) return 0;
@@ -8281,6 +8283,7 @@ function _sortLineIdxForSwaths(lines, progression, lineNumKey, midpoints) {
 }
 
 // Partition adjacent lines into exactly min(N, nLines) non-empty groups.
+// User-requested Number of Swaths is BINDING. Engagement/ranking MUST NOT rewrite N.
 // Fixed ceil(n/N) left empty tail slots (12 lines / 5 swaths → 4 bands).
 function _splitIntoSwathCount(sortedIdx, nSw) {
  const n = sortedIdx.length;
@@ -13235,6 +13238,7 @@ function computeRoute() {
  // line swaths as blocks, one heading per swath. Skip-k racetrack is 2D only.
  if (state.settings.surveyType === '3d' && !swathRacetrackFilled) {
  const bandIdx = _sortLineIdxForSwaths(lines, progression, lineNumKey, midpoints);
+ // User-requested Number of Swaths is BINDING. Engagement/ranking MUST NOT rewrite N.
  const swaths = _sliceAdjacentSwaths(bandIdx, lines, { numSwaths: state.settings.numSwaths || 2 });
  if (progression === 'interleaved-reverse') swaths.forEach(s => s.reverse());
 

@@ -1,0 +1,16 @@
+---
+description: User Number of Swaths is binding — do not rewrite N
+alwaysApply: true
+---
+
+# Number of Swaths (N) is binding
+
+User-requested Number of Swaths is BINDING. Engagement/ranking MUST NOT rewrite N.
+
+Aled already fixed this. Do not "optimize" the count for a faster tour, even
+swath pairs, leftover Swath Width, or engagement ranking. If the user asked
+for N swaths, the plan has N adjacent bands (when there are at least N sail
+lines). Those bands ARE how the route is mapped. Auto must not search other
+values of N and must not permute swath-block order for time or engagement.
+
+Regression: `node _live_deploy/test-route-solver.mjs`
