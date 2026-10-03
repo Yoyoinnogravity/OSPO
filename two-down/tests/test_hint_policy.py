@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from twodown.config import HINT_LINE, HINT_MISS, PACKAGE_ROOT, PINUP_SLUG, STUDY_SLUG
-from twodown.hints import AIM, AUTHOR, BRING, BUTTERFLY, CLOSE_ENOUGH, COCKTAIL, COLE, CROSS, DAVIS, DEFAULT_HINT, FATS, FIELD, GLOBE, HUMOUR, MODEL, PAPERS, PORTER, PUDDING, RASTA, SEMICONDUCTOR, SMILES, STANDING, STARCH, TRANCE, USA, VEGETABLE, WELLINGTON, attach_hint, match_hint
+from twodown.hints import AIM, AUTHOR, BAYS, BOAT, BRING, BUTTERFLY, CAFE, CLOSE_ENOUGH, COCKTAIL, COLE, CROSS, DAVIS, DEFAULT_HINT, FATS, FIELD, GLOBE, HUMOUR, LEATHER, MODEL, PAPERS, PORTER, PUDDING, RASTA, RESTAURANT, SEAFOOD, SEMICONDUCTOR, SMILES, STANDING, STARCH, STEPS, TRANCE, TREASURE, USA, VEGETABLE, WELLINGTON, attach_hint, match_hint
 from twodown.models import Clue
 from twodown.pipeline import aimlessly_clue, cole_clue, davis_cup_clue, dreamlike_clue, fats_clue, mass_media_clue, published_clue, rasta_clue, smiles_clue, study_clue, wellington_clue
 
@@ -352,6 +352,14 @@ def test_new_daily_definitions_get_unique_generated_stills():
         ("Starch", STARCH, "CASSAVA"),
         ("pudding", PUDDING, "MOUSSE"),
         ("Cocktail", COCKTAIL, "MARTINI"),
+        ("café", CAFE, "BISTRO"),
+        ("seafood", SEAFOOD, "SHRIMP"),
+        ("leather", LEATHER, "BUCKSKIN"),
+        ("treasure", TREASURE, "HOARD"),
+        ("boat", BOAT, "YACHT"),
+        ("Steps", STEPS, "STAIRCASE"),
+        ("restaurant", RESTAURANT, "BRASSERIE"),
+        ("bays", BAYS, "GARLAND"),
     )
     images = []
     for definition, photo, answer in pairs:

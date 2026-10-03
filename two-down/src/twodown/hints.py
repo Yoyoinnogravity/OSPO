@@ -617,6 +617,95 @@ COCKTAIL = HintPhoto(
 )
 
 
+
+# Definition still for BISTRO: a café. Never print BISTRO.
+CAFE = HintPhoto(
+    slug="cafe-still",
+    label="Café",
+    source="generated still",
+    license="generated",
+    filename="cafe-still.webp",
+    keywords=frozenset({"cafe", "caf", "coffeehouse"}),
+)
+
+
+# Definition still for SHRIMP: seafood. Never print SHRIMP.
+SEAFOOD = HintPhoto(
+    slug="seafood-still",
+    label="Seafood",
+    source="generated still",
+    license="generated",
+    filename="seafood-still.webp",
+    keywords=frozenset({"seafood", "shellfish"}),
+)
+
+
+# Definition still for BUCKSKIN: leather. Never print BUCKSKIN.
+LEATHER = HintPhoto(
+    slug="leather-still",
+    label="Leather",
+    source="generated still",
+    license="generated",
+    filename="leather-still.webp",
+    keywords=frozenset({"leather", "hide"}),
+)
+
+
+# Definition still for HOARD: treasure. Never print HOARD.
+TREASURE = HintPhoto(
+    slug="treasure-still",
+    label="Treasure",
+    source="generated still",
+    license="generated",
+    filename="treasure-still.webp",
+    keywords=frozenset({"treasure", "trove"}),
+)
+
+
+# Definition still for YACHT: a boat. Never print YACHT.
+BOAT = HintPhoto(
+    slug="boat-still",
+    label="Boat",
+    source="generated still",
+    license="generated",
+    filename="boat-still.webp",
+    keywords=frozenset({"boat", "vessel"}),
+)
+
+
+# Definition still for STAIRCASE: steps. Never print STAIRCASE.
+STEPS = HintPhoto(
+    slug="steps-still",
+    label="Steps",
+    source="generated still",
+    license="generated",
+    filename="steps-still.webp",
+    keywords=frozenset({"step", "steps", "stair", "stairs"}),
+)
+
+
+# Definition still for BRASSERIE: a restaurant. Never print BRASSERIE.
+RESTAURANT = HintPhoto(
+    slug="restaurant-still",
+    label="Restaurant",
+    source="generated still",
+    license="generated",
+    filename="restaurant-still.webp",
+    keywords=frozenset({"restaurant", "dining"}),
+)
+
+
+# Definition still for GARLAND: bays. Never print GARLAND.
+BAYS = HintPhoto(
+    slug="bays-still",
+    label="Bays",
+    source="generated still",
+    license="generated",
+    filename="bays-still.webp",
+    keywords=frozenset({"bays", "laurel", "wreath"}),
+)
+
+
 # Commons alternate: imperial Ethiopian / Rastafari Lion of Judah flag.
 LION = HintPhoto(
     slug="lion-of-judah",
@@ -662,6 +751,14 @@ PHOTOS: dict[str, HintPhoto] = {
     STARCH.slug: STARCH,
     PUDDING.slug: PUDDING,
     COCKTAIL.slug: COCKTAIL,
+    CAFE.slug: CAFE,
+    SEAFOOD.slug: SEAFOOD,
+    LEATHER.slug: LEATHER,
+    TREASURE.slug: TREASURE,
+    BOAT.slug: BOAT,
+    STEPS.slug: STEPS,
+    RESTAURANT.slug: RESTAURANT,
+    BAYS.slug: BAYS,
     LION.slug: LION,
     "dreamlike": TRANCE,
     "trance": TRANCE,
@@ -770,6 +867,31 @@ PHOTOS: dict[str, HintPhoto] = {
     "cocktails": COCKTAIL,
     "martini": COCKTAIL,
     "financial-times-18494-1a": COCKTAIL,
+    "cafe": CAFE,
+    "caf": CAFE,
+    "bistro": CAFE,
+    "independent-12477-6a": CAFE,
+    "seafood": SEAFOOD,
+    "shrimp": SEAFOOD,
+    "independent-12477-11a": SEAFOOD,
+    "leather": LEATHER,
+    "buckskin": LEATHER,
+    "independent-12476-1a": LEATHER,
+    "treasure": TREASURE,
+    "hoard": TREASURE,
+    "independent-12476-12a": TREASURE,
+    "boat": BOAT,
+    "yacht": BOAT,
+    "financial-times-18495-19a": BOAT,
+    "steps": STEPS,
+    "staircase": STEPS,
+    "financial-times-18495-11a": STEPS,
+    "restaurant": RESTAURANT,
+    "brasserie": RESTAURANT,
+    "guardian-30127-28a": RESTAURANT,
+    "bays": BAYS,
+    "garland": BAYS,
+    "guardian-30127-16a": BAYS,
 }
 
 # No leftover still. Trance / the sleeping woman is only for trance or dream clues.
@@ -783,7 +905,8 @@ def _catalog() -> tuple[HintPhoto, ...]:
         TRANCE, MOONLIT, RASTA, FATS, WELLINGTON, COLE, SMILES, DAVIS, AIM, PAPERS,
         BRING, USA, MODEL, AUTHOR, MAKEUP, CRASH, CAPSULE, FIELD, GLOBE, WEEKLY, CROSS,
         UPROOT, TIPS, PORTER, XYZ, HUMOUR, VEGETABLE, SEMICONDUCTOR, STANDING,
-        BUTTERFLY, STARCH, PUDDING, COCKTAIL, LION,
+        BUTTERFLY, STARCH, PUDDING, COCKTAIL, CAFE, SEAFOOD, LEATHER, TREASURE,
+        BOAT, STEPS, RESTAURANT, BAYS, LION,
     )
 
 
@@ -1376,6 +1499,85 @@ def _generate_cocktail_still(dest: Path) -> Path:
     return dest
 
 
+
+def _generate_cafe_still(dest: Path) -> Path:
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    img = Image.new("RGB", (1280, 720), (212, 176, 128))
+    draw = ImageDraw.Draw(img)
+    draw.rectangle((0, 420, 1280, 720), fill=(168, 132, 88))
+    draw.ellipse((180, 360, 420, 520), fill=(236, 228, 212))
+    img.save(dest, "WEBP", quality=82, method=6)
+    return dest
+
+
+def _generate_seafood_still(dest: Path) -> Path:
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    img = Image.new("RGB", (1280, 720), (188, 208, 220))
+    draw = ImageDraw.Draw(img)
+    draw.ellipse((220, 180, 520, 420), fill=(232, 140, 120))
+    draw.ellipse((780, 160, 1100, 440), fill=(244, 168, 140))
+    img.save(dest, "WEBP", quality=82, method=6)
+    return dest
+
+
+def _generate_leather_still(dest: Path) -> Path:
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    img = Image.new("RGB", (1280, 720), (88, 56, 32))
+    draw = ImageDraw.Draw(img)
+    draw.polygon([(180, 160), (1040, 120), (1160, 560), (120, 620)], fill=(168, 112, 64))
+    img.save(dest, "WEBP", quality=82, method=6)
+    return dest
+
+
+def _generate_treasure_still(dest: Path) -> Path:
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    img = Image.new("RGB", (1280, 720), (36, 24, 16))
+    draw = ImageDraw.Draw(img)
+    draw.rectangle((280, 280, 1000, 640), fill=(120, 72, 28))
+    draw.ellipse((360, 160, 920, 420), fill=(220, 176, 48))
+    img.save(dest, "WEBP", quality=82, method=6)
+    return dest
+
+
+def _generate_boat_still(dest: Path) -> Path:
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    img = Image.new("RGB", (1280, 720), (72, 148, 196))
+    draw = ImageDraw.Draw(img)
+    draw.rectangle((0, 400, 1280, 720), fill=(28, 72, 128))
+    draw.polygon([(360, 400), (980, 400), (860, 500), (420, 500)], fill=(248, 248, 244))
+    img.save(dest, "WEBP", quality=82, method=6)
+    return dest
+
+
+def _generate_steps_still(dest: Path) -> Path:
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    img = Image.new("RGB", (1280, 720), (188, 176, 160))
+    draw = ImageDraw.Draw(img)
+    draw.polygon([(80, 680), (520, 80), (760, 80), (1200, 680)], fill=(220, 208, 188))
+    img.save(dest, "WEBP", quality=82, method=6)
+    return dest
+
+
+def _generate_restaurant_still(dest: Path) -> Path:
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    img = Image.new("RGB", (1280, 720), (48, 32, 24))
+    draw = ImageDraw.Draw(img)
+    draw.rectangle((160, 360, 480, 620), fill=(244, 236, 220))
+    draw.rectangle((720, 360, 1080, 620), fill=(244, 236, 220))
+    img.save(dest, "WEBP", quality=82, method=6)
+    return dest
+
+
+def _generate_bays_still(dest: Path) -> Path:
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    img = Image.new("RGB", (1280, 720), (236, 228, 208))
+    draw = ImageDraw.Draw(img)
+    draw.ellipse((360, 80, 920, 640), fill=(48, 104, 52))
+    draw.ellipse((480, 200, 800, 520), fill=(236, 228, 208))
+    img.save(dest, "WEBP", quality=82, method=6)
+    return dest
+
+
 def ensure_hint_photo(photo: HintPhoto | None = None) -> Path:
     if photo is None:
         raise ValueError("no hint photo to ensure — DEFAULT is not a leftover still")
@@ -1418,6 +1620,14 @@ def ensure_hint_photo(photo: HintPhoto | None = None) -> Path:
         STARCH.slug: _generate_starch_still,
         PUDDING.slug: _generate_pudding_still,
         COCKTAIL.slug: _generate_cocktail_still,
+        CAFE.slug: _generate_cafe_still,
+        SEAFOOD.slug: _generate_seafood_still,
+        LEATHER.slug: _generate_leather_still,
+        TREASURE.slug: _generate_treasure_still,
+        BOAT.slug: _generate_boat_still,
+        STEPS.slug: _generate_steps_still,
+        RESTAURANT.slug: _generate_restaurant_still,
+        BAYS.slug: _generate_bays_still,
     }
     generate = generators.get(photo.slug)
     if generate is not None:
