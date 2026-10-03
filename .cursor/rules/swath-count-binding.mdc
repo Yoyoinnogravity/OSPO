@@ -13,4 +13,8 @@ for N swaths, the plan has N adjacent bands (when there are at least N sail
 lines). Those bands ARE how the route is mapped. Auto must not search other
 values of N and must not permute swath-block order for time or engagement.
 
+A swath is neighbouring sail lines across-track, drawn with cyan dashed
+delimitation and a SWATH n label on that band. Not a heading chip.
+Line colour is the time rainbow, not a yellow fill of the whole grid.
+
 Regression: `node _live_deploy/test-route-solver.mjs`

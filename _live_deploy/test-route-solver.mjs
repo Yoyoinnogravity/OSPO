@@ -112,7 +112,7 @@ vm.runInContext(`
   else { const _t = showToast; showToast = function(){}; }
 `, ctx);
 
-assert(/app\.js\?v=17\.39/.test(html), 'app.js cache bump 17.39 missing');
+assert(/app\.js\?v=17\.40/.test(html), 'app.js cache bump 17.40 missing');
 assert(src.includes('function _crossLineWidthM'), '3D sq km helper missing');
 assert(src.includes('Sq km formula Aled set'), 'sq km lock comment missing');
 assert(src.includes('(n * sep) / 2'), 'sq km must use (numStreamers × streamerSeparation / 2)');
@@ -125,14 +125,19 @@ assert(src.includes("createPane('routePane')"), 'planned route must have its own
 assert(src.includes('function _fitMapToPlannedRoute'), 'after a plan the map must fit to the vessel route');
 assert(src.includes('function dubinsMinRadiusFallback'), 'heading-change must not fall back to a straight chord');
 assert(src.includes('colour clock starts at first acquisition'), 'time colour must start at first lineStart t=0');
-assert(src.includes('function visitColorAtIdx'), 'route overlay must colour transits by survey time');
+assert(src.includes('A swath is not a Low'), 'swath overlay must not be a heading chip');
+assert(src.includes('SWATH ${g + 1}</div>'), 'swath label must be SWATH n only');
+assert(!src.includes('High\\u2192Low SP'), 'map swath chips must not say High→Low SP');
+assert(src.includes('function _acrossTrackKey'), 'swath bands must sort across-track');
 assert(src.includes('function _buildRouteTimelineSegments'), 'timeline must build per-segment colours');
 assert(src.includes('data-timeline-seg'), 'timeline bar must paint per-segment time colours');
 assert(src.includes('Time-line colour is BINDING'), 'time-line colour lock comment missing');
 assert(!src.includes("color: '#ffcc33', weight: 2, opacity: 0.85"),
   'unfocused run-out must keep time colour, not flat yellow');
 assert(src.includes(".addTo(layerRoute)"), 'Start/End markers must sit on the route layer');
-assert(!src.includes('else if (!surveyVisible)'), 'Show All must still paint on-line vessel track');
+assert(src.includes('it is a RAINBOW'), 'time colour must be a rainbow, not a yellow wash');
+assert(src.includes('r: 191, g: 90, b: 242'), 'rainbow must end in violet');
+assert(src.includes('Even rainbow across sail-line visit order'), 'line colours must spread across the rainbow');
 assert(src.includes('Load a preplot first, then click Route Planning'), 'empty Plan Route must toast, not silent-return');
 assert(src.includes('if (showStartLineChooser()) return'), 'chooser miss must still executePlanRoute');
 assert(html.includes('1500 sequences, keep the fastest'), 'chooser Auto must score 1500 then keep the fastest');
@@ -212,6 +217,7 @@ function setup(lines, extra) {
     state.settings.startLineReversed = false;
     state.settings.startConfigured = true;
     state.settings.numSwaths = ${extra.numSwaths == null ? 2 : extra.numSwaths};
+    state.settings.swathCountUserSet = ${extra.swathCountUserSet ? 'true' : 'false'};
     state.settings.swathUnit = ${JSON.stringify(extra.swathUnit || 'm')};
     state.settings.swathRawValue = ${extra.swathRawValue ?? 0};
     state.settings.swathWidth = ${extra.swathWidth ?? 0};
@@ -480,6 +486,53 @@ assert(Math.abs(area.w - area.gridW) > 50, 'sq km must not use preplot grid spac
 assert(area.sqKm > 78 && area.sqKm < 82,
   '10 × ~20 km × 400 m must be ~80 km2, got ' + area.sqKm);
 
+const rain = vm.runInContext(`
+  (function() {
+    return {
+      a: timeGradientColor(0),
+      y: timeGradientColor(0.33),
+      g: timeGradientColor(0.5),
+      c: timeGradientColor(0.66),
+      z: timeGradientColor(1)
+    };
+  })()
+`, ctx);
+assert(rain.a === 'rgb(255,69,58)', 'rainbow start must be red, got ' + rain.a);
+assert(rain.z === 'rgb(191,90,242)', 'rainbow end must be violet, got ' + rain.z);
+assert(rain.g === 'rgb(48,209,88)', 'rainbow mid must be green, got ' + rain.g);
+assert(rain.c === 'rgb(0,210,255)', 'rainbow must pass through cyan, got ' + rain.c);
+assert(rain.y !== rain.g && rain.g !== rain.z, 'rainbow must not collapse to yellow');
+
+const named = makeGrid(10, 250, 20000);
+named.forEach((l, i) => { l.name = 'L' + (i % 2 === 0 ? (10 + i) : (100 + i)); });
+const bands = vm.runInContext(`
+  (function() {
+    const lines = ${JSON.stringify(named)};
+    state.lines = lines;
+    state._allLines = lines;
+    state.settings.numSwaths = 2;
+    state.settings.swathCountUserSet = true;
+    state.settings.swathRawValue = 0;
+    state.settings.swathWidth = 0;
+    const g = _computeSwathGroups(2, 'low-high');
+    const ids = g.map(grp => grp.map(l => l.id).sort((a, b) => a - b));
+    return {
+      n: g.length,
+      na: g[0].length,
+      nb: g[1].length,
+      a: ids[0],
+      b: ids[1],
+      aSpan: ids[0][ids[0].length - 1] - ids[0][0],
+      bSpan: ids[1][ids[1].length - 1] - ids[1][0]
+    };
+  })()
+`, ctx);
+assert(bands.n === 2, '2 swaths must draw 2 bands, n=' + bands.n);
+assert(bands.na === 5 && bands.nb === 5, '10 lines / 2 swaths must be 5+5, got ' + bands.na + '+' + bands.nb);
+assert(bands.aSpan === 4 && bands.bSpan === 4,
+  'swaths must be adjacent across-track halves, not name-interleaved, a=' + bands.a + ' b=' + bands.b);
+vm.runInContext('state.settings.swathCountUserSet = false;', ctx);
+
 const turnGeom = vm.runInContext(`
   (function() {
     state.settings.turnRadius = 3500;
@@ -737,7 +790,7 @@ assert(vm.runInContext('globalThis.__autoNs', ctx) === '6',
 
 console.log(JSON.stringify({
   ok: true,
-  cache: '17.39',
+  cache: '17.40',
   rule: '2D skip-k; 3D swath shooting (adjacent monopass, locked heading, stadium returns)',
   kNom,
   nn: { visit: nn.nVisit, mode: nn.stats.mode, ms: nn.ms },

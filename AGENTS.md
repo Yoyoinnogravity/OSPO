@@ -8,14 +8,23 @@ User-requested Number of Swaths is BINDING. Engagement/ranking MUST NOT rewrite 
 
 This is already documented in `_live_deploy/app.js` (comments on `_effectiveLinesPerSwath`, `_splitIntoSwathCount`, and 3D route mapping). Do not remove those comments, reintroduce ceil(n/N) empty-tail grouping that drops bands, or DP-permute swath order for a faster tour. The on-map N bands are the route.
 
+A swath is a contiguous **across-track** band of neighbouring sail lines.
+Map it with cyan dashed delimitation and a `SWATH n` label on that band.
+Do not redefine a swath as a Low→High heading chip. Line colour is the
+time rainbow.
+
 Always-on Cursor rule: `.cursor/rules/swath-count-binding.mdc`
 
 ## Time-line colour
 
-Time-line colour is BINDING. Red at first acquisition, green at last. The
-planned route overlay and the bottom timeline bar must both show that
-sequence. Do not flatten transits, run-out, or the timeline to a single
-yellow/overview stroke for "readability" or engagement.
+Time-line colour is BINDING and it is a **rainbow**. Red at first
+acquisition, then orange, yellow, green, cyan, blue, violet at last.
+Sail lines, transits, and the bottom timeline all use that sequence.
+
+Do not collapse it to a yellow wash, a single overview stroke, or a flat
+green preplot. Show All must not duplicate every sail line on top of the
+rainbow preplot (that hides swath delimitation). Step/focus still lights
+the current line.
 
 Always-on Cursor rule: `.cursor/rules/timeline-colours.mdc`
 

@@ -737,7 +737,8 @@ function initLeafletMap() {
 
  if (!map.getPane('swathPane')) {
   map.createPane('swathPane');
-  map.getPane('swathPane').style.zIndex = 350; // under survey-line overlay (400)
+  // Above the preplot (400) so cyan delimitation is visible; below the route (450).
+  map.getPane('swathPane').style.zIndex = 425;
  }
  if (!map.getPane('routePane')) {
   map.createPane('routePane');
@@ -8129,6 +8130,7 @@ function renderSurveyLines() {
  const visit = (typeof _routeVisitOrder === 'function') ? _routeVisitOrder() : { byName: new Map(), n: 0 };
  allLines.forEach((line, idx) => {
  const ls = (state.lineStatus && state.lineStatus[line.id]) || { status: 'planned' };
+ // Rainbow along visit order — agreed. Not a yellow wash, not a flat green preplot.
  let lineColor = visit.n
   ? visitColorForLine(line.name, visit)
   : '#00ff88';
@@ -8263,12 +8265,20 @@ function _effectiveLinesPerSwath(lines) {
  return 0;
 }
 
-// Canonical across-track order so Swath 1 is always the low / west / south
-// adjacent bundle. Visit direction is applied afterwards, not by reversing
-// membership.
+// Signed distance of a line's midpoint along the across-track axis (perp to
+// the first sail line). Neighbouring lines sort next to each other.
+function _acrossTrackKey(line, refMid, perpBrg) {
+ const mid = [(line.start[0] + line.end[0]) / 2, (line.start[1] + line.end[1]) / 2];
+ const d = haversine(refMid, mid);
+ if (!(d > 0)) return 0;
+ const rad = ((bearing(refMid, mid) - perpBrg) * Math.PI) / 180;
+ return d * Math.cos(rad);
+}
+
+// Canonical across-track order so Swath 1 is the first adjacent bundle.
+// A swath is neighbouring sail lines, not a heading and not a P1 name sort.
 function _sortLineIdxForSwaths(lines, progression, lineNumKey, midpoints) {
  const indices = lines.map((_, i) => i);
- const key = (i) => (lineNumKey && lineNumKey[i] != null) ? lineNumKey[i] : i;
  const mid = (i) => midpoints[i] || [
   (lines[i].start[0] + lines[i].end[0]) / 2,
   (lines[i].start[1] + lines[i].end[1]) / 2
@@ -8277,7 +8287,16 @@ function _sortLineIdxForSwaths(lines, progression, lineNumKey, midpoints) {
   indices.sort((a, b) => mid(a)[1] - mid(b)[1]);
  } else if (progression === 'south-north' || progression === 'north-south') {
   indices.sort((a, b) => mid(a)[0] - mid(b)[0]);
+ } else if (lines.length && lines[0] && lines[0].start && lines[0].end) {
+  const ref = mid(0);
+  const perp = (bearing(lines[0].start, lines[0].end) + 90) % 360;
+  indices.sort((a, b) => _acrossTrackKey(lines[a], ref, perp) - _acrossTrackKey(lines[b], ref, perp));
+  const key = (i) => (lineNumKey && lineNumKey[i] != null) ? lineNumKey[i] : i;
+  if (indices.length >= 2 && key(indices[0]) > key(indices[indices.length - 1])) {
+   indices.reverse();
+  }
  } else {
+  const key = (i) => (lineNumKey && lineNumKey[i] != null) ? lineNumKey[i] : i;
   indices.sort((a, b) => key(a) - key(b));
  }
  return indices;
@@ -8422,7 +8441,9 @@ function _swathBandLatLngs(grp) {
  return [a.start, a.end, bEnd, bStart];
 }
 
-// Draw filled 3D swath bands on the preplot, plus a SWATH n label on each band.
+// Draw 3D swath bands: adjacent sail-line groups, cyan dashed delimitation,
+// and a SWATH n label on that band. A swath is not a Low→High heading chip
+// in the middle of the grid. Line colour is the time rainbow.
 function renderSwathOverlays() {
  if (!layerSwaths) return;
  layerSwaths.clearLayers();
@@ -8433,7 +8454,6 @@ function renderSwathOverlays() {
  const progression = s.progression || 'low-high';
  const groups = _computeSwathGroups(numSwaths, progression);
  if (groups.length < 1) return;
- const swathDirections = s.swathDirections || [];
  const paneOpts = (typeof map !== 'undefined' && map && map.getPane && map.getPane('swathPane'))
   ? { pane: 'swathPane' } : {};
 
@@ -8443,22 +8463,21 @@ function renderSwathOverlays() {
  const ring = _swathBandLatLngs(grp);
  if (ring) {
   L.polygon(ring, Object.assign({
-   color, weight: 1.6, opacity: 0.85,
-   fillColor: color, fillOpacity: 0.22,
+   color: '#00d2ff', weight: 1.4, opacity: 0.9, dashArray: '10,8',
+   fillColor: color, fillOpacity: 0.04,
    interactive: false
   }, paneOpts)).addTo(layerSwaths);
  }
  let latSum = 0, lonSum = 0;
  grp.forEach(l => { latSum += (l.start[0] + l.end[0]) / 2; lonSum += (l.start[1] + l.end[1]) / 2; });
  const centre = [latSum / grp.length, lonSum / grp.length];
- const dir = swathDirections[g] || defaultSwathDirection(g);
- const dirTxt = dir === 'high-low' ? 'High\u2192Low SP' : 'Low\u2192High SP';
  L.marker(centre, {
   interactive: false,
   icon: L.divIcon({
    className: '',
-   html: `<div style="background:rgba(4,16,30,0.88);border:1px solid ${color};color:${color};font-size:11px;font-weight:700;padding:2px 7px;border-radius:3px;white-space:nowrap;text-shadow:1px 1px 2px #000;pointer-events:none;transform:translate(-50%,-50%);">SWATH ${g + 1}<span style="color:#9fb2c4;font-weight:400;font-size:9px;"> \u00b7 ${dirTxt}</span></div>`,
-   iconAnchor: [0, 0]
+   iconSize: [0, 0],
+   iconAnchor: [0, 0],
+   html: `<div style="background:rgba(4,16,30,0.88);border:1px solid #00d2ff;color:#00d2ff;font-size:11px;font-weight:700;padding:2px 7px;border-radius:3px;white-space:nowrap;text-shadow:1px 1px 2px #000;pointer-events:none;transform:translate(-50%,-50%);">SWATH ${g + 1}</div>`
   })
  }).addTo(layerSwaths);
  });
@@ -14572,16 +14591,19 @@ function computeDubinsTransitDist(waypoints, startIdx, endIdx) {
 }
 
 // ===== RENDER ROUTE =====
-// Time-line colour is BINDING. Red at first acquisition, green at last.
-// Do not flatten the planned route or the bottom timeline to a single
-// yellow/overview stroke for "readability" or engagement. N swaths map the
-// route; this colour is how the route is read in time.
+// Time-line colour is BINDING and it is a RAINBOW. We agreed: red at first
+// acquisition, then orange, yellow, green, cyan, blue, violet at last.
+// Do not collapse this to a yellow wash, a single overview stroke, or a
+// flat green preplot. Sail lines, transits, and the timeline all use it.
 function timeGradientColor(fraction) {
  const stops = [
- { t: 0.0, r: 255, g: 69, b: 58 }, // #ff453a red (start)
- { t: 0.35, r: 255, g: 149, b: 0 }, // #ff9500 orange
- { t: 0.65, r: 255, g: 214, b: 10 }, // #ffd60a yellow
- { t: 1.0, r: 48, g: 209, b: 88 } // #30d158 green (end)
+ { t: 0.00, r: 255, g: 69, b: 58 },   // red
+ { t: 0.16, r: 255, g: 149, b: 0 },   // orange
+ { t: 0.33, r: 255, g: 214, b: 10 },  // yellow
+ { t: 0.50, r: 48, g: 209, b: 88 },   // green
+ { t: 0.66, r: 0, g: 210, b: 255 },   // cyan
+ { t: 0.83, r: 64, g: 156, b: 255 },  // blue
+ { t: 1.00, r: 191, g: 90, b: 242 }   // violet
  ];
  const f = Math.max(0, Math.min(1, fraction));
  let lo = stops[0], hi = stops[stops.length - 1];
@@ -14634,11 +14656,9 @@ function _routeVisitOrder(waypoints) {
 
 function visitColorForLine(lineName, visit) {
  if (!visit || !visit.n) return '#00ff88';
- if (visit.t0ByName && visit.totalSec > 0 && visit.t0ByName.has(lineName)) {
-  return timeGradientColor(visit.t0ByName.get(lineName) / visit.totalSec);
- }
  const i = visit.byName.get(lineName);
  if (i == null) return '#8a9bb0';
+ // Even rainbow across sail-line visit order so 80 lines are not all yellow.
  return timeGradientColor(visit.n <= 1 ? 0 : i / (visit.n - 1));
 }
 
@@ -14814,10 +14834,10 @@ function renderRoute(waypoints, opts) {
  const pts = waypoints.map(w => w.pt);
  let startPt = null, endPt = null;
 
- // Always draw the vessel sail: on-line, run-in/out, and Dubins line-change
- // turns. Skipping on-line because the preplot exists left Show All blank;
- // the U-turns sit past run-out, so they must stay painted and the map
- // must fit to them after a plan.
+ // Overview: preplot already shows sail lines. Draw run-in/out and Dubins
+ // line-changes in time colour. Step/focus still paints the current line.
+ // Repainting every sail line in time colour on Show All filled the grid
+ // and hid swath delimitation. U-turns sit past run-out and must stay painted.
  for (let i = 0; i < waypoints.length - 1; i++) {
   const a = waypoints[i], b = waypoints[i + 1];
   const focused = _routeSegFocused(i, highlight);
@@ -14827,6 +14847,10 @@ function renderRoute(waypoints, opts) {
   const tColor = visitColorAtIdx(visit, i, a.lineName && a.lineName === b.lineName ? a.lineName : null);
 
   if (a.type === 'lineStart' && b.type === 'lineEnd' && a.lineName === b.lineName) {
+   // Show All: preplot already draws the sail line. Repainting every line in
+   // time colour fills the grid and hides swath delimitation. Step/focus still
+   // lights the current line.
+   if (overview && !focused) continue;
    const acqColor = tColor;
    if ((state.obstructions || []).length && findLineObstructionIntersections(a.pt, b.pt).length) {
     state._staleRouteObsHits = (state._staleRouteObsHits || 0) + 1;
