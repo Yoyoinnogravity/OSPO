@@ -20,3 +20,8 @@ yellow/overview stroke for "readability" or engagement.
 Always-on Cursor rule: `.cursor/rules/timeline-colours.mdc`
 
 Guard: `node _live_deploy/test-route-solver.mjs` and `node _live_deploy/test-route-draw.mjs`
+
+## Full-fold sq km
+
+3D Prime Full Fold area is line km × **preplot line separation** (adjacent sail
+lines on the grid). Do not use `(streamers × sep) / 2` or swath width.
