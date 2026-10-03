@@ -8425,7 +8425,7 @@ function renderSwathOverlays() {
  if (state.showSwaths === false) return;
  const s = state.settings;
  if ((s.surveyType || '3d') !== '3d') return;
- const numSwaths = s.numSwaths || 1;
+ const numSwaths = Math.max(2, parseInt(s.numSwaths, 10) || 2);
  const progression = s.progression || 'low-high';
  const groups = _computeSwathGroups(numSwaths, progression);
  if (groups.length < 1) return;
@@ -8473,7 +8473,7 @@ function renderSwathOverlays() {
  const p1 = destinationPoint(dS, (dBrg + 180) % 360, ext);
  const p2 = destinationPoint(dE, dBrg, ext);
  L.polyline([p1, p2], Object.assign({
-  color: '#e2e8f0', weight: 1.2, opacity: 0.45, dashArray: '10,8', interactive: false
+  color: '#00d2ff', weight: 2, opacity: 0.95, dashArray: '10,8', interactive: false
  }, paneOpts)).addTo(layerSwaths);
  }
 }

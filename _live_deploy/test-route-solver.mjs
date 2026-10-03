@@ -614,6 +614,7 @@ const nUser5 = vm.runInContext(`
 `, ctx);
 assert(nUser5 === 5, 'user-elected 5 swaths on 12 lines must yield 5, got ' + nUser5);
 assert(src.includes('function _syncHardMapSwathPicker'), '3D map must have a hard-coded swath count control');
+assert(src.includes("color: '#00d2ff', weight: 2"), 'swath delimitation must be cyan dashed, not faint grey');
 vm.runInContext(`
   globalThis.__picker = { style: { display: 'none' } };
   globalThis.__hardNs = { value: '2' };
