@@ -17,9 +17,10 @@ Always-on Cursor rule: `.cursor/rules/swath-count-binding.mdc`
 
 ## Time-line colour
 
-Time-line colour is BINDING and it is a **rainbow**. Red at first
-acquisition, then orange, yellow, green, cyan, blue, violet at last.
-Sail lines, transits, and the bottom timeline all use that sequence.
+Time-line colour is BINDING and it is a **rainbow through time**. Red at
+first acquisition, then orange, yellow, green, cyan, blue, violet at last,
+mapped by elapsed survey time (not by line count). Sail lines, transits,
+and the bottom timeline all use that clock.
 
 Do not collapse it to a yellow wash, a single overview stroke, or a flat
 green preplot. Show All must not duplicate every sail line on top of the

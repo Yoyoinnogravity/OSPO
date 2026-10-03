@@ -3,11 +3,11 @@ description: Time-line colour is binding — red at start, green at end
 alwaysApply: true
 ---
 
-# Time-line colour is a rainbow
+# Time-line colour is a rainbow through time
 
 Red at first acquisition, then orange, yellow, green, cyan, blue, violet
-at last. Sail lines, transits, and the bottom timeline bar all use that
-sequence.
+at last — mapped by elapsed survey time, not by line index. Sail lines,
+transits, and the bottom timeline bar all use that clock.
 
 Do not collapse this to a yellow wash, a single yellow/overview stroke, or
 a flat green preplot. Do not replace per-segment timeline colours with an

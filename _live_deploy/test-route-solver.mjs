@@ -112,7 +112,7 @@ vm.runInContext(`
   else { const _t = showToast; showToast = function(){}; }
 `, ctx);
 
-assert(/app\.js\?v=17\.40/.test(html), 'app.js cache bump 17.40 missing');
+assert(/app\.js\?v=17\.41/.test(html), 'app.js cache bump 17.41 missing');
 assert(src.includes('function _crossLineWidthM'), '3D sq km helper missing');
 assert(src.includes('Sq km formula Aled set'), 'sq km lock comment missing');
 assert(src.includes('(n * sep) / 2'), 'sq km must use (numStreamers × streamerSeparation / 2)');
@@ -135,9 +135,9 @@ assert(src.includes('Time-line colour is BINDING'), 'time-line colour lock comme
 assert(!src.includes("color: '#ffcc33', weight: 2, opacity: 0.85"),
   'unfocused run-out must keep time colour, not flat yellow');
 assert(src.includes(".addTo(layerRoute)"), 'Start/End markers must sit on the route layer');
-assert(src.includes('it is a RAINBOW'), 'time colour must be a rainbow, not a yellow wash');
+assert(src.includes('RAINBOW THROUGH TIME'), 'time colour must be a rainbow through time');
 assert(src.includes('r: 191, g: 90, b: 242'), 'rainbow must end in violet');
-assert(src.includes('Even rainbow across sail-line visit order'), 'line colours must spread across the rainbow');
+assert(src.includes('t0ByName.get(lineName) / visit.totalSec'), 'line colour must follow elapsed survey time');
 assert(src.includes('Load a preplot first, then click Route Planning'), 'empty Plan Route must toast, not silent-return');
 assert(src.includes('if (showStartLineChooser()) return'), 'chooser miss must still executePlanRoute');
 assert(html.includes('1500 sequences, keep the fastest'), 'chooser Auto must score 1500 then keep the fastest');
@@ -790,7 +790,7 @@ assert(vm.runInContext('globalThis.__autoNs', ctx) === '6',
 
 console.log(JSON.stringify({
   ok: true,
-  cache: '17.40',
+  cache: '17.41',
   rule: '2D skip-k; 3D swath shooting (adjacent monopass, locked heading, stadium returns)',
   kNom,
   nn: { visit: nn.nVisit, mode: nn.stats.mode, ms: nn.ms },

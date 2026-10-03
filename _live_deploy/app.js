@@ -8130,7 +8130,7 @@ function renderSurveyLines() {
  const visit = (typeof _routeVisitOrder === 'function') ? _routeVisitOrder() : { byName: new Map(), n: 0 };
  allLines.forEach((line, idx) => {
  const ls = (state.lineStatus && state.lineStatus[line.id]) || { status: 'planned' };
- // Rainbow along visit order — agreed. Not a yellow wash, not a flat green preplot.
+ // Rainbow along survey time — agreed. Not line-index, not a yellow wash.
  let lineColor = visit.n
   ? visitColorForLine(line.name, visit)
   : '#00ff88';
@@ -14591,10 +14591,10 @@ function computeDubinsTransitDist(waypoints, startIdx, endIdx) {
 }
 
 // ===== RENDER ROUTE =====
-// Time-line colour is BINDING and it is a RAINBOW. We agreed: red at first
-// acquisition, then orange, yellow, green, cyan, blue, violet at last.
-// Do not collapse this to a yellow wash, a single overview stroke, or a
-// flat green preplot. Sail lines, transits, and the timeline all use it.
+// Time-line colour is BINDING and it is a RAINBOW THROUGH TIME.
+// Red at first acquisition, then orange, yellow, green, cyan, blue,
+// violet at last. Mapped by elapsed survey time, not by line index.
+// Sail lines, transits, and the timeline all use it.
 function timeGradientColor(fraction) {
  const stops = [
  { t: 0.00, r: 255, g: 69, b: 58 },   // red
@@ -14656,15 +14656,18 @@ function _routeVisitOrder(waypoints) {
 
 function visitColorForLine(lineName, visit) {
  if (!visit || !visit.n) return '#00ff88';
+ if (visit.t0ByName && visit.totalSec > 0 && visit.t0ByName.has(lineName)) {
+  return timeGradientColor(visit.t0ByName.get(lineName) / visit.totalSec);
+ }
  const i = visit.byName.get(lineName);
  if (i == null) return '#8a9bb0';
- // Even rainbow across sail-line visit order so 80 lines are not all yellow.
  return timeGradientColor(visit.n <= 1 ? 0 : i / (visit.n - 1));
 }
 
 function visitColorAtIdx(visit, i, lineName) {
- if (lineName) return visitColorForLine(lineName, visit);
- if (!visit || !(visit.totalSec > 0) || !visit.tAtIdx) return '#8a9bb0';
+ if (!visit || !(visit.totalSec > 0) || !visit.tAtIdx) {
+  return lineName ? visitColorForLine(lineName, visit) : '#8a9bb0';
+ }
  return timeGradientColor((visit.tAtIdx[i] || 0) / visit.totalSec);
 }
 
@@ -15447,13 +15450,11 @@ function _buildRouteTimelineSegments(route) {
  }
  i++;
  }
- const visit = _routeVisitOrder(route);
  const totalHrs = segments.reduce((sum, seg) => sum + seg.hours, 0) || 1;
  let elapsed = 0;
  for (let k = 0; k < segments.length; k++) {
   const seg = segments[k];
-  if (seg.type === 'line') seg.color = visitColorForLine(seg.name, visit);
-  else seg.color = timeGradientColor(elapsed / totalHrs);
+  seg.color = timeGradientColor(elapsed / totalHrs);
   elapsed += seg.hours;
  }
  return segments;
