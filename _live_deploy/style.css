@@ -314,6 +314,25 @@ body {
   background: rgba(234, 179, 8, 0.12) !important;
   box-shadow: 0 0 0 1px rgba(234, 179, 8, 0.2);
 }
+
+/* ROUTE PLANNING — primary action; filled green so it is not lost among outline buttons */
+.btn-plan-route {
+  border: 1px solid #30d158 !important;
+  color: #041018 !important;
+  background: #30d158 !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.55px !important;
+  text-transform: uppercase;
+  padding-left: 16px !important;
+  padding-right: 16px !important;
+  box-shadow: 0 0 0 1px rgba(48, 209, 88, 0.45), 0 0 14px rgba(48, 209, 88, 0.4);
+}
+.btn-plan-route:hover {
+  background: #4ae374 !important;
+  color: #041018 !important;
+  border-color: #6eee9a !important;
+  box-shadow: 0 0 18px rgba(48, 209, 88, 0.6);
+}
 @keyframes criteria-attn-pulse {
   0%, 100% {
     box-shadow: 0 0 0 1px rgba(255, 214, 10, 0.35), 0 0 6px rgba(255, 214, 10, 0.2);

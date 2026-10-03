@@ -13,6 +13,7 @@ const appPath = path.resolve(__dirname, 'app.js');
 const htmlPath = path.resolve(__dirname, 'index.html');
 const src = fs.readFileSync(appPath, 'utf8');
 const html = fs.readFileSync(htmlPath, 'utf8');
+const css = fs.readFileSync(path.resolve(__dirname, 'style.css'), 'utf8');
 
 function assert(cond, msg) {
   if (!cond) throw new Error(msg);
@@ -129,7 +130,11 @@ assert(!/const subset = state\.route\.slice/.test(src),
   'stepper must not slice the route (that hid context and still scribbled on Show All)');
 assert(html.includes('id="route-step-all-btn"'), 'Show All button needs an id');
 assert(/app\.js\?v=17\.38/.test(html), 'app.js cache bump missing');
-assert(/style\.min\.css\?v=3\.33/.test(html), 'css cache bump missing');
+assert(/style\.min\.css\?v=3\.34/.test(html), 'css cache bump missing');
+assert(html.includes('id="btn-plan-route"'), 'ROUTE PLANNING needs an id');
+assert(html.includes('btn-plan-route'), 'ROUTE PLANNING must use the prominent plan-route class');
+assert(css.includes('.btn-plan-route') && css.includes('background: #30d158'),
+  'ROUTE PLANNING must be a filled green primary action');
 
 const timed = ctx._routeTransitOverviewStyle('rgb(255,69,58)');
 assert(timed.color === 'rgb(255,69,58)', 'overview style must accept time colour, got ' + timed.color);

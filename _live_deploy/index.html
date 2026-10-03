@@ -115,7 +115,7 @@
 <link rel="dns-prefetch" href="https://cesium.com">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script>if(!/Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)&&window.innerWidth>768){document.write('<link rel="stylesheet" href="https://cesium.com/downloads/cesiumjs/releases/1.119/Build/Cesium/Widgets/widgets.css"/>')}</script>
-<link rel="stylesheet" href="style.min.css?v=3.33"/>
+<link rel="stylesheet" href="style.min.css?v=3.34"/>
 </head>
 <body>
  <!-- SEO landing content for crawlers when JavaScript is unavailable -->
@@ -411,7 +411,7 @@
  <button class="t2-btn btn-postplot-qc" onclick="showPostplotQC()" style="text-align: center; justify-content: center; margin: 0; height: 28px; padding: 4px 12px; border: 1px solid #a855f7; color: #c084fc; font-weight: 700;">POSTPLOT QC</button>
  <button class="t2-btn btn-fold-coverage" onclick="showFoldCoverage()" style="text-align: center; justify-content: center; margin: 0; height: 28px; padding: 4px 12px; border: 1px solid #2dd4bf; color: #5eead4; font-weight: 700;">FOLD COVERAGE</button>
  <button class="t2-btn btn-ray-trace" onclick="showRayTracing()" title="Acoustic ray tracing for OBN / water-column paths" style="text-align: center; justify-content: center; margin: 0; height: 28px; padding: 4px 12px; border: 1px solid #f59e0b; color: #fbbf24; font-weight: 700;">RAY TRACING</button>
- <button class="t2-btn" onclick="planRoute()" style="text-align: center; justify-content: center; margin: 0; height: 28px; padding: 4px 12px; border: 1px solid #30d158; color: #4ef5a3; font-weight: 700;">ROUTE PLANNING</button>
+ <button class="t2-btn btn-plan-route" id="btn-plan-route" onclick="planRoute()" title="Plan the vessel route" style="text-align: center; justify-content: center; margin: 0; height: 28px; padding: 4px 16px; font-weight: 800;">ROUTE PLANNING</button>
  <button class="t2-btn btn-reset" id="btn-reset-route" onclick="resetRoute()" style="text-align: center; justify-content: center; margin: 0; height: 28px; padding: 4px 12px;">RESET ROUTE</button>
  <div style="position:relative;display:inline-block;flex-shrink:0;">
  <button class="t2-btn btn-copymap" id="btn-copy-map" onclick="toggleCopyMapMenu(event)" title="Copy the active map to the clipboard (choose what to include), without the floating panels" style="text-align: center; justify-content: center; margin: 0; height: 28px; padding: 4px 12px; border: 1px solid #38bdf8; color: #7dd3fc; font-weight: 700;">COPY MAP</button>
