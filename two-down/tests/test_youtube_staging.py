@@ -5,6 +5,7 @@ from twodown.staging import (
     INTRO_YOUTUBE_ID,
     LEGACY_NEEDS_UPLOAD_ZIP,
     NEEDS_UPLOAD_ZIP_HELP,
+    YOUTUBE_CONFIRMATIONS_ID,
     apply_feed_matches,
     ensure_uploads_json,
     is_uploaded,
@@ -14,11 +15,12 @@ from twodown.staging import (
     parse_youtube_id,
     pending_slugs,
     slug_from_title,
+    studio_confirmations_html,
     studio_description,
     uploaded_slugs,
     write_needs_upload_zips,
 )
-from twodown.youtube import video_title, video_title_from_line
+from twodown.youtube import video_insert_body, video_title, video_title_from_line
 
 
 def _day(root, date, slug, clue, answer="SECRET"):
@@ -108,6 +110,11 @@ def test_publish_films_writes_two_staging_sections(tmp_path):
     assert title in needs
     assert "SILICON" not in title
     assert studio_description() in needs
+    assert f'id="{YOUTUBE_CONFIRMATIONS_ID}"' in page
+    assert "YouTube confirmations" in page
+    assert "Made for kids" in page
+    assert "Altered / synthetic / AI-generated" in page
+    assert "Yes — disclose" in page
     assert "Mark as uploaded" in needs
     assert "cryptic-fit-youtube-uploads" in (tmp_path / "assets" / "app.js").read_text(encoding="utf-8")
     assert (tmp_path / "youtube-uploads.json").is_file()
@@ -211,6 +218,34 @@ def test_committed_upload_page_links_every_zip_part():
     assert "https://www.youtube.com/shorts/iP6Zh87lE_8" in posted
     assert "https://www.youtube.com/shorts/9WmM2srrHPU" in posted
     assert "Download Short" in page
+    assert f'id="{YOUTUBE_CONFIRMATIONS_ID}"' in page
+    assert "YouTube confirmations" in page
+    assert "Made for kids" in page
+    assert ">No<" in page
+    assert "Altered / synthetic / AI-generated" in page
+    assert "Yes — disclose" in page
+    assert "Education" in page
+    assert "Solve it, I know you can." in page
+    assert "Fifteen Squared" not in page
+
+
+def test_studio_confirmations_are_honest_defaults():
+    card = studio_confirmations_html()
+    assert f'id="{YOUTUBE_CONFIRMATIONS_ID}"' in card
+    assert "Made for kids" in card
+    assert "Age-restricted" in card
+    assert "Paid promotion" in card
+    assert "Altered / synthetic / AI-generated" in card
+    assert "Yes — disclose" in card
+    assert "Language" in card
+    assert "English" in card
+    assert "Education" in card
+    assert "Public" in card
+    assert "never the answer" in card
+    assert studio_description() in card
+    assert "Fifteen Squared" not in card
+    assert "<dt>Made for kids</dt><dd>No</dd>" in card
+    assert "<dt>Altered / synthetic / AI-generated</dt><dd>Yes — disclose</dd>" in card
 
 
 def test_pages_workflow_builds_pk_zip_parts_before_deploy():

@@ -20,12 +20,14 @@ from twodown.site import (
     solved_films,
 )
 from twodown.youtube import (
+    YOUTUBE_CATEGORY_EDUCATION,
     YOUTUBE_CHANNEL,
     YOUTUBE_CHANNEL_URL,
     YOUTUBE_STUDIO,
     short_mp4_url,
     thumbnail_file,
     upload_short,
+    video_insert_body,
     video_title,
     video_title_from_line,
 )
@@ -478,6 +480,12 @@ def test_youtube_thumbnail_is_set_without_dropping_the_video_id(tmp_path, monkey
 
     assert upload_short(item) == "abc123"
     assert item.youtube_id == "abc123"
+    body = seen["insert"]["body"]
+    assert body["status"]["selfDeclaredMadeForKids"] is False
+    assert body["status"]["privacyStatus"] == "public"
+    assert body["status"]["containsSyntheticMedia"] is True
+    assert body["snippet"]["categoryId"] == YOUTUBE_CATEGORY_EDUCATION
+    assert body["snippet"]["defaultLanguage"] == "en"
     assert seen["thumb"]["videoId"] == "abc123"
     assert ("thumb.jpg" in seen["media"][1][0]) or seen["media"][1][0].endswith("thumb.jpg")
     assert seen["media"][1][1] == "image/jpeg"
@@ -514,6 +522,22 @@ def test_youtube_titles_use_cryptic_fun_channel():
     assert "We credit all" in youtube_description(_item())
     assert "Fifteen Squared" not in youtube_description(_item())
     assert "Blogged by" in youtube_description(_item())
+
+
+def test_youtube_insert_body_is_not_made_for_kids():
+    body = video_insert_body(_item())
+    assert body["status"]["selfDeclaredMadeForKids"] is False
+    assert body["status"]["privacyStatus"] == "public"
+    assert body["status"]["containsSyntheticMedia"] is True
+    assert body["snippet"]["categoryId"] == "27"
+    assert body["snippet"]["defaultLanguage"] == "en"
+    assert "END RESULT" not in body["snippet"]["title"]
+    assert body["snippet"]["title"].endswith("#Shorts")
+    assert set(body["status"]) == {
+        "privacyStatus",
+        "selfDeclaredMadeForKids",
+        "containsSyntheticMedia",
+    }
 
 
 def test_ads_on_writes_ads_txt_and_unit(tmp_path, monkeypatch):

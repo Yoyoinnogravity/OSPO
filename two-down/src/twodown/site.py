@@ -48,6 +48,7 @@ from twodown.staging import (
     load_uploads,
     short_download_name,
     shorts_url,
+    studio_confirmations_html,
     studio_description,
     videos_by_slug,
     write_needs_upload_zips,
@@ -336,6 +337,30 @@ a.action.ghost {
   gap: 10px;
   align-items: center;
   margin: 18px 0 28px;
+}
+.youtube-confirmations { max-width: 40rem; }
+.youtube-confirmations dl {
+  display: grid;
+  gap: 8px 0;
+  margin: 14px 0 10px;
+}
+.youtube-confirmations dl div {
+  display: grid;
+  grid-template-columns: minmax(9rem, 15rem) 1fr;
+  gap: 8px 16px;
+  font-family: "Liberation Sans", sans-serif;
+  font-size: 0.92rem;
+}
+.youtube-confirmations dt { color: var(--muted); margin: 0; }
+.youtube-confirmations dd { margin: 0; color: var(--ink); font-weight: 700; }
+.youtube-confirmations dd pre {
+  margin: 0;
+  font: inherit;
+  font-weight: 700;
+  white-space: pre-wrap;
+}
+@media (max-width: 640px) {
+  .youtube-confirmations dl div { grid-template-columns: 1fr; gap: 2px 0; }
 }
 a.action.download-short, a.action.download-all {
   font-size: 1.2rem;
@@ -1720,6 +1745,7 @@ def _upload_body(root: Path) -> str:
     return f"""
     {_croc_hello("", title="Upload these Shorts to YouTube.", lede="Two lists for " + CHANNEL_HANDLE + ". Download, unzip if from the zip, drag the mp4 onto Studio — you cannot drag from this page. We do not upload for you.")}
     <p class="lede" data-yt-uploads-key="{_e(LOCAL_STORAGE_KEY)}">The channel intro Short is already live at <a href="{_e(shorts_url(INTRO_YOUTUBE_ID))}" target="_blank" rel="noopener">YouTube</a>. It is not a daily /c/ film. Daily films stay under Needs upload until a YouTube id is committed or you mark one in this browser.</p>
+    {studio_confirmations_html()}
     {_needs_upload_zip_bar(root)}
     <section class="staging-list" id="needs-upload">
       <h2>Needs upload</h2>

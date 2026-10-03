@@ -34,6 +34,7 @@ STUDIO_DROP_HELP = (
     "You cannot drag from this page."
 )
 YOUTUBE_POSTER_NOTE = "The poster is the unsolved clue. Do not upload a frame that shows the answer."
+YOUTUBE_CONFIRMATIONS_ID = "youtube-confirmations"
 _YOUTUBE_ID = re.compile(r"^[A-Za-z0-9_-]{11}$")
 _ATOM = "{http://www.w3.org/2005/Atom}"
 _YT = "{http://www.youtube.com/xml/schemas/2015}"
@@ -45,6 +46,29 @@ _BRAND_SLUG_PREFIXES = ("crypticfit-", "cryptic-fit-")
 def studio_description() -> str:
     """Spoiler-free YouTube description paste. Never the answer."""
     return f"{TAGLINE}\n{SITE_ORIGIN}"
+
+
+def studio_confirmations_html() -> str:
+    """One card of honest Studio answers for every cryptic.fit Short."""
+    desc = studio_description()
+    return f"""    <article class="panel youtube-confirmations" id="{YOUTUBE_CONFIRMATIONS_ID}">
+      <p class="kicker">YouTube confirmations</p>
+      <h2>Same answers every Short.</h2>
+      <p>These are AI-generated cryptic shorts for adults. Click Studio identically each time. We do not bot the dialogs.</p>
+      <dl>
+        <div><dt>Made for kids</dt><dd>No</dd></div>
+        <div><dt>Age-restricted</dt><dd>No</dd></div>
+        <div><dt>Paid promotion / sponsorship</dt><dd>No</dd></div>
+        <div><dt>Altered / synthetic / AI-generated</dt><dd>Yes — disclose</dd></div>
+        <div><dt>Language</dt><dd>English</dd></div>
+        <div><dt>Category</dt><dd>Education</dd></div>
+        <div><dt>Visibility</dt><dd>Public</dd></div>
+        <div><dt>Movie / licensed music we do not own</dt><dd>No</dd></div>
+        <div><dt>Title</dt><dd>Clue + #Shorts, never the answer</dd></div>
+        <div><dt>Description</dt><dd><pre>{desc}</pre></dd></div>
+      </dl>
+      <p class="youtube-help">Studio still needs a click. Daily upload quota still applies.</p>
+    </article>"""
 
 
 def short_download_name(slug: str) -> str:
@@ -270,6 +294,38 @@ _ZIP_BAR = re.compile(
 )
 
 
+_CONFIRMATIONS = re.compile(
+    r"[ \t]*<article class=\"panel youtube-confirmations\"[^>]*>.*?</article>",
+    re.S,
+)
+
+
+def refresh_upload_confirmations(root: Path) -> None:
+    """Keep the Studio answers card on upload.html."""
+    page = Path(root) / "upload.html"
+    if not page.is_file():
+        return
+    card = studio_confirmations_html()
+    text = page.read_text(encoding="utf-8")
+    if _CONFIRMATIONS.search(text):
+        updated = _CONFIRMATIONS.sub(card, text, count=1)
+    else:
+        marker = '<p class="youtube-help">'
+        zip_at = text.find(marker)
+        if zip_at != -1:
+            updated = text[:zip_at] + card + "\n    " + text[zip_at:]
+        else:
+            updated = text.replace(
+                '<section class="staging-list" id="needs-upload">',
+                f"{card}\n    \n    <section class=\"staging-list\" id=\"needs-upload\">",
+                1,
+            )
+            if updated == text:
+                return
+    if updated != text:
+        page.write_text(updated, encoding="utf-8")
+
+
 def refresh_upload_zip_bar(root: Path) -> None:
     """Keep upload.html zip buttons in sync with the planned parts."""
     page = Path(root) / "upload.html"
@@ -286,9 +342,10 @@ def refresh_upload_zip_bar(root: Path) -> None:
             1,
         )
     else:
-        return
+        updated = text
     if updated != text:
         page.write_text(updated, encoding="utf-8")
+    refresh_upload_confirmations(root)
 
 
 def _clear_needs_upload_zips(media: Path) -> None:

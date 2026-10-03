@@ -15,6 +15,8 @@ YOUTUBE_STUDIO = "https://www.youtube.com/upload"
 SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
 TOKEN_ENV = "TWODOWN_YOUTUBE_TOKEN"
 CLIENT_ENV = "TWODOWN_YOUTUBE_CLIENT_SECRET"
+# YouTube videoCategories.list: 27 = Education.
+YOUTUBE_CATEGORY_EDUCATION = "27"
 
 
 def short_mp4_url(slug: str) -> str:
@@ -88,6 +90,28 @@ def _set_thumbnail(youtube, video_id: str, item: SpokenClue) -> None:
     youtube.thumbnails().set(videoId=video_id, media_body=media).execute()
 
 
+def video_insert_body(item: SpokenClue, privacy: str = "public") -> dict:
+    """videos.insert snippet+status. Only fields the Data API v3 actually accepts.
+
+    Studio-only prompts (paid promotion, age restriction, not a movie) have
+    no write field on videos.insert. This runs only when a token exists.
+    """
+    return {
+        "snippet": {
+            "title": video_title(item.clue),
+            "description": video_description(item),
+            "tags": ["cryptic.fit", "cryptic crossword", item.clue.device, item.clue.setter],
+            "categoryId": YOUTUBE_CATEGORY_EDUCATION,
+            "defaultLanguage": "en",
+        },
+        "status": {
+            "privacyStatus": privacy,
+            "selfDeclaredMadeForKids": False,
+            "containsSyntheticMedia": True,
+        },
+    }
+
+
 def upload_short(item: SpokenClue, privacy: str = "public") -> str | None:
     """Upload one Short to the authorised channel.
 
@@ -103,18 +127,7 @@ def upload_short(item: SpokenClue, privacy: str = "public") -> str | None:
     from googleapiclient.http import MediaFileUpload
 
     youtube = build("youtube", "v3", credentials=creds)
-    body = {
-        "snippet": {
-            "title": video_title(item.clue),
-            "description": video_description(item),
-            "tags": ["cryptic.fit", "cryptic crossword", item.clue.device, item.clue.setter],
-            "categoryId": "27",
-        },
-        "status": {
-            "privacyStatus": privacy,
-            "selfDeclaredMadeForKids": False,
-        },
-    }
+    body = video_insert_body(item, privacy=privacy)
     media = MediaFileUpload(item.video_path, chunksize=-1, resumable=True, mimetype="video/mp4")
     result = youtube.videos().insert(part="snippet,status", body=body, media_body=media).execute()
     video_id = result.get("id")
