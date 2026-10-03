@@ -1,6 +1,8 @@
 .venv/
 output/
 cryptic_fun_site.zip
+site/media/crypticfit-needs-upload.zip
+site/media/crypticfit-needs-upload-*.zip
 __pycache__/
 *.pyc
 *.egg-info/

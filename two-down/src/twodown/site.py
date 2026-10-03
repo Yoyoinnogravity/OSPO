@@ -38,8 +38,9 @@ from twodown.staging import (
     CHANNEL_HANDLE,
     INTRO_YOUTUBE_ID,
     LOCAL_STORAGE_KEY,
-    NEEDS_UPLOAD_ZIP,
     STUDIO_DROP_HELP,
+    needs_upload_zip_bar_html,
+    needs_upload_zip_names,
     YOUTUBE_POSTER_NOTE,
     committed_youtube_id,
     ensure_uploads_json,
@@ -49,7 +50,7 @@ from twodown.staging import (
     shorts_url,
     studio_description,
     videos_by_slug,
-    write_needs_upload_zip,
+    write_needs_upload_zips,
 )
 from twodown.youtube import (
     YOUTUBE_CHANNEL_URL,
@@ -1696,16 +1697,7 @@ def _staging_row(root: Path, film: SolvedFilm, record: dict | None) -> str:
 
 
 def _needs_upload_zip_bar(root: Path) -> str:
-    zip_path = Path(root) / "media" / NEEDS_UPLOAD_ZIP
-    if not zip_path.is_file():
-        return ""
-    return f"""
-    <p class="youtube-help">{_e(STUDIO_DROP_HELP)} The zip is needs-upload only.</p>
-    <p class="youtube-zip">
-      <a class="action download-all" href="media/{NEEDS_UPLOAD_ZIP}" download="{NEEDS_UPLOAD_ZIP}">Download needs-upload zip</a>
-      <a class="action ghost" href="{_e(YOUTUBE_STUDIO)}" target="_blank" rel="noopener">Open YouTube Studio</a>
-    </p>
-    """
+    return needs_upload_zip_bar_html(needs_upload_zip_names(root))
 
 
 def _upload_body(root: Path) -> str:
@@ -1846,7 +1838,7 @@ def publish_films(root: Path) -> Path:
     (assets / "app.js").write_text(JS, encoding="utf-8")
     ensure_safe_posters(root)
     ensure_uploads_json(root)
-    write_needs_upload_zip(root)
+    write_needs_upload_zips(root)
     page = root / "films.html"
     page.write_text(
         _page(

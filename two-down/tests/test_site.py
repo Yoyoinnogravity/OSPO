@@ -180,6 +180,9 @@ def test_publish_site_writes_spoiler_pages(tmp_path):
     assert "Open YouTube Studio" in upload_page
     assert STUDIO_DROP_HELP in upload_page
     assert "cannot drag from this page" in upload_page
+    assert "Download zip 1" in upload_page
+    assert "media/crypticfit-needs-upload-1.zip" in upload_page
+    assert "Do not drop the zip" in upload_page
     assert "Copy title" in upload_page
     assert "Solve it, I know you can." in upload_page
     assert "Answer: END RESULT" not in upload_page

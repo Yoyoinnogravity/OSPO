@@ -10,10 +10,19 @@ from urllib.parse import parse_qs, urlparse
 from xml.etree import ElementTree as ET
 
 from twodown.config import SITE_ORIGIN, TAGLINE
-from twodown.youtube import video_title_from_line
 
 UPLOADS_NAME = "youtube-uploads.json"
-NEEDS_UPLOAD_ZIP = "crypticfit-needs-upload.zip"
+LEGACY_NEEDS_UPLOAD_ZIP = "crypticfit-needs-upload.zip"
+NEEDS_UPLOAD_ZIP_PREFIX = "crypticfit-needs-upload"
+# GitHub rejects blobs over 100MB. Stay well under 90MB so Pages can
+# serve real zip bytes instead of a Git LFS pointer.
+MAX_NEEDS_UPLOAD_ZIP_BYTES = 80 * 1024 * 1024
+ZIP_ENTRY_OVERHEAD = 128
+NEEDS_UPLOAD_ZIP_HELP = (
+    "Unzip each file, then drag the mp4s from your Downloads folder onto YouTube Studio. "
+    "Do not drop the zip. You cannot drag from this page."
+)
+YOUTUBE_STUDIO_UPLOAD = "https://www.youtube.com/upload"
 CHANNEL_HANDLE = "@crypticfit"
 CHANNEL_ID = "UCjJDo1MB7pFjtJfeV2Yb7eA"
 CHANNEL_FEED_URL = f"https://www.youtube.com/feeds/videos.xml?channel_id={CHANNEL_ID}"
@@ -183,28 +192,139 @@ def ensure_uploads_json(root: Path, extra: list[str] | None = None) -> dict[str,
     return data
 
 
-def write_needs_upload_zip(root: Path, slugs: list[str] | None = None) -> Path | None:
-    """Zip pending /c/ mp4s only. Already-posted films stay out."""
+def needs_upload_zip_name(part: int) -> str:
+    return f"{NEEDS_UPLOAD_ZIP_PREFIX}-{part}.zip"
+
+
+def pending_video_files(root: Path, slugs: list[str] | None = None) -> list[Path]:
+    """Published /c/ mp4s that still need a YouTube id. No study orphans."""
     uploads = load_uploads(root)
     wanted = slugs if slugs is not None else pending_slugs(root, uploads)
     media = Path(root) / "media"
-    dest = media / NEEDS_UPLOAD_ZIP
     videos: list[Path] = []
     for slug in wanted:
         video = media / f"{slug}.mp4"
         if video.is_file():
             videos.append(video)
+    return videos
+
+
+def plan_needs_upload_parts(
+    videos: list[Path],
+    max_bytes: int = MAX_NEEDS_UPLOAD_ZIP_BYTES,
+) -> list[list[Path]]:
+    """Pack pending mp4s into zip parts, each well under the GitHub blob limit."""
+    parts: list[list[Path]] = []
+    current: list[Path] = []
+    current_size = 0
+    limit = max(1, max_bytes)
+    for video in videos:
+        size = video.stat().st_size + ZIP_ENTRY_OVERHEAD
+        if current and current_size + size > limit:
+            parts.append(current)
+            current = []
+            current_size = 0
+        current.append(video)
+        current_size += size
+    if current:
+        parts.append(current)
+    return parts
+
+
+def needs_upload_zip_names(
+    root: Path,
+    slugs: list[str] | None = None,
+    max_bytes: int = MAX_NEEDS_UPLOAD_ZIP_BYTES,
+) -> list[str]:
+    videos = pending_video_files(root, slugs)
     if not videos:
-        if dest.exists():
-            dest.unlink()
-        return None
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    tmp = dest.with_suffix(".zip.part")
-    with zipfile.ZipFile(tmp, "w", compression=zipfile.ZIP_STORED) as archive:
-        for video in videos:
-            archive.write(video, arcname=short_download_name(video.stem))
-    tmp.replace(dest)
-    return dest
+        return []
+    return [needs_upload_zip_name(index) for index, _part in enumerate(plan_needs_upload_parts(videos, max_bytes), start=1)]
+
+
+def needs_upload_zip_bar_html(names: list[str]) -> str:
+    """Upload page buttons: one per zip part, plus Studio."""
+    if not names:
+        return ""
+    buttons = [
+        f'<a class="action download-all" href="media/{name}" download="{name}">Download zip {index}</a>'
+        for index, name in enumerate(names, start=1)
+    ]
+    buttons.append(
+        f'<a class="action ghost" href="{YOUTUBE_STUDIO_UPLOAD}" target="_blank" rel="noopener">Open YouTube Studio</a>'
+    )
+    joined = "\n      ".join(buttons)
+    return (
+        f'    <p class="youtube-help">{NEEDS_UPLOAD_ZIP_HELP}</p>\n'
+        f'    <p class="youtube-zip">\n'
+        f'      {joined}\n'
+        f'    </p>'
+    )
+
+
+_ZIP_BAR = re.compile(
+    r"[ \t]*<p class=\"youtube-help\">.*?</p>\s*<p class=\"youtube-zip\">.*?</p>",
+    re.S,
+)
+
+
+def refresh_upload_zip_bar(root: Path) -> None:
+    """Keep upload.html zip buttons in sync with the planned parts."""
+    page = Path(root) / "upload.html"
+    if not page.is_file():
+        return
+    bar = needs_upload_zip_bar_html(needs_upload_zip_names(root))
+    text = page.read_text(encoding="utf-8")
+    if _ZIP_BAR.search(text):
+        updated = _ZIP_BAR.sub(bar, text, count=1) if bar else _ZIP_BAR.sub("", text, count=1)
+    elif bar:
+        updated = text.replace(
+            '<section class="staging-list" id="needs-upload">',
+            f"{bar}\n    \n    <section class=\"staging-list\" id=\"needs-upload\">",
+            1,
+        )
+    else:
+        return
+    if updated != text:
+        page.write_text(updated, encoding="utf-8")
+
+
+def _clear_needs_upload_zips(media: Path) -> None:
+    for path in media.glob(f"{NEEDS_UPLOAD_ZIP_PREFIX}*.zip"):
+        path.unlink()
+    leftover = media / LEGACY_NEEDS_UPLOAD_ZIP
+    if leftover.exists():
+        leftover.unlink()
+
+
+def write_needs_upload_zips(
+    root: Path,
+    slugs: list[str] | None = None,
+    max_bytes: int = MAX_NEEDS_UPLOAD_ZIP_BYTES,
+) -> list[Path]:
+    """Zip pending /c/ mp4s only, split so each part stays under max_bytes."""
+    media = Path(root) / "media"
+    videos = pending_video_files(root, slugs)
+    _clear_needs_upload_zips(media)
+    if not videos:
+        return []
+    dests: list[Path] = []
+    media.mkdir(parents=True, exist_ok=True)
+    for index, part in enumerate(plan_needs_upload_parts(videos, max_bytes), start=1):
+        dest = media / needs_upload_zip_name(index)
+        tmp = dest.with_name(dest.name + ".part")
+        with zipfile.ZipFile(tmp, "w", compression=zipfile.ZIP_STORED) as archive:
+            for video in part:
+                archive.write(video, arcname=short_download_name(video.stem))
+        tmp.replace(dest)
+        dests.append(dest)
+    return dests
+
+
+def write_needs_upload_zip(root: Path, slugs: list[str] | None = None) -> Path | None:
+    """Back-compat wrapper. Prefer write_needs_upload_zips."""
+    written = write_needs_upload_zips(root, slugs)
+    return written[0] if written else None
 
 
 def parse_channel_feed(xml_text: str) -> list[dict[str, str]]:
@@ -257,6 +377,8 @@ def match_feed_to_films(
     description must contain that slug's /c/ URL. Ambiguous hits are dropped.
     The intro id is never assigned unless it uniquely matches a published film.
     """
+    from twodown.youtube import video_title_from_line
+
     by_title: dict[str, list[str]] = {}
     for slug, clue_line in films:
         title = _title_key(video_title_from_line(clue_line))

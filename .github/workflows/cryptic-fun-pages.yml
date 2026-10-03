@@ -34,6 +34,25 @@ jobs:
           fi
           echo "$DOMAIN" > two-down/site/CNAME
           echo "Publishing on $DOMAIN."
+      - name: Build needs-upload zip parts from published mp4s
+        run: |
+          PYTHONPATH=two-down/src python3 - <<'PY'
+          from pathlib import Path
+          from twodown.staging import refresh_upload_zip_bar, write_needs_upload_zips
+
+          root = Path("two-down/site")
+          written = write_needs_upload_zips(root)
+          refresh_upload_zip_bar(root)
+          if not written:
+              print("No pending Shorts; no zip parts.")
+          for path in written:
+              raw = path.read_bytes()[:4]
+              if raw[:2] != b"PK":
+                  raise SystemExit(f"{path.name} is not a PK zip: {raw!r}")
+              if b"git-lfs.github.com" in path.read_bytes()[:200]:
+                  raise SystemExit(f"{path.name} looks like a Git LFS pointer")
+              print(f"{path.name} {path.stat().st_size} bytes magic={raw!r}")
+          PY
       - uses: actions/upload-pages-artifact@v3
         with:
           path: two-down/site

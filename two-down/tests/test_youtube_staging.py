@@ -3,17 +3,19 @@ from zipfile import ZipFile
 from twodown.site import publish_films
 from twodown.staging import (
     INTRO_YOUTUBE_ID,
-    NEEDS_UPLOAD_ZIP,
+    LEGACY_NEEDS_UPLOAD_ZIP,
+    NEEDS_UPLOAD_ZIP_HELP,
     apply_feed_matches,
     ensure_uploads_json,
     is_uploaded,
     match_feed_to_films,
+    needs_upload_zip_names,
     parse_channel_feed,
     parse_youtube_id,
     pending_slugs,
     studio_description,
     uploaded_slugs,
-    write_needs_upload_zip,
+    write_needs_upload_zips,
 )
 from twodown.youtube import video_title, video_title_from_line
 
@@ -120,15 +122,104 @@ def test_zip_builder_excludes_uploaded(tmp_path):
     from twodown.staging import save_uploads
 
     save_uploads(tmp_path, data)
-    dest = write_needs_upload_zip(tmp_path)
-    assert dest is not None
-    assert dest.name == NEEDS_UPLOAD_ZIP
-    names = ZipFile(dest).namelist()
+    dests = write_needs_upload_zips(tmp_path)
+    assert [path.name for path in dests] == ["crypticfit-needs-upload-1.zip"]
+    names = ZipFile(dests[0]).namelist()
     assert names == ["crypticfit-financial-times-18494-5a.mp4"]
     assert "crypticfit-independent-12462-6a.mp4" not in names
+    assert dests[0].read_bytes()[:2] == b"PK"
+    assert b"git-lfs.github.com" not in dests[0].read_bytes()[:200]
     publish_films(tmp_path)
     kit = (tmp_path / "upload.html").read_text(encoding="utf-8")
-    assert f"media/{NEEDS_UPLOAD_ZIP}" in kit
+    assert "media/crypticfit-needs-upload-1.zip" in kit
+    assert "Download zip 1" in kit
+    assert "Do not drop the zip" in kit
+    assert LEGACY_NEEDS_UPLOAD_ZIP not in kit
+    assert NEEDS_UPLOAD_ZIP_HELP in kit
+
+
+def test_zip_builder_splits_under_the_github_blob_limit(tmp_path):
+    _day(tmp_path, "2026-09-16", "independent-12462-6a", "Model youngster eating in (3-2)", "PIN-UP")
+    _day(tmp_path, "2026-10-01", "financial-times-18494-5a", "Colin is buildinga semiconductor (7)", "SILICON")
+    _day(tmp_path, "2026-10-02", "guardian-30127-16a", "Standing of data science around university (6)", "STATUS")
+    data = ensure_uploads_json(tmp_path)
+    for row in data["videos"]:
+        if row["slug"] == "independent-12462-6a":
+            row["youtube_id"] = "7q-WFyj0WnA"
+    from twodown.staging import save_uploads
+
+    save_uploads(tmp_path, data)
+    dests = write_needs_upload_zips(tmp_path, max_bytes=40)
+    assert [path.name for path in dests] == [
+        "crypticfit-needs-upload-1.zip",
+        "crypticfit-needs-upload-2.zip",
+    ]
+    listed = [ZipFile(path).namelist() for path in dests]
+    assert listed[0] == ["crypticfit-financial-times-18494-5a.mp4"]
+    assert listed[1] == ["crypticfit-guardian-30127-16a.mp4"]
+    for path in dests:
+        assert path.read_bytes()[:2] == b"PK"
+        assert path.stat().st_size < 90 * 1024 * 1024
+        assert "PIN-UP" not in path.name
+        assert "SILICON" not in path.name
+        assert "STATUS" not in path.name
+    assert "crypticfit-independent-12462-6a.mp4" not in {name for part in listed for name in part}
+    assert "aimlessly-sonia.mp4" not in {name for part in listed for name in part}
+    publish_films(tmp_path)
+    # Tiny fixture mp4s fit in one part at the default 80MB cap.
+    kit = (tmp_path / "upload.html").read_text(encoding="utf-8")
+    assert "Download zip 1" in kit
+    assert "media/crypticfit-needs-upload-1.zip" in kit
+    assert LEGACY_NEEDS_UPLOAD_ZIP not in kit
+
+
+def test_committed_upload_page_links_every_zip_part():
+    from pathlib import Path
+
+    from twodown.staging import pending_video_files, plan_needs_upload_parts
+
+    site = Path(__file__).resolve().parents[1] / "site"
+    names = needs_upload_zip_names(site)
+    assert len(names) >= 2
+    assert names[0] == "crypticfit-needs-upload-1.zip"
+    videos = pending_video_files(site)
+    stems = {video.stem for video in videos}
+    assert "independent-12462-6a" not in stems
+    assert "aimlessly-sonia" not in stems
+    assert "rasta-study" not in stems
+    for part in plan_needs_upload_parts(videos):
+        assert sum(video.stat().st_size for video in part) < 90 * 1024 * 1024
+    page = (site / "upload.html").read_text(encoding="utf-8")
+    for name in names:
+        assert f"media/{name}" in page
+        assert f'download="{name}"' in page
+    for index, _name in enumerate(names, start=1):
+        assert f"Download zip {index}" in page
+    assert "Do not drop the zip" in page
+    assert 'download="crypticfit-needs-upload.zip"' not in page
+    assert "PIN-UP" not in page
+    assert "7q-WFyj0WnA" in page
+    assert "Download Short" in page
+
+
+def test_pages_workflow_builds_pk_zip_parts_before_deploy():
+    from pathlib import Path
+
+    workflow = Path(__file__).resolve().parents[2] / ".github" / "workflows" / "cryptic-fun-pages.yml"
+    text = workflow.read_text(encoding="utf-8")
+    assert "write_needs_upload_zips" in text
+    assert "refresh_upload_zip_bar" in text
+    assert text.find("write_needs_upload_zips") < text.find("upload-pages-artifact")
+    assert "git-lfs.github.com" not in text
+
+
+def test_site_media_zips_are_not_git_lfs():
+    from pathlib import Path
+
+    attrs = (Path(__file__).resolve().parents[1] / "site" / ".gitattributes").read_text(encoding="utf-8")
+    assert "*.zip !filter !diff !merge -text" in attrs
+    ignore = (Path(__file__).resolve().parents[1] / ".gitignore").read_text(encoding="utf-8")
+    assert "crypticfit-needs-upload" in ignore
 
 
 def test_titles_have_shorts_not_answers():
