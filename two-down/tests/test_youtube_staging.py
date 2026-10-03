@@ -13,6 +13,7 @@ from twodown.staging import (
     parse_channel_feed,
     parse_youtube_id,
     pending_slugs,
+    slug_from_title,
     studio_description,
     uploaded_slugs,
     write_needs_upload_zips,
@@ -185,6 +186,8 @@ def test_committed_upload_page_links_every_zip_part():
     videos = pending_video_files(site)
     stems = {video.stem for video in videos}
     assert "independent-12462-6a" not in stems
+    assert "financial-times-18478-1a" not in stems
+    assert "financial-times-18477-14a" not in stems
     assert "aimlessly-sonia" not in stems
     assert "rasta-study" not in stems
     for part in plan_needs_upload_parts(videos):
@@ -199,6 +202,14 @@ def test_committed_upload_page_links_every_zip_part():
     assert 'download="crypticfit-needs-upload.zip"' not in page
     assert "PIN-UP" not in page
     assert "7q-WFyj0WnA" in page
+    assert "iP6Zh87lE_8" in page
+    assert "9WmM2srrHPU" in page
+    needs = page.split('id="needs-upload"', 1)[1].split('id="on-youtube"', 1)[0]
+    posted = page.split('id="on-youtube"', 1)[1]
+    assert "financial-times-18478-1a" not in needs
+    assert "financial-times-18477-14a" not in needs
+    assert "https://www.youtube.com/shorts/iP6Zh87lE_8" in posted
+    assert "https://www.youtube.com/shorts/9WmM2srrHPU" in posted
     assert "Download Short" in page
 
 
@@ -291,6 +302,49 @@ def test_feed_match_is_unique_or_left_pending():
         }
     ]
     assert match_feed_to_films(ambiguous, films) == {}
+
+
+def test_slug_style_title_matches_only_when_it_is_a_published_slug():
+    films = [
+        ("financial-times-18478-1a", "Engineered space unit, life-supporting primarily (7)"),
+        ("financial-times-18477-14a", "X Y and Z advancing initially with the other reversed (4)"),
+        ("guardian-30113-9a", "Will the author flog incomplete bit of fiction? (4)"),
+    ]
+    slugs = {slug for slug, _clue in films}
+    assert slug_from_title("crypticfit financial times 18478 1a", slugs) == "financial-times-18478-1a"
+    assert slug_from_title("crypticfit financial times 18477 14a", slugs) == "financial-times-18477-14a"
+    assert slug_from_title("crypticfit", slugs) is None
+    assert slug_from_title("Aled’s intro", slugs) is None
+    matched = match_feed_to_films(
+        [
+            {
+                "youtube_id": "iP6Zh87lE_8",
+                "title": "crypticfit financial times 18478 1a",
+                "published": "2026-10-03T17:01:00+00:00",
+                "description": "Cryptic clue",
+                "link": "https://www.youtube.com/shorts/iP6Zh87lE_8",
+            },
+            {
+                "youtube_id": "9WmM2srrHPU",
+                "title": "crypticfit financial times 18477 14a",
+                "published": "2026-10-03T16:56:03+00:00",
+                "description": "Cryptic crossword fun",
+                "link": "https://www.youtube.com/shorts/9WmM2srrHPU",
+            },
+            {
+                "youtube_id": "Gk1KOS_23M8",
+                "title": "crypticfit",
+                "published": "2026-10-03T17:10:02+00:00",
+                "description": "Cryptic clues",
+                "link": "https://www.youtube.com/shorts/Gk1KOS_23M8",
+            },
+        ],
+        films,
+    )
+    assert matched["financial-times-18478-1a"]["youtube_id"] == "iP6Zh87lE_8"
+    assert matched["financial-times-18477-14a"]["youtube_id"] == "9WmM2srrHPU"
+    assert "guardian-30113-9a" not in matched
+    assert all(row["youtube_id"] != "Gk1KOS_23M8" for row in matched.values())
 
 
 def test_apply_feed_matches_persists_only_safe_hits(tmp_path):

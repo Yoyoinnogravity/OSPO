@@ -7,10 +7,14 @@
   },
   "videos": [
     {
-      "slug": "financial-times-18477-14a"
+      "slug": "financial-times-18477-14a",
+      "youtube_id": "9WmM2srrHPU",
+      "uploaded_at": "2026-10-03"
     },
     {
-      "slug": "financial-times-18478-1a"
+      "slug": "financial-times-18478-1a",
+      "youtube_id": "iP6Zh87lE_8",
+      "uploaded_at": "2026-10-03"
     },
     {
       "slug": "financial-times-18478-5a"

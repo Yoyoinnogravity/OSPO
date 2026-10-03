@@ -38,6 +38,8 @@ _YOUTUBE_ID = re.compile(r"^[A-Za-z0-9_-]{11}$")
 _ATOM = "{http://www.w3.org/2005/Atom}"
 _YT = "{http://www.youtube.com/xml/schemas/2015}"
 _SLUG_IN_TEXT = re.compile(r"/c/([a-z0-9-]+)/?", re.I)
+_SLUG_WORD = re.compile(r"[a-z0-9]+")
+_BRAND_SLUG_PREFIXES = ("crypticfit-", "cryptic-fit-")
 
 
 def studio_description() -> str:
@@ -367,15 +369,37 @@ def _title_key(text: str) -> str:
     return " ".join((text or "").casefold().split())
 
 
+def _slugish(text: str) -> str:
+    return "-".join(_SLUG_WORD.findall((text or "").casefold()))
+
+
+def slug_from_title(title: str, slugs: set[str] | list[str]) -> str | None:
+    """Published /c/ slug when the title is that slug, maybe after a brand prefix.
+
+    Aled sometimes titles a Short like ``crypticfit financial times 18478 1a``
+    instead of the clue + #Shorts line. Only an exact published slug counts.
+    """
+    known = set(slugs)
+    key = _slugish(title)
+    if not key:
+        return None
+    for prefix in _BRAND_SLUG_PREFIXES:
+        if key.startswith(prefix) and len(key) > len(prefix):
+            key = key[len(prefix) :]
+            break
+    return key if key in known else None
+
+
 def match_feed_to_films(
     entries: list[dict[str, str]],
     films: list[tuple[str, str]],
 ) -> dict[str, dict[str, str]]:
     """Map slug → {youtube_id, uploaded_at} only when the match is unique.
 
-    `films` is (slug, clue line). Title must equal our Short title, or the
-    description must contain that slug's /c/ URL. Ambiguous hits are dropped.
-    The intro id is never assigned unless it uniquely matches a published film.
+    `films` is (slug, clue line). Title must equal our Short title, name the
+    published /c/ slug uniquely, or the description must contain that slug's
+    /c/ URL. Ambiguous hits are dropped. The intro id is never assigned unless
+    it uniquely matches a published film.
     """
     from twodown.youtube import video_title_from_line
 
@@ -397,6 +421,9 @@ def match_feed_to_films(
         title_hits = by_title.get(_title_key(entry.get("title") or ""), [])
         if len(title_hits) == 1 and title_hits[0] not in hits:
             hits.append(title_hits[0])
+        slug_hit = slug_from_title(entry.get("title") or "", slugs)
+        if slug_hit and slug_hit not in hits:
+            hits.append(slug_hit)
         if video_id == INTRO_YOUTUBE_ID and not hits:
             continue
         if len(hits) != 1:
