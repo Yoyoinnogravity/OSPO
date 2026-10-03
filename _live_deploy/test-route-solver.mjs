@@ -563,15 +563,12 @@ const tPrio = plan(makeGrid(12), { surveyType: '2d', progression: 'auto' });
 assert(tPrio.nVisit === 12, 'priority Auto must visit all 12');
 assert(src.includes('min="1" max="100"'), 'Line Manager UI 1-100 missing');
 
-function swathOfRank(rank, n, numSw) {
-  return Math.floor(rank / Math.ceil(n / numSw));
-}
 function swathBlocksIntact(ranks, n, numSw) {
   if (!ranks.length) return false;
-  let prev = swathOfRank(ranks[0], n, numSw);
+  let prev = swathOfRank(ranks[0], numSw, n);
   const seen = new Set([prev]);
   for (let i = 1; i < ranks.length; i++) {
-    const s = swathOfRank(ranks[i], n, numSw);
+    const s = swathOfRank(ranks[i], numSw, n);
     if (s === prev) continue;
     if (seen.has(s)) return false;
     seen.add(s);
@@ -581,7 +578,7 @@ function swathBlocksIntact(ranks, n, numSw) {
 }
 function adjacentInsideSwath(ranks, n, numSw) {
   for (let i = 1; i < ranks.length; i++) {
-    if (swathOfRank(ranks[i], n, numSw) !== swathOfRank(ranks[i - 1], n, numSw)) continue;
+    if (swathOfRank(ranks[i], numSw, n) !== swathOfRank(ranks[i - 1], numSw, n)) continue;
     if (Math.abs(ranks[i] - ranks[i - 1]) !== 1) return false;
   }
   return true;
@@ -603,9 +600,9 @@ assert(swathBlocksIntact(r83, n83, sw10),
   'P1 must not interleave swaths, first12=' + r83.slice(0, 12).join(','));
 assert(adjacentInsideSwath(r83, n83, sw10),
   'inside a swath still neighbour-to-neighbour with Priority set');
-assert(r83.slice(0, 2).every((r) => swathOfRank(r, n83, sw10) === swathOfRank(81, n83, sw10)),
+assert(r83.slice(0, 2).every((r) => swathOfRank(r, sw10, n83) === swathOfRank(81, sw10, n83)),
   'P1 swath must be acquired first as a block, first=' + r83.slice(0, 4).join(','));
-assert(!(r83[0] === 81 && swathOfRank(r83[1], n83, sw10) === 0),
+assert(!(r83[0] === 81 && swathOfRank(r83[1], sw10, n83) === 0),
   'P1 line 81 must not be yanked out of its swath into swath 1');
 
 const t83Int = plan(makeGrid(n83), {
@@ -616,7 +613,7 @@ const t83Int = plan(makeGrid(n83), {
 });
 assert(swathBlocksIntact(t83Int.ranks, n83, sw10),
   'interleaved+P1 must keep swath blocks, first12=' + t83Int.ranks.slice(0, 12).join(','));
-assert(t83Int.ranks.slice(0, 2).every((r) => swathOfRank(r, n83, sw10) === swathOfRank(81, n83, sw10)),
+assert(t83Int.ranks.slice(0, 2).every((r) => swathOfRank(r, sw10, n83) === swathOfRank(81, sw10, n83)),
   'interleaved P1 swath must still be first');
 
 // User-elected swath count must survive leftover Swath Width (map spinner / Criteria).
