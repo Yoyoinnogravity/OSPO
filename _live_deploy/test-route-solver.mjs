@@ -112,7 +112,8 @@ vm.runInContext(`
   else { const _t = showToast; showToast = function(){}; }
 `, ctx);
 
-assert(/app\.js\?v=17\.32/.test(html), 'app.js cache bump 17.32 missing');
+assert(/app\.js\?v=17\.34/.test(html), 'app.js cache bump 17.34 missing');
+assert(src.includes('function _splitIntoSwathCount'), 'Number of Swaths must equal-split into exactly N bands');
 assert(/id="val-turn-radius">3\.5km/.test(html), 'toolbar RADIUS default must be 3.5km not 5.1');
 assert(/id="input-turn-radius" value="3500"/.test(html), 'turn-radius input default must be 3500 m');
 assert(!/value="5100"/.test(html), 'HTML must not default min turn radius to 5100');
@@ -554,6 +555,33 @@ const tPrio = plan(makeGrid(12), { surveyType: '2d', progression: 'auto' });
 assert(tPrio.nVisit === 12, 'priority Auto must visit all 12');
 assert(src.includes('min="1" max="100"'), 'Line Manager UI 1-100 missing');
 
+// Ask for N swaths → N swaths. Fixed-ceil(n/N) dropped empty tail bands
+// (12 lines / 5 → 4, 12 / 10 → 6). Remainder split honours N whenever
+// nLines >= N.
+{
+  const nLinesAsk = 12;
+  setup(makeGrid(nLinesAsk), { surveyType: '3d', progression: 'low-high', numSwaths: 2 });
+  const asked = [2, 3, 4, 5, 6, 8, 10];
+  for (const nAsk of asked) {
+    const got = vm.runInContext(`
+      (function() {
+        const lines = state.lines;
+        const idx = lines.map((_, i) => i);
+        return _sliceAdjacentSwaths(idx, lines, { numSwaths: ${nAsk} }).length;
+      })()
+    `, ctx);
+    assert(got === nAsk, 'ask for ' + nAsk + ' swaths on ' + nLinesAsk + ' lines must yield ' + nAsk + ', got ' + got);
+  }
+  const tAsk5 = plan(makeGrid(nLinesAsk), { surveyType: '3d', progression: 'low-high', numSwaths: 5 });
+  assert(tAsk5.nVisit === nLinesAsk, '5-swath plan must still visit all 12');
+  assert(tAsk5.stats && tAsk5.stats.nSwaths === 5,
+    'plan with Number of Swaths=5 must report 5 bands, got ' + (tAsk5.stats && tAsk5.stats.nSwaths));
+  const tAsk10 = plan(makeGrid(40), { surveyType: '3d', progression: 'auto', numSwaths: 10 });
+  assert(tAsk10.nVisit === 40, '10-swath Auto must visit all 40');
+  assert(tAsk10.stats && tAsk10.stats.nSwaths === 10,
+    'ask for 10 swaths must yield 10, got ' + (tAsk10.stats && tAsk10.stats.nSwaths));
+}
+
 // User-elected swath count must survive leftover Swath Width (map spinner / Criteria).
 setup(makeGrid(12), {
   surveyType: '3d',
@@ -570,6 +598,21 @@ const nUser = vm.runInContext(`
   })()
 `, ctx);
 assert(nUser === 4, 'user-elected 4 swaths must not be replaced by leftover width, got ' + nUser);
+setup(makeGrid(12), {
+  surveyType: '3d',
+  progression: 'low-high',
+  numSwaths: 5,
+  swathWidth: 50000,
+});
+vm.runInContext('state.settings.swathCountUserSet = true;', ctx);
+const nUser5 = vm.runInContext(`
+  (function() {
+    const lines = state.lines;
+    const idx = lines.map((_, i) => i);
+    return _sliceAdjacentSwaths(idx, lines, { numSwaths: 5 }).length;
+  })()
+`, ctx);
+assert(nUser5 === 5, 'user-elected 5 swaths on 12 lines must yield 5, got ' + nUser5);
 assert(src.includes('function _persistSwathElection'), 'swath election must persist');
 assert(src.includes('function _restoreSwathElection'), 'swath election must restore after login');
 assert(src.includes('swathCountUserSet'), 'swathCountUserSet flag missing');
@@ -615,7 +658,7 @@ assert(vm.runInContext('globalThis.__autoNs', ctx) === '6',
 
 console.log(JSON.stringify({
   ok: true,
-  cache: '17.32',
+  cache: '17.34',
   rule: '2D skip-k; 3D swath shooting (adjacent monopass, locked heading, stadium returns)',
   kNom,
   nn: { visit: nn.nVisit, mode: nn.stats.mode, ms: nn.ms },
