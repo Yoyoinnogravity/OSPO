@@ -1,0 +1,16 @@
+---
+description: 3D sq km uses (streamers × sep) / 2 — do not use grid spacing
+alwaysApply: true
+---
+
+# Full-fold sq km formula is binding
+
+Aled already set this. 3D Prime Full Fold area is:
+
+full-fold length × (numStreamers × streamerSeparation / 2) / 1,000,000
+
+Do not substitute adjacent sail-line / preplot grid spacing, settings.lineSpacing,
+or swath width. Line Separation on the map summary is a display / offline metric
+only; it must not feed sq km.
+
+Regression: `node _live_deploy/test-route-solver.mjs`

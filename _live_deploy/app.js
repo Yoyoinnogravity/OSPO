@@ -394,6 +394,7 @@ const state = {
  streamerSeparation: 100, // metres between streamers
  swathWidth: 0, // metres (0 = auto-detect from line spacing)
  numSwaths: 2,
+ // User-requested Number of Swaths is BINDING. Engagement/ranking MUST NOT rewrite N.
  swathCountUserSet: false, // true once the user picks a swath count; Auto must not clobber it
  swathDirections: [],
  swathUnit: 'm',
@@ -736,7 +737,8 @@ function initLeafletMap() {
 
  if (!map.getPane('swathPane')) {
   map.createPane('swathPane');
-  map.getPane('swathPane').style.zIndex = 350; // under survey-line overlay (400)
+  // Above the preplot (400) so cyan delimitation is visible; below the route (450).
+  map.getPane('swathPane').style.zIndex = 425;
  }
  if (!map.getPane('routePane')) {
   map.createPane('routePane');
@@ -4632,6 +4634,7 @@ function updateSurveyTypeIndicator(type) {
  // Empty workspace: do not imply 3D before a preplot / OBN patch exists.
  if (!surveyHasLoadedGeometry()) {
   indicator.style.display = 'none';
+  if (typeof _syncHardMapSwathPicker === 'function') _syncHardMapSwathPicker();
   return;
  }
  if (!type) type = (state.settings.surveyType || '3d');
@@ -4651,8 +4654,21 @@ function updateSurveyTypeIndicator(type) {
  indicator.style.display = 'block';
  // Area (sq km) is a 3D full-fold coverage concept - hide for 2D planning.
  setAreaStatsVisible(type !== '2d');
+ if (typeof _syncHardMapSwathPicker === 'function') _syncHardMapSwathPicker();
  if (typeof _syncSwathOnOffTabs === 'function') _syncSwathOnOffTabs();
  if (typeof renderSwathOverlays === 'function') renderSwathOverlays();
+}
+
+/** Hard-coded map chrome: Number of swaths is only on the map when 3D is chosen. */
+function _syncHardMapSwathPicker() {
+ const picker = document.getElementById('map-swath-picker');
+ if (!picker) return;
+ const type = state.settings.surveyType || '3d';
+ const show3d = type === '3d';
+ picker.style.display = show3d ? 'block' : 'none';
+ const n = state.settings.numSwaths || 2;
+ const hard = document.getElementById('map-hard-num-swaths');
+ if (hard && String(hard.value) !== String(n)) hard.value = String(n);
 }
 
 /** Show or hide sq-km / area UI (2D surveys only need line / SP / time metrics). */
@@ -5545,8 +5561,9 @@ function askSurveyCriteria({ zone, hemi }, callback) {
  state.settings.swathWidth = swMetres;
  state.settings.swathUnit = swUnit;
  state.settings.swathRawValue = isFinite(swVal) && swVal > 0 ? swVal : 0;
- // Swath width is not preplot line spacing. Skip-k and sq km must keep
- // using adjacent-line separation from the grid, not this value.
+ // Swath width is not preplot line spacing. Skip-k / offline keep using
+ // adjacent-line separation from the grid, not this value.
+ // Sq km formula Aled set: (numStreamers × streamerSeparation / 2).
  state.settings.progression = progression;
  state.settings.surveyType = surveyType;
  state.settings.numSwaths = numSwaths;
@@ -8113,6 +8130,7 @@ function renderSurveyLines() {
  const visit = (typeof _routeVisitOrder === 'function') ? _routeVisitOrder() : { byName: new Map(), n: 0 };
  allLines.forEach((line, idx) => {
  const ls = (state.lineStatus && state.lineStatus[line.id]) || { status: 'planned' };
+ // Rainbow along survey time — agreed. Not line-index, not a yellow wash.
  let lineColor = visit.n
   ? visitColorForLine(line.name, visit)
   : '#00ff88';
@@ -8233,6 +8251,7 @@ function renderSurveyLines() {
 // split by Number of Swaths. Never skip-k / every-Nth — a swath is adjacent.
 function _effectiveLinesPerSwath(lines) {
  const s = state.settings || {};
+ // User-requested Number of Swaths is BINDING. Engagement/ranking MUST NOT rewrite N.
  // User picked Number of Swaths (map spinner or typed in Criteria). That
  // election wins: equal adjacent bands, not a leftover width from Auto.
  if (s.swathCountUserSet) return 0;
@@ -8246,12 +8265,20 @@ function _effectiveLinesPerSwath(lines) {
  return 0;
 }
 
-// Canonical across-track order so Swath 1 is always the low / west / south
-// adjacent bundle. Visit direction is applied afterwards, not by reversing
-// membership.
+// Signed distance of a line's midpoint along the across-track axis (perp to
+// the first sail line). Neighbouring lines sort next to each other.
+function _acrossTrackKey(line, refMid, perpBrg) {
+ const mid = [(line.start[0] + line.end[0]) / 2, (line.start[1] + line.end[1]) / 2];
+ const d = haversine(refMid, mid);
+ if (!(d > 0)) return 0;
+ const rad = ((bearing(refMid, mid) - perpBrg) * Math.PI) / 180;
+ return d * Math.cos(rad);
+}
+
+// Canonical across-track order so Swath 1 is the first adjacent bundle.
+// A swath is neighbouring sail lines, not a heading and not a P1 name sort.
 function _sortLineIdxForSwaths(lines, progression, lineNumKey, midpoints) {
  const indices = lines.map((_, i) => i);
- const key = (i) => (lineNumKey && lineNumKey[i] != null) ? lineNumKey[i] : i;
  const mid = (i) => midpoints[i] || [
   (lines[i].start[0] + lines[i].end[0]) / 2,
   (lines[i].start[1] + lines[i].end[1]) / 2
@@ -8260,10 +8287,36 @@ function _sortLineIdxForSwaths(lines, progression, lineNumKey, midpoints) {
   indices.sort((a, b) => mid(a)[1] - mid(b)[1]);
  } else if (progression === 'south-north' || progression === 'north-south') {
   indices.sort((a, b) => mid(a)[0] - mid(b)[0]);
+ } else if (lines.length && lines[0] && lines[0].start && lines[0].end) {
+  const ref = mid(0);
+  const perp = (bearing(lines[0].start, lines[0].end) + 90) % 360;
+  indices.sort((a, b) => _acrossTrackKey(lines[a], ref, perp) - _acrossTrackKey(lines[b], ref, perp));
+  const key = (i) => (lineNumKey && lineNumKey[i] != null) ? lineNumKey[i] : i;
+  if (indices.length >= 2 && key(indices[0]) > key(indices[indices.length - 1])) {
+   indices.reverse();
+  }
  } else {
+  const key = (i) => (lineNumKey && lineNumKey[i] != null) ? lineNumKey[i] : i;
   indices.sort((a, b) => key(a) - key(b));
  }
  return indices;
+}
+
+// Partition adjacent lines into exactly min(N, nLines) non-empty groups.
+// User-requested Number of Swaths is BINDING. Engagement/ranking MUST NOT rewrite N.
+// Fixed ceil(n/N) left empty tail slots (12 lines / 5 swaths → 4 bands).
+function _splitIntoSwathCount(sortedIdx, nSw) {
+ const n = sortedIdx.length;
+ const k = Math.max(1, Math.min(nSw, n));
+ const groups = [];
+ let offset = 0;
+ for (let g = 0; g < k; g++) {
+  const sz = Math.ceil((n - offset) / (k - g));
+  const slice = sortedIdx.slice(offset, offset + sz);
+  if (slice.length) groups.push(slice);
+  offset += sz;
+ }
+ return groups;
 }
 
 // Contiguous slices of already-sorted adjacent lines. Never round-robin.
@@ -8280,13 +8333,7 @@ function _sliceAdjacentSwaths(sortedIdx, lines, opts) {
   return groups;
  }
  const nSw = Math.max(1, parseInt(opts.numSwaths != null ? opts.numSwaths : (state.settings && state.settings.numSwaths), 10) || 1);
- const groupSize = Math.ceil(sortedIdx.length / nSw);
- const groups = [];
- for (let g = 0; g < nSw; g++) {
-  const slice = sortedIdx.slice(g * groupSize, (g + 1) * groupSize);
-  if (slice.length) groups.push(slice);
- }
- return groups;
+ return _splitIntoSwathCount(sortedIdx, nSw);
 }
 
 // Order in which adjacent-line swaths are acquired. Default / Auto / sequential
@@ -8394,18 +8441,19 @@ function _swathBandLatLngs(grp) {
  return [a.start, a.end, bEnd, bStart];
 }
 
-// Draw filled 3D swath bands on the preplot, plus a SWATH n label on each band.
+// Draw 3D swath bands: adjacent sail-line groups, cyan dashed delimitation,
+// and a SWATH n label on that band. A swath is not a Low→High heading chip
+// in the middle of the grid. Line colour is the time rainbow.
 function renderSwathOverlays() {
  if (!layerSwaths) return;
  layerSwaths.clearLayers();
  if (state.showSwaths === false) return;
  const s = state.settings;
  if ((s.surveyType || '3d') !== '3d') return;
- const numSwaths = s.numSwaths || 1;
+ const numSwaths = Math.max(2, parseInt(s.numSwaths, 10) || 2);
  const progression = s.progression || 'low-high';
  const groups = _computeSwathGroups(numSwaths, progression);
  if (groups.length < 1) return;
- const swathDirections = s.swathDirections || [];
  const paneOpts = (typeof map !== 'undefined' && map && map.getPane && map.getPane('swathPane'))
   ? { pane: 'swathPane' } : {};
 
@@ -8415,22 +8463,21 @@ function renderSwathOverlays() {
  const ring = _swathBandLatLngs(grp);
  if (ring) {
   L.polygon(ring, Object.assign({
-   color, weight: 1.6, opacity: 0.85,
-   fillColor: color, fillOpacity: 0.22,
+   color: '#00d2ff', weight: 1.4, opacity: 0.9, dashArray: '10,8',
+   fillColor: color, fillOpacity: 0.04,
    interactive: false
   }, paneOpts)).addTo(layerSwaths);
  }
  let latSum = 0, lonSum = 0;
  grp.forEach(l => { latSum += (l.start[0] + l.end[0]) / 2; lonSum += (l.start[1] + l.end[1]) / 2; });
  const centre = [latSum / grp.length, lonSum / grp.length];
- const dir = swathDirections[g] || defaultSwathDirection(g);
- const dirTxt = dir === 'high-low' ? 'High\u2192Low SP' : 'Low\u2192High SP';
  L.marker(centre, {
   interactive: false,
   icon: L.divIcon({
    className: '',
-   html: `<div style="background:rgba(4,16,30,0.88);border:1px solid ${color};color:${color};font-size:11px;font-weight:700;padding:2px 7px;border-radius:3px;white-space:nowrap;text-shadow:1px 1px 2px #000;pointer-events:none;transform:translate(-50%,-50%);">SWATH ${g + 1}<span style="color:#9fb2c4;font-weight:400;font-size:9px;"> \u00b7 ${dirTxt}</span></div>`,
-   iconAnchor: [0, 0]
+   iconSize: [0, 0],
+   iconAnchor: [0, 0],
+   html: `<div style="background:rgba(4,16,30,0.88);border:1px solid #00d2ff;color:#00d2ff;font-size:11px;font-weight:700;padding:2px 7px;border-radius:3px;white-space:nowrap;text-shadow:1px 1px 2px #000;pointer-events:none;transform:translate(-50%,-50%);">SWATH ${g + 1}</div>`
   })
  }).addTo(layerSwaths);
  });
@@ -8449,7 +8496,7 @@ function renderSwathOverlays() {
  const p1 = destinationPoint(dS, (dBrg + 180) % 360, ext);
  const p2 = destinationPoint(dE, dBrg, ext);
  L.polyline([p1, p2], Object.assign({
-  color: '#e2e8f0', weight: 1.2, opacity: 0.45, dashArray: '10,8', interactive: false
+  color: '#00d2ff', weight: 2, opacity: 0.95, dashArray: '10,8', interactive: false
  }, paneOpts)).addTo(layerSwaths);
  }
 }
@@ -8551,6 +8598,9 @@ function setMapSwathCount(n) {
  }
  const mapEl = document.getElementById('map-num-swaths');
  if (mapEl && String(mapEl.value) !== String(n)) mapEl.value = String(n);
+ const hardEl = document.getElementById('map-hard-num-swaths');
+ if (hardEl && String(hardEl.value) !== String(n)) hardEl.value = String(n);
+ if (typeof _syncHardMapSwathPicker === 'function') _syncHardMapSwathPicker();
  if (typeof updateSwathDirectionUI === 'function') updateSwathDirectionUI();
  if (state.showSwaths !== false && map && layerSwaths && !map.hasLayer(layerSwaths)) {
   map.addLayer(layerSwaths);
@@ -8579,6 +8629,9 @@ function _syncSwathOnOffTabs() {
  var mapEl = document.getElementById('map-num-swaths');
  var n = state.settings.numSwaths || 2;
  if (mapEl && String(mapEl.value) !== String(n)) mapEl.value = String(n);
+ var hardEl = document.getElementById('map-hard-num-swaths');
+ if (hardEl && String(hardEl.value) !== String(n)) hardEl.value = String(n);
+ if (typeof _syncHardMapSwathPicker === 'function') _syncHardMapSwathPicker();
 }
 
 function _mapSwathsBlockHtml() {
@@ -8710,7 +8763,7 @@ function updateSurveySummary(extraStats) {
  var nStr = state.settings.numStreamers || 6;
  var strSep = state.settings.streamerSeparation || 100;
  var spInt = state.settings.spInterval || 12.5;
- var crossLineM = (nStr * strSep) / 2;
+ var crossLineM = _crossLineWidthM(nStr, strSep);
 
  // Per-line: SP count from the preplot'SP records (see lineSpCount),
  // coverage = numSP x spInt (CMP bins). Separate prime and infill
@@ -8758,15 +8811,8 @@ function updateSurveySummary(extraStats) {
  var remainingKm = remainingM / 1000;
  var avgLineKm = primeCount > 0 ? primeKm / primeCount : 0;
 
- // Line separation (detect from midpoints of adjacent prime lines)
  var primeLines = allLines.filter(function(l) { return !l._infill; });
- var lineSepM = 0;
- if (primeLines.length >= 2) {
- var mids = primeLines.map(function(l) { return [(l.start[0]+l.end[0])/2, (l.start[1]+l.end[1])/2]; });
- var sepSum = 0, sepCnt = 0;
- for (var si = 1; si < mids.length; si++) { sepSum += haversine(mids[si-1], mids[si]); sepCnt++; }
- lineSepM = sepCnt > 0 ? Math.round(sepSum / sepCnt) : 0;
- }
+ var lineSepM = getPreplotLineSeparationM();
 
  // Line bearing (grid and geographic) from first prime line
  var gridBrg = 0, geoBrg = 0;
@@ -9359,9 +9405,16 @@ function segmentClearOfAllObstructions(a, b) {
  return true;
 }
 
-// Preplot line separation (m): average adjacent prime-line midpoint distance.
-// Do NOT use settings.lineSpacing here — it used to be overwritten with
-// swath width; always measure adjacent prime-line separation instead.
+// Sq km formula Aled set. Do not substitute preplot line spacing or swath width.
+// 3D full-fold area = full-fold length × (numStreamers × streamerSeparation / 2).
+function _crossLineWidthM(nStr, strSep) {
+ if (typeof nStr === 'object') { nStr = undefined; strSep = undefined; }
+ const n = (nStr != null && nStr > 0) ? nStr : ((state.settings && state.settings.numStreamers) || 6);
+ const sep = (strSep != null && strSep > 0) ? strSep : ((state.settings && state.settings.streamerSeparation) || 100);
+ return Math.max(1, (n * sep) / 2);
+}
+
+// Display / offline only. Do not feed this into sq km.
 function getPreplotLineSeparationM() {
  const lines = ((state._allLines || state.lines) || []).filter(l => !l._infill);
  if (lines.length >= 2) {
@@ -12771,9 +12824,9 @@ function _monopassSwathSeq(idxs, reversed, visitFlip) {
 //  - finish each swath as a block before the next
 //  - every line in a swath uses that swath's Low→High / High→Low heading
 // Fastest legal plan: adjacent sequential inside the swath (skip-k needs
-// opposite headings). Auto searches every swath-block order + start edge
-// (exact DP, nSwaths <= 10). Explicit Low→High / interleaved keep their
-// visit order and only search start edges. Skip-k racetrack is 2D only.
+// opposite headings). The on-map Number of Swaths bands ARE the route map:
+// Auto does not permute swath-block order for engagement / time. Explicit
+// Low→High / interleaved keep their visit order. Skip-k racetrack is 2D only.
 function _swathOrientations(idxs, headingRev, startIdx, userStartLocked) {
  const flips = [];
  const lockedHere = userStartLocked && startIdx >= 0 && idxs.indexOf(startIdx) >= 0;
@@ -13205,6 +13258,7 @@ function computeRoute() {
  // line swaths as blocks, one heading per swath. Skip-k racetrack is 2D only.
  if (state.settings.surveyType === '3d' && !swathRacetrackFilled) {
  const bandIdx = _sortLineIdxForSwaths(lines, progression, lineNumKey, midpoints);
+ // User-requested Number of Swaths is BINDING. Engagement/ranking MUST NOT rewrite N.
  const swaths = _sliceAdjacentSwaths(bandIdx, lines, { numSwaths: state.settings.numSwaths || 2 });
  if (progression === 'interleaved-reverse') swaths.forEach(s => s.reverse());
 
@@ -13214,7 +13268,7 @@ function computeRoute() {
   for (let g = 0; g < swaths.length; g++) {
    if (swaths[g].indexOf(startFilteredIdx) >= 0) { forceStartSwath = g; break; }
   }
- } else if (state.settings.startPoint && !is3dAuto) {
+ } else if (state.settings.startPoint) {
   let bestD = Infinity, bestG = -1;
   for (let g = 0; g < swaths.length; g++) {
    if (!swaths[g].length) continue;
@@ -13250,7 +13304,8 @@ function computeRoute() {
   userStartLocked: !!startLineObj,
   forceStartSwath,
   swathOrder,
-  searchSwathOrder: is3dAuto && state.settings.optimizerMode !== 'nn',
+  // The map's N swath bands are the plan. Do not DP-permute them.
+  searchSwathOrder: false,
   depotSec: depotSec3d,
   swathDirs: swaths.map((_, g) => swDirsPlan[g] || defaultSwathDirection(g))
  });
@@ -13290,18 +13345,20 @@ function computeRoute() {
  // on-map swath labels), regardless of the progression direction. Compass
  // progressions band along their (spatial) sort order instead.
  {
- const nSw = state.settings.numSwaths || 1;
+ const nSw = Math.max(2, parseInt(state.settings.numSwaths, 10) || 2);
  const swDirs = state.settings.swathDirections || [];
  const isCompass = (progression === 'west-east' || progression === 'east-west' ||
  progression === 'south-north' || progression === 'north-south');
  const bandOrder = isCompass
  ? indices.slice()
  : lines.map((_, i) =>i).sort((a, b) =>lineNumKey[a] - lineNumKey[b]);
- const gSize = Math.ceil(bandOrder.length / nSw);
- for (let g = 0; g < nSw; g++) {
+ const bands = (typeof _sliceAdjacentSwaths === 'function')
+  ? _sliceAdjacentSwaths(bandOrder, lines, { numSwaths: nSw })
+  : _splitIntoSwathCount(bandOrder, nSw);
+ for (let g = 0; g < bands.length; g++) {
  const dir = swDirs[g] || defaultSwathDirection(g);
- for (let k = g * gSize; k < Math.min((g + 1) * gSize, bandOrder.length); k++) {
- swathDirOf[bandOrder[k]] = dir;
+ for (let k = 0; k < bands[g].length; k++) {
+ swathDirOf[bands[g][k]] = dir;
  }
  }
  }
@@ -14534,13 +14591,19 @@ function computeDubinsTransitDist(waypoints, startIdx, endIdx) {
 }
 
 // ===== RENDER ROUTE =====
-// Sequence colour: placed on time — red at survey start, green at survey end.
+// Time-line colour is BINDING and it is a RAINBOW THROUGH TIME.
+// Red at first acquisition, then orange, yellow, green, cyan, blue,
+// violet at last. Mapped by elapsed survey time, not by line index.
+// Sail lines, transits, and the timeline all use it.
 function timeGradientColor(fraction) {
  const stops = [
- { t: 0.0, r: 255, g: 69, b: 58 }, // #ff453a red (start)
- { t: 0.35, r: 255, g: 149, b: 0 }, // #ff9500 orange
- { t: 0.65, r: 255, g: 214, b: 10 }, // #ffd60a yellow
- { t: 1.0, r: 48, g: 209, b: 88 } // #30d158 green (end)
+ { t: 0.00, r: 255, g: 69, b: 58 },   // red
+ { t: 0.16, r: 255, g: 149, b: 0 },   // orange
+ { t: 0.33, r: 255, g: 214, b: 10 },  // yellow
+ { t: 0.50, r: 48, g: 209, b: 88 },   // green
+ { t: 0.66, r: 0, g: 210, b: 255 },   // cyan
+ { t: 0.83, r: 64, g: 156, b: 255 },  // blue
+ { t: 1.00, r: 191, g: 90, b: 242 }   // violet
  ];
  const f = Math.max(0, Math.min(1, fraction));
  let lo = stops[0], hi = stops[stops.length - 1];
@@ -14570,6 +14633,7 @@ function _routeSegTimeSec(waypoints, i, onlineMs, turnMs) {
 function _routeVisitOrder(waypoints) {
  const byName = new Map();
  const t0ByName = new Map();
+ const tAtIdx = [];
  let n = 0;
  const route = waypoints || state.route || [];
  const onlineKn = (state.settings && state.settings.speed) || 4.5;
@@ -14579,14 +14643,15 @@ function _routeVisitOrder(waypoints) {
  let t = 0;
  for (let i = 0; i < route.length; i++) {
   const w = route[i];
+  tAtIdx[i] = t;
   if (w && w.type === 'lineStart' && w.lineName && !byName.has(w.lineName)) {
-   if (n === 0) t = 0; // colour clock starts at first acquisition, not the approach run-in
+   if (n === 0) { t = 0; tAtIdx[i] = 0; } // colour clock starts at first acquisition, not the approach run-in
    byName.set(w.lineName, n++);
    t0ByName.set(w.lineName, t);
   }
   if (i < route.length - 1) t += _routeSegTimeSec(route, i, onlineMs, turnMs);
  }
- return { byName, n, t0ByName, totalSec: t };
+ return { byName, n, t0ByName, totalSec: t, tAtIdx };
 }
 
 function visitColorForLine(lineName, visit) {
@@ -14597,6 +14662,13 @@ function visitColorForLine(lineName, visit) {
  const i = visit.byName.get(lineName);
  if (i == null) return '#8a9bb0';
  return timeGradientColor(visit.n <= 1 ? 0 : i / (visit.n - 1));
+}
+
+function visitColorAtIdx(visit, i, lineName) {
+ if (!visit || !(visit.totalSec > 0) || !visit.tAtIdx) {
+  return lineName ? visitColorForLine(lineName, visit) : '#8a9bb0';
+ }
+ return timeGradientColor((visit.tAtIdx[i] || 0) / visit.totalSec);
 }
 
 function _addRouteArrow(from, to, color, layer, opacity) {
@@ -14669,10 +14741,10 @@ function _bezierSpline(points, segmentsPerCurve) {
 let _routeViewMode = 'overview'; // 'overview' | 'step'
 let _routeHighlight = null; // { startWpIdx, endWpIdx } or null
 
-function _routeTransitOverviewStyle() {
+function _routeTransitOverviewStyle(color) {
  return {
   pane: 'routePane',
-  color: '#ffcc33',
+  color: color || '#ffcc33',
   weight: 2.6,
   opacity: 0.95,
   lineCap: 'round',
@@ -14726,17 +14798,18 @@ function _drawRoutePolyline(latlngs, style) {
  L.polyline(latlngs, Object.assign({ pane: 'routePane' }, style)).addTo(layerRoute);
 }
 
-function _drawFocusedTransit(arcPts) {
+function _drawFocusedTransit(arcPts, color) {
  if (!arcPts || arcPts.length < 2) return;
+ const c = color || '#ffb020';
  _drawRoutePolyline(arcPts, {
   color: '#1a1006', weight: 5, opacity: 0.8,
   lineCap: 'round', lineJoin: 'round', interactive: false
  });
- _drawRoutePolyline(arcPts, _routeTransitFocusStyle());
+ _drawRoutePolyline(arcPts, Object.assign(_routeTransitFocusStyle(), { color: c }));
  if (layerArrows) {
   const midIdx = Math.floor(arcPts.length / 2);
   const endIdx = Math.min(midIdx + 1, arcPts.length - 1);
-  _addRouteArrow(arcPts[midIdx], arcPts[endIdx], '#ffb020', layerArrows, 0.95);
+  _addRouteArrow(arcPts[midIdx], arcPts[endIdx], c, layerArrows, 0.95);
  }
 }
 
@@ -14764,18 +14837,24 @@ function renderRoute(waypoints, opts) {
  const pts = waypoints.map(w => w.pt);
  let startPt = null, endPt = null;
 
- // Always draw the vessel sail: on-line, run-in/out, and Dubins line-change
- // turns. Skipping on-line because the preplot exists left Show All blank;
- // the U-turns sit past run-out, so they must stay painted and the map
- // must fit to them after a plan.
+ // Overview: preplot already shows sail lines. Draw run-in/out and Dubins
+ // line-changes in time colour. Step/focus still paints the current line.
+ // Repainting every sail line in time colour on Show All filled the grid
+ // and hid swath delimitation. U-turns sit past run-out and must stay painted.
  for (let i = 0; i < waypoints.length - 1; i++) {
   const a = waypoints[i], b = waypoints[i + 1];
   const focused = _routeSegFocused(i, highlight);
   if (a.type === 'lineStart' && !startPt) startPt = a.pt;
   if (b.type === 'lineEnd') endPt = b.pt;
 
+  const tColor = visitColorAtIdx(visit, i, a.lineName && a.lineName === b.lineName ? a.lineName : null);
+
   if (a.type === 'lineStart' && b.type === 'lineEnd' && a.lineName === b.lineName) {
-   const acqColor = visitColorForLine(a.lineName, visit);
+   // Show All: preplot already draws the sail line. Repainting every line in
+   // time colour fills the grid and hides swath delimitation. Step/focus still
+   // lights the current line.
+   if (overview && !focused) continue;
+   const acqColor = tColor;
    if ((state.obstructions || []).length && findLineObstructionIntersections(a.pt, b.pt).length) {
     state._staleRouteObsHits = (state._staleRouteObsHits || 0) + 1;
     _drawRoutePolyline([a.pt, b.pt], {
@@ -14791,18 +14870,18 @@ function renderRoute(waypoints, opts) {
     _drawRoutePolyline([a.pt, b.pt], { color: acqColor, weight: 2.4, opacity: 0.95, interactive: false });
    }
   } else if (a.type === 'lineEnd' && b.type === 'runOutEnd' && a.lineName === b.lineName) {
-   const acqColor = visitColorForLine(a.lineName, visit);
+   const acqColor = tColor;
    if (focused) {
     _drawRoutePolyline([a.pt, b.pt], { color: acqColor, weight: 2.5, opacity: 0.9, dashArray: '8,4', interactive: false });
     if (layerArrows) _addRouteArrow(a.pt, b.pt, acqColor, layerArrows, 0.9);
    } else {
-    _drawRoutePolyline([a.pt, b.pt], { color: '#ffcc33', weight: 2, opacity: 0.85, dashArray: '8,4', interactive: false });
+    _drawRoutePolyline([a.pt, b.pt], { color: acqColor, weight: 2, opacity: 0.85, dashArray: '8,4', interactive: false });
    }
   } else if (a.type === 'runInStart' && b.type === 'lineStart' && a.lineName === b.lineName) {
    if (focused) {
-    _drawFocusedTransit([a.pt, b.pt]);
+    _drawFocusedTransit([a.pt, b.pt], tColor);
    } else {
-    _drawRoutePolyline([a.pt, b.pt], _routeTransitOverviewStyle());
+    _drawRoutePolyline([a.pt, b.pt], _routeTransitOverviewStyle(tColor));
    }
   } else if ((a.type === 'obsAvoidStart' || a.type === 'obsAvoidance' || a.type === 'obsAvoidEnd') &&
    (b.type === 'obsAvoidStart' || b.type === 'obsAvoidance' || b.type === 'obsAvoidEnd' ||
@@ -14816,10 +14895,10 @@ function renderRoute(waypoints, opts) {
      k++;
     }
     if (focused) {
-     _drawFocusedTransit(obsAvoidPts);
+     _drawFocusedTransit(obsAvoidPts, tColor);
     } else {
      _drawRoutePolyline(obsAvoidPts, {
-      color: '#b89620', weight: 1.15, opacity: 0.85, dashArray: '5,5',
+      color: tColor, weight: 1.15, opacity: 0.85, dashArray: '5,5',
       lineCap: 'round', interactive: false
      });
     }
@@ -14830,22 +14909,22 @@ function renderRoute(waypoints, opts) {
   } else if (a.type === 'detour' || b.type === 'detour' ||
    a.type === 'transit-detour' || b.type === 'transit-detour') {
    if (focused) {
-    _drawFocusedTransit([a.pt, b.pt]);
+    _drawFocusedTransit([a.pt, b.pt], tColor);
    } else {
     _drawRoutePolyline([a.pt, b.pt], {
-     color: '#b89620', weight: 1.15, opacity: 0.85, dashArray: '5,5',
+     color: tColor, weight: 1.15, opacity: 0.85, dashArray: '5,5',
      lineCap: 'round', interactive: false
     });
    }
   } else {
-   // Transit / line turn — always draw on Show All. This is the vessel route.
+   // Transit / line turn — always draw on Show All. Colour follows survey time.
    let arcPts;
    try { arcPts = computeArcTurn(waypoints, i); }
    catch (_) { arcPts = [a.pt, b.pt]; }
    if (focused) {
-    _drawFocusedTransit(arcPts);
+    _drawFocusedTransit(arcPts, tColor);
    } else {
-    _drawRoutePolyline(arcPts, _routeTransitOverviewStyle());
+    _drawRoutePolyline(arcPts, _routeTransitOverviewStyle(tColor));
    }
   }
  }
@@ -14951,7 +15030,7 @@ function showRouteStats(waypoints) {
  const nStr = state.settings.numStreamers || 6;
  const strSep = state.settings.streamerSeparation || 100;
  const spInt = state.settings.spInterval || 12.5;
- const crossLineM = (nStr * strSep) / 2;
+ const crossLineM = _crossLineWidthM(nStr, strSep);
 
  // Separate prime from infill and track acquired vs remaining
  let primeM = 0, infillM = 0;
@@ -15323,15 +15402,15 @@ function showLineSchedulePanel(route) {
 }
 
 // ===== ROUTE TIMELINE BAR =====
-function showRouteTimeline(route) {
- if (!route || route.length < 2) return;
- const s = state.settings;
+// Time-line colour is BINDING. Each bar segment is the same red→green as the
+// map. Do not replace this with a single empty/gradient strip.
+function _buildRouteTimelineSegments(route) {
+ if (!route || route.length < 2) return [];
+ const s = state.settings || {};
  const speed = s.speed ?? 4.5;
  const turnSpeed = s.turnSpeed ?? speed;
  const startTime = s.startTime ? new Date(s.startTime) : new Date();
  let currentTime = new Date(startTime);
-
- // Build segments array: { type, name, hours, startTime, endTime }
  const segments = [];
  let i = 0;
  while (i < route.length) {
@@ -15371,7 +15450,39 @@ function showRouteTimeline(route) {
  }
  i++;
  }
+ const totalHrs = segments.reduce((sum, seg) => sum + seg.hours, 0) || 1;
+ let elapsed = 0;
+ for (let k = 0; k < segments.length; k++) {
+  const seg = segments[k];
+  seg.color = timeGradientColor(elapsed / totalHrs);
+  elapsed += seg.hours;
+ }
+ return segments;
+}
 
+function _escTimelineAttr(s) {
+ return String(s == null ? '' : s)
+  .replace(/&/g, '&amp;')
+  .replace(/"/g, '&quot;')
+  .replace(/</g, '&lt;');
+}
+
+function _routeTimelineTrackHtml(segments) {
+ let html = '';
+ for (let k = 0; k < segments.length; k++) {
+  const seg = segments[k];
+  const flex = Math.max(Number(seg.hours) || 0, 0.0001);
+  const title = seg.type === 'line' ? (seg.name || 'line') : 'Line change';
+  html += `<div data-timeline-seg="${seg.type}" data-name="${_escTimelineAttr(title)}" style="flex:${flex};background:${seg.color};min-width:1px;height:18px;" title="${_escTimelineAttr(title)}"></div>`;
+ }
+ return html;
+}
+
+function showRouteTimeline(route) {
+ if (!route || route.length < 2) return;
+ const s = state.settings;
+ const startTime = s.startTime ? new Date(s.startTime) : new Date();
+ const segments = _buildRouteTimelineSegments(route);
  if (segments.length === 0) return;
  const totalHrs = segments.reduce((sum, seg) =>sum + seg.hours, 0);
 
@@ -15413,9 +15524,6 @@ function showRouteTimeline(route) {
  document.getElementById('main').appendChild(bar);
  }
 
- // Timeline matches the map: red at start, green at end
- const gradientStops = '#ff453a 0%, #ff9500 35%, #ffd60a 65%, #30d158 100%';
-
  let markersHtml = '';
  dayMarkers.forEach(m => {
  markersHtml += `<div style="position:absolute;left:${m.pct}%;top:0;bottom:0;border-left:1px solid rgba(255,255,255,0.4);pointer-events:none;">
@@ -15426,21 +15534,18 @@ function showRouteTimeline(route) {
  const totalDays = (totalAdjHrs / 24).toFixed(1);
  const fmtStart = fmtDM24(startTime);
  const fmtEnd = fmtDM24(endTime);
+ const trackHtml = _routeTimelineTrackHtml(segments);
 
  bar.innerHTML = `
  <div style="display:flex;justify-content:space-between;align-items:center;padding:2px 8px;font-size:9px;color:#5a6a7a;">
- <span>${fmtStart} start</span>
+ <span style="color:#ff453a;">${fmtStart} start</span>
  <span style="color:#00d2ff;font-weight:600;">${totalDays} days total</span>
- <span>${fmtEnd} end</span>
+ <span style="color:#30d158;">${fmtEnd} end</span>
  </div>
  <div style="position:relative;margin:0 8px 6px;">
- <div style="min-height:18px;height:18px;border-radius:3px;overflow:hidden;opacity:0.9;"
- title="Route timeline: ${totalDays} days"></div>
+ <div id="route-timeline-track" style="display:flex;min-height:18px;height:18px;border-radius:3px;overflow:hidden;opacity:0.95;">${trackHtml}</div>
  ${markersHtml}
  </div>`;
- // Apply gradient via JS property to avoid template literal escaping issues
- const gradBar = bar.querySelector('div[title]');
- if (gradBar) gradBar.style.background = 'linear-gradient(to right, ' + gradientStops + ')';
  bar.style.display = 'block';
 
  // Push bottom-bar and Leaflet scale control above the timeline bar
@@ -17434,10 +17539,8 @@ function _refreshCostPanel(dlg) {
  let surveyDays = 0, lineKm = 0, sqKm = 0;
  if (hasRoute) {
  const spInt = s.spInterval || 12.5;
- const nStr = s.numStreamers || 6;
- const strSep = s.streamerSeparation || 100;
- const crossLineM = (nStr * strSep) / 2;
  const allLines = state._allLines || state.lines;
+ const crossLineM = _crossLineWidthM();
  let totalSP = 0;
  allLines.forEach(l => { totalSP += lineSpCount(l, spInt); });
  const totalCoverageM = totalSP * spInt; // one CMP bin per SP (see lineFullFoldM)
@@ -17501,12 +17604,10 @@ function _refreshCostPanel(dlg) {
  infillCost = (s.costPerLineKm || 0) * infillLineKm;
  } else if (infillMode === 'sqkm') {
  const spInt = s.spInterval || 12.5;
- const nStr = s.numStreamers || 6;
- const strSep = s.streamerSeparation || 100;
- const crossLineM = (nStr * strSep) / 2;
- let infillTotalSP = 0, infillLineCnt = 0;
- allLines.filter(l =>l._infill).forEach(l => { infillTotalSP += lineSpCount(l, spInt); infillLineCnt++; });
- const infillSqKm = (infillTotalSP - infillLineCnt) * spInt * crossLineM / 1000000;
+ const crossLineM = _crossLineWidthM();
+ let infillFullFoldM = 0;
+ allLines.filter(l => l._infill).forEach(l => { infillFullFoldM += lineFullFoldM(l, spInt); });
+ const infillSqKm = infillFullFoldM * crossLineM / 1000000;
  infillCost = (s.costPerSqKm || 0) * infillSqKm;
  }
  }
@@ -21565,7 +21666,7 @@ function openReportsPanel() {
  const nStr = s.numStreamers || 6;
  const strSep = s.streamerSeparation || 100;
  const spInt = s.spInterval || 12.5;
- const crossLineM = (nStr * strSep) / 2;
+ const crossLineM = _crossLineWidthM(nStr, strSep);
 
  // Per-line: SP count from the preplot'SP range (fallback: dist / spInt),
  // coverage = spCount x spInt (CMP bins). Separate prime/infill,
@@ -22652,11 +22753,11 @@ async function _doGenerateReport() {
  const fmtDeg = (deg) => { const d = Math.abs(deg); return `${Math.floor(d)} deg ${((d - Math.floor(d)) * 60).toFixed(4)}'`; };
  const fmtCoord = (lat, lon) => `${fmtDeg(lat)} ${lat >= 0 ? 'N' : 'S'}, ${fmtDeg(lon)} ${lon >= 0 ? 'E' : 'W'}`;
 
- // Area = fullFoldLength x crossLineWidth / 1,000,000
+ // Area = fullFoldLength × (numStreamers × streamerSeparation / 2) / 1,000,000
  const nStr = s.numStreamers || 6;
  const strSep = s.streamerSeparation || 100;
  const spInt = s.spInterval || 12.5;
- const crossLineM = (nStr * strSep) / 2;
+ const crossLineM = _crossLineWidthM(nStr, strSep);
  let totalFullFoldM = 0, totalSP = 0;
  let primeFullFoldM = 0, primeSP = 0, primeLineCount = 0;
  let infillFullFoldM = 0, infillSP = 0, infillLineCount = 0;

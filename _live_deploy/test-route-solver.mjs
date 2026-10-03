@@ -112,7 +112,12 @@ vm.runInContext(`
   else { const _t = showToast; showToast = function(){}; }
 `, ctx);
 
-assert(/app\.js\?v=17\.32/.test(html), 'app.js cache bump 17.32 missing');
+assert(/app\.js\?v=17\.41/.test(html), 'app.js cache bump 17.41 missing');
+assert(src.includes('function _crossLineWidthM'), '3D sq km helper missing');
+assert(src.includes('Sq km formula Aled set'), 'sq km lock comment missing');
+assert(src.includes('(n * sep) / 2'), 'sq km must use (numStreamers × streamerSeparation / 2)');
+assert(!src.includes('full-fold area uses adjacent sail-line separation'),
+  'sq km must not use preplot grid spacing');
 assert(/id="val-turn-radius">3\.5km/.test(html), 'toolbar RADIUS default must be 3.5km not 5.1');
 assert(/id="input-turn-radius" value="3500"/.test(html), 'turn-radius input default must be 3500 m');
 assert(!/value="5100"/.test(html), 'HTML must not default min turn radius to 5100');
@@ -120,8 +125,19 @@ assert(src.includes("createPane('routePane')"), 'planned route must have its own
 assert(src.includes('function _fitMapToPlannedRoute'), 'after a plan the map must fit to the vessel route');
 assert(src.includes('function dubinsMinRadiusFallback'), 'heading-change must not fall back to a straight chord');
 assert(src.includes('colour clock starts at first acquisition'), 'time colour must start at first lineStart t=0');
+assert(src.includes('A swath is not a Low'), 'swath overlay must not be a heading chip');
+assert(src.includes('SWATH ${g + 1}</div>'), 'swath label must be SWATH n only');
+assert(!src.includes('High\\u2192Low SP'), 'map swath chips must not say High→Low SP');
+assert(src.includes('function _acrossTrackKey'), 'swath bands must sort across-track');
+assert(src.includes('function _buildRouteTimelineSegments'), 'timeline must build per-segment colours');
+assert(src.includes('data-timeline-seg'), 'timeline bar must paint per-segment time colours');
+assert(src.includes('Time-line colour is BINDING'), 'time-line colour lock comment missing');
+assert(!src.includes("color: '#ffcc33', weight: 2, opacity: 0.85"),
+  'unfocused run-out must keep time colour, not flat yellow');
 assert(src.includes(".addTo(layerRoute)"), 'Start/End markers must sit on the route layer');
-assert(!src.includes('else if (!surveyVisible)'), 'Show All must still paint on-line vessel track');
+assert(src.includes('RAINBOW THROUGH TIME'), 'time colour must be a rainbow through time');
+assert(src.includes('r: 191, g: 90, b: 242'), 'rainbow must end in violet');
+assert(src.includes('t0ByName.get(lineName) / visit.totalSec'), 'line colour must follow elapsed survey time');
 assert(src.includes('Load a preplot first, then click Route Planning'), 'empty Plan Route must toast, not silent-return');
 assert(src.includes('if (showStartLineChooser()) return'), 'chooser miss must still executePlanRoute');
 assert(html.includes('1500 sequences, keep the fastest'), 'chooser Auto must score 1500 then keep the fastest');
@@ -143,7 +159,8 @@ assert(!src.includes('Math.min(iters, 20000)'), 'planner must not accept a 20000
 assert(html.includes('skip-k racetrack'), 'chooser Auto must describe skip-k racetrack');
 assert(html.includes('Acquire per swath'), 'chooser must offer acquire-per-swath plans');
 assert(src.includes("progression = 'low-high'"), '3D Auto bands neighbouring lines by line number');
-assert(src.includes('searchSwathOrder'), '3D Auto must search legal swath-block order');
+assert(src.includes('searchSwathOrder: false'),
+  '3D route must follow the mapped swath bands, not permute them for a faster tour');
 assert(src.includes('one heading per swath'), '3D heading lock must stay in the solver');
 assert(!src.includes('searchHeadings'), '3D must not flip Survey Criteria headings');
 assert(src.includes('acquire each adjacent-line swath as a block'), '3D plan type must say acquire per swath');
@@ -200,6 +217,7 @@ function setup(lines, extra) {
     state.settings.startLineReversed = false;
     state.settings.startConfigured = true;
     state.settings.numSwaths = ${extra.numSwaths == null ? 2 : extra.numSwaths};
+    state.settings.swathCountUserSet = ${extra.swathCountUserSet ? 'true' : 'false'};
     state.settings.swathUnit = ${JSON.stringify(extra.swathUnit || 'm')};
     state.settings.swathRawValue = ${extra.swathRawValue ?? 0};
     state.settings.swathWidth = ${extra.swathWidth ?? 0};
@@ -424,6 +442,96 @@ assert(col.total > 0 && col.t0 === 0, 'first line must sit at t=0, t0=' + col.t0
 assert(col.tZ > col.t0, 'last line must be later in time than the first');
 assert(col.a === 'rgb(255,69,58)', 'first line in time must be red, got ' + col.a);
 assert(col.z !== col.a, 'last line in time must not match the start colour');
+const tl = vm.runInContext(`
+  (function() {
+    const segs = _buildRouteTimelineSegments(state._lastRoute);
+    const lines = segs.filter(s => s.type === 'line');
+    const html = _routeTimelineTrackHtml(segs);
+    return {
+      n: segs.length,
+      nLines: lines.length,
+      first: lines[0] && lines[0].color,
+      last: lines.length ? lines[lines.length - 1].color : null,
+      htmlHasSeg: html.includes('data-timeline-seg'),
+      htmlHasRgb: /background:rgb\\(/.test(html)
+    };
+  })()
+`, ctx);
+assert(tl.nLines >= 2, 'timeline must have line segments, nLines=' + tl.nLines);
+assert(tl.first === 'rgb(255,69,58)', 'timeline first line must be red, got ' + tl.first);
+assert(tl.last && tl.last !== tl.first, 'timeline last line must not match start colour, got ' + tl.last);
+assert(tl.htmlHasSeg && tl.htmlHasRgb, 'timeline HTML must paint rgb segment colours');
+
+const areaGrid = makeGrid(10, 250, 20000);
+const area = vm.runInContext(`
+  (function() {
+    const lines = ${JSON.stringify(areaGrid)};
+    state.lines = lines;
+    state._allLines = lines;
+    state.settings.numStreamers = 8;
+    state.settings.streamerSeparation = 100;
+    state.settings.spInterval = 25;
+    const w = _crossLineWidthM();
+    const streamerW = (8 * 100) / 2;
+    const gridW = _medianLineSpacingM(lines);
+    let foldM = 0;
+    lines.forEach(l => { foldM += lineFullFoldM(l, 25); });
+    return { w, streamerW, gridW, foldM, sqKm: foldM * w / 1000000 };
+  })()
+`, ctx);
+assert(Math.abs(area.w - 400) < 1, 'sq km width must be (8×100)/2 = 400 m, got ' + area.w);
+assert(Math.abs(area.streamerW - 400) < 1, 'streamer formula sanity, got ' + area.streamerW);
+assert(Math.abs(area.gridW - 250) < 8, 'grid spacing sanity 250 m, got ' + area.gridW);
+assert(Math.abs(area.w - area.gridW) > 50, 'sq km must not use preplot grid spacing');
+assert(area.sqKm > 78 && area.sqKm < 82,
+  '10 × ~20 km × 400 m must be ~80 km2, got ' + area.sqKm);
+
+const rain = vm.runInContext(`
+  (function() {
+    return {
+      a: timeGradientColor(0),
+      y: timeGradientColor(0.33),
+      g: timeGradientColor(0.5),
+      c: timeGradientColor(0.66),
+      z: timeGradientColor(1)
+    };
+  })()
+`, ctx);
+assert(rain.a === 'rgb(255,69,58)', 'rainbow start must be red, got ' + rain.a);
+assert(rain.z === 'rgb(191,90,242)', 'rainbow end must be violet, got ' + rain.z);
+assert(rain.g === 'rgb(48,209,88)', 'rainbow mid must be green, got ' + rain.g);
+assert(rain.c === 'rgb(0,210,255)', 'rainbow must pass through cyan, got ' + rain.c);
+assert(rain.y !== rain.g && rain.g !== rain.z, 'rainbow must not collapse to yellow');
+
+const named = makeGrid(10, 250, 20000);
+named.forEach((l, i) => { l.name = 'L' + (i % 2 === 0 ? (10 + i) : (100 + i)); });
+const bands = vm.runInContext(`
+  (function() {
+    const lines = ${JSON.stringify(named)};
+    state.lines = lines;
+    state._allLines = lines;
+    state.settings.numSwaths = 2;
+    state.settings.swathCountUserSet = true;
+    state.settings.swathRawValue = 0;
+    state.settings.swathWidth = 0;
+    const g = _computeSwathGroups(2, 'low-high');
+    const ids = g.map(grp => grp.map(l => l.id).sort((a, b) => a - b));
+    return {
+      n: g.length,
+      na: g[0].length,
+      nb: g[1].length,
+      a: ids[0],
+      b: ids[1],
+      aSpan: ids[0][ids[0].length - 1] - ids[0][0],
+      bSpan: ids[1][ids[1].length - 1] - ids[1][0]
+    };
+  })()
+`, ctx);
+assert(bands.n === 2, '2 swaths must draw 2 bands, n=' + bands.n);
+assert(bands.na === 5 && bands.nb === 5, '10 lines / 2 swaths must be 5+5, got ' + bands.na + '+' + bands.nb);
+assert(bands.aSpan === 4 && bands.bSpan === 4,
+  'swaths must be adjacent across-track halves, not name-interleaved, a=' + bands.a + ' b=' + bands.b);
+vm.runInContext('state.settings.swathCountUserSet = false;', ctx);
 
 const turnGeom = vm.runInContext(`
   (function() {
@@ -487,8 +595,8 @@ const tPer = plan(grid164, { surveyType: '3d', progression: 'auto', numSwaths: 4
 assert(tPer.nVisit === 164, '3D Auto per-swath must visit all 164');
 assert(tPer.stats && tPer.stats.mode === 'swath-blocks',
   '3D Auto must use swath-blocks, got ' + (tPer.stats && tPer.stats.mode));
-assert(tPer.stats && tPer.stats.solver === 'swath-dp',
-  '3D Auto must use exact swath-block DP, got ' + (tPer.stats && tPer.stats.solver));
+assert(tPer.stats && tPer.stats.solver === 'swath-blocks',
+  '3D Auto must shoot mapped swath blocks, got ' + (tPer.stats && tPer.stats.solver));
 assert(Math.abs(tPer.ranks[1] - tPer.ranks[0]) === 1,
   '3D Auto swath must progress adjacent, hop=' + Math.abs(tPer.ranks[1] - tPer.ranks[0]));
 const perFirst = tPer.ranks.slice(0, gSize4);
@@ -554,6 +662,33 @@ const tPrio = plan(makeGrid(12), { surveyType: '2d', progression: 'auto' });
 assert(tPrio.nVisit === 12, 'priority Auto must visit all 12');
 assert(src.includes('min="1" max="100"'), 'Line Manager UI 1-100 missing');
 
+// Ask for N swaths → N swaths. Fixed-ceil(n/N) dropped empty tail bands
+// (12 lines / 5 → 4, 12 / 10 → 6). Remainder split honours N whenever
+// nLines >= N.
+{
+  const nLinesAsk = 12;
+  setup(makeGrid(nLinesAsk), { surveyType: '3d', progression: 'low-high', numSwaths: 2 });
+  const asked = [2, 3, 4, 5, 6, 8, 10];
+  for (const nAsk of asked) {
+    const got = vm.runInContext(`
+      (function() {
+        const lines = state.lines;
+        const idx = lines.map((_, i) => i);
+        return _sliceAdjacentSwaths(idx, lines, { numSwaths: ${nAsk} }).length;
+      })()
+    `, ctx);
+    assert(got === nAsk, 'ask for ' + nAsk + ' swaths on ' + nLinesAsk + ' lines must yield ' + nAsk + ', got ' + got);
+  }
+  const tAsk5 = plan(makeGrid(nLinesAsk), { surveyType: '3d', progression: 'low-high', numSwaths: 5 });
+  assert(tAsk5.nVisit === nLinesAsk, '5-swath plan must still visit all 12');
+  assert(tAsk5.stats && tAsk5.stats.nSwaths === 5,
+    'plan with Number of Swaths=5 must report 5 bands, got ' + (tAsk5.stats && tAsk5.stats.nSwaths));
+  const tAsk10 = plan(makeGrid(40), { surveyType: '3d', progression: 'auto', numSwaths: 10 });
+  assert(tAsk10.nVisit === 40, '10-swath Auto must visit all 40');
+  assert(tAsk10.stats && tAsk10.stats.nSwaths === 10,
+    'ask for 10 swaths must yield 10, got ' + (tAsk10.stats && tAsk10.stats.nSwaths));
+}
+
 // User-elected swath count must survive leftover Swath Width (map spinner / Criteria).
 setup(makeGrid(12), {
   surveyType: '3d',
@@ -570,6 +705,46 @@ const nUser = vm.runInContext(`
   })()
 `, ctx);
 assert(nUser === 4, 'user-elected 4 swaths must not be replaced by leftover width, got ' + nUser);
+setup(makeGrid(12), {
+  surveyType: '3d',
+  progression: 'low-high',
+  numSwaths: 5,
+  swathWidth: 50000,
+});
+vm.runInContext('state.settings.swathCountUserSet = true;', ctx);
+const nUser5 = vm.runInContext(`
+  (function() {
+    const lines = state.lines;
+    const idx = lines.map((_, i) => i);
+    return _sliceAdjacentSwaths(idx, lines, { numSwaths: 5 }).length;
+  })()
+`, ctx);
+assert(nUser5 === 5, 'user-elected 5 swaths on 12 lines must yield 5, got ' + nUser5);
+assert(src.includes('function _syncHardMapSwathPicker'), '3D map must have a hard-coded swath count control');
+assert(src.includes("color: '#00d2ff', weight: 2"), 'swath delimitation must be cyan dashed, not faint grey');
+vm.runInContext(`
+  globalThis.__picker = { style: { display: 'none' } };
+  globalThis.__hardNs = { value: '2' };
+  const _gid2 = document.getElementById;
+  document.getElementById = (id) => id === 'map-swath-picker' ? globalThis.__picker
+    : id === 'map-hard-num-swaths' ? globalThis.__hardNs
+    : _gid2(id);
+  state.settings.surveyType = '3d';
+  state.settings.numSwaths = 4;
+  _syncHardMapSwathPicker();
+  globalThis.__disp3d = globalThis.__picker.style.display;
+  globalThis.__hardVal = globalThis.__hardNs.value;
+  state.settings.surveyType = '2d';
+  _syncHardMapSwathPicker();
+  globalThis.__disp2d = globalThis.__picker.style.display;
+  document.getElementById = _gid2;
+`, ctx);
+assert(vm.runInContext('globalThis.__disp3d', ctx) === 'block',
+  '3D must show the hard-coded map swath picker');
+assert(vm.runInContext('globalThis.__hardVal', ctx) === '4',
+  'map picker must show the elected swath count');
+assert(vm.runInContext('globalThis.__disp2d', ctx) === 'none',
+  '2D must hide the hard-coded map swath picker');
 assert(src.includes('function _persistSwathElection'), 'swath election must persist');
 assert(src.includes('function _restoreSwathElection'), 'swath election must restore after login');
 assert(src.includes('swathCountUserSet'), 'swathCountUserSet flag missing');
@@ -615,7 +790,7 @@ assert(vm.runInContext('globalThis.__autoNs', ctx) === '6',
 
 console.log(JSON.stringify({
   ok: true,
-  cache: '17.32',
+  cache: '17.41',
   rule: '2D skip-k; 3D swath shooting (adjacent monopass, locked heading, stadium returns)',
   kNom,
   nn: { visit: nn.nVisit, mode: nn.stats.mode, ms: nn.ms },
