@@ -17,7 +17,6 @@ from twodown.config import BRAND, BRAND_LINE, CREDIT_LINE, CREDIT_WHO, DEFAULT_V
 from twodown.models import DailyPair, SpokenClue
 from twodown.render import opening_frame_poster, write_share_card, write_thumbnail
 from twodown.scenes import DEFAULT_SCENE, get_scene, list_scenes
-from twodown.captions import youtube_description
 from twodown.seo import (
     FAVICON_SVG,
     PageSeo,
@@ -333,6 +332,11 @@ a.action.ghost {
   gap: 10px;
   align-items: center;
   margin: 18px 0 28px;
+}
+a.action.download-short, a.action.download-all {
+  font-size: 1.2rem;
+  font-weight: 700;
+  padding: 16px 22px;
 }
 .staging-list { margin: 0 0 36px; }
 .staging-list > h2 { margin: 28px 0 8px; }
@@ -1026,39 +1030,49 @@ def _root_prefix(media_prefix: str) -> str:
     return ""
 
 
+_YOUTUBE_CHUNK = re.compile(
+    r"""
+    \s*<div\s+class="youtube-upload"[^>]*>.*?</div>
+    (?:\s*<p\s+class="youtube-title">.*?</p>)?
+    (?:\s*<details\s+class="youtube-copy">.*?</details>)?
+    (?:\s*<p\s+class="youtube-(?:copy|help|poster|desc|note)">.*?</p>)*
+    """,
+    re.S | re.X,
+)
+
+
 def _youtube_upload_block(
     slug: str,
     title: str,
     *,
     description: str | None = None,
     kit_href: str | None = None,
+    file_href: str | None = None,
 ) -> str:
-    """Download the Short, open Studio, paste the ready title."""
-    mp4 = short_mp4_url(slug)
-    desc = ""
-    if description:
-        desc = (
-            '<details class="youtube-copy">'
-            "<summary>YouTube description</summary>"
-            f"<pre>{_e(description)}</pre>"
-            "</details>"
-        )
-    kit = ""
-    if kit_href:
-        kit = f'<a href="{_e(kit_href)}">Upload kit</a>'
+    """Download the Short as a local file, then drop it on Studio."""
+    href = file_href or f"media/{slug}.mp4"
+    filename = short_download_name(slug)
+    desc = studio_description() if description is None else description
+    kit = f'<a href="{_e(kit_href)}">Upload kit</a>' if kit_href else ""
     return f"""
       <div class="youtube-upload" data-youtube-upload="{_e(slug)}">
-        <a class="action" href="{_e(mp4)}" download="{_e(slug)}.mp4">Get this Short for YouTube</a>
+        <p class="youtube-help">{_e(STUDIO_DROP_HELP)}</p>
+        <a class="action download-short" href="{_e(href)}" download="{_e(filename)}">Download Short</a>
         <a class="action ghost" href="{_e(YOUTUBE_STUDIO)}" target="_blank" rel="noopener">Open YouTube Studio</a>
         {kit}
       </div>
-      <p class="youtube-title">YouTube title for <a href="{_e(YOUTUBE_CHANNEL_URL)}" target="_blank" rel="noopener">@crypticfit</a><code>{_e(title)}</code></p>
-      {desc}
+      <p class="youtube-title">YouTube title for <a href="{_e(YOUTUBE_CHANNEL_URL)}" target="_blank" rel="noopener">{_e(CHANNEL_HANDLE)}</a><code>{_e(title)}</code>
+        <button type="button" class="copy-field" data-copy="{_e(title)}" data-copy-label="Copy title">Copy title</button>
+      </p>
+      <p class="youtube-copy">YouTube description<pre>{_e(desc)}</pre>
+        <button type="button" class="copy-field" data-copy="{_e(desc)}" data-copy-label="Copy description">Copy description</button>
+      </p>
+      <p class="youtube-poster">{_e(YOUTUBE_POSTER_NOTE)}</p>
     """
 
 
 def attach_youtube_upload(html_text: str, kit_prefix: str = "") -> str:
-    """Add a YouTube upload control to each film article that is missing one."""
+    """Add or refresh a YouTube upload control on each film article."""
     page_h1 = ""
     heading = re.search(r"<h1>([^<]+)</h1>", html_text)
     if heading:
@@ -1066,10 +1080,9 @@ def attach_youtube_upload(html_text: str, kit_prefix: str = "") -> str:
 
     def _one(match: re.Match[str]) -> str:
         open_tag, body, close = match.group(1), match.group(2), match.group(3)
-        if "data-youtube-upload" in body or "data-youtube-upload" in open_tag:
-            return match.group(0)
+        body = _YOUTUBE_CHUNK.sub("", body)
         if not re.search(r"<video\b", body, flags=re.I) and 'data-slug="' not in open_tag:
-            return match.group(0)
+            return f"{open_tag}{body}{close}"
         slug = ""
         slug_m = re.search(r'data-slug="([^"]+)"', open_tag)
         if slug_m:
@@ -1079,25 +1092,26 @@ def attach_youtube_upload(html_text: str, kit_prefix: str = "") -> str:
             if src_m:
                 slug = Path(src_m.group(1)).stem
         if not slug:
-            return match.group(0)
+            return f"{open_tag}{body}{close}"
         clue_m = re.search(r'<p class="clue-text">([^<]*)</p>', body)
         clue_line = html.unescape(clue_m.group(1)).strip() if clue_m else page_h1 or slug
         block = _youtube_upload_block(
             slug,
             video_title_from_line(clue_line),
             kit_href=f"{kit_prefix}upload.html#{slug}",
+            file_href=f"{kit_prefix}media/{slug}.mp4",
         )
         if re.search(r'<div class="spoiler"', body):
             updated, n = re.subn(
                 r'(<div class="spoiler"[^>]*>)(.*?)(</div>)(\s*)$',
-                lambda inner: f"{inner.group(1)}{inner.group(2)}{block}{inner.group(3)}{inner.group(4)}",
+                lambda inner: f"{inner.group(1)}{inner.group(2).rstrip()}{block}{inner.group(3)}{inner.group(4)}",
                 body,
                 count=1,
                 flags=re.S,
             )
-            body = updated if n else body + block
+            body = updated if n else body.rstrip() + block
         else:
-            body = body + block
+            body = body.rstrip() + block
         return f"{open_tag}{body}{close}"
 
     return re.sub(
@@ -1139,8 +1153,8 @@ def _article(
     upload = _youtube_upload_block(
         clue.slug,
         video_title(clue),
-        description=youtube_description(item),
         kit_href=f"{_root_prefix(media_prefix)}upload.html#{clue.slug}",
+        file_href=f"{media_prefix}{clue.slug}.mp4",
     )
     extras: list[str] = []
     if clue.definition:
@@ -1488,6 +1502,7 @@ def _playable_daily(root: Path) -> str:
                 slug,
                 video_title_from_line(film.clue),
                 kit_href=f"upload.html#{slug}",
+                file_href=f"media/{slug}.mp4",
             )
         if film.slug:
             opener = f'<p class="credit"><a href="c/{_e(film.slug)}/#play">Open this clue</a></p>'
