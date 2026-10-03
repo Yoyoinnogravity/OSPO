@@ -4632,6 +4632,7 @@ function updateSurveyTypeIndicator(type) {
  // Empty workspace: do not imply 3D before a preplot / OBN patch exists.
  if (!surveyHasLoadedGeometry()) {
   indicator.style.display = 'none';
+  if (typeof _syncHardMapSwathPicker === 'function') _syncHardMapSwathPicker();
   return;
  }
  if (!type) type = (state.settings.surveyType || '3d');
@@ -4651,8 +4652,21 @@ function updateSurveyTypeIndicator(type) {
  indicator.style.display = 'block';
  // Area (sq km) is a 3D full-fold coverage concept - hide for 2D planning.
  setAreaStatsVisible(type !== '2d');
+ if (typeof _syncHardMapSwathPicker === 'function') _syncHardMapSwathPicker();
  if (typeof _syncSwathOnOffTabs === 'function') _syncSwathOnOffTabs();
  if (typeof renderSwathOverlays === 'function') renderSwathOverlays();
+}
+
+/** Hard-coded map chrome: Number of swaths is only on the map when 3D is chosen. */
+function _syncHardMapSwathPicker() {
+ const picker = document.getElementById('map-swath-picker');
+ if (!picker) return;
+ const type = state.settings.surveyType || '3d';
+ const show3d = type === '3d';
+ picker.style.display = show3d ? 'block' : 'none';
+ const n = state.settings.numSwaths || 2;
+ const hard = document.getElementById('map-hard-num-swaths');
+ if (hard && String(hard.value) !== String(n)) hard.value = String(n);
 }
 
 /** Show or hide sq-km / area UI (2D surveys only need line / SP / time metrics). */
@@ -8561,6 +8575,9 @@ function setMapSwathCount(n) {
  }
  const mapEl = document.getElementById('map-num-swaths');
  if (mapEl && String(mapEl.value) !== String(n)) mapEl.value = String(n);
+ const hardEl = document.getElementById('map-hard-num-swaths');
+ if (hardEl && String(hardEl.value) !== String(n)) hardEl.value = String(n);
+ if (typeof _syncHardMapSwathPicker === 'function') _syncHardMapSwathPicker();
  if (typeof updateSwathDirectionUI === 'function') updateSwathDirectionUI();
  if (state.showSwaths !== false && map && layerSwaths && !map.hasLayer(layerSwaths)) {
   map.addLayer(layerSwaths);
@@ -8589,6 +8606,9 @@ function _syncSwathOnOffTabs() {
  var mapEl = document.getElementById('map-num-swaths');
  var n = state.settings.numSwaths || 2;
  if (mapEl && String(mapEl.value) !== String(n)) mapEl.value = String(n);
+ var hardEl = document.getElementById('map-hard-num-swaths');
+ if (hardEl && String(hardEl.value) !== String(n)) hardEl.value = String(n);
+ if (typeof _syncHardMapSwathPicker === 'function') _syncHardMapSwathPicker();
 }
 
 function _mapSwathsBlockHtml() {

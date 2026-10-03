@@ -112,7 +112,7 @@ vm.runInContext(`
   else { const _t = showToast; showToast = function(){}; }
 `, ctx);
 
-assert(/app\.js\?v=17\.34/.test(html), 'app.js cache bump 17.34 missing');
+assert(/app\.js\?v=17\.35/.test(html), 'app.js cache bump 17.35 missing');
 assert(src.includes('function _splitIntoSwathCount'), 'Number of Swaths must equal-split into exactly N bands');
 assert(/id="val-turn-radius">3\.5km/.test(html), 'toolbar RADIUS default must be 3.5km not 5.1');
 assert(/id="input-turn-radius" value="3500"/.test(html), 'turn-radius input default must be 3500 m');
@@ -613,6 +613,30 @@ const nUser5 = vm.runInContext(`
   })()
 `, ctx);
 assert(nUser5 === 5, 'user-elected 5 swaths on 12 lines must yield 5, got ' + nUser5);
+assert(src.includes('function _syncHardMapSwathPicker'), '3D map must have a hard-coded swath count control');
+vm.runInContext(`
+  globalThis.__picker = { style: { display: 'none' } };
+  globalThis.__hardNs = { value: '2' };
+  const _gid2 = document.getElementById;
+  document.getElementById = (id) => id === 'map-swath-picker' ? globalThis.__picker
+    : id === 'map-hard-num-swaths' ? globalThis.__hardNs
+    : _gid2(id);
+  state.settings.surveyType = '3d';
+  state.settings.numSwaths = 4;
+  _syncHardMapSwathPicker();
+  globalThis.__disp3d = globalThis.__picker.style.display;
+  globalThis.__hardVal = globalThis.__hardNs.value;
+  state.settings.surveyType = '2d';
+  _syncHardMapSwathPicker();
+  globalThis.__disp2d = globalThis.__picker.style.display;
+  document.getElementById = _gid2;
+`, ctx);
+assert(vm.runInContext('globalThis.__disp3d', ctx) === 'block',
+  '3D must show the hard-coded map swath picker');
+assert(vm.runInContext('globalThis.__hardVal', ctx) === '4',
+  'map picker must show the elected swath count');
+assert(vm.runInContext('globalThis.__disp2d', ctx) === 'none',
+  '2D must hide the hard-coded map swath picker');
 assert(src.includes('function _persistSwathElection'), 'swath election must persist');
 assert(src.includes('function _restoreSwathElection'), 'swath election must restore after login');
 assert(src.includes('swathCountUserSet'), 'swathCountUserSet flag missing');
@@ -658,7 +682,7 @@ assert(vm.runInContext('globalThis.__autoNs', ctx) === '6',
 
 console.log(JSON.stringify({
   ok: true,
-  cache: '17.34',
+  cache: '17.35',
   rule: '2D skip-k; 3D swath shooting (adjacent monopass, locked heading, stadium returns)',
   kNom,
   nn: { visit: nn.nVisit, mode: nn.stats.mode, ms: nn.ms },
