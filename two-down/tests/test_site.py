@@ -155,8 +155,8 @@ def test_publish_site_writes_spoiler_pages(tmp_path):
     assert 'href="films.html">Films</a>' in index
     header = index.split("</header>", 1)[0]
     assert 'href="upload.html">Download Shorts</a>' in header
-    follow = header.split('class="follow"', 1)[1]
-    assert follow.find("YouTube") < follow.find("Download Shorts")
+    follow_bar = header.split('class="follow"', 1)[1]
+    assert follow_bar.find("YouTube") < follow_bar.find("Download Shorts")
     assert "Download Shorts for YouTube is on the" in index
     assert 'href="upload.html">upload page</a>' in index
     films_page = (tmp_path / "films.html").read_text(encoding="utf-8")
