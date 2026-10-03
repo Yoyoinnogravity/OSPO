@@ -112,8 +112,18 @@ vm.runInContext(`
   else { const _t = showToast; showToast = function(){}; }
 `, ctx);
 
-assert(/app\.js\?v=17\.34/.test(html), 'app.js cache bump 17.34 missing');
+assert(/app\.js\?v=17\.35/.test(html), 'app.js cache bump 17.35 missing');
 assert(src.includes('function _splitIntoSwathCount'), 'Number of Swaths must equal-split into exactly N bands');
+assert(src.includes('User-requested Number of Swaths is BINDING. Engagement/ranking MUST NOT rewrite N.'),
+  'binding Number of Swaths comment missing — do not let ranking rewrite N');
+{
+  const agents = fs.readFileSync(path.resolve(__dirname, '..', 'AGENTS.md'), 'utf8');
+  const rule = fs.readFileSync(path.resolve(__dirname, '..', '.cursor', 'rules', 'swath-count-binding.mdc'), 'utf8');
+  assert(agents.includes('User-requested Number of Swaths is BINDING. Engagement/ranking MUST NOT rewrite N.'),
+    'AGENTS.md must document binding N');
+  assert(rule.includes('User-requested Number of Swaths is BINDING. Engagement/ranking MUST NOT rewrite N.'),
+    'Cursor rule must document binding N');
+}
 assert(/id="val-turn-radius">3\.5km/.test(html), 'toolbar RADIUS default must be 3.5km not 5.1');
 assert(/id="input-turn-radius" value="3500"/.test(html), 'turn-radius input default must be 3500 m');
 assert(!/value="5100"/.test(html), 'HTML must not default min turn radius to 5100');
@@ -204,6 +214,7 @@ function setup(lines, extra) {
     state.settings.swathUnit = ${JSON.stringify(extra.swathUnit || 'm')};
     state.settings.swathRawValue = ${extra.swathRawValue ?? 0};
     state.settings.swathWidth = ${extra.swathWidth ?? 0};
+    state.settings.swathCountUserSet = ${extra.swathCountUserSet ? 'true' : 'false'};
     state.settings.lineDirection2d = 'auto';
     state.settings.swathDirections = ${JSON.stringify(extra.swathDirections || [])};
     state._optimizerStats = null;
@@ -580,6 +591,18 @@ assert(src.includes('min="1" max="100"'), 'Line Manager UI 1-100 missing');
   assert(tAsk10.nVisit === 40, '10-swath Auto must visit all 40');
   assert(tAsk10.stats && tAsk10.stats.nSwaths === 10,
     'ask for 10 swaths must yield 10, got ' + (tAsk10.stats && tAsk10.stats.nSwaths));
+  // Ranking / Auto fastest-tour search must keep the elected N.
+  const tRank = plan(makeGrid(12), {
+    surveyType: '3d',
+    progression: 'auto',
+    numSwaths: 5,
+    swathWidth: 50000,
+    swathCountUserSet: true,
+  });
+  assert(tRank.stats && tRank.stats.nSwaths === 5,
+    'Auto ranking must not rewrite N, got nSwaths=' + (tRank.stats && tRank.stats.nSwaths));
+  assert(vm.runInContext('state.settings.numSwaths', ctx) === 5,
+    'planner must not assign a new Number of Swaths');
 }
 
 // User-elected swath count must survive leftover Swath Width (map spinner / Criteria).
@@ -658,7 +681,7 @@ assert(vm.runInContext('globalThis.__autoNs', ctx) === '6',
 
 console.log(JSON.stringify({
   ok: true,
-  cache: '17.34',
+  cache: '17.35',
   rule: '2D skip-k; 3D swath shooting (adjacent monopass, locked heading, stadium returns)',
   kNom,
   nn: { visit: nn.nVisit, mode: nn.stats.mode, ms: nn.ms },

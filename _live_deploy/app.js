@@ -394,6 +394,7 @@ const state = {
  streamerSeparation: 100, // metres between streamers
  swathWidth: 0, // metres (0 = auto-detect from line spacing)
  numSwaths: 2,
+ // User-requested Number of Swaths is BINDING. Engagement/ranking MUST NOT rewrite N.
  swathCountUserSet: false, // true once the user picks a swath count; Auto must not clobber it
  swathDirections: [],
  swathUnit: 'm',
@@ -8233,6 +8234,7 @@ function renderSurveyLines() {
 // split by Number of Swaths. Never skip-k / every-Nth — a swath is adjacent.
 function _effectiveLinesPerSwath(lines) {
  const s = state.settings || {};
+ // User-requested Number of Swaths is BINDING. Engagement/ranking MUST NOT rewrite N.
  // User picked Number of Swaths (map spinner or typed in Criteria). That
  // election wins: equal adjacent bands, not a leftover width from Auto.
  if (s.swathCountUserSet) return 0;
@@ -8267,6 +8269,7 @@ function _sortLineIdxForSwaths(lines, progression, lineNumKey, midpoints) {
 }
 
 // Partition adjacent lines into exactly min(N, nLines) non-empty groups.
+// User-requested Number of Swaths is BINDING. Engagement/ranking MUST NOT rewrite N.
 // Fixed ceil(n/N) left empty tail slots (12 lines / 5 swaths → 4 bands).
 function _splitIntoSwathCount(sortedIdx, nSw) {
  const n = sortedIdx.length;
@@ -12782,8 +12785,9 @@ function _monopassSwathSeq(idxs, reversed, visitFlip) {
 //  - every line in a swath uses that swath's Low→High / High→Low heading
 // Fastest legal plan: adjacent sequential inside the swath (skip-k needs
 // opposite headings). Auto searches every swath-block order + start edge
-// (exact DP, nSwaths <= 10). Explicit Low→High / interleaved keep their
-// visit order and only search start edges. Skip-k racetrack is 2D only.
+// (exact DP, nSwaths <= 10). User-requested Number of Swaths is BINDING.
+// Engagement/ranking MUST NOT rewrite N. Explicit Low→High / interleaved keep
+// their visit order and only search start edges. Skip-k racetrack is 2D only.
 function _swathOrientations(idxs, headingRev, startIdx, userStartLocked) {
  const flips = [];
  const lockedHere = userStartLocked && startIdx >= 0 && idxs.indexOf(startIdx) >= 0;
@@ -12887,9 +12891,8 @@ function planSwathBlockRacetracks(lines, swaths, transitTimeSec, opts) {
   nOpt = chain.nOpt;
   solver = 'swath-blocks';
  } else {
-  // Exact DP over swath blocks. nSwaths is 2–10; 2^n · n · orients is tiny.
-  // This is the fastest legal 3D tour under the per-swath / locked-heading rules,
-  // not a 1500-option sample.
+  // Exact DP over swath-block *order*. nSwaths is the user's N (2–10).
+  // User-requested Number of Swaths is BINDING. Engagement/ranking MUST NOT rewrite N.
   const n = active.length;
   const orients = active.map(g => orientsOf(g));
   const nOri = orients.map(o => o.length);
@@ -13215,6 +13218,7 @@ function computeRoute() {
  // line swaths as blocks, one heading per swath. Skip-k racetrack is 2D only.
  if (state.settings.surveyType === '3d' && !swathRacetrackFilled) {
  const bandIdx = _sortLineIdxForSwaths(lines, progression, lineNumKey, midpoints);
+ // User-requested Number of Swaths is BINDING. Engagement/ranking MUST NOT rewrite N.
  const swaths = _sliceAdjacentSwaths(bandIdx, lines, { numSwaths: state.settings.numSwaths || 2 });
  if (progression === 'interleaved-reverse') swaths.forEach(s => s.reverse());
 
