@@ -404,6 +404,14 @@ def test_published_slugs_do_not_share_one_stock_photo():
         "financial-times-18494-1a",
         "guardian-30125-1a",
         "financial-times-18493-9a",
+        "independent-12477-6a",
+        "independent-12477-11a",
+        "independent-12476-1a",
+        "independent-12476-12a",
+        "financial-times-18495-11a",
+        "financial-times-18495-19a",
+        "guardian-30127-16a",
+        "guardian-30127-28a",
     ]
     images: list[str] = []
     for slug in slugs:
