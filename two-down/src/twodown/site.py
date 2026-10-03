@@ -118,8 +118,10 @@ header a { color: var(--muted); }
 body.scene-photo header a { color: var(--muted); }
 body.scene-photo header .wordmark { color: var(--ink); }
 body.scene-photo header .follow a { color: var(--ink); }
-body.scene-photo header .follow a.on { color: var(--cream); }
+body.scene-photo header .follow a.on,
+body.scene-photo header .follow a.download-shorts { color: var(--cream); }
 nav a:hover { color: var(--crimson); }
+header nav a[href$="upload.html"] { color: var(--crimson); font-weight: 700; }
 .chrome-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
 .wordmark { display: inline-flex; align-items: center; gap: 10px; font-family: "Liberation Sans", "Helvetica Neue", sans-serif; font-weight: 700; font-size: 1.6rem; letter-spacing: 0.02em; color: var(--ink); text-decoration: none; }
 .wordmark .profile { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; background: var(--news); flex: none; }
@@ -186,7 +188,8 @@ nav a { margin-left: 18px; font-family: "Liberation Sans", sans-serif; font-size
   font-size: 0.85rem;
   text-decoration: none;
 }
-.voices button.on, .places button.on, .follow button.on, .follow a.on { background: var(--crimson); color: var(--cream); border-color: var(--crimson); }
+.voices button.on, .places button.on, .follow button.on, .follow a.on,
+.follow a.download-shorts { background: var(--crimson); color: var(--cream); border-color: var(--crimson); font-weight: 700; }
 h1 { font-size: clamp(2rem, 5vw, 3.4rem); line-height: 1.05; margin: 28px 0 8px; }
 body.scene-photo h1, body.scene-photo .lede { text-shadow: 0 2px 18px rgba(0,0,0,0.55); }
 .lede { font-size: 1.15rem; color: var(--muted); max-width: 40rem; }
@@ -843,6 +846,7 @@ def _follow_bar(prefix: str) -> str:
         "<span>Follow</span>"
         f'<button type="button" data-follow-toggle data-follow-href="{prefix}follow.html" aria-pressed="true">Following</button>'
         + "".join(links)
+        + f'<a class="download-shorts" href="{prefix}upload.html">Download Shorts</a>'
         + "</div>"
     )
 
@@ -898,6 +902,7 @@ def _nav(prefix: str) -> str:
       <nav>
         <a href="{prefix}index.html">Today</a>
         <a href="{prefix}films.html">Films</a>
+        <a href="{prefix}upload.html">Download Shorts</a>
         <a href="{prefix}follow.html">Follow</a>
         <a href="{prefix}suggest.html">Suggest</a>
         <a href="{prefix}support.html">Support</a>
@@ -1368,6 +1373,52 @@ def _ensure_films_nav(html_text: str) -> str:
     )
 
 
+
+def _home_download_note(prefix: str = "") -> str:
+    return (
+        '<p class="lede">Download Shorts for YouTube is on the '
+        f'<a href="{prefix}upload.html">upload page</a>.</p>'
+    )
+
+
+def _ensure_download_shorts_chrome(html_text: str) -> str:
+    """Put Download Shorts in the header next to YouTube, not only on Films."""
+    header, sep, rest = html_text.partition("</header>")
+    if not sep:
+        return html_text
+    if not re.search(r'<nav\b[\s\S]*href="(?:\.\./)*upload\.html"[^>]*>Download Shorts</a>', header):
+        header = re.sub(
+            r'(<a href="((?:\.\./)*)films\.html">Films</a>)',
+            r'\1\n        <a href="\2upload.html">Download Shorts</a>',
+            header,
+            count=1,
+        )
+    if not re.search(r'class="follow"[\s\S]*href="(?:\.\./)*upload\.html"[^>]*>Download Shorts</a>', header):
+        found = re.search(r'data-follow-href="((?:\.\./)*)follow\.html"', header)
+        if found is None:
+            found = re.search(r'href="((?:\.\./)*)follow\.html"', header)
+        prefix = found.group(1) if found else ""
+        header = re.sub(
+            r'(<a href="https://www\.youtube\.com/@crypticfit"[^>]*>YouTube</a>)',
+            rf'\1<a class="download-shorts" href="{prefix}upload.html">Download Shorts</a>',
+            header,
+            count=1,
+        )
+    return header + sep + rest
+
+
+def _ensure_home_download_note(html_text: str) -> str:
+    if "Download Shorts for YouTube is on the" in html_text:
+        return html_text
+    if "Today’s pair." not in html_text:
+        return html_text
+    return html_text.replace(
+        '<p class="kicker">Two clues',
+        _home_download_note() + "\n    <p class=\"kicker\">Two clues",
+        1,
+    )
+
+
 def _media_prefix(html_path: Path, root: Path) -> str:
     rel = html_path.parent.relative_to(root)
     return "../" * len(rel.parts)
@@ -1830,7 +1881,10 @@ def publish_films(root: Path) -> Path:
             skip = days[0][0] if days else None
             teaser = _earlier_teaser(root, skip_date=skip)
             text = text.replace("<aside class=\"teaser\">", teaser + "\n    <aside class=\"teaser\">", 1)
-        index.write_text(_ensure_films_nav(text), encoding="utf-8")
+        index.write_text(
+            _ensure_home_download_note(_ensure_download_shorts_chrome(_ensure_films_nav(text))),
+            encoding="utf-8",
+        )
     for html_path in root.rglob("*.html"):
         if html_path in {page, upload_page}:
             continue
@@ -1843,6 +1897,8 @@ def publish_films(root: Path) -> Path:
             updated = attach_play_anchor(updated)
         updated = attach_youtube_upload(updated, kit_prefix=prefix)
         updated = _ensure_films_nav(updated)
+        updated = _ensure_download_shorts_chrome(updated)
+        updated = _ensure_home_download_note(updated)
         updated = _ensure_profile(updated, picture_panel=html_path.name == "follow.html")
         if updated != original:
             html_path.write_text(updated, encoding="utf-8")
@@ -1893,6 +1949,7 @@ def publish_site(pair: DailyPair, dest: Path | None = None) -> Path:
     articles = "\n".join(_article(item, "media/") for item in pair.clues)
     index_body = f"""
     {_croc_hello("", title=TAGLINE, lede="Two clues a day from the Independent, the Guardian and the Financial Times. Have a go before you tap solve.")}
+    {_home_download_note("")}
     <p class="kicker">Two clues · {_e(pretty)}</p>
     <h2 class="day-title">Today’s pair.</h2>
     <p class="lede">Have a go before you tap solve. We speak the parses. We don’t nick the grid. Pick a place from the header if you’d rather solve against the Matterhorn than newsprint.</p>

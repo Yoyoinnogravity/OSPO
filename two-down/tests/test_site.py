@@ -1,7 +1,9 @@
 from twodown.captions import youtube_description
 from twodown.models import Clue, DailyPair, SpokenClue
 from twodown.staging import STUDIO_DROP_HELP, short_download_name, studio_description
+from twodown.config import SITE_ROOT
 from twodown.site import (
+    _ensure_download_shorts_chrome,
     _ensure_profile,
     _playable_daily,
     _solved_shelf,
@@ -60,6 +62,33 @@ def test_old_pages_gain_the_profile_picture():
     assert "favicon.svg" not in once
     assert once.count('id="picture"') == 1
     assert _ensure_profile(once, picture_panel=True) == once
+
+
+def test_old_pages_gain_download_shorts_chrome():
+    old = (
+        "<header>\n"
+        '      <nav>\n        <a href="../../index.html">Today</a>\n'
+        '        <a href="../../films.html">Films</a>\n'
+        '        <a href="../../follow.html">Follow</a>\n      </nav>\n'
+        '<div class="follow" role="group" aria-label="Follow cryptic.fit">'
+        '<a href="https://www.youtube.com/@crypticfit" data-follow-link '
+        'rel="me noopener" target="_blank">YouTube</a></div>\n'
+        "</header>\n<main></main>"
+    )
+    once = _ensure_download_shorts_chrome(old)
+    header = once.split("</header>", 1)[0]
+    assert header.count('href="../../upload.html">Download Shorts</a>') == 2
+    assert header.find("YouTube") < header.find("Download Shorts")
+    assert _ensure_download_shorts_chrome(once) == once
+
+
+def test_homepage_html_has_download_shorts_link():
+    homepage = (SITE_ROOT / "index.html").read_text(encoding="utf-8")
+    header = homepage.split("</header>", 1)[0]
+    assert 'href="upload.html">Download Shorts</a>' in header
+    assert header.find("YouTube") < header.find("Download Shorts")
+    assert "Download Shorts for YouTube is on the" in homepage
+    assert 'href="upload.html">upload page</a>' in homepage
 
 
 def test_publish_site_writes_spoiler_pages(tmp_path):
@@ -122,6 +151,11 @@ def test_publish_site_writes_spoiler_pages(tmp_path):
     assert "https://cryptic.fit/upload.html" in (tmp_path / "sitemap.xml").read_text(encoding="utf-8")
     assert (tmp_path / "upload.html").exists()
     assert 'href="films.html">Films</a>' in index
+    header = index.split("</header>", 1)[0]
+    assert 'href="upload.html">Download Shorts</a>' in header
+    assert header.find("YouTube") < header.find("Download Shorts")
+    assert "Download Shorts for YouTube is on the" in index
+    assert 'href="upload.html">upload page</a>' in index
     films_page = (tmp_path / "films.html").read_text(encoding="utf-8")
     assert "Download Short" in films_page
     assert 'href="media/independent-12458-12a.mp4"' in films_page
