@@ -27847,7 +27847,8 @@ function clearShipRoute() {
 }
 
 function drawShipRouteAdvice(result) {
- if (!shipRouteLayer || typeof L === 'undefined') return;
+ if (typeof map === 'undefined' || !map || typeof L === 'undefined') return;
+ if (!shipRouteLayer) shipRouteLayer = L.layerGroup().addTo(map);
  shipRouteLayer.clearLayers();
  drawShipRouteMarkers();
  const bestId = result.best && result.best.id;
@@ -27914,6 +27915,7 @@ async function adviseShipRoute() {
   if (resultEl) {
    resultEl.innerHTML = '<div style="color:#e2e8f0;">' + advice.advice + '</div>'
     + '<div style="font-size:9px;color:#64748b;margin-top:6px;line-height:1.4;">Planning aid from public NOAA fields. The master still owns the passage. Not a chart.</div>';
+   try { resultEl.scrollIntoView({ block: 'nearest' }); } catch (_) {}
   }
   if (advice.ok) {
    drawShipRouteAdvice(advice);
