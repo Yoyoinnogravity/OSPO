@@ -53,42 +53,58 @@ if ($code !== 0) {
 }
 
 $job = ship_route_job_load($id);
+if (($job['status'] ?? '') === 'ready') exit(0);
 $bounds = $job['bounds'] ?? null;
 if (!is_array($bounds)) {
     ship_route_fail($id, 'The route computer did not return a search box.');
     exit(1);
 }
 
+ship_route_progress_write($id, [
+    'phase' => 'forecast',
+    'detail' => 'Reading the NOAA wind and wave forecast for this passage. The prediction starts when those times are in.',
+]);
+
 $php = PHP_BINARY ?: 'php';
-$fieldCmd = escapeshellarg($php) . ' -d display_errors=0 ' . escapeshellarg(__DIR__ . '/noaa-route-field.php')
+$hours = (string)($job['horizonHours'] ?? 72);
+$forecastCmd = escapeshellarg($php) . ' -d display_errors=0 ' . escapeshellarg(__DIR__ . '/noaa-route-forecast.php')
     . ' ' . escapeshellarg((string)$bounds['south'])
     . ' ' . escapeshellarg((string)$bounds['north'])
     . ' ' . escapeshellarg((string)$bounds['west'])
-    . ' ' . escapeshellarg((string)$bounds['east']);
-$field = null;
-$fieldCode = 1;
+    . ' ' . escapeshellarg((string)$bounds['east'])
+    . ' ' . escapeshellarg($hours);
+$forecast = null;
+$forecastCode = 1;
 for ($attempt = 0; $attempt < 2; $attempt++) {
     if ($attempt === 1) sleep(3);
-    $fieldRaw = ship_route_exec($fieldCmd, $fieldCode);
-    $field = json_decode($fieldRaw, true);
-    if ($fieldCode === 0 && is_array($field) && !empty($field['ok'])) break;
+    $forecastRaw = ship_route_exec($forecastCmd, $forecastCode);
+    $forecast = json_decode($forecastRaw, true);
+    if ($forecastCode === 0 && is_array($forecast) && !empty($forecast['ok'])) break;
 }
-if ($fieldCode !== 0 || !is_array($field) || empty($field['ok'])) {
-    $why = is_array($field) && !empty($field['error']) ? $field['error'] : 'NOAA did not return a field for this passage.';
+if ($forecastCode !== 0 || !is_array($forecast) || empty($forecast['ok'])) {
+    $why = is_array($forecast) && !empty($forecast['error']) ? $forecast['error'] : 'NOAA did not return a forecast for this passage.';
     ship_route_fail($id, $why);
     exit(1);
 }
 
 $job = ship_route_job_load($id);
-$job['field'] = $field;
+$job['forecast'] = $forecast;
 ship_route_job_save($job);
+ship_route_progress_write($id, [
+    'phase' => 'predicting',
+    'step' => 0,
+    'steps' => 0,
+    'predictions' => 0,
+    'frames' => count($forecast['frames'] ?? []),
+    'detail' => 'Forecast is in. Predicting courses through those times.',
+]);
 
-$advise = ship_route_exec(
-    escapeshellarg($node) . ' ' . escapeshellarg($cli) . ' advise ' . escapeshellarg($jobPath),
-    $adviseCode
+$predict = ship_route_exec(
+    escapeshellarg($node) . ' ' . escapeshellarg($cli) . ' predict ' . escapeshellarg($jobPath),
+    $predictCode
 );
-if ($adviseCode !== 0) {
-    ship_route_fail($id, 'The route computer stopped while timing the tracks. ' . trim($advise));
+if ($predictCode !== 0) {
+    ship_route_fail($id, 'The route computer stopped during the prediction. ' . trim($predict));
     exit(1);
 }
 

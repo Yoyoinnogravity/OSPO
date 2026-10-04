@@ -54,7 +54,7 @@
   <main id="main" class="wrap wrap-wide">
     <p class="kicker">Commercial service</p>
     <h1>Passage desk</h1>
-    <p class="lede">For tankers and cargo ships. You send the departure, the arrival, and the ship. Candooka’s route computer reads NOAA currents, wind, and waves, times the straight line and the offsets, and returns the advice. That work does not run on your machine.</p>
+    <p class="lede">For tankers and cargo ships. You send the departure, the arrival, and the ship. The route computer predicts the passage: it steps the ship through the NOAA wind and wave forecast, tries many courses and speeds, and keeps the earliest arrival inside the ship’s sea limit. That work does not run on your machine.</p>
     <div class="desk">
       <form class="card" id="order">
         <p class="kicker">New passage</p>
@@ -88,7 +88,7 @@
           </div>
         </div>
         <button class="cta" id="send" type="submit">Send to the route computer</button>
-        <p class="fine">One latest NOAA field for the whole passage. A planning aid. The master still owns the voyage.</p>
+        <p class="fine">GFS wind and WAVEWATCH III waves at several forecast hours. Daily altimetry currents are held. An isochrone, not a ship-motion study. The master still owns the voyage.</p>
       </form>
       <section class="card" id="ticket" hidden>
         <p class="kicker">Route computer</p>
@@ -100,6 +100,6 @@
     </div>
   </main>
   <footer class="site-footer">© 2026 Candooka · Passage desk</footer>
-  <script src="/route/desk.js?v=2"></script>
+  <script src="/route/desk.js?v=3"></script>
 </body>
 </html>

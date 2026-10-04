@@ -144,7 +144,7 @@ const app = fs.readFileSync(path.resolve(__dirname, 'app.js'), 'utf8');
 assert(html.includes('id="ship-route-vessel"'), 'NOAA panel needs the vessel picker');
 assert(html.includes('Send to the passage desk'), 'NOAA panel must hand the passage to the commercial desk');
 assert(html.includes('ship-route-advisor.js?v=17.42'), 'advisor script cache bump missing');
-assert(/app\.js\?v=17\.43/.test(html), 'app.js cache bump 17.43 missing');
+assert(/app\.js\?v=17\.44/.test(html), 'app.js cache bump 17.43 missing');
 assert(app.includes('function adviseShipRoute'), 'app.js must send the passage to the desk');
 assert(app.includes('api/ship-route-job.php'), 'the planner must post the job, not time it in the browser');
 assert(!app.includes('api/noaa-route-field.php'), 'the browser must not fetch the NOAA field itself');

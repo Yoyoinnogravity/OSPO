@@ -83,6 +83,27 @@ function ship_route_job_create($in) {
     return [$job, null];
 }
 
+function ship_route_progress_path($id) {
+    $path = ship_route_job_path($id);
+    if (!$path) return null;
+    return substr($path, 0, -5) . '.progress.json';
+}
+
+function ship_route_progress_write($id, $progress) {
+    $path = ship_route_progress_path($id);
+    if (!$path) return false;
+    $tmp = $path . '.tmp';
+    file_put_contents($tmp, json_encode($progress));
+    return rename($tmp, $path);
+}
+
+function ship_route_progress_read($id) {
+    $path = ship_route_progress_path($id);
+    if (!$path || !is_file($path)) return null;
+    $progress = json_decode((string)file_get_contents($path), true);
+    return is_array($progress) ? $progress : null;
+}
+
 function ship_route_job_public($job) {
     return [
         'ok' => true,
@@ -93,6 +114,7 @@ function ship_route_job_public($job) {
         'finishedAt' => $job['finishedAt'] ?? null,
         'order' => $job['order'] ?? null,
         'error' => $job['error'] ?? null,
+        'progress' => ship_route_progress_read($job['id']),
         'result' => $job['result'] ?? null,
         'deskUrl' => '/route/?job=' . $job['id'],
     ];

@@ -72,8 +72,18 @@
       return;
     }
     if (job.status === 'running') {
-      setStatus('running', 'The route computer is working this passage.');
-      adviceEl.textContent = 'It is reading NOAA currents, wind, and waves, then timing the tracks. Leave this page open.';
+      var progress = job.progress || {};
+      if (progress.phase === 'predicting' && progress.predictions) {
+        setStatus('running', 'Predicting this passage.');
+        adviceEl.textContent = 'Step ' + progress.step + ' of ' + progress.steps + '. '
+          + progress.predictions + ' positions checked through ' + (progress.frames || '') + ' forecast times. Leave this page open.';
+      } else if (progress.phase === 'forecast') {
+        setStatus('running', 'Reading the NOAA forecast.');
+        adviceEl.textContent = progress.detail || 'Wind and waves are being read forward in time. The prediction starts after that.';
+      } else {
+        setStatus('running', 'The route computer is working this passage.');
+        adviceEl.textContent = 'It is loading the forecast, then predicting courses through those times. Leave this page open.';
+      }
       return;
     }
     if (job.status === 'failed') {

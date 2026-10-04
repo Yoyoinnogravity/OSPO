@@ -27896,12 +27896,17 @@ async function pollShipRouteJob(id, n) {
    return;
   }
   if (job.status === 'queued' || job.status === 'running') {
-   if (resultEl) {
-    resultEl.innerHTML = (job.status === 'running'
-     ? 'The route computer is working this passage.'
-     : 'Queued on the passage desk.') + shipRouteDeskNote(id);
+   var progress = job.progress || {};
+   var work = 'Queued on the passage desk.';
+   if (job.status === 'running' && progress.phase === 'predicting' && progress.predictions) {
+    work = 'Predicting. Step ' + progress.step + ' of ' + progress.steps + ', ' + progress.predictions + ' positions checked.';
+   } else if (job.status === 'running' && progress.phase === 'forecast') {
+    work = progress.detail || 'Reading the NOAA forecast.';
+   } else if (job.status === 'running') {
+    work = 'The route computer is predicting this passage.';
    }
-   if (n > 90) {
+   if (resultEl) resultEl.innerHTML = work + shipRouteDeskNote(id);
+   if (n > 200) {
     if (resultEl) resultEl.innerHTML = 'Still working. Watch the ticket on the passage desk.' + shipRouteDeskNote(id);
     return;
    }

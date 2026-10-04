@@ -468,6 +468,8 @@
     boundsOf: boundsOf,
     bilinear: bilinear,
     sampleField: sampleField,
+    destination: destination,
+    sogAt: sogAt,
     scoreRoute: scoreRoute,
     advise: advise
   };
