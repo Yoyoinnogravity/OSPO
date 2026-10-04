@@ -142,11 +142,12 @@ assert(fromField.advice.includes('2026-10-04'), fromField.advice);
 const html = fs.readFileSync(path.resolve(__dirname, 'index.html'), 'utf8');
 const app = fs.readFileSync(path.resolve(__dirname, 'app.js'), 'utf8');
 assert(html.includes('id="ship-route-vessel"'), 'NOAA panel needs the vessel picker');
-assert(html.includes('Advise best route'), 'NOAA panel needs the advise button');
+assert(html.includes('Send to the passage desk'), 'NOAA panel must hand the passage to the commercial desk');
 assert(html.includes('ship-route-advisor.js?v=17.42'), 'advisor script cache bump missing');
-assert(/app\.js\?v=17\.42/.test(html), 'app.js cache bump 17.42 missing');
-assert(app.includes('function adviseShipRoute'), 'app.js must request the NOAA field and draw the advice');
-assert(app.includes('api/noaa-route-field.php'), 'advice must load the NOAA route field');
+assert(/app\.js\?v=17\.43/.test(html), 'app.js cache bump 17.43 missing');
+assert(app.includes('function adviseShipRoute'), 'app.js must send the passage to the desk');
+assert(app.includes('api/ship-route-job.php'), 'the planner must post the job, not time it in the browser');
+assert(!app.includes('api/noaa-route-field.php'), 'the browser must not fetch the NOAA field itself');
 assert(fs.existsSync(path.resolve(__dirname, 'api/noaa-route-field.php')), 'NOAA route field proxy missing');
 
 const candidates = A.buildCandidates(origin, dest);

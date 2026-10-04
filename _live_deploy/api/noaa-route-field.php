@@ -5,6 +5,14 @@
 //   wind     — GFS 10 m ugrd10m/vgrd10m (m/s towards)
 //   waves    — WAVEWATCH III Thgt (m) and Tdir (degrees, waves travel towards)
 // Public-domain U.S. Government work via ERDDAP.
+// CLI: php noaa-route-field.php <south> <north> <west> <east>
+
+if (PHP_SAPI === 'cli' && isset($argv[1])) {
+    $_GET['south'] = $argv[1];
+    $_GET['north'] = $argv[2] ?? '';
+    $_GET['west'] = $argv[3] ?? '';
+    $_GET['east'] = $argv[4] ?? '';
+}
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');

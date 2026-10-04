@@ -27772,6 +27772,8 @@ let shipRouteA = null;
 let shipRouteB = null;
 let shipRouteLayer = null;
 let shipRouteBusy = false;
+let shipRoutePollTimer = null;
+let shipRouteTicket = null;
 
 function onShipVesselChange() {
  const sel = document.getElementById('ship-route-vessel');
@@ -27833,7 +27835,14 @@ function drawShipRouteMarkers() {
  }
 }
 
+function stopShipRoutePoll() {
+ if (shipRoutePollTimer) clearTimeout(shipRoutePollTimer);
+ shipRoutePollTimer = null;
+ shipRouteTicket = null;
+}
+
 function clearShipRoute() {
+ stopShipRoutePoll();
  shipRouteA = null;
  shipRouteB = null;
  shipRoutePick = null;
@@ -27870,12 +27879,57 @@ function drawShipRouteAdvice(result) {
  }
 }
 
+function shipRouteDeskNote(id) {
+ return '<div style="margin-top:6px;font-size:10px;"><a href="/route/?job=' + id + '" target="_blank" rel="noopener" style="color:#67e8f9;">Open this ticket on the passage desk</a></div>'
+  + '<div style="font-size:9px;color:#64748b;margin-top:6px;line-height:1.4;">The route computer does the search. This window only waits. Planning aid from public NOAA fields. The master still owns the passage.</div>';
+}
+
+async function pollShipRouteJob(id, n) {
+ if (shipRouteTicket !== id) return;
+ const resultEl = document.getElementById('ship-route-result');
+ try {
+  const res = await fetch('api/ship-route-job.php?id=' + encodeURIComponent(id), { cache: 'no-store' });
+  const job = await res.json();
+  if (shipRouteTicket !== id) return;
+  if (!job || !job.ok) {
+   if (resultEl) resultEl.textContent = (job && job.error) || 'The passage desk did not return this ticket.';
+   return;
+  }
+  if (job.status === 'queued' || job.status === 'running') {
+   if (resultEl) {
+    resultEl.innerHTML = (job.status === 'running'
+     ? 'The route computer is working this passage.'
+     : 'Queued on the passage desk.') + shipRouteDeskNote(id);
+   }
+   if (n > 90) {
+    if (resultEl) resultEl.innerHTML = 'Still working. Watch the ticket on the passage desk.' + shipRouteDeskNote(id);
+    return;
+   }
+   shipRoutePollTimer = setTimeout(() => pollShipRouteJob(id, n + 1), 2000);
+   return;
+  }
+  if (job.status === 'failed') {
+   if (resultEl) resultEl.innerHTML = (job.error || 'The route computer stopped.') + shipRouteDeskNote(id);
+   showToast('Route computer stopped');
+   return;
+  }
+  const advice = job.result || {};
+  if (resultEl) {
+   resultEl.innerHTML = '<div style="color:#e2e8f0;">' + (advice.advice || 'Advice is ready.') + '</div>' + shipRouteDeskNote(id);
+   try { resultEl.scrollIntoView({ block: 'nearest' }); } catch (_) {}
+  }
+  if (advice.best) {
+   drawShipRouteAdvice(advice);
+   if (typeof setNoaaMapOverlay === 'function') setNoaaMapOverlay('currents');
+  }
+  showToast(advice.ok && advice.best ? ('Best route: ' + (advice.best.label || advice.best.id)) : 'Passage desk finished');
+ } catch (err) {
+  if (shipRouteTicket === id && resultEl) resultEl.textContent = 'The passage desk did not answer.';
+ }
+}
+
 async function adviseShipRoute() {
  if (shipRouteBusy) return;
- if (typeof ShipRouteAdvisor === 'undefined') {
-  showToast('Ship route advisor did not load');
-  return;
- }
  if (!shipRouteA || !shipRouteB) {
   showToast('Set departure and arrival on the map');
   return;
@@ -27885,46 +27939,35 @@ async function adviseShipRoute() {
  const resultEl = document.getElementById('ship-route-result');
  const vessel = vesselEl ? vesselEl.value : 'tanker';
  const stwKt = stwEl ? Number(stwEl.value) : undefined;
- const candidates = ShipRouteAdvisor.buildCandidates(shipRouteA, shipRouteB);
- const box = ShipRouteAdvisor.boundsOf(candidates, 0.75);
- if (resultEl) resultEl.textContent = 'Reading NOAA currents, wind, and waves for this passage…';
+ if (resultEl) resultEl.textContent = 'Sending this passage to the route computer…';
  shipRouteBusy = true;
+ stopShipRoutePoll();
  try {
-  const q = new URLSearchParams({
-   south: box.south.toFixed(3),
-   west: box.west.toFixed(3),
-   north: box.north.toFixed(3),
-   east: box.east.toFixed(3)
+  const res = await fetch('api/ship-route-job.php', {
+   method: 'POST',
+   headers: { 'Content-Type': 'application/json' },
+   cache: 'no-store',
+   body: JSON.stringify({
+    vessel: vessel,
+    stwKt: stwKt,
+    origin: shipRouteA,
+    dest: shipRouteB
+   })
   });
-  const res = await fetch('api/noaa-route-field.php?' + q.toString(), { cache: 'no-store' });
-  const field = await res.json();
-  if (!field || !field.ok) {
-   const msg = (field && field.error) || 'NOAA field unavailable';
+  const job = await res.json();
+  if (!job || !job.ok) {
+   const msg = (job && job.error) || 'The passage desk did not take the order.';
    if (resultEl) resultEl.textContent = msg;
    showToast(msg);
    return;
   }
-  const advice = ShipRouteAdvisor.advise({
-   origin: shipRouteA,
-   dest: shipRouteB,
-   vessel: vessel,
-   stwKt: stwKt,
-   candidates: candidates,
-   field: field
-  });
-  if (resultEl) {
-   resultEl.innerHTML = '<div style="color:#e2e8f0;">' + advice.advice + '</div>'
-    + '<div style="font-size:9px;color:#64748b;margin-top:6px;line-height:1.4;">Planning aid from public NOAA fields. The master still owns the passage. Not a chart.</div>';
-   try { resultEl.scrollIntoView({ block: 'nearest' }); } catch (_) {}
-  }
-  if (advice.ok) {
-   drawShipRouteAdvice(advice);
-   if (typeof setNoaaMapOverlay === 'function') setNoaaMapOverlay('currents');
-  }
-  showToast(advice.ok ? ('Best route: ' + (advice.best.label || advice.best.id)) : 'No route advice');
+  shipRouteTicket = job.id;
+  if (resultEl) resultEl.innerHTML = 'Queued on the passage desk.' + shipRouteDeskNote(job.id);
+  showToast('Sent to the passage desk');
+  pollShipRouteJob(job.id, 0);
  } catch (err) {
-  if (resultEl) resultEl.textContent = 'Could not read the NOAA field.';
-  showToast('Could not read the NOAA field');
+  if (resultEl) resultEl.textContent = 'The passage desk did not answer.';
+  showToast('The passage desk did not answer');
  } finally {
   shipRouteBusy = false;
  }
