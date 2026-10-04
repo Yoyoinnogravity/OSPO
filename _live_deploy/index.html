@@ -1273,7 +1273,7 @@
  <div id="panel-noaa" class="settings-panel" style="display:none; min-width:340px; max-width:440px; max-height:90vh; overflow-y:auto;">
  <button class="panel-close-btn" onclick="hidePanel('noaa')">&times;</button>
  <div class="panel-title">NOAA weather</div>
- <div style="font-size:11px;color:#94a3b8;margin-bottom:12px;line-height:1.45;">Public-domain NOAA fields (GFS wind, WAVEWATCH III waves/swell, altimetry currents, MUR SST). Point values at map centre; overlays refresh as you pan.</div>
+ <div style="font-size:11px;color:#94a3b8;margin-bottom:12px;line-height:1.45;">Public-domain NOAA fields (GFS wind, WAVEWATCH III waves, altimetry currents, MUR SST). Use them to advise a tanker or cargo ship on the better A-to-B track.</div>
 
  <div style="border:1px solid #1e293b;border-radius:8px;padding:10px 12px;margin-bottom:12px;background:#0a0a12;">
  <div style="font-size:10px;color:#a5f3fc;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;margin-bottom:8px;">Point at map centre</div>
@@ -1313,6 +1313,28 @@
  </label>
  <button type="button" onclick="refreshNoaaMapOverlay(true)" style="width:100%;padding:7px 10px;border-radius:4px;border:1px solid #155e75;background:#0c1929;color:#67e8f9;font-weight:700;cursor:pointer;font-size:11px;font-family:inherit;">Refresh overlay</button>
  <div id="noaa-map-status" style="font-size:10px;color:#64748b;margin-top:8px;line-height:1.4;"></div>
+ </div>
+
+ <div style="border:1px solid #155e75;border-radius:8px;padding:10px 12px;margin-bottom:12px;background:rgba(8,47,73,0.45);">
+ <div style="font-size:10px;color:#67e8f9;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;margin-bottom:6px;">Best route for a ship</div>
+ <div style="font-size:10px;color:#94a3b8;margin-bottom:10px;line-height:1.45;">Set departure and arrival on the map. Candooka reads NOAA currents, GFS wind, and WAVEWATCH III waves on the straight line and on port and starboard offsets, then names the quicker track that stays inside the ship’s sea limit.</div>
+ <label style="display:block;font-size:10px;color:#a5f3fc;margin-bottom:8px;">Vessel<br>
+  <select id="ship-route-vessel" onchange="onShipVesselChange()" style="width:100%;margin-top:4px;padding:7px 8px;border-radius:4px;border:1px solid #155e75;background:#0c1929;color:#e2e8f0;font-size:12px;font-family:inherit;">
+   <option value="tanker">Tanker</option>
+   <option value="cargo">Cargo</option>
+  </select>
+ </label>
+ <label style="display:block;font-size:10px;color:#a5f3fc;margin-bottom:8px;">Calm-water speed (kt)<br>
+  <input id="ship-route-stw" type="number" value="12" min="4" max="25" step="0.5" oninput="this.dataset.touched='1'" style="width:100%;margin-top:4px;box-sizing:border-box;padding:7px 8px;border-radius:4px;border:1px solid #155e75;background:#0c1929;color:#e2e8f0;font-size:12px;font-family:inherit;"/>
+ </label>
+ <div style="display:flex;gap:6px;margin-bottom:8px;">
+  <button type="button" onclick="armShipRoutePick('a')" style="flex:1;padding:7px 8px;border-radius:4px;border:1px solid #0e7490;background:#164e63;color:#fff;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;">Set departure</button>
+  <button type="button" onclick="armShipRoutePick('b')" style="flex:1;padding:7px 8px;border-radius:4px;border:1px solid #0e7490;background:#164e63;color:#fff;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;">Set arrival</button>
+ </div>
+ <div id="ship-route-ends" style="font-size:10px;color:#64748b;margin-bottom:8px;line-height:1.4;">Departure and arrival are not set.</div>
+ <button type="button" onclick="adviseShipRoute()" style="width:100%;padding:8px 10px;border-radius:4px;border:none;background:#22d3ee;color:#082f49;font-weight:800;cursor:pointer;font-size:12px;font-family:inherit;">Advise best route</button>
+ <div id="ship-route-result" style="font-size:11px;color:#e2e8f0;margin-top:8px;line-height:1.45;"></div>
+ <button type="button" onclick="clearShipRoute()" style="width:100%;margin-top:6px;padding:6px 8px;border-radius:4px;border:1px solid #1e293b;background:transparent;color:#94a3b8;font-size:10px;cursor:pointer;font-family:inherit;">Clear route</button>
  </div>
 
  <div style="border:1px solid #1e293b;border-radius:8px;padding:10px 12px;margin-bottom:4px;background:#0a0a12;">
@@ -2181,7 +2203,8 @@
  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
  <script src="https://unpkg.com/shpjs@latest/dist/shp.min.js"></script>
  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
- <script src="app.js?v=17.41"></script>
+ <script src="ship-route-advisor.js?v=17.42"></script>
+ <script src="app.js?v=17.42"></script>
  <script src="ray_tracing_module.js?v=16.53"></script>
  <script src="wmm_declination.js?v=16.49"></script>
  <script src="magnetic_isogones.js?v=16.49"></script>

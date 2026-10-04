@@ -129,7 +129,7 @@ assert(src.includes("mode: 'step'"), 'stepper must request step drawing');
 assert(!/const subset = state\.route\.slice/.test(src),
   'stepper must not slice the route (that hid context and still scribbled on Show All)');
 assert(html.includes('id="route-step-all-btn"'), 'Show All button needs an id');
-assert(/app\.js\?v=17\.41/.test(html), 'app.js cache bump missing');
+assert(/app\.js\?v=17\.42/.test(html), 'app.js cache bump missing');
 assert(/style\.min\.css\?v=3\.34/.test(html), 'css cache bump missing');
 assert(html.includes('id="btn-plan-route"'), 'ROUTE PLANNING needs an id');
 assert(html.includes('btn-plan-route'), 'ROUTE PLANNING must use the prominent plan-route class');

@@ -112,7 +112,7 @@ vm.runInContext(`
   else { const _t = showToast; showToast = function(){}; }
 `, ctx);
 
-assert(/app\.js\?v=17\.41/.test(html), 'app.js cache bump 17.41 missing');
+assert(/app\.js\?v=17\.42/.test(html), 'app.js cache bump 17.42 missing');
 assert(src.includes('function _crossLineWidthM'), '3D sq km helper missing');
 assert(src.includes('Sq km formula Aled set'), 'sq km lock comment missing');
 assert(src.includes('(n * sep) / 2'), 'sq km must use (numStreamers × streamerSeparation / 2)');
@@ -790,7 +790,7 @@ assert(vm.runInContext('globalThis.__autoNs', ctx) === '6',
 
 console.log(JSON.stringify({
   ok: true,
-  cache: '17.41',
+  cache: '17.42',
   rule: '2D skip-k; 3D swath shooting (adjacent monopass, locked heading, stadium returns)',
   kNom,
   nn: { visit: nn.nVisit, mode: nn.stats.mode, ms: nn.ms },

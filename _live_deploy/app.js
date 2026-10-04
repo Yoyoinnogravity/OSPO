@@ -785,6 +785,10 @@ function initLeafletMap() {
  document.getElementById('zoom-level').textContent = `Z: ${map.getZoom()}`;
  });
  map.on('click', e => {
+ if (typeof shipRoutePick !== 'undefined' && shipRoutePick) {
+  onShipRouteMapClick(e);
+  return;
+ }
  if (drawingObstruction) return;
  if (settingStartPoint) {
  state.settings.startPoint = [e.latlng.lat, e.latlng.lng];
@@ -27759,6 +27763,168 @@ async function refreshNoaaMapOverlay(forceToast) {
   if (forceToast) showToast('NOAA overlay request failed');
  } finally {
   if (reqId === noaaMapRequestId) noaaMapBusy = false;
+ }
+}
+
+// ===== Ship route advice from the NOAA current / wind / wave field =====
+let shipRoutePick = null;
+let shipRouteA = null;
+let shipRouteB = null;
+let shipRouteLayer = null;
+let shipRouteBusy = false;
+
+function onShipVesselChange() {
+ const sel = document.getElementById('ship-route-vessel');
+ const input = document.getElementById('ship-route-stw');
+ if (!sel || !input || typeof ShipRouteAdvisor === 'undefined') return;
+ const speed = String(ShipRouteAdvisor.vesselProfile(sel.value).stwKt);
+ if (!input.dataset.touched || input.value === input.dataset.auto) {
+  input.value = speed;
+  delete input.dataset.touched;
+ }
+ input.dataset.auto = speed;
+}
+
+function armShipRoutePick(which) {
+ shipRoutePick = which === 'b' ? 'b' : 'a';
+ if (typeof map !== 'undefined' && map && map.getContainer) map.getContainer().style.cursor = 'crosshair';
+ showToast(shipRoutePick === 'a' ? 'Click the map for departure' : 'Click the map for arrival');
+ const ends = document.getElementById('ship-route-ends');
+ if (ends) ends.textContent = shipRoutePick === 'a' ? 'Click the map to set departure.' : 'Click the map to set arrival.';
+}
+
+function fmtShipLatLon(p) {
+ if (!p) return 'not set';
+ const ns = p.lat >= 0 ? 'N' : 'S';
+ const ew = p.lon >= 0 ? 'E' : 'W';
+ return Math.abs(p.lat).toFixed(2) + '°' + ns + '  ' + Math.abs(p.lon).toFixed(2) + '°' + ew;
+}
+
+function paintShipRouteEnds() {
+ const el = document.getElementById('ship-route-ends');
+ if (!el) return;
+ el.textContent = 'Departure ' + fmtShipLatLon(shipRouteA) + '    Arrival ' + fmtShipLatLon(shipRouteB);
+}
+
+function onShipRouteMapClick(e) {
+ const p = { lat: e.latlng.lat, lon: e.latlng.lng };
+ if (shipRoutePick === 'b') shipRouteB = p;
+ else shipRouteA = p;
+ shipRoutePick = null;
+ if (typeof map !== 'undefined' && map && map.getContainer) map.getContainer().style.cursor = '';
+ paintShipRouteEnds();
+ drawShipRouteMarkers();
+ showToast(shipRouteB && p === shipRouteB ? 'Arrival set' : 'Departure set');
+}
+
+function drawShipRouteMarkers() {
+ if (typeof map === 'undefined' || !map || typeof L === 'undefined') return;
+ if (!shipRouteLayer) shipRouteLayer = L.layerGroup().addTo(map);
+ shipRouteLayer.clearLayers();
+ if (shipRouteA) {
+  L.circleMarker([shipRouteA.lat, shipRouteA.lon], {
+   radius: 7, color: '#082f49', weight: 2, fillColor: '#4ade80', fillOpacity: 1
+  }).bindTooltip('Departure', { permanent: true, direction: 'top', offset: [0, -8] }).addTo(shipRouteLayer);
+ }
+ if (shipRouteB) {
+  L.circleMarker([shipRouteB.lat, shipRouteB.lon], {
+   radius: 7, color: '#082f49', weight: 2, fillColor: '#facc15', fillOpacity: 1
+  }).bindTooltip('Arrival', { permanent: true, direction: 'top', offset: [0, -8] }).addTo(shipRouteLayer);
+ }
+}
+
+function clearShipRoute() {
+ shipRouteA = null;
+ shipRouteB = null;
+ shipRoutePick = null;
+ if (shipRouteLayer) shipRouteLayer.clearLayers();
+ const result = document.getElementById('ship-route-result');
+ if (result) result.innerHTML = '';
+ paintShipRouteEnds();
+ const ends = document.getElementById('ship-route-ends');
+ if (ends && !shipRouteA && !shipRouteB) ends.textContent = 'Departure and arrival are not set.';
+ if (typeof map !== 'undefined' && map && map.getContainer) map.getContainer().style.cursor = '';
+}
+
+function drawShipRouteAdvice(result) {
+ if (!shipRouteLayer || typeof L === 'undefined') return;
+ shipRouteLayer.clearLayers();
+ drawShipRouteMarkers();
+ const bestId = result.best && result.best.id;
+ (result.routes || []).forEach((route) => {
+  if (!route.valid || !route.points) return;
+  const latlngs = route.points.map((p) => [p.lat, p.lon]);
+  const isBest = route.id === bestId;
+  L.polyline(latlngs, {
+   color: isBest ? (result.best.withinLimits ? '#22d3ee' : '#fbbf24') : '#64748b',
+   weight: isBest ? 5 : 2,
+   opacity: isBest ? 0.95 : 0.55,
+   dashArray: isBest ? null : '6 6',
+   interactive: false
+  }).addTo(shipRouteLayer);
+ });
+ if (result.best && result.best.points && result.best.points.length) {
+  const b = L.latLngBounds(result.best.points.map((p) => [p.lat, p.lon]));
+  if (b.isValid()) map.fitBounds(b.pad(0.25));
+ }
+}
+
+async function adviseShipRoute() {
+ if (shipRouteBusy) return;
+ if (typeof ShipRouteAdvisor === 'undefined') {
+  showToast('Ship route advisor did not load');
+  return;
+ }
+ if (!shipRouteA || !shipRouteB) {
+  showToast('Set departure and arrival on the map');
+  return;
+ }
+ const vesselEl = document.getElementById('ship-route-vessel');
+ const stwEl = document.getElementById('ship-route-stw');
+ const resultEl = document.getElementById('ship-route-result');
+ const vessel = vesselEl ? vesselEl.value : 'tanker';
+ const stwKt = stwEl ? Number(stwEl.value) : undefined;
+ const candidates = ShipRouteAdvisor.buildCandidates(shipRouteA, shipRouteB);
+ const box = ShipRouteAdvisor.boundsOf(candidates, 0.75);
+ if (resultEl) resultEl.textContent = 'Reading NOAA currents, wind, and waves for this passage…';
+ shipRouteBusy = true;
+ try {
+  const q = new URLSearchParams({
+   south: box.south.toFixed(3),
+   west: box.west.toFixed(3),
+   north: box.north.toFixed(3),
+   east: box.east.toFixed(3)
+  });
+  const res = await fetch('api/noaa-route-field.php?' + q.toString(), { cache: 'no-store' });
+  const field = await res.json();
+  if (!field || !field.ok) {
+   const msg = (field && field.error) || 'NOAA field unavailable';
+   if (resultEl) resultEl.textContent = msg;
+   showToast(msg);
+   return;
+  }
+  const advice = ShipRouteAdvisor.advise({
+   origin: shipRouteA,
+   dest: shipRouteB,
+   vessel: vessel,
+   stwKt: stwKt,
+   candidates: candidates,
+   field: field
+  });
+  if (resultEl) {
+   resultEl.innerHTML = '<div style="color:#e2e8f0;">' + advice.advice + '</div>'
+    + '<div style="font-size:9px;color:#64748b;margin-top:6px;line-height:1.4;">Planning aid from public NOAA fields. The master still owns the passage. Not a chart.</div>';
+  }
+  if (advice.ok) {
+   drawShipRouteAdvice(advice);
+   if (typeof setNoaaMapOverlay === 'function') setNoaaMapOverlay('currents');
+  }
+  showToast(advice.ok ? ('Best route: ' + (advice.best.label || advice.best.id)) : 'No route advice');
+ } catch (err) {
+  if (resultEl) resultEl.textContent = 'Could not read the NOAA field.';
+  showToast('Could not read the NOAA field');
+ } finally {
+  shipRouteBusy = false;
  }
 }
 
