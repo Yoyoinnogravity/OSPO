@@ -215,13 +215,26 @@
     return q00 * (1 - tx) * (1 - ty) + q01 * tx * (1 - ty) + q10 * (1 - tx) * ty + q11 * tx * ty;
   }
 
-  function nearest(lats, lons, grid, lat, lon) {
-    if (!lats || !lons || !grid) return null;
-    var row = locate(lats, lat);
-    var col = locate(lons, lon);
-    if (!row || !col) return null;
-    var i = row.t < 0.5 ? row.i : row.i + 1;
-    var j = col.t < 0.5 ? col.i : col.i + 1;
+  /** Value of the grid cell whose centre is nearest, if the point sits in that cell. */
+  function cellValue(lats, lons, grid, lat, lon) {
+    if (!lats || !lons || !grid || !lats.length || !lons.length) return null;
+    var i = 0;
+    var best = Infinity;
+    var k;
+    for (k = 0; k < lats.length; k++) {
+      var dLat = Math.abs(lats[k] - lat);
+      if (dLat < best) { best = dLat; i = k; }
+    }
+    var j = 0;
+    best = Infinity;
+    for (k = 0; k < lons.length; k++) {
+      var dLon = Math.abs(lons[k] - lon);
+      if (dLon < best) { best = dLon; j = k; }
+    }
+    var latStep = lats.length > 1 ? Math.abs(lats[1] - lats[0]) : 0.5;
+    var lonStep = lons.length > 1 ? Math.abs(lons[1] - lons[0]) : 0.5;
+    if (Math.abs(lats[i] - lat) > latStep * 0.75) return null;
+    if (Math.abs(lons[j] - lon) > lonStep * 0.75) return null;
     var v = grid[i] && grid[i][j];
     return (v == null || !isFinite(v)) ? null : v;
   }
@@ -231,12 +244,13 @@
     var c = field.currents;
     var w = field.wind;
     var wv = field.waves;
-    var cu = c ? bilinear(c.lats, c.lons, c.u, lat, lon) : null;
-    var cv = c ? bilinear(c.lats, c.lons, c.v, lat, lon) : null;
-    var wu = w ? bilinear(w.lats, w.lons, w.u, lat, lon) : null;
-    var wvnd = w ? bilinear(w.lats, w.lons, w.v, lat, lon) : null;
-    var hs = wv ? bilinear(wv.lats, wv.lons, wv.hs, lat, lon) : null;
-    var dir = wv ? nearest(wv.lats, wv.lons, wv.dir, lat, lon) : null;
+    // Nearest water cell. Bilinear was dropping whole coastal tracks wherever one corner was land.
+    var cu = c ? cellValue(c.lats, c.lons, c.u, lat, lon) : null;
+    var cv = c ? cellValue(c.lats, c.lons, c.v, lat, lon) : null;
+    var wu = w ? cellValue(w.lats, w.lons, w.u, lat, lon) : null;
+    var wvnd = w ? cellValue(w.lats, w.lons, w.v, lat, lon) : null;
+    var hs = wv ? cellValue(wv.lats, wv.lons, wv.hs, lat, lon) : null;
+    var dir = wv ? cellValue(wv.lats, wv.lons, wv.dir, lat, lon) : null;
     var ocean = (cu != null && cv != null) || hs != null;
     if (!ocean && wu == null) return null;
     return {

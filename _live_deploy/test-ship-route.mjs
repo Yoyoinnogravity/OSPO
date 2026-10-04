@@ -123,8 +123,18 @@ const field = {
     dir: [[90, 90], [90, 90]]
   }
 };
-const mid = A.sampleField(field, 0, 101);
-assert(mid && Math.abs(mid.hsM - 2) < 0.05, 'bilinear wave height at the middle should be ~2 m, got ' + (mid && mid.hsM));
+const northCell = A.sampleField(field, 0.8, 101);
+assert(northCell && Math.abs(northCell.hsM - 3) < 0.05, 'northern cell wave height should be 3 m, got ' + (northCell && northCell.hsM));
+const southCell = A.sampleField(field, -0.8, 101);
+assert(southCell && Math.abs(southCell.hsM - 1) < 0.05, 'southern cell wave height should be 1 m, got ' + (southCell && southCell.hsM));
+const coast = A.sampleField({
+  currents: { lats: [0, 1], lons: [100, 101], u: [[null, 0.4], [null, 0.4]], v: [[0, 0], [0, 0]] },
+  waves: { lats: [0, 1], lons: [100, 101], hs: [[null, 1.2], [null, 1.2]], dir: [[90, 90], [90, 90]] }
+}, 0.2, 100.8);
+assert(coast && Math.abs(coast.currentU - 0.4) < 0.01, 'a point in a water cell must keep its current when the next cell is land');
+assert(A.sampleField({
+  currents: { lats: [0, 1], lons: [100, 101], u: [[null, 0.4], [null, 0.4]], v: [[0, 0], [0, 0]] }
+}, 0.2, 100.1) == null, 'a point in a land cell must not borrow the neighbouring current');
 const fromField = A.advise({ origin, dest, vessel: 'cargo', stwKt: 16, field });
 assert(fromField.ok && fromField.best.id === 'direct', 'uniform-along-track field should keep the straight line');
 assert(fromField.advice.includes('2026-10-04'), fromField.advice);
