@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Passage desk | Candooka commercial routing</title>
+  <meta name="description" content="Commercial passage desk for tankers and cargo ships. Candooka’s route computer times tracks with NOAA currents, wind, and waves. The page only takes the order.">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://candooka.world/route/">
+  <link rel="icon" href="/content/logo.svg" type="image/svg+xml">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Passage desk | Candooka">
+  <meta property="og:description" content="Send a tanker or cargo passage. The route computer does the search and returns the advice.">
+  <meta property="og:url" content="https://candooka.world/route/">
+  <link rel="stylesheet" href="/content/content.min.css">
+  <style>
+    .desk { display: grid; gap: 1rem; grid-template-columns: minmax(16rem, 22rem) 1fr; align-items: start; }
+    @media (max-width: 800px) { .desk { grid-template-columns: 1fr; } }
+    form.card label { display: block; font-size: 0.82rem; color: var(--muted); margin: 0.75rem 0 0.25rem; }
+    form.card input, form.card select {
+      width: 100%; padding: 0.55rem 0.65rem; border-radius: 8px;
+      border: 1px solid var(--line); background: #071018; color: var(--ink);
+      font: inherit; font-size: 0.95rem;
+    }
+    .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
+    button.cta { border: 0; cursor: pointer; width: 100%; text-align: center; font: inherit; }
+    button.cta:disabled { opacity: 0.55; cursor: progress; }
+    #ticket[hidden] { display: none; }
+    .status { font-weight: 700; margin: 0.2rem 0 0.6rem; }
+    .status.running, .status.queued { color: var(--accent-2); }
+    .status.ready { color: var(--ok); }
+    .status.failed { color: #f0a8a8; }
+    #advice { white-space: pre-wrap; }
+    #track { width: 100%; height: auto; margin-top: 0.8rem; background: #071018; border-radius: 10px; border: 1px solid var(--line); }
+    #track[hidden] { display: none; }
+    .fine { color: var(--muted); font-size: 0.82rem; }
+  </style>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <a class="brand" href="/">
+      <img src="/content/logo.svg" width="36" height="36" alt="">
+      Candooka
+    </a>
+    <nav aria-label="Primary">
+      <a href="/">Planner</a>
+      <a href="/about.html">About</a>
+      <a href="/insights/">Insights</a>
+      <a href="/work/">Work</a>
+      <a href="/route/" aria-current="page">Passage desk</a>
+    </nav>
+  </header>
+  <main id="main" class="wrap wrap-wide">
+    <p class="kicker">Commercial service</p>
+    <h1>Passage desk</h1>
+    <p class="lede">For tankers and cargo ships. You send the departure, the arrival, and the ship. The route computer predicts the passage: it steps the ship through the NOAA wind and wave forecast, tries many courses and speeds, and keeps the earliest arrival inside the ship’s sea limit. That work does not run on your machine.</p>
+    <div class="desk">
+      <form class="card" id="order">
+        <p class="kicker">New passage</p>
+        <label for="reference">Ship or voyage name</label>
+        <input id="reference" name="reference" maxlength="80" autocomplete="off" placeholder="Optional">
+        <label for="vessel">Vessel</label>
+        <select id="vessel" name="vessel">
+          <option value="tanker">Tanker</option>
+          <option value="cargo">Cargo</option>
+        </select>
+        <label for="stw">Calm-water speed (kt)</label>
+        <input id="stw" name="stw" type="number" min="4" max="25" step="0.5" value="12">
+        <div class="pair">
+          <div>
+            <label for="lat-a">Departure latitude</label>
+            <input id="lat-a" required type="number" min="-80" max="80" step="0.0001" placeholder="1.6">
+          </div>
+          <div>
+            <label for="lon-a">Departure longitude</label>
+            <input id="lon-a" required type="number" min="-180" max="180" step="0.0001" placeholder="103.0">
+          </div>
+        </div>
+        <div class="pair">
+          <div>
+            <label for="lat-b">Arrival latitude</label>
+            <input id="lat-b" required type="number" min="-80" max="80" step="0.0001" placeholder="5.4">
+          </div>
+          <div>
+            <label for="lon-b">Arrival longitude</label>
+            <input id="lon-b" required type="number" min="-180" max="180" step="0.0001" placeholder="100.0">
+          </div>
+        </div>
+        <button class="cta" id="send" type="submit">Send to the route computer</button>
+        <p class="fine">GFS wind and WAVEWATCH III waves at several forecast hours. Daily altimetry currents are held. An isochrone, not a ship-motion study. The master still owns the voyage.</p>
+      </form>
+      <section class="card" id="ticket" hidden>
+        <p class="kicker">Route computer</p>
+        <p class="status" id="status" aria-live="polite">Waiting.</p>
+        <p id="order-line" class="fine"></p>
+        <p id="advice"></p>
+        <svg id="track" viewBox="0 0 100 70" hidden role="img" aria-label="Advised track"></svg>
+      </section>
+    </div>
+  </main>
+  <footer class="site-footer">© 2026 Candooka · Passage desk</footer>
+  <script src="/route/desk.js?v=3"></script>
+</body>
+</html>

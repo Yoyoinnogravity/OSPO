@@ -785,6 +785,10 @@ function initLeafletMap() {
  document.getElementById('zoom-level').textContent = `Z: ${map.getZoom()}`;
  });
  map.on('click', e => {
+ if (typeof shipRoutePick !== 'undefined' && shipRoutePick) {
+  onShipRouteMapClick(e);
+  return;
+ }
  if (drawingObstruction) return;
  if (settingStartPoint) {
  state.settings.startPoint = [e.latlng.lat, e.latlng.lng];
@@ -27759,6 +27763,218 @@ async function refreshNoaaMapOverlay(forceToast) {
   if (forceToast) showToast('NOAA overlay request failed');
  } finally {
   if (reqId === noaaMapRequestId) noaaMapBusy = false;
+ }
+}
+
+// ===== Ship route advice from the NOAA current / wind / wave field =====
+let shipRoutePick = null;
+let shipRouteA = null;
+let shipRouteB = null;
+let shipRouteLayer = null;
+let shipRouteBusy = false;
+let shipRoutePollTimer = null;
+let shipRouteTicket = null;
+
+function onShipVesselChange() {
+ const sel = document.getElementById('ship-route-vessel');
+ const input = document.getElementById('ship-route-stw');
+ if (!sel || !input || typeof ShipRouteAdvisor === 'undefined') return;
+ const speed = String(ShipRouteAdvisor.vesselProfile(sel.value).stwKt);
+ if (!input.dataset.touched || input.value === input.dataset.auto) {
+  input.value = speed;
+  delete input.dataset.touched;
+ }
+ input.dataset.auto = speed;
+}
+
+function armShipRoutePick(which) {
+ shipRoutePick = which === 'b' ? 'b' : 'a';
+ if (typeof map !== 'undefined' && map && map.getContainer) map.getContainer().style.cursor = 'crosshair';
+ showToast(shipRoutePick === 'a' ? 'Click the map for departure' : 'Click the map for arrival');
+ const ends = document.getElementById('ship-route-ends');
+ if (ends) ends.textContent = shipRoutePick === 'a' ? 'Click the map to set departure.' : 'Click the map to set arrival.';
+}
+
+function fmtShipLatLon(p) {
+ if (!p) return 'not set';
+ const ns = p.lat >= 0 ? 'N' : 'S';
+ const ew = p.lon >= 0 ? 'E' : 'W';
+ return Math.abs(p.lat).toFixed(2) + '°' + ns + '  ' + Math.abs(p.lon).toFixed(2) + '°' + ew;
+}
+
+function paintShipRouteEnds() {
+ const el = document.getElementById('ship-route-ends');
+ if (!el) return;
+ el.textContent = 'Departure ' + fmtShipLatLon(shipRouteA) + '    Arrival ' + fmtShipLatLon(shipRouteB);
+}
+
+function onShipRouteMapClick(e) {
+ const p = { lat: e.latlng.lat, lon: e.latlng.lng };
+ if (shipRoutePick === 'b') shipRouteB = p;
+ else shipRouteA = p;
+ shipRoutePick = null;
+ if (typeof map !== 'undefined' && map && map.getContainer) map.getContainer().style.cursor = '';
+ paintShipRouteEnds();
+ drawShipRouteMarkers();
+ showToast(shipRouteB && p === shipRouteB ? 'Arrival set' : 'Departure set');
+}
+
+function drawShipRouteMarkers() {
+ if (typeof map === 'undefined' || !map || typeof L === 'undefined') return;
+ if (!shipRouteLayer) shipRouteLayer = L.layerGroup().addTo(map);
+ shipRouteLayer.clearLayers();
+ if (shipRouteA) {
+  L.circleMarker([shipRouteA.lat, shipRouteA.lon], {
+   radius: 7, color: '#082f49', weight: 2, fillColor: '#4ade80', fillOpacity: 1
+  }).bindTooltip('Departure', { permanent: true, direction: 'top', offset: [0, -8] }).addTo(shipRouteLayer);
+ }
+ if (shipRouteB) {
+  L.circleMarker([shipRouteB.lat, shipRouteB.lon], {
+   radius: 7, color: '#082f49', weight: 2, fillColor: '#facc15', fillOpacity: 1
+  }).bindTooltip('Arrival', { permanent: true, direction: 'top', offset: [0, -8] }).addTo(shipRouteLayer);
+ }
+}
+
+function stopShipRoutePoll() {
+ if (shipRoutePollTimer) clearTimeout(shipRoutePollTimer);
+ shipRoutePollTimer = null;
+ shipRouteTicket = null;
+}
+
+function clearShipRoute() {
+ stopShipRoutePoll();
+ shipRouteA = null;
+ shipRouteB = null;
+ shipRoutePick = null;
+ if (shipRouteLayer) shipRouteLayer.clearLayers();
+ const result = document.getElementById('ship-route-result');
+ if (result) result.innerHTML = '';
+ paintShipRouteEnds();
+ const ends = document.getElementById('ship-route-ends');
+ if (ends && !shipRouteA && !shipRouteB) ends.textContent = 'Departure and arrival are not set.';
+ if (typeof map !== 'undefined' && map && map.getContainer) map.getContainer().style.cursor = '';
+}
+
+function drawShipRouteAdvice(result) {
+ if (typeof map === 'undefined' || !map || typeof L === 'undefined') return;
+ if (!shipRouteLayer) shipRouteLayer = L.layerGroup().addTo(map);
+ shipRouteLayer.clearLayers();
+ drawShipRouteMarkers();
+ const bestId = result.best && result.best.id;
+ (result.routes || []).forEach((route) => {
+  if (!route.valid || !route.points) return;
+  const latlngs = route.points.map((p) => [p.lat, p.lon]);
+  const isBest = route.id === bestId;
+  L.polyline(latlngs, {
+   color: isBest ? (result.best.withinLimits ? '#22d3ee' : '#fbbf24') : '#64748b',
+   weight: isBest ? 5 : 2,
+   opacity: isBest ? 0.95 : 0.55,
+   dashArray: isBest ? null : '6 6',
+   interactive: false
+  }).addTo(shipRouteLayer);
+ });
+ if (result.best && result.best.points && result.best.points.length) {
+  const b = L.latLngBounds(result.best.points.map((p) => [p.lat, p.lon]));
+  if (b.isValid()) map.fitBounds(b.pad(0.25));
+ }
+}
+
+function shipRouteDeskNote(id) {
+ return '<div style="margin-top:6px;font-size:10px;"><a href="/route/?job=' + id + '" target="_blank" rel="noopener" style="color:#67e8f9;">Open this ticket on the passage desk</a></div>'
+  + '<div style="font-size:9px;color:#64748b;margin-top:6px;line-height:1.4;">The route computer does the search. This window only waits. Planning aid from public NOAA fields. The master still owns the passage.</div>';
+}
+
+async function pollShipRouteJob(id, n) {
+ if (shipRouteTicket !== id) return;
+ const resultEl = document.getElementById('ship-route-result');
+ try {
+  const res = await fetch('api/ship-route-job.php?id=' + encodeURIComponent(id), { cache: 'no-store' });
+  const job = await res.json();
+  if (shipRouteTicket !== id) return;
+  if (!job || !job.ok) {
+   if (resultEl) resultEl.textContent = (job && job.error) || 'The passage desk did not return this ticket.';
+   return;
+  }
+  if (job.status === 'queued' || job.status === 'running') {
+   var progress = job.progress || {};
+   var work = 'Queued on the passage desk.';
+   if (job.status === 'running' && progress.phase === 'predicting' && progress.predictions) {
+    work = 'Predicting. Step ' + progress.step + ' of ' + progress.steps + ', ' + progress.predictions + ' positions checked.';
+   } else if (job.status === 'running' && progress.phase === 'forecast') {
+    work = progress.detail || 'Reading the NOAA forecast.';
+   } else if (job.status === 'running') {
+    work = 'The route computer is predicting this passage.';
+   }
+   if (resultEl) resultEl.innerHTML = work + shipRouteDeskNote(id);
+   if (n > 200) {
+    if (resultEl) resultEl.innerHTML = 'Still working. Watch the ticket on the passage desk.' + shipRouteDeskNote(id);
+    return;
+   }
+   shipRoutePollTimer = setTimeout(() => pollShipRouteJob(id, n + 1), 2000);
+   return;
+  }
+  if (job.status === 'failed') {
+   if (resultEl) resultEl.innerHTML = (job.error || 'The route computer stopped.') + shipRouteDeskNote(id);
+   showToast('Route computer stopped');
+   return;
+  }
+  const advice = job.result || {};
+  if (resultEl) {
+   resultEl.innerHTML = '<div style="color:#e2e8f0;">' + (advice.advice || 'Advice is ready.') + '</div>' + shipRouteDeskNote(id);
+   try { resultEl.scrollIntoView({ block: 'nearest' }); } catch (_) {}
+  }
+  if (advice.best) {
+   drawShipRouteAdvice(advice);
+   if (typeof setNoaaMapOverlay === 'function') setNoaaMapOverlay('currents');
+  }
+  showToast(advice.ok && advice.best ? ('Best route: ' + (advice.best.label || advice.best.id)) : 'Passage desk finished');
+ } catch (err) {
+  if (shipRouteTicket === id && resultEl) resultEl.textContent = 'The passage desk did not answer.';
+ }
+}
+
+async function adviseShipRoute() {
+ if (shipRouteBusy) return;
+ if (!shipRouteA || !shipRouteB) {
+  showToast('Set departure and arrival on the map');
+  return;
+ }
+ const vesselEl = document.getElementById('ship-route-vessel');
+ const stwEl = document.getElementById('ship-route-stw');
+ const resultEl = document.getElementById('ship-route-result');
+ const vessel = vesselEl ? vesselEl.value : 'tanker';
+ const stwKt = stwEl ? Number(stwEl.value) : undefined;
+ if (resultEl) resultEl.textContent = 'Sending this passage to the route computer…';
+ shipRouteBusy = true;
+ stopShipRoutePoll();
+ try {
+  const res = await fetch('api/ship-route-job.php', {
+   method: 'POST',
+   headers: { 'Content-Type': 'application/json' },
+   cache: 'no-store',
+   body: JSON.stringify({
+    vessel: vessel,
+    stwKt: stwKt,
+    origin: shipRouteA,
+    dest: shipRouteB
+   })
+  });
+  const job = await res.json();
+  if (!job || !job.ok) {
+   const msg = (job && job.error) || 'The passage desk did not take the order.';
+   if (resultEl) resultEl.textContent = msg;
+   showToast(msg);
+   return;
+  }
+  shipRouteTicket = job.id;
+  if (resultEl) resultEl.innerHTML = 'Queued on the passage desk.' + shipRouteDeskNote(job.id);
+  showToast('Sent to the passage desk');
+  pollShipRouteJob(job.id, 0);
+ } catch (err) {
+  if (resultEl) resultEl.textContent = 'The passage desk did not answer.';
+  showToast('The passage desk did not answer');
+ } finally {
+  shipRouteBusy = false;
  }
 }
 
