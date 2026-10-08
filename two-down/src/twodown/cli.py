@@ -150,10 +150,10 @@ def main(argv: list[str] | None = None) -> int:
     today.add_argument("--youtube-privacy", default="public", choices=["unlisted", "private", "public"])
     _add_social_flags(today)
 
-    upload = sub.add_parser("upload", help="Upload today's Short, or the newest downloads still missing from YouTube")
+    upload = sub.add_parser("upload", help="Upload today's Short, or every download still missing from YouTube")
     upload.add_argument("--out", type=Path, default=DEFAULT_OUTPUT)
     upload.add_argument("--date", help="London calendar date YYYY-MM-DD")
-    upload.add_argument("--pending", action="store_true", help="Post the newest day's downloads that are not on YouTube yet")
+    upload.add_argument("--pending", action="store_true", help="Post every download that is not on YouTube yet")
     upload.add_argument("--youtube-required", action="store_true", help="Exit 1 unless those downloads received a YouTube id")
     upload.add_argument("--youtube-privacy", default="public", choices=["unlisted", "private", "public"])
     _add_social_flags(upload)
@@ -275,14 +275,17 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.cmd == "upload" and args.pending:
-        from twodown.pipeline import post_newest_downloads
+        from twodown.pipeline import post_pending_downloads
 
-        pair = post_newest_downloads(privacy=args.youtube_privacy)
+        pair = post_pending_downloads(privacy=args.youtube_privacy)
         if not pair.clues:
             print("No new downloads waiting for YouTube.")
             return 0
-        _print_pair(pair)
+        posted = [item.clue.slug for item in pair.clues if item.youtube_id]
         missing = [item.clue.slug for item in pair.clues if not item.youtube_id]
+        print(f"downloads {len(pair.clues)}")
+        if posted:
+            print("posted " + ", ".join(posted))
         if missing:
             print(
                 "These downloads are not on YouTube: " + ", ".join(missing) + ".",

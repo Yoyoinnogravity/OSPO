@@ -238,6 +238,7 @@ def upload_clues(
     for item in batch:
         video_id = upload_short(item, privacy=privacy)
         if video_id:
+            item.youtube_id = video_id
             ids.append(video_id)
     return ids
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import html as htmlmod
 import re
+import sys
 from datetime import datetime
 from pathlib import Path
 from shutil import copy2
@@ -537,12 +538,13 @@ def _pair_from_published_day(date: str) -> DailyPair:
     )
 
 
-def newest_pending_slugs(root: Path | None = None) -> tuple[str, list[str]] | None:
-    """Newest site day that still has a download with no YouTube id."""
+def pending_download_days(root: Path | None = None) -> list[tuple[str, list[str]]]:
+    """Every site day that still has a download with no YouTube id, newest first."""
     from twodown.staging import is_uploaded, load_uploads, videos_by_slug
 
     site = Path(root or SITE_ROOT)
     known = videos_by_slug(load_uploads(site))
+    found: list[tuple[str, list[str]]] = []
     days = sorted(path.parent.name for path in (site / "d").glob("*/index.html"))
     for date in reversed(days):
         waiting: list[str] = []
@@ -552,8 +554,14 @@ def newest_pending_slugs(root: Path | None = None) -> tuple[str, list[str]] | No
                 continue
             waiting.append(slug)
         if waiting:
-            return date, waiting
-    return None
+            found.append((date, waiting))
+    return found
+
+
+def newest_pending_slugs(root: Path | None = None) -> tuple[str, list[str]] | None:
+    """Newest site day that still has a download with no YouTube id."""
+    days = pending_download_days(root)
+    return days[0] if days else None
 
 
 def sync_channel_ledger(root: Path | None = None) -> dict[str, dict[str, str]]:
@@ -575,24 +583,17 @@ def sync_channel_ledger(root: Path | None = None) -> dict[str, dict[str, str]]:
     return apply_feed_matches(site, entries, films)
 
 
-def post_newest_downloads(privacy: str = "public") -> DailyPair:
-    """Upload every unpublished Short from the newest day that still has one."""
-    from twodown.youtube import remember_youtube_ids, upload_clues, youtube_ready
-
-    sync_channel_ledger(SITE_ROOT)
-    found = newest_pending_slugs(SITE_ROOT)
-    voice = resolve_voice(DEFAULT_VOICE_ALIAS)
-    if found is None:
-        return DailyPair(date="", voice=voice, source_site=SOURCE_SITE, already_published=True)
-    date, slugs = found
+def _downloads_for_slugs(site: Path, slugs: list[str], voice: str) -> list[SpokenClue]:
     items: list[SpokenClue] = []
     for slug in slugs:
         try:
-            clue = published_clue(slug, SITE_ROOT)
+            clue = published_clue(slug, site)
         except (FileNotFoundError, ValueError):
             continue
-        video = SITE_ROOT / "media" / f"{slug}.mp4"
-        thumb = SITE_ROOT / "media" / f"{slug}-thumb.jpg"
+        video = site / "media" / f"{slug}.mp4"
+        if not video.is_file():
+            continue
+        thumb = site / "media" / f"{slug}-thumb.jpg"
         items.append(
             SpokenClue(
                 clue=clue,
@@ -603,14 +604,58 @@ def post_newest_downloads(privacy: str = "public") -> DailyPair:
                 site_path=f"{SITE_ORIGIN}/c/{slug}/",
             )
         )
-    pair = DailyPair(date=date, voice=voice, clues=items, source_site=SOURCE_SITE, site_index=str(SITE_ROOT / "index.html"))
-    if items and youtube_ready():
-        pair.youtube_ids = upload_clues(pair.clues, privacy=privacy, limit=None)
-        if remember_youtube_ids(pair):
-            from twodown.site import publish_films
+    return items
 
-            publish_films(SITE_ROOT)
+
+def post_pending_downloads(privacy: str = "public", root: Path | None = None) -> DailyPair:
+    """Upload every unpublished Short that already has an mp4, newest day first."""
+    from twodown.youtube import remember_youtube_ids, upload_clues, youtube_ready
+
+    site = Path(root or SITE_ROOT)
+    sync_channel_ledger(site)
+    days = pending_download_days(site)
+    voice = resolve_voice(DEFAULT_VOICE_ALIAS)
+    if not days:
+        return DailyPair(date="", voice=voice, source_site=SOURCE_SITE, already_published=True)
+    slugs = [slug for _date, group in days for slug in group]
+    items = _downloads_for_slugs(site, slugs, voice)
+    pair = DailyPair(
+        date=days[0][0],
+        voice=voice,
+        clues=items,
+        source_site=SOURCE_SITE,
+        site_index=str(site / "index.html"),
+    )
+    if not items or not youtube_ready():
+        return pair
+    ids: list[str] = []
+    for item in items:
+        try:
+            got = upload_clues([item], privacy=privacy, limit=None)
+        except Exception as exc:
+            pair.youtube_ids = ids
+            if remember_youtube_ids(pair, site):
+                from twodown.site import publish_films
+
+                publish_films(site)
+            print(
+                f"YouTube stopped after {len(ids)} download(s): {exc.__class__.__name__}",
+                file=sys.stderr,
+            )
+            return pair
+        ids.extend(got)
+        pair.youtube_ids = list(ids)
+        remember_youtube_ids(pair, site)
+    if remember_youtube_ids(pair, site):
+        from twodown.site import publish_films
+
+        publish_films(site)
     return pair
+
+
+def post_newest_downloads(privacy: str = "public") -> DailyPair:
+    """Upload every waiting download. The name remains for the earlier one-day command."""
+    return post_pending_downloads(privacy=privacy)
 
 
 def published_date(site_root: Path | None, date: str) -> bool:

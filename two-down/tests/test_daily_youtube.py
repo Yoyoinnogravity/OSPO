@@ -1,5 +1,5 @@
 from twodown.models import Clue, DailyPair, SpokenClue
-from twodown.pipeline import newest_pending_slugs, published_clue
+from twodown.pipeline import newest_pending_slugs, pending_download_days, post_pending_downloads, published_clue
 from twodown.staging import apply_feed_matches, load_uploads, parse_channel_feed, record_youtube_upload
 from twodown.youtube import upload_clues, upload_pair, video_title
 
@@ -91,6 +91,48 @@ def test_newest_pending_day_is_the_latest_download(tmp_path):
     (page / "index.html").write_text("<p>x</p>", encoding="utf-8")
     record_youtube_upload(tmp_path, "old-1a", "7q-WFyj0WnA", "2026-10-01")
     assert newest_pending_slugs(tmp_path) == ("2026-10-03", ["new-6a", "new-11a"])
+    assert pending_download_days(tmp_path) == [("2026-10-03", ["new-6a", "new-11a"])]
+
+
+def test_pending_downloads_include_every_unpublished_day(tmp_path):
+    _day(tmp_path, "2026-10-01", ["old-1a"])
+    _day(tmp_path, "2026-10-03", ["new-6a", "new-11a"])
+    assert pending_download_days(tmp_path) == [
+        ("2026-10-03", ["new-6a", "new-11a"]),
+        ("2026-10-01", ["old-1a"]),
+    ]
+
+
+def test_post_pending_downloads_keeps_the_first_id_when_youtube_stops(tmp_path, monkeypatch):
+    first = "independent-12477-6a"
+    second = "independent-12458-11a"
+    _day(tmp_path, "2026-10-03", [first])
+    _day(tmp_path, "2026-10-01", [second])
+    monkeypatch.setattr("twodown.pipeline.sync_channel_ledger", lambda root=None: {})
+    monkeypatch.setattr("twodown.youtube.SITE_ROOT", tmp_path)
+    monkeypatch.setattr("twodown.youtube.youtube_ready", lambda: True)
+
+    def clue_for(slug, site):
+        if slug == first:
+            return _clue(puzzle_id="12477", number="6")
+        return _clue(puzzle_id="12458", number="11")
+
+    monkeypatch.setattr("twodown.pipeline.published_clue", clue_for)
+    posted: list[str] = []
+
+    def fake_upload(item, privacy="public"):
+        posted.append(item.clue.slug)
+        if item.clue.slug == second:
+            raise RuntimeError("quotaExceeded")
+        return "aaaaaaaaaaa"
+
+    monkeypatch.setattr("twodown.youtube.upload_short", fake_upload)
+    pair = post_pending_downloads(root=tmp_path)
+    assert posted == [first, second]
+    assert pair.youtube_ids == ["aaaaaaaaaaa"]
+    saved = {row["slug"]: row.get("youtube_id") for row in load_uploads(tmp_path)["videos"]}
+    assert saved[first] == "aaaaaaaaaaa"
+    assert second not in saved or not saved[second]
 
 
 def test_upload_clues_posts_every_download_on_that_day(tmp_path, monkeypatch):

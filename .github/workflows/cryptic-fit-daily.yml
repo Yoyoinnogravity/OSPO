@@ -31,7 +31,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y ffmpeg fonts-liberation
           pip install -e "./two-down"
-      - name: Post the newest downloads
+      - name: Post every download still missing from YouTube
         id: downloads
         env:
           TWODOWN_YOUTUBE_TOKEN: ${{ secrets.TWODOWN_YOUTUBE_TOKEN }}
@@ -58,7 +58,7 @@ jobs:
       - name: Require the downloads on YouTube
         if: steps.downloads.outcome != 'success'
         run: |
-          echo "The newest downloads are not on YouTube."
+          echo "Downloads are still missing from YouTube."
           echo "Add repository secret TWODOWN_YOUTUBE_TOKEN: the cryptic.fit OAuth JSON (youtube.upload)."
           echo "Channel: https://www.youtube.com/@crypticfit"
           exit 1
