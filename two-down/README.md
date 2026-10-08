@@ -56,7 +56,9 @@ Social
 every platform that has a token. Missing tokens are skipped, not fatal.
 The daily YouTube post is the GitHub Action `cryptic.fit daily`
 (`.github/workflows/cryptic-fit-daily.yml`), which needs the
-`TWODOWN_YOUTUBE_TOKEN` Actions secret.
+`TWODOWN_YOUTUBE_TOKEN` Actions secret. Each run posts at most five
+waiting Shorts. Both runs share that cap, and one insert stays free
+for today's new film, which is what the default quota will accept.
 
 ```bash
 export TWODOWN_YOUTUBE_TOKEN=/path/to/youtube-token.json

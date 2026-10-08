@@ -1,5 +1,11 @@
 from twodown.models import Clue, DailyPair, SpokenClue
-from twodown.pipeline import newest_pending_slugs, pending_download_days, post_pending_downloads, published_clue
+from twodown.pipeline import (
+    newest_pending_slugs,
+    pending_download_days,
+    post_pending_downloads,
+    published_clue,
+    youtube_accepts_remaining,
+)
 from twodown.staging import apply_feed_matches, load_uploads, parse_channel_feed, record_youtube_upload
 from twodown.youtube import upload_clues, upload_pair, video_title
 
@@ -101,6 +107,50 @@ def test_pending_downloads_include_every_unpublished_day(tmp_path):
         ("2026-10-03", ["new-6a", "new-11a"]),
         ("2026-10-01", ["old-1a"]),
     ]
+
+
+def test_youtube_accepts_remaining_counts_uploads_on_that_london_day(tmp_path):
+    for index, slug in enumerate(("one-1a", "two-1a", "three-1a")):
+        page = tmp_path / "c" / slug
+        page.mkdir(parents=True)
+        (page / "index.html").write_text("<p>x</p>", encoding="utf-8")
+        record_youtube_upload(tmp_path, slug, f"aaaaaaaaaa{index}", "2026-10-08")
+    record_youtube_upload(tmp_path, "old-1a", "bbbbbbbbbbb", "2026-10-07")
+    assert youtube_accepts_remaining(tmp_path, day="2026-10-08") == 2
+    assert youtube_accepts_remaining(tmp_path, day="2026-10-09") == 5
+
+
+def test_regular_run_posts_one_batch_and_the_next_run_waits(tmp_path, monkeypatch):
+    first = "independent-12477-6a"
+    second = "independent-12458-11a"
+    _day(tmp_path, "2026-10-03", [first])
+    _day(tmp_path, "2026-10-01", [second])
+    monkeypatch.setattr("twodown.pipeline.sync_channel_ledger", lambda root=None: {})
+    monkeypatch.setattr("twodown.youtube.SITE_ROOT", tmp_path)
+    monkeypatch.setattr("twodown.youtube.youtube_ready", lambda: True)
+    monkeypatch.setattr("twodown.pipeline.youtube_accepts_remaining", lambda root=None, day=None: 1)
+
+    def clue_for(slug, site):
+        if slug == first:
+            return _clue(puzzle_id="12477", number="6")
+        return _clue(puzzle_id="12458", number="11")
+
+    monkeypatch.setattr("twodown.pipeline.published_clue", clue_for)
+    posted: list[str] = []
+
+    def fake_upload(item, privacy="public"):
+        posted.append(item.clue.slug)
+        return "aaaaaaaaaaa"
+
+    monkeypatch.setattr("twodown.youtube.upload_short", fake_upload)
+    pair = post_pending_downloads(root=tmp_path)
+    assert [item.clue.slug for item in pair.clues] == [first]
+    assert posted == [first]
+    monkeypatch.setattr("twodown.pipeline.youtube_accepts_remaining", lambda root=None, day=None: 0)
+    again = post_pending_downloads(root=tmp_path)
+    assert again.clues == []
+    assert again.already_published is True
+    assert posted == [first]
 
 
 def test_post_pending_downloads_keeps_the_first_id_when_youtube_stops(tmp_path, monkeypatch):

@@ -4,6 +4,8 @@ on:
   schedule:
     # 09:00 and 12:00 London while the UK is on BST (UTC+1).
     # The noon run picks the clue up if Fifteen Squared is late.
+    # Both runs share one daily YouTube accept cap, so the second
+    # run does not post another backlog batch the quota would reject.
     - cron: "0 8 * * *"
     - cron: "0 11 * * *"
   workflow_dispatch:
@@ -31,7 +33,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y ffmpeg fonts-liberation
           pip install -e "./two-down"
-      - name: Post every download still missing from YouTube
+      - name: Post the Shorts YouTube will accept today
         id: downloads
         env:
           TWODOWN_YOUTUBE_TOKEN: ${{ secrets.TWODOWN_YOUTUBE_TOKEN }}
@@ -58,7 +60,7 @@ jobs:
       - name: Require the downloads on YouTube
         if: steps.downloads.outcome != 'success'
         run: |
-          echo "Downloads are still missing from YouTube."
+          echo "YouTube did not accept today's batch."
           echo "Add repository secret TWODOWN_YOUTUBE_TOKEN: the cryptic.fit OAuth JSON (youtube.upload)."
           echo "Channel: https://www.youtube.com/@crypticfit"
           exit 1

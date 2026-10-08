@@ -108,6 +108,11 @@ HINT_HOLD_SECONDS = 2.0
 HINT_PAUSE_SECONDS = 0.8
 # One Short a day. twodown.train rotates which source supplies it.
 CLUES_PER_DAY = 1
+# videos.insert costs 1,600 quota units and the thumbnail costs 50.
+# Six Shorts fit in YouTube's default 10,000-unit day. Five waiting
+# downloads leave the sixth slot for today's new film. Both cron runs
+# share this cap, counted from uploaded_at on the London date.
+YOUTUBE_ACCEPTS_PER_DAY = 5
 # Lock the spoken beat on this constructed study clue before touching the others.
 # MASS MEDIA is FT 18483 1 across; twodown short rebuilds this clue only.
 STUDY_SLUG = "financial-times-18483-1a"

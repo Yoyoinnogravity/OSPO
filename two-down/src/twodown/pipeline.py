@@ -19,6 +19,7 @@ from twodown.config import (
     SOURCE_SITE,
     STUDY_SLUG,
     VOICES,
+    YOUTUBE_ACCEPTS_PER_DAY,
 )
 from twodown.hints import attach_hint
 from twodown.ingest import LONDON, fetch_daily_posts, posts_for_london_date
@@ -607,8 +608,27 @@ def _downloads_for_slugs(site: Path, slugs: list[str], voice: str) -> list[Spoke
     return items
 
 
-def post_pending_downloads(privacy: str = "public", root: Path | None = None) -> DailyPair:
-    """Upload every unpublished Short that already has an mp4, newest day first."""
+def youtube_accepts_remaining(root: Path | None = None, day: str | None = None) -> int:
+    """How many more Shorts YouTube will accept today before the quota cap."""
+    from twodown.staging import load_uploads
+
+    site = Path(root or SITE_ROOT)
+    today = day or datetime.now(LONDON).date().isoformat()
+    used = 0
+    for row in load_uploads(site).get("videos") or []:
+        if not isinstance(row, dict) or not row.get("youtube_id"):
+            continue
+        if str(row.get("uploaded_at") or "")[:10] == today:
+            used += 1
+    return max(0, YOUTUBE_ACCEPTS_PER_DAY - used)
+
+
+def post_pending_downloads(
+    privacy: str = "public",
+    root: Path | None = None,
+    daily: bool = True,
+) -> DailyPair:
+    """Upload waiting Shorts, newest first. A regular run stops at today's accept cap."""
     from twodown.youtube import remember_youtube_ids, upload_clues, youtube_ready
 
     site = Path(root or SITE_ROOT)
@@ -617,7 +637,11 @@ def post_pending_downloads(privacy: str = "public", root: Path | None = None) ->
     voice = resolve_voice(DEFAULT_VOICE_ALIAS)
     if not days:
         return DailyPair(date="", voice=voice, source_site=SOURCE_SITE, already_published=True)
+    if daily and youtube_accepts_remaining(site) == 0:
+        return DailyPair(date=days[0][0], voice=voice, source_site=SOURCE_SITE, already_published=True)
     slugs = [slug for _date, group in days for slug in group]
+    if daily:
+        slugs = slugs[: youtube_accepts_remaining(site)]
     items = _downloads_for_slugs(site, slugs, voice)
     pair = DailyPair(
         date=days[0][0],
@@ -654,7 +678,7 @@ def post_pending_downloads(privacy: str = "public", root: Path | None = None) ->
 
 
 def post_newest_downloads(privacy: str = "public") -> DailyPair:
-    """Upload every waiting download. The name remains for the earlier one-day command."""
+    """Post today's YouTube batch. The name remains for the earlier command."""
     return post_pending_downloads(privacy=privacy)
 
 

@@ -150,11 +150,12 @@ def main(argv: list[str] | None = None) -> int:
     today.add_argument("--youtube-privacy", default="public", choices=["unlisted", "private", "public"])
     _add_social_flags(today)
 
-    upload = sub.add_parser("upload", help="Upload today's Short, or every download still missing from YouTube")
+    upload = sub.add_parser("upload", help="Upload today's Short, or the downloads YouTube will accept today")
     upload.add_argument("--out", type=Path, default=DEFAULT_OUTPUT)
     upload.add_argument("--date", help="London calendar date YYYY-MM-DD")
-    upload.add_argument("--pending", action="store_true", help="Post every download that is not on YouTube yet")
-    upload.add_argument("--youtube-required", action="store_true", help="Exit 1 unless those downloads received a YouTube id")
+    upload.add_argument("--pending", action="store_true", help="Post waiting downloads, up to today's YouTube accept cap")
+    upload.add_argument("--all", action="store_true", help="Ignore the daily cap and post every waiting download")
+    upload.add_argument("--youtube-required", action="store_true", help="Exit 1 unless this run's downloads received a YouTube id")
     upload.add_argument("--youtube-privacy", default="public", choices=["unlisted", "private", "public"])
     _add_social_flags(upload)
 
@@ -277,8 +278,13 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "upload" and args.pending:
         from twodown.pipeline import post_pending_downloads
 
-        pair = post_pending_downloads(privacy=args.youtube_privacy)
+        pair = post_pending_downloads(privacy=args.youtube_privacy, daily=not args.all)
         if not pair.clues:
+            from twodown.pipeline import pending_download_days
+
+            if pending_download_days():
+                print("YouTube already accepted today's batch. More go out on the next run.")
+                return 0
             print("No new downloads waiting for YouTube.")
             return 0
         posted = [item.clue.slug for item in pair.clues if item.youtube_id]

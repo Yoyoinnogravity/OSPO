@@ -8,7 +8,10 @@ as the source, and never invent an answer.
 
 The schedule is `.github/workflows/cryptic-fit-daily.yml`. After it is on `main`
 it runs at 08:00 and 11:00 UTC, films the one clue, and uploads that Short to
-https://www.youtube.com/@crypticfit.
+https://www.youtube.com/@crypticfit. Each run also posts waiting downloads, at
+most five a London day. YouTube's default quota accepts about six inserts;
+the sixth slot is today's new film. The noon run shares that cap, so it does
+not post a second backlog batch.
 
 The remaining human step is the token. In the repo, **Settings → Secrets and
 variables → Actions**, add `TWODOWN_YOUTUBE_TOKEN`. The value is the
