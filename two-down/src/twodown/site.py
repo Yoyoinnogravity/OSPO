@@ -1752,7 +1752,7 @@ def _upload_body(root: Path) -> str:
     posted_html = "".join(posted)
     empty_posted = "" if posted_html else '<p data-on-youtube-empty>None of the daily Shorts are on the committed list yet.</p>'
     return f"""
-    {_croc_hello("", title="Upload these Shorts to YouTube.", lede="Two lists for " + CHANNEL_HANDLE + ". Download, unzip if from the zip, drag the mp4 onto Studio — you cannot drag from this page. We do not upload for you.")}
+    {_croc_hello("", title="Upload these Shorts to YouTube.", lede="Two lists for " + CHANNEL_HANDLE + ". The daily job posts today's Short when the YouTube token is set. This page is the record. You still cannot drag from this page.")}
     <p class="lede" data-yt-uploads-key="{_e(LOCAL_STORAGE_KEY)}">The channel intro Short is already live at <a href="{_e(shorts_url(INTRO_YOUTUBE_ID))}" target="_blank" rel="noopener">YouTube</a>. It is not a daily /c/ film. Daily films stay under Needs upload until a YouTube id is committed or you mark one in this browser.</p>
     {studio_confirmations_html()}
     {_needs_upload_zip_bar(root)}

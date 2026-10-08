@@ -121,6 +121,9 @@ def test_youtube_description_credits_the_photograph():
     )
     text = video_description(item)
     scene = get_scene("kyoto")
+    assert item.clue.answer not in text
+    assert "Answer:" not in text
+    assert "The answer stays in the film." in text
     assert scene.photographer in text
     assert scene.license in text
     assert "Wikimedia" in text

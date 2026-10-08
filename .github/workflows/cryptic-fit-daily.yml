@@ -1,0 +1,58 @@
+name: cryptic.fit daily
+
+on:
+  schedule:
+    # 09:00 and 12:00 London while the UK is on BST (UTC+1).
+    # The noon run picks the clue up if Fifteen Squared is late.
+    - cron: "0 8 * * *"
+    - cron: "0 11 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: cryptic-fit-daily
+  cancel-in-progress: false
+
+jobs:
+  film:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install film tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg fonts-liberation
+          pip install -e "./two-down"
+      - name: Film today's clue and upload it
+        id: film
+        env:
+          TWODOWN_YOUTUBE_TOKEN: ${{ secrets.TWODOWN_YOUTUBE_TOKEN }}
+        run: python3 -m twodown today --no-tiktok --no-instagram --no-facebook --youtube-required
+        continue-on-error: true
+      - name: Commit the site and the YouTube id
+        if: github.ref == 'refs/heads/main'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add two-down/site two-down/own-clues.json
+          if git diff --cached --quiet; then
+            echo "Nothing new to commit."
+            exit 0
+          fi
+          git commit -m "cryptic.fit · $(TZ=Europe/London date +%F)"
+          git push origin HEAD:main
+      - name: Require a YouTube id
+        if: steps.film.outcome != 'success'
+        run: |
+          echo "Today's Short is not on YouTube."
+          echo "Add repository secret TWODOWN_YOUTUBE_TOKEN: the cryptic.fit OAuth JSON (youtube.upload)."
+          echo "Channel: https://www.youtube.com/@crypticfit"
+          exit 1

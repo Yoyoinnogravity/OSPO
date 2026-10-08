@@ -141,7 +141,12 @@ def main(argv: list[str] | None = None) -> int:
     today.add_argument("--quiet", action="store_true", help="Skip TTS, video, site and social uploads")
     today.add_argument("--no-video", action="store_true")
     today.add_argument("--no-site", action="store_true")
-    today.add_argument("--force", action="store_true", help="Rebuild even if today's pair is already on the site")
+    today.add_argument("--force", action="store_true", help="Rebuild even if today's clue is already on the site")
+    today.add_argument(
+        "--youtube-required",
+        action="store_true",
+        help="Exit 1 unless today's Short has a YouTube id",
+    )
     today.add_argument("--youtube-privacy", default="public", choices=["unlisted", "private", "public"])
     _add_social_flags(today)
 
@@ -323,6 +328,12 @@ def main(argv: list[str] | None = None) -> int:
     )
     if pair.already_published and not pair.clues:
         print(f"already published {pair.date} — skip (use --force to rebuild)")
+        if getattr(args, "youtube_required", False):
+            print(
+                "Today's Short is not on YouTube. Set TWODOWN_YOUTUBE_TOKEN to the cryptic.fit OAuth JSON.",
+                file=sys.stderr,
+            )
+            return 1
         return 0
     if not pair.clues:
         print(
@@ -333,6 +344,12 @@ def main(argv: list[str] | None = None) -> int:
     if pair.already_published:
         print(f"already published {pair.date}")
     _print_pair(pair)
+    if getattr(args, "youtube_required", False) and not any(item.youtube_id for item in pair.clues):
+        print(
+            "Today's Short is not on YouTube. Set TWODOWN_YOUTUBE_TOKEN to the cryptic.fit OAuth JSON.",
+            file=sys.stderr,
+        )
+        return 1
     return 0
 
 

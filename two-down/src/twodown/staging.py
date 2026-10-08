@@ -9,7 +9,9 @@ from typing import Any
 from urllib.parse import parse_qs, urlparse
 from xml.etree import ElementTree as ET
 
-from twodown.config import SITE_ORIGIN, TAGLINE
+import requests
+
+from twodown.config import SITE_ORIGIN, TAGLINE, USER_AGENT
 
 UPLOADS_NAME = "youtube-uploads.json"
 LEGACY_NEEDS_UPLOAD_ZIP = "crypticfit-needs-upload.zip"
@@ -177,6 +179,43 @@ def committed_youtube_id(record: dict[str, Any] | None) -> str | None:
 
 def is_uploaded(record: dict[str, Any] | None) -> bool:
     return committed_youtube_id(record) is not None
+
+
+def record_youtube_upload(
+    root: Path,
+    slug: str,
+    youtube_id: str,
+    uploaded_at: str | None = None,
+) -> bool:
+    """Store one Short's id. A different id already on the slug is left alone."""
+    video_id = parse_youtube_id(youtube_id)
+    slug = (slug or "").strip()
+    if not video_id or not slug:
+        return False
+    data = ensure_uploads_json(root, extra=[slug])
+    known = videos_by_slug(data)
+    row = known.setdefault(slug, {"slug": slug})
+    current = committed_youtube_id(row)
+    if current:
+        return False
+    row["slug"] = slug
+    row["youtube_id"] = video_id
+    row["uploaded_at"] = (uploaded_at or datetime.now(timezone.utc).date().isoformat())[:10]
+    data["videos"] = list(known.values())
+    save_uploads(root, data)
+    return True
+
+
+def fetch_channel_feed(session: requests.Session | None = None) -> list[dict[str, str]]:
+    """Public @crypticfit uploads. Used so a second run does not post the same Short."""
+    sess = session or requests.Session()
+    response = sess.get(
+        CHANNEL_FEED_URL,
+        headers={"User-Agent": USER_AGENT, "Accept": "application/atom+xml"},
+        timeout=30,
+    )
+    response.raise_for_status()
+    return parse_channel_feed(response.text)
 
 
 def pending_slugs(root: Path, data: dict[str, Any] | None = None) -> list[str]:
@@ -426,6 +465,16 @@ def _title_key(text: str) -> str:
     return " ".join((text or "").casefold().split())
 
 
+def _expected_title(clue_line: str) -> str:
+    """Clue line, or a full Short title when it already ends in #Shorts."""
+    text = (clue_line or "").strip()
+    if text.casefold().endswith("#shorts"):
+        return _title_key(text)
+    from twodown.youtube import video_title_from_line
+
+    return _title_key(video_title_from_line(text))
+
+
 def _slugish(text: str) -> str:
     return "-".join(_SLUG_WORD.findall((text or "").casefold()))
 
@@ -458,11 +507,9 @@ def match_feed_to_films(
     /c/ URL. Ambiguous hits are dropped. The intro id is never assigned unless
     it uniquely matches a published film.
     """
-    from twodown.youtube import video_title_from_line
-
     by_title: dict[str, list[str]] = {}
     for slug, clue_line in films:
-        title = _title_key(video_title_from_line(clue_line))
+        title = _expected_title(clue_line)
         by_title.setdefault(title, []).append(slug)
     slugs = {slug for slug, _clue in films}
 

@@ -52,8 +52,11 @@ answer in the video, not the caption.
 Social
 ------
 
-`twodown today` and `twodown upload` send the same two vertical videos to
+`twodown today` and `twodown upload` send the day's Short to
 every platform that has a token. Missing tokens are skipped, not fatal.
+The daily YouTube post is the GitHub Action `cryptic.fit daily`
+(`.github/workflows/cryptic-fit-daily.yml`), which needs the
+`TWODOWN_YOUTUBE_TOKEN` Actions secret.
 
 ```bash
 export TWODOWN_YOUTUBE_TOKEN=/path/to/youtube-token.json
@@ -134,7 +137,9 @@ Do **not** upload with cPanel File Manager, FileZilla, or `scp` to
 `twodown live` prints this same order (registry first, then Pages, then DNS).
 
 YouTube still needs `TWODOWN_YOUTUBE_TOKEN` (OAuth for the cryptic.fit channel),
-not a payment.
+not a payment. Put that JSON in the GitHub Actions secret of the same name
+so `.github/workflows/cryptic-fit-daily.yml` can post the Short. The schedule
+starts once that workflow is on `main`.
 
 Money
 -----

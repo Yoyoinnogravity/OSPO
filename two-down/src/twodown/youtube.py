@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 from twodown.captions import youtube_description
-from twodown.config import BRAND, CLUES_PER_DAY, SITE_ORIGIN
+from twodown.config import BRAND, CLUES_PER_DAY, SITE_ORIGIN, SITE_ROOT
 from twodown.models import Clue, DailyPair, SpokenClue
 from twodown.render import write_thumbnail
 from twodown.tokens import secret_text
@@ -146,12 +146,80 @@ def upload_short(item: SpokenClue, privacy: str = "public") -> str | None:
     return video_id
 
 
-def upload_pair(pair: DailyPair, privacy: str = "public") -> list[str]:
+def apply_ledger_ids(pair: DailyPair, root: Path | None = None) -> None:
+    """Copy committed ids onto the pair so a later run does not upload again."""
     ids: list[str] = []
-    for item in pair.clues[:CLUES_PER_DAY]:
+    for item in pair.clues:
+        if not item.youtube_id:
+            item.youtube_id = known_youtube_id(item.clue.slug, root)
         if item.youtube_id:
             ids.append(item.youtube_id)
+    if ids:
+        pair.youtube_ids = ids
+
+
+def known_youtube_id(slug: str, root: Path | None = None) -> str | None:
+    from twodown.staging import committed_youtube_id, load_uploads, videos_by_slug
+
+    data = load_uploads(Path(root or SITE_ROOT))
+    return committed_youtube_id(videos_by_slug(data).get(slug))
+
+
+def remember_youtube_ids(pair: DailyPair, root: Path | None = None) -> bool:
+    """Write new ids into youtube-uploads.json. Existing ids are not replaced."""
+    from twodown.staging import record_youtube_upload
+
+    site = Path(root or SITE_ROOT)
+    changed = False
+    for item in pair.clues:
+        if not item.youtube_id:
             continue
+        if record_youtube_upload(site, item.clue.slug, item.youtube_id):
+            changed = True
+    return changed
+
+
+def sync_channel_ids(pair: DailyPair, root: Path | None = None) -> bool:
+    """Fill ids from the ledger and the public channel feed. Never guesses."""
+    from twodown.staging import apply_feed_matches, fetch_channel_feed
+
+    site = Path(root or SITE_ROOT)
+    changed = False
+    for item in pair.clues:
+        if item.youtube_id:
+            continue
+        found = known_youtube_id(item.clue.slug, site)
+        if found:
+            item.youtube_id = found
+    missing = [item for item in pair.clues if not item.youtube_id]
+    if not missing:
+        return changed
+    try:
+        entries = fetch_channel_feed()
+    except Exception:
+        return changed
+    films = [(item.clue.slug, video_title(item.clue)) for item in missing]
+    applied = apply_feed_matches(site, entries, films)
+    if applied:
+        changed = True
+    for item in missing:
+        match = applied.get(item.clue.slug)
+        if match:
+            item.youtube_id = match["youtube_id"]
+    return changed
+
+
+def upload_pair(pair: DailyPair, privacy: str = "public") -> list[str]:
+    ids: list[str] = []
+    fresh: list[SpokenClue] = []
+    for item in pair.clues:
+        if not item.youtube_id:
+            item.youtube_id = known_youtube_id(item.clue.slug)
+        if item.youtube_id:
+            ids.append(item.youtube_id)
+        else:
+            fresh.append(item)
+    for item in fresh[:CLUES_PER_DAY]:
         video_id = upload_short(item, privacy=privacy)
         if video_id:
             ids.append(video_id)

@@ -121,17 +121,28 @@ def publish_pair(
     facebook: bool = True,
     youtube_privacy: str = "public",
 ) -> dict[str, list[str]]:
-    """Upload today's two Shorts to every connected platform. One failure does not stop the rest."""
+    """Upload today's Short to every connected platform. One failure does not stop the rest."""
     attach_site_videos(pair)
     notes: dict[str, list[str]] = {name: [] for name in PLATFORMS}
     status = platform_status()
     hints = setup_hints()
 
     if youtube:
+        from twodown.youtube import apply_ledger_ids, remember_youtube_ids, sync_channel_ids
+
+        apply_ledger_ids(pair)
         if not status["youtube"]:
-            notes["youtube"] = [hints["youtube"]]
+            known = [item.youtube_id for item in pair.clues if item.youtube_id]
+            notes["youtube"] = known or [hints["youtube"]]
         else:
+            desk_changed = sync_channel_ids(pair)
             notes["youtube"] = upload_youtube(pair, privacy=youtube_privacy)
+            if remember_youtube_ids(pair):
+                desk_changed = True
+            if desk_changed:
+                from twodown.site import publish_films
+
+                publish_films(SITE_ROOT)
 
     if tiktok and not status["tiktok"]:
         notes["tiktok"] = [hints["tiktok"]]

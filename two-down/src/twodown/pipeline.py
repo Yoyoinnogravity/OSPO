@@ -33,8 +33,8 @@ from twodown.social import publish_pair, setup_hints
 from twodown.voice import build_short_soundtrack, resolve_voice, synthesise_parts
 
 _KICKER = re.compile(
-    r"^(?P<paper>.+) (?P<puzzle_id>\d+) · (?P<setter>.+) · "
-    r"(?P<number>\d+) (?P<direction>\w+) · (?P<device>.+)$"
+    r"^(?:(?P<theme>[^·]+?) · )?(?P<paper>[^·]+?) (?P<puzzle_id>\d+) · "
+    r"(?P<setter>.+) · (?P<number>\d+) (?P<direction>\w+) · (?P<device>.+)$"
 )
 _CLUE_LINE = re.compile(r"^(?P<clue>.+) \((?P<enum>[^)]+)\)$")
 
@@ -72,6 +72,7 @@ def published_clue(slug: str, site_root: Path | None = None) -> Clue:
             raise ValueError(f"Could not parse published clue {slug}")
         blogger = credit.get_text(" ", strip=True).split("·", 1)[-1].strip()
         definition = (article.get("data-definition") or "").strip() or None
+        theme = (match.group("theme") or "").strip() or None
         return attach_hint(
             Clue(
                 source_url=str(credit["href"]),
@@ -88,6 +89,7 @@ def published_clue(slug: str, site_root: Path | None = None) -> Clue:
                 parse=htmlmod.unescape(parse.get_text(" ", strip=True)),
                 device=match["device"],
                 enumeration_ok=True,
+                theme=theme,
             )
         )
     raise FileNotFoundError(f"No published clue {slug}")
@@ -492,6 +494,49 @@ def render_extra_shorts(
     return spoken
 
 
+def _day_slugs(root: Path, date: str) -> list[str]:
+    page = root / "d" / date / "index.html"
+    if not page.is_file():
+        return []
+    soup = BeautifulSoup(page.read_text(encoding="utf-8"), "lxml")
+    found: list[str] = []
+    for article in soup.select("article.clue[data-slug]"):
+        slug = str(article.get("data-slug") or "").strip()
+        if slug and slug not in found:
+            found.append(slug)
+    return found
+
+
+def _pair_from_published_day(date: str) -> DailyPair:
+    """One SpokenClue per film already on the day page, so YouTube can take the mp4."""
+    items: list[SpokenClue] = []
+    for slug in _day_slugs(SITE_ROOT, date):
+        try:
+            clue = published_clue(slug, SITE_ROOT)
+        except (FileNotFoundError, ValueError):
+            continue
+        video = SITE_ROOT / "media" / f"{slug}.mp4"
+        thumb = SITE_ROOT / "media" / f"{slug}-thumb.jpg"
+        items.append(
+            SpokenClue(
+                clue=clue,
+                script="",
+                voice=resolve_voice(DEFAULT_VOICE_ALIAS),
+                video_path=str(video) if video.is_file() else None,
+                thumbnail_path=str(thumb) if thumb.is_file() else None,
+                site_path=f"{SITE_ORIGIN}/c/{slug}/",
+            )
+        )
+    return DailyPair(
+        date=date,
+        voice=resolve_voice(DEFAULT_VOICE_ALIAS),
+        clues=items,
+        source_site=SOURCE_SITE,
+        site_index=str(SITE_ROOT / "index.html"),
+        already_published=True,
+    )
+
+
 def published_date(site_root: Path | None, date: str) -> bool:
     """True when today's archive page is already on the static site."""
     root = Path(site_root or SITE_ROOT)
@@ -559,19 +604,21 @@ def run_today(
                 (dest_root / "pair.json").write_text(existing.model_dump_json(indent=2), encoding="utf-8")
             return existing
         if published_date(SITE_ROOT, stamp):
-            skipped = DailyPair(
-                date=stamp,
-                voice=resolve_voice(_voice_alias(voice)),
-                source_posts=[p.url for p in todays],
-                source_site=SOURCE_SITE,
-                site_index=str(SITE_ROOT / "index.html"),
-                already_published=True,
-            )
+            existing_day = _pair_from_published_day(stamp)
             (dest_root / "already-published.txt").write_text(
                 f"{stamp} already on cryptic.fit. Pass --force to rebuild.\n",
                 encoding="utf-8",
             )
-            return skipped
+            if youtube and existing_day.clues:
+                publish_pair(
+                    existing_day,
+                    youtube=True,
+                    tiktok=False,
+                    instagram=False,
+                    facebook=False,
+                    youtube_privacy=youtube_privacy,
+                )
+            return existing_day
     filmed = datetime.strptime(stamp, "%Y-%m-%d").date()
     pick = pick_clue_of_the_day(clues, filmed, own_path=OWN_CLUES)
     pair_clues = [pick.clue] if pick else []

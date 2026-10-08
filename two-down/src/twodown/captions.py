@@ -46,7 +46,7 @@ def youtube_description(item: SpokenClue) -> str:
         f"{SOCIAL_HANDLE} — {BRAND_PROMISE}.\n"
         f"{CREDIT_LINE}\n\n"
         f"{clue_line(clue)}\n"
-        f"Answer: {clue.answer}\n\n"
+        f"The answer stays in the film.\n\n"
         f"{page}\n"
         f"Support: {SITE_ORIGIN}/support.html\n"
         f"Parse: {clue.source_url}\n"
