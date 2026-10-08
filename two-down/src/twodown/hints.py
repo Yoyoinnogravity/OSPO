@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import random
 import re
 from dataclasses import dataclass
 from io import BytesIO
@@ -706,6 +707,28 @@ BAYS = HintPhoto(
 )
 
 
+# Definition still for ITCHY FEET: a desire to travel. Never print ITCHY FEET.
+TRAVEL = HintPhoto(
+    slug="travel-still",
+    label="Travel",
+    source="generated still",
+    license="generated",
+    filename="travel-still.webp",
+    keywords=frozenset({"travel", "travelling", "traveling", "desire"}),
+)
+
+
+# Definition still for BIAS: prejudice. Never print BIAS.
+PREJUDICE = HintPhoto(
+    slug="prejudice-still",
+    label="Prejudice",
+    source="generated still",
+    license="generated",
+    filename="prejudice-still.webp",
+    keywords=frozenset({"prejudice"}),
+)
+
+
 # Commons alternate: imperial Ethiopian / Rastafari Lion of Judah flag.
 LION = HintPhoto(
     slug="lion-of-judah",
@@ -759,6 +782,8 @@ PHOTOS: dict[str, HintPhoto] = {
     STEPS.slug: STEPS,
     RESTAURANT.slug: RESTAURANT,
     BAYS.slug: BAYS,
+    TRAVEL.slug: TRAVEL,
+    PREJUDICE.slug: PREJUDICE,
     LION.slug: LION,
     "dreamlike": TRANCE,
     "trance": TRANCE,
@@ -892,6 +917,12 @@ PHOTOS: dict[str, HintPhoto] = {
     "bays": BAYS,
     "garland": BAYS,
     "guardian-30127-16a": BAYS,
+    "travel": TRAVEL,
+    "travelling": TRAVEL,
+    "traveling": TRAVEL,
+    "independent-12477-17a": TRAVEL,
+    "prejudice": PREJUDICE,
+    "guardian-30122-18a": PREJUDICE,
 }
 
 # No leftover still. Trance / the sleeping woman is only for trance or dream clues.
@@ -906,7 +937,7 @@ def _catalog() -> tuple[HintPhoto, ...]:
         BRING, USA, MODEL, AUTHOR, MAKEUP, CRASH, CAPSULE, FIELD, GLOBE, WEEKLY, CROSS,
         UPROOT, TIPS, PORTER, XYZ, HUMOUR, VEGETABLE, SEMICONDUCTOR, STANDING,
         BUTTERFLY, STARCH, PUDDING, COCKTAIL, CAFE, SEAFOOD, LEATHER, TREASURE,
-        BOAT, STEPS, RESTAURANT, BAYS, LION,
+        BOAT, STEPS, RESTAURANT, BAYS, TRAVEL, PREJUDICE, LION,
     )
 
 
@@ -1578,6 +1609,52 @@ def _generate_bays_still(dest: Path) -> Path:
     return dest
 
 
+def _grain(img: Image.Image, seed: int) -> Image.Image:
+    """Keep a generated still from collapsing to a tiny flat WebP."""
+    rng = random.Random(seed)
+    px = img.load()
+    width, height = img.size
+    for y in range(height):
+        for x in range(width):
+            red, green, blue = px[x, y]
+            drift = rng.randint(-14, 14)
+            px[x, y] = (
+                max(0, min(255, red + drift)),
+                max(0, min(255, green + drift)),
+                max(0, min(255, blue + rng.randint(-8, 8))),
+            )
+    return img
+
+
+def _generate_travel_still(dest: Path) -> Path:
+    """Suitcase and a road. No answer text."""
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    img = Image.new("RGB", (1280, 720), (186, 214, 232))
+    draw = ImageDraw.Draw(img)
+    draw.rectangle((0, 430, 1280, 720), fill=(92, 148, 72))
+    draw.polygon([(520, 250), (760, 250), (1040, 720), (240, 720)], fill=(72, 74, 78))
+    draw.rectangle((470, 300, 810, 520), fill=(196, 92, 48))
+    draw.rectangle((500, 250, 780, 310), fill=(168, 72, 36))
+    draw.rectangle((620, 210, 660, 260), fill=(48, 48, 52))
+    img = _grain(img, 17)
+    img.save(dest, "WEBP", quality=82, method=6)
+    return dest
+
+
+def _generate_prejudice_still(dest: Path) -> Path:
+    """A balance scale. No answer text."""
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    img = Image.new("RGB", (1280, 720), (36, 40, 52))
+    draw = ImageDraw.Draw(img)
+    draw.rectangle((620, 160, 660, 560), fill=(212, 196, 160))
+    draw.polygon([(280, 220), (1000, 280), (960, 320), (320, 260)], fill=(232, 216, 176))
+    draw.ellipse((220, 300, 460, 460), outline=(232, 216, 176), width=18)
+    draw.ellipse((820, 340, 1060, 500), outline=(232, 216, 176), width=18)
+    img = _grain(img, 22)
+    img.save(dest, "WEBP", quality=82, method=6)
+    return dest
+
+
 def ensure_hint_photo(photo: HintPhoto | None = None) -> Path:
     if photo is None:
         raise ValueError("no hint photo to ensure — DEFAULT is not a leftover still")
@@ -1628,6 +1705,8 @@ def ensure_hint_photo(photo: HintPhoto | None = None) -> Path:
         STEPS.slug: _generate_steps_still,
         RESTAURANT.slug: _generate_restaurant_still,
         BAYS.slug: _generate_bays_still,
+        TRAVEL.slug: _generate_travel_still,
+        PREJUDICE.slug: _generate_prejudice_still,
     }
     generate = generators.get(photo.slug)
     if generate is not None:
