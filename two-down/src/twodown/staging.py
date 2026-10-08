@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import html
 import json
 import re
 import zipfile
@@ -7,6 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlparse
+from urllib.request import Request, urlopen
 from xml.etree import ElementTree as ET
 
 from twodown.config import SITE_ORIGIN, TAGLINE
@@ -114,6 +116,7 @@ def empty_uploads() -> dict[str, Any]:
         "channel_id": CHANNEL_ID,
         "intro": {"youtube_id": INTRO_YOUTUBE_ID, "note": INTRO_NOTE},
         "videos": [],
+        "unmatched": [],
     }
 
 
@@ -136,6 +139,8 @@ def load_uploads(root: Path) -> dict[str, Any]:
         intro.setdefault("note", INTRO_NOTE)
     data.setdefault("channel", CHANNEL_HANDLE)
     data.setdefault("channel_id", CHANNEL_ID)
+    if not isinstance(data.get("unmatched"), list):
+        data["unmatched"] = []
     return data
 
 
@@ -214,6 +219,9 @@ def ensure_uploads_json(root: Path, extra: list[str] | None = None) -> dict[str,
     data["channel"] = CHANNEL_HANDLE
     data["channel_id"] = CHANNEL_ID
     data["intro"] = {"youtube_id": INTRO_YOUTUBE_ID, "note": INTRO_NOTE}
+    if not isinstance(data.get("unmatched"), list):
+        data["unmatched"] = []
+    _clean_unmatched(data)
     save_uploads(root, data)
     return data
 
@@ -528,8 +536,307 @@ def apply_feed_matches(root: Path, entries: list[dict[str, str]], films: list[tu
         applied[slug] = match
     if applied:
         data["videos"] = list(known.values())
+        _clean_unmatched(data)
         save_uploads(root, data)
     return applied
+
+
+def _used_youtube_ids(data: dict[str, Any]) -> set[str]:
+    used: set[str] = set()
+    intro = data.get("intro")
+    if isinstance(intro, dict):
+        intro_id = parse_youtube_id(str(intro.get("youtube_id") or ""))
+        if intro_id:
+            used.add(intro_id)
+    for raw in data.get("videos") or []:
+        if isinstance(raw, dict):
+            video_id = committed_youtube_id(raw)
+            if video_id:
+                used.add(video_id)
+    return used
+
+
+def _clean_unmatched(data: dict[str, Any]) -> None:
+    """Drop channel rows that already belong to a film or the intro."""
+    used = _used_youtube_ids(data)
+    kept: list[dict[str, str]] = []
+    for raw in data.get("unmatched") or []:
+        if not isinstance(raw, dict):
+            continue
+        video_id = parse_youtube_id(str(raw.get("youtube_id") or ""))
+        if not video_id or video_id in used:
+            continue
+        item = {"youtube_id": video_id, "title": str(raw.get("title") or "").strip()}
+        uploaded_at = str(raw.get("uploaded_at") or "")[:10]
+        if uploaded_at:
+            item["uploaded_at"] = uploaded_at
+        kept.append(item)
+        used.add(video_id)
+    data["unmatched"] = kept
+
+
+def published_film_lines(root: Path) -> list[tuple[str, str]]:
+    """(slug, clue line) for every published /c/ film. No answers."""
+    lines: dict[str, str] = {}
+    article = re.compile(
+        r'<article\b[^>]*\bdata-slug="([^"]+)"[^>]*>.*?<p class="clue-text">([^<]*)</p>',
+        re.S,
+    )
+    day_root = Path(root) / "d"
+    if day_root.is_dir():
+        for page in sorted(day_root.glob("*/index.html")):
+            text = page.read_text(encoding="utf-8", errors="replace")
+            for slug, clue in article.findall(text):
+                lines.setdefault(slug, html.unescape(clue).strip())
+    clue_root = Path(root) / "c"
+    if clue_root.is_dir():
+        for page in sorted(clue_root.glob("*/index.html")):
+            slug = page.parent.name
+            if slug in lines:
+                continue
+            text = page.read_text(encoding="utf-8", errors="replace")
+            heading = re.search(r"<h1>([^<]+)</h1>", text)
+            if heading:
+                lines[slug] = html.unescape(heading.group(1)).strip()
+    return [(slug, lines[slug]) for slug in published_slugs(root) if slug in lines]
+
+
+def fetch_channel_feed(timeout: float = 12.0) -> str:
+    """Public @crypticfit Atom feed. No OAuth."""
+    request = Request(CHANNEL_FEED_URL, headers={"User-Agent": "cryptic.fit youtube desk"})
+    with urlopen(request, timeout=timeout) as response:
+        return response.read().decode("utf-8")
+
+
+def undecided_from_feed(
+    entries: list[dict[str, str]],
+    data: dict[str, Any],
+    films: list[tuple[str, str]],
+) -> list[dict[str, str]]:
+    """Channel Shorts that do not uniquely name a published film."""
+    matched_ids = {row["youtube_id"] for row in match_feed_to_films(entries, films).values()}
+    used = set(matched_ids)
+    used.add(INTRO_YOUTUBE_ID)
+    used.update(_used_youtube_ids(data))
+    out: list[dict[str, str]] = []
+    for entry in entries:
+        video_id = parse_youtube_id(entry.get("youtube_id"))
+        if not video_id or video_id in used:
+            continue
+        used.add(video_id)
+        item = {"youtube_id": video_id, "title": (entry.get("title") or "").strip()}
+        uploaded_at = (entry.get("published") or "")[:10]
+        if uploaded_at:
+            item["uploaded_at"] = uploaded_at
+        out.append(item)
+    return out
+
+
+def decide_upload(root: Path, slug: str, youtube_id: str | None) -> dict[str, Any]:
+    """File a film on YouTube, or send it back to pending when youtube_id is empty."""
+    data = ensure_uploads_json(root)
+    known = videos_by_slug(data)
+    published = set(published_slugs(root))
+    if slug not in published and slug not in known:
+        raise ValueError(f"unknown film {slug}")
+    row = known.setdefault(slug, {"slug": slug})
+    row["slug"] = slug
+    if youtube_id:
+        parsed = parse_youtube_id(youtube_id)
+        if not parsed:
+            raise ValueError("not a YouTube Shorts URL or id")
+        if parsed == INTRO_YOUTUBE_ID:
+            raise ValueError("that id is the channel intro, not a daily film")
+        for other, other_row in known.items():
+            if other != slug and committed_youtube_id(other_row) == parsed:
+                raise ValueError(f"{parsed} is already {other}")
+        row["youtube_id"] = parsed
+        row["uploaded_at"] = today_iso()
+    else:
+        row.pop("youtube_id", None)
+        row.pop("uploaded_at", None)
+    data["videos"] = [known[name] for name in published_slugs(root) if name in known]
+    for name, extra in known.items():
+        if name not in published and is_uploaded(extra):
+            data["videos"].append(extra)
+    _clean_unmatched(data)
+    save_uploads(root, data)
+    return row
+
+
+def youtube_desk(root: Path, data: dict[str, Any] | None = None) -> dict[str, Any]:
+    """The two lists: already there, and still pending. Plus channel Shorts not filed."""
+    uploads = data if data is not None else load_uploads(root)
+    known = videos_by_slug(uploads)
+    there: list[dict[str, str]] = []
+    for slug in uploaded_slugs(root, uploads):
+        video_id = committed_youtube_id(known.get(slug)) or ""
+        there.append({"slug": slug, "youtube_id": video_id, "url": shorts_url(video_id)})
+    pending = pending_slugs(root, uploads)
+    undecided = [dict(row) for row in uploads.get("unmatched") or [] if isinstance(row, dict)]
+    return {"there": there, "pending": pending, "undecided": undecided}
+
+
+def sync_channel_uploads(root: Path, xml_text: str | None = None) -> dict[str, Any]:
+    """Pull the public channel feed and file only unique matches. Never guess."""
+    films = published_film_lines(root)
+    if xml_text is None:
+        xml_text = fetch_channel_feed()
+    entries = parse_channel_feed(xml_text)
+    applied = apply_feed_matches(root, entries, films)
+    data = ensure_uploads_json(root, extra=[slug for slug, _line in films])
+    data["unmatched"] = undecided_from_feed(entries, data, films)
+    _clean_unmatched(data)
+    save_uploads(root, data)
+    desk = youtube_desk(root, data)
+    desk["applied"] = applied
+    return desk
+
+
+def undecided_section_html(items: list[dict[str, Any]], films: list[tuple[str, str]], pending: list[str]) -> str:
+    """Channel Shorts that still need a decision. Empty when every upload is filed."""
+    if not items:
+        return ""
+    labels = {slug: clue for slug, clue in films}
+    options = ['<option value="">Still not one of the pending films</option>']
+    for slug in pending:
+        clue = labels.get(slug) or slug
+        options.append(f'<option value="{html.escape(slug, quote=True)}">{html.escape(clue)}</option>')
+    option_html = "".join(options)
+    cards: list[str] = []
+    for item in items:
+        video_id = parse_youtube_id(str(item.get("youtube_id") or ""))
+        if not video_id:
+            continue
+        title = str(item.get("title") or video_id)
+        cards.append(
+            f"""
+    <article class="panel" data-unmatched-video data-youtube-id="{html.escape(video_id, quote=True)}">
+      <p class="kicker">On {html.escape(CHANNEL_HANDLE)} · not filed</p>
+      <h2>{html.escape(title)}</h2>
+      <p><a class="action" href="{html.escape(shorts_url(video_id), quote=True)}" target="_blank" rel="noopener">Open on YouTube</a></p>
+      <form class="mark-uploaded" data-assign-unmatched data-youtube-id="{html.escape(video_id, quote=True)}">
+        <label>This Short is
+          <select name="slug">{option_html}</select>
+        </label>
+        <button type="submit">It's that film</button>
+        <p class="suggest-status" data-mark-status></p>
+      </form>
+      <p class="youtube-persist">Leave it here if you are not sure. Pending films stay pending until you decide.</p>
+    </article>"""
+        )
+    if not cards:
+        return ""
+    body = "".join(cards)
+    return f"""    <section class="staging-list" id="channel-undecided" data-channel-undecided>
+      <h2>On the channel, not decided</h2>
+      <p>These Shorts are already on {CHANNEL_HANDLE}. They do not name a daily film, so they stay out of both lists until you decide.</p>
+      {body}
+    </section>"""
+
+
+_STAGING_ARTICLE = re.compile(
+    r"[ \t]*<article class=\"panel\" id=\"[^\"]+\" data-staging-row\b.*?</article>\n?",
+    re.S,
+)
+_UNDECIDED_SECTION = re.compile(
+    r"[ \t]*<section class=\"staging-list\" id=\"channel-undecided\"\b.*?</section>\n?",
+    re.S,
+)
+
+
+def _upsert_attr(tag: str, name: str, value: str) -> str:
+    if re.search(rf'\b{name}="[^"]*"', tag):
+        return re.sub(rf'\b{name}="[^"]*"', f'{name}="{value}"', tag, count=1)
+    return tag[:-1] + f' {name}="{value}">'
+
+
+def _set_div_hidden(article: str, marker: str, hidden: bool) -> str:
+    hidden_attr = " hidden" if hidden else ""
+
+    def repl(match: re.Match[str]) -> str:
+        return f"<div {marker}{hidden_attr}>"
+
+    return re.sub(rf"<div {marker}(?: hidden)?>", repl, article, count=1)
+
+
+def present_article(article: str, youtube_id: str | None) -> str:
+    """Flip one desk card between pending and already there."""
+    video_id = youtube_id or ""
+    there = bool(video_id)
+
+    def open_tag(match: re.Match[str]) -> str:
+        tag = _upsert_attr(match.group(0), "data-youtube-id", video_id)
+        return _upsert_attr(tag, "data-committed-id", video_id)
+
+    article = re.sub(r"<article\b[^>]*>", open_tag, article, count=1)
+    article = _set_div_hidden(article, "data-staging-pending", hidden=there)
+    article = _set_div_hidden(article, "data-staging-posted", hidden=not there)
+    href = shorts_url(video_id) if video_id else "https://www.youtube.com/@crypticfit"
+    article = re.sub(r'(data-shorts-link href=")[^"]*"', rf'\1{href}"', article, count=1)
+
+    def press(match: re.Match[str]) -> str:
+        which = match.group(1)
+        pressed = "true" if (which == "there") == there else "false"
+        return f'data-decide="{which}" aria-pressed="{pressed}"'
+
+    return re.sub(r'data-decide="(pending|there)" aria-pressed="(?:true|false)"', press, article)
+
+
+def refresh_upload_lists(root: Path) -> None:
+    """Move upload.html cards into Needs upload or On YouTube from the committed ids."""
+    page = Path(root) / "upload.html"
+    if not page.is_file():
+        return
+    text = page.read_text(encoding="utf-8")
+    articles = _STAGING_ARTICLE.findall(text)
+    if not articles:
+        return
+    text = _STAGING_ARTICLE.sub("", text)
+    data = load_uploads(root)
+    known = videos_by_slug(data)
+    pending_bits: list[str] = []
+    posted_bits: list[str] = []
+    for article in articles:
+        slug_match = re.search(r'data-slug="([^"]+)"', article)
+        slug = slug_match.group(1) if slug_match else ""
+        video_id = committed_youtube_id(known.get(slug))
+        article = present_article(article if article.endswith("\n") else article + "\n", video_id)
+        if video_id:
+            posted_bits.append(article)
+        else:
+            pending_bits.append(article)
+    pending_html = "".join(pending_bits)
+    posted_html = "".join(posted_bits)
+    text = text.replace('<div id="needs-upload-list">', '<div id="needs-upload-list">\n' + pending_html, 1)
+    text = text.replace('<div id="on-youtube-list">', '<div id="on-youtube-list">\n' + posted_html, 1)
+    text = re.sub(
+        r'(data-pending-count>)\d+',
+        rf"\g<1>{len(pending_bits)}",
+        text,
+        count=1,
+    )
+    text = re.sub(
+        r'(data-posted-count>)\d+',
+        rf"\g<1>{len(posted_bits)}",
+        text,
+        count=1,
+    )
+    section = undecided_section_html(
+        [row for row in data.get("unmatched") or [] if isinstance(row, dict)],
+        published_film_lines(root),
+        [slug for slug in pending_slugs(root, data)],
+    )
+    block = f"{section}\n" if section else ""
+    if _UNDECIDED_SECTION.search(text):
+        text = _UNDECIDED_SECTION.sub(block, text, count=1)
+    elif section:
+        text = text.replace(
+            '<section class="staging-list" id="on-youtube">',
+            section + '\n    <section class="staging-list" id="on-youtube">',
+            1,
+        )
+    page.write_text(text, encoding="utf-8")
 
 
 def today_iso() -> str:

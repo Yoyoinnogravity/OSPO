@@ -115,7 +115,10 @@ def test_publish_films_writes_two_staging_sections(tmp_path):
     assert "Made for kids" in page
     assert "Altered / synthetic / AI-generated" in page
     assert "Yes — disclose" in page
-    assert "Mark as uploaded" in needs
+    assert 'data-decide="pending"' in needs
+    assert 'data-decide="there"' in needs
+    assert "Decide after you upload" in needs
+    assert "still pending" in page
     assert "cryptic-fit-youtube-uploads" in (tmp_path / "assets" / "app.js").read_text(encoding="utf-8")
     assert (tmp_path / "youtube-uploads.json").is_file()
 
@@ -253,8 +256,11 @@ def test_pages_workflow_builds_pk_zip_parts_before_deploy():
 
     workflow = Path(__file__).resolve().parents[2] / ".github" / "workflows" / "cryptic-fun-pages.yml"
     text = workflow.read_text(encoding="utf-8")
+    assert "sync_channel_uploads" in text
+    assert "refresh_upload_lists" in text
     assert "write_needs_upload_zips" in text
     assert "refresh_upload_zip_bar" in text
+    assert text.find("sync_channel_uploads") < text.find("write_needs_upload_zips")
     assert text.find("write_needs_upload_zips") < text.find("upload-pages-artifact")
     assert 'raw[:2] != b"PK"' in text
 
@@ -404,3 +410,91 @@ def test_apply_feed_matches_persists_only_safe_hits(tmp_path):
     )
     assert applied["independent-12462-6a"]["youtube_id"] == "7q-WFyj0WnA"
     assert uploaded_slugs(tmp_path) == ["independent-12462-6a"]
+
+
+def test_sync_files_slug_titles_and_leaves_plain_titles_undecided(tmp_path):
+    from twodown.staging import sync_channel_uploads, youtube_desk
+
+    _day(tmp_path, "2026-09-16", "guardian-30112-5a", "Fish arrive in bays? (7)", "ARRIVAL")
+    _day(tmp_path, "2026-10-01", "financial-times-18494-5a", "Colin is buildinga semiconductor (7)", "SILICON")
+    xml = """<?xml version="1.0" encoding="UTF-8"?>
+    <feed xmlns="http://www.w3.org/2005/Atom" xmlns:yt="http://www.youtube.com/xml/schemas/2015" xmlns:media="http://search.yahoo.com/mrss/">
+      <entry>
+        <yt:videoId>GU3uCkszl4Q</yt:videoId>
+        <title>crypticfit guardian 30112 5a</title>
+        <published>2026-10-04T07:42:34+00:00</published>
+        <media:group><media:description>Crypyic clue</media:description></media:group>
+      </entry>
+      <entry>
+        <yt:videoId>Gk1KOS_23M8</yt:videoId>
+        <title>crypticfit</title>
+        <published>2026-10-03T17:10:02+00:00</published>
+        <media:group><media:description>Cryptic clues</media:description></media:group>
+      </entry>
+      <entry>
+        <yt:videoId>8D8XTzkgNLE</yt:videoId>
+        <title>Aled’s intro</title>
+        <published>2026-09-21T16:48:36+00:00</published>
+        <media:group><media:description>Dictionary ident.</media:description></media:group>
+      </entry>
+    </feed>
+    """
+    desk = sync_channel_uploads(tmp_path, xml)
+    assert desk["applied"]["guardian-30112-5a"]["youtube_id"] == "GU3uCkszl4Q"
+    assert "guardian-30112-5a" in uploaded_slugs(tmp_path)
+    assert "financial-times-18494-5a" in pending_slugs(tmp_path)
+    undecided_ids = [row["youtube_id"] for row in desk["undecided"]]
+    assert undecided_ids == ["Gk1KOS_23M8"]
+    assert "ARRIVAL" not in (tmp_path / "youtube-uploads.json").read_text(encoding="utf-8")
+    assert "SILICON" not in (tmp_path / "youtube-uploads.json").read_text(encoding="utf-8")
+    saved = youtube_desk(tmp_path)
+    assert saved["there"][0]["url"] == "https://www.youtube.com/shorts/GU3uCkszl4Q"
+
+
+def test_decide_moves_a_film_between_pending_and_there(tmp_path):
+    from twodown.staging import decide_upload, refresh_upload_lists
+
+    _day(tmp_path, "2026-09-16", "independent-12462-6a", "Model youngster eating in (3-2)", "PIN-UP")
+    _day(tmp_path, "2026-10-01", "financial-times-18494-5a", "Colin is buildinga semiconductor (7)", "SILICON")
+    publish_films(tmp_path)
+    decide_upload(tmp_path, "financial-times-18494-5a", "https://www.youtube.com/shorts/GU3uCkszl4Q")
+    refresh_upload_lists(tmp_path)
+    page = (tmp_path / "upload.html").read_text(encoding="utf-8")
+    needs = page.split('id="needs-upload"', 1)[1].split('id="on-youtube"', 1)[0]
+    posted = page.split('id="on-youtube"', 1)[1]
+    assert "financial-times-18494-5a" not in needs
+    assert "https://www.youtube.com/shorts/GU3uCkszl4Q" in posted
+    assert "SILICON" not in page
+    decide_upload(tmp_path, "financial-times-18494-5a", None)
+    refresh_upload_lists(tmp_path)
+    page = (tmp_path / "upload.html").read_text(encoding="utf-8")
+    needs = page.split('id="needs-upload"', 1)[1].split('id="on-youtube"', 1)[0]
+    assert "financial-times-18494-5a" in needs
+    assert "financial-times-18494-5a" in pending_slugs(tmp_path)
+
+
+def test_publish_desk_shows_an_undecided_channel_short(tmp_path):
+    from twodown.staging import save_uploads, sync_channel_uploads
+
+    _day(tmp_path, "2026-10-01", "financial-times-18494-5a", "Colin is buildinga semiconductor (7)", "SILICON")
+    xml = """<?xml version="1.0" encoding="UTF-8"?>
+    <feed xmlns="http://www.w3.org/2005/Atom" xmlns:yt="http://www.youtube.com/xml/schemas/2015">
+      <entry>
+        <yt:videoId>Gk1KOS_23M8</yt:videoId>
+        <title>crypticfit</title>
+        <published>2026-10-03T17:10:02+00:00</published>
+      </entry>
+    </feed>
+    """
+    sync_channel_uploads(tmp_path, xml)
+    publish_films(tmp_path)
+    page = (tmp_path / "upload.html").read_text(encoding="utf-8")
+    assert 'id="channel-undecided"' in page
+    assert "On the channel, not decided" in page
+    assert "Gk1KOS_23M8" in page
+    assert "data-decide=\"pending\"" in page
+    assert "data-decide=\"there\"" in page
+    assert "SILICON" not in page
+    data = ensure_uploads_json(tmp_path)
+    assert data["unmatched"][0]["youtube_id"] == "Gk1KOS_23M8"
+    save_uploads(tmp_path, data)

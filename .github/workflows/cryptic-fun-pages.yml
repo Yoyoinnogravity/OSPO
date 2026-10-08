@@ -38,9 +38,26 @@ jobs:
         run: |
           PYTHONPATH=two-down/src python3 - <<'PY'
           from pathlib import Path
-          from twodown.staging import refresh_upload_zip_bar, write_needs_upload_zips
+          from twodown.staging import (
+              refresh_upload_lists,
+              refresh_upload_zip_bar,
+              sync_channel_uploads,
+              write_needs_upload_zips,
+          )
 
           root = Path("two-down/site")
+          try:
+              desk = sync_channel_uploads(root)
+              print(
+                  "On YouTube {there}; pending {pending}; not decided {undecided}".format(
+                      there=len(desk["there"]),
+                      pending=len(desk["pending"]),
+                      undecided=len(desk["undecided"]),
+                  )
+              )
+          except Exception as exc:
+              print(f"Channel feed skipped: {exc}")
+          refresh_upload_lists(root)
           written = write_needs_upload_zips(root)
           refresh_upload_zip_bar(root)
           if not written:

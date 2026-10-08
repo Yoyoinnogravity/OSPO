@@ -46,10 +46,13 @@ from twodown.staging import (
     ensure_uploads_json,
     is_uploaded,
     load_uploads,
+    pending_slugs,
+    published_film_lines,
     short_download_name,
     shorts_url,
     studio_confirmations_html,
     studio_description,
+    undecided_section_html,
     videos_by_slug,
     write_needs_upload_zips,
 )
@@ -392,13 +395,27 @@ a.action.download-short, a.action.download-all {
   flex-direction: column;
   gap: 6px;
 }
-.mark-uploaded input {
+.mark-uploaded input, .mark-uploaded select {
   font-family: "Liberation Serif", Georgia, serif;
   font-size: 1.05rem;
   color: var(--ink);
   background: var(--cream);
   border: 1px solid var(--rule);
   padding: 8px 10px;
+}
+.decide-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.decide-actions button {
+  font-family: "Liberation Sans", sans-serif;
+  background: transparent;
+  color: var(--crimson);
+  border: 1px solid var(--crimson);
+  padding: 10px 16px;
+  cursor: pointer;
+  font-size: 0.95rem;
+}
+.decide-actions button[aria-pressed="true"] {
+  background: var(--crimson);
+  color: var(--cream);
 }
 button.copy-field {
   font-family: "Liberation Sans", sans-serif;
@@ -768,59 +785,151 @@ function youtubeShortsUrl(id) {
   return "https://www.youtube.com/shorts/" + id;
 }
 
+function setDecidePressed(row, which) {
+  if (!row) return;
+  row.querySelectorAll("[data-decide]").forEach((btn) => {
+    btn.setAttribute("aria-pressed", btn.dataset.decide === which ? "true" : "false");
+  });
+}
+
+function refreshStagingCounts() {
+  const pending = document.querySelectorAll("#needs-upload-list [data-staging-row]").length;
+  const posted = document.querySelectorAll("#on-youtube-list [data-staging-row]").length;
+  const pendingCount = document.querySelector("[data-pending-count]");
+  const postedCount = document.querySelector("[data-posted-count]");
+  if (pendingCount) pendingCount.textContent = String(pending);
+  if (postedCount) postedCount.textContent = String(posted);
+  const empty = document.querySelector("[data-on-youtube-empty]");
+  if (empty) empty.hidden = posted > 0;
+  const pendingEmpty = document.querySelector("[data-pending-empty]");
+  if (pendingEmpty) pendingEmpty.hidden = pending > 0;
+}
+
+function showPendingRow(row) {
+  const pendingBits = row.querySelector("[data-staging-pending]");
+  const postedBits = row.querySelector("[data-staging-posted]");
+  if (pendingBits) pendingBits.hidden = false;
+  if (postedBits) postedBits.hidden = true;
+  const list = document.getElementById("needs-upload-list");
+  if (list && row.parentElement && row.parentElement.id !== "needs-upload-list") {
+    list.appendChild(row);
+  }
+  setDecidePressed(row, "pending");
+  refreshStagingCounts();
+}
+
 function showPostedRow(row, id) {
   const pendingBits = row.querySelector("[data-staging-pending]");
   const postedBits = row.querySelector("[data-staging-posted]");
   const link = row.querySelector("[data-shorts-link]");
   if (pendingBits) pendingBits.hidden = true;
   if (postedBits) postedBits.hidden = false;
-  if (link && id) {
-    link.href = youtubeShortsUrl(id);
-    link.textContent = "Open on YouTube";
+  if (link) {
+    if (id) {
+      link.href = youtubeShortsUrl(id);
+      link.textContent = "Open on YouTube";
+    } else {
+      link.href = "https://www.youtube.com/@crypticfit";
+      link.textContent = "Marked there in this browser";
+    }
   }
-  row.dataset.youtubeId = id || "";
+  row.dataset.youtubeId = id || row.dataset.committedId || "";
   const list = document.getElementById("on-youtube-list");
   if (list && row.parentElement && row.parentElement.id !== "on-youtube-list") {
     list.appendChild(row);
   }
-  const empty = document.querySelector("[data-on-youtube-empty]");
-  if (empty) empty.hidden = Boolean(list && list.querySelector("[data-staging-row]"));
+  setDecidePressed(row, "there");
+  refreshStagingCounts();
 }
 
 function applyStagingMarks() {
   const local = loadLocalUploads();
   document.querySelectorAll("[data-staging-row]").forEach((row) => {
     const slug = row.dataset.slug;
-    const rec = slug ? local[slug] : null;
-    const id = (rec && rec.youtube_id) || row.dataset.youtubeId || "";
-    if (id) showPostedRow(row, id);
-  });
-  const list = document.getElementById("on-youtube-list");
-  const empty = document.querySelector("[data-on-youtube-empty]");
-  if (empty) empty.hidden = Boolean(list && list.querySelector("[data-staging-row]"));
-}
-
-document.querySelectorAll("[data-mark-uploaded]").forEach((form) => {
-  form.addEventListener("submit", (event) => {
-    event.preventDefault();
-    const slug = form.dataset.slug;
-    const input = form.querySelector("input[name='url']");
-    const status = form.querySelector("[data-mark-status]");
-    const id = parseYoutubeId(input ? input.value : "");
-    if (!slug || !id) {
-      if (status) status.textContent = "Paste a YouTube Shorts or watch URL.";
+    const committed = row.dataset.committedId || "";
+    if (committed) {
+      showPostedRow(row, committed);
       return;
     }
-    const local = loadLocalUploads();
+    const rec = slug ? local[slug] : null;
+    if (rec && rec.status === "pending") {
+      showPendingRow(row);
+      return;
+    }
+    const id = (rec && rec.youtube_id) || "";
+    if ((rec && rec.status === "there") || id) showPostedRow(row, id);
+  });
+  refreshStagingCounts();
+}
+
+function rememberDecision(slug, status, id) {
+  const local = loadLocalUploads();
+  if (status === "pending") {
+    delete local[slug];
+  } else {
     local[slug] = {
-      youtube_id: id,
-      url: youtubeShortsUrl(id),
+      status: "there",
+      youtube_id: id || "",
+      url: id ? youtubeShortsUrl(id) : "",
       uploaded_at: new Date().toISOString().slice(0, 10),
     };
-    saveLocalUploads(local);
+  }
+  saveLocalUploads(local);
+}
+
+document.querySelectorAll("[data-decide-youtube]").forEach((form) => {
+  form.addEventListener("click", (event) => {
+    const btn = event.target.closest("[data-decide]");
+    if (!btn || !form.contains(btn)) return;
+    event.preventDefault();
+    const slug = form.dataset.slug;
     const row = form.closest("[data-staging-row]");
-    if (row) showPostedRow(row, id);
-    if (status) status.textContent = "Saved in this browser. Tell us the URL and we will persist it on the site.";
+    const status = form.querySelector("[data-mark-status]");
+    const input = form.querySelector("input[name='url']");
+    const decision = btn.dataset.decide;
+    if (!slug || !row) return;
+    if (decision === "pending") {
+      if (row.dataset.committedId) {
+        if (status) status.textContent = "Already on YouTube. The site list keeps it there.";
+        setDecidePressed(row, "there");
+        return;
+      }
+      rememberDecision(slug, "pending", "");
+      showPendingRow(row);
+      if (status) status.textContent = "Pending. It stays in Needs upload.";
+      return;
+    }
+    const typed = input ? input.value : "";
+    const id = parseYoutubeId(typed);
+    if (typed.trim() && !id) {
+      if (status) status.textContent = "Paste a YouTube Shorts or watch URL, or leave the box empty.";
+      return;
+    }
+    rememberDecision(slug, "there", id);
+    showPostedRow(row, id || row.dataset.committedId || "");
+    if (status) {
+      status.textContent = id
+        ? "On YouTube in this browser. The Shorts link is saved here."
+        : "On YouTube in this browser. Paste the Shorts link when you have it.";
+    }
+  });
+});
+
+document.querySelectorAll("[data-assign-unmatched]").forEach((form) => {
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const videoId = form.dataset.youtubeId || "";
+    const select = form.querySelector("select[name='slug']");
+    const status = form.querySelector("[data-mark-status]");
+    const slug = select ? select.value : "";
+    if (!slug || !videoId) {
+      if (status) status.textContent = "Left undecided. Pending films stay pending.";
+      return;
+    }
+    rememberDecision(slug, "there", videoId);
+    const row = document.querySelector('[data-staging-row][data-slug="' + slug + '"]');
+    if (row) showPostedRow(row, videoId);
+    if (status) status.textContent = "Filed on that film in this browser.";
   });
 });
 applyStagingMarks();
@@ -1685,8 +1794,11 @@ def _staging_row(root: Path, film: SolvedFilm, record: dict | None) -> str:
     posted_href = shorts_url(video_id) if video_id else YOUTUBE_CHANNEL_URL
     pending_hidden = " hidden" if video_id else ""
     posted_hidden = "" if video_id else " hidden"
+    pending_pressed = "false" if video_id else "true"
+    there_pressed = "true" if video_id else "false"
+    url_value = shorts_url(video_id) if video_id else ""
     return f"""
-    <article class="panel" id="{_e(slug)}" data-staging-row data-slug="{_e(slug)}" data-youtube-id="{_e(video_id or "")}">
+    <article class="panel" id="{_e(slug)}" data-staging-row data-slug="{_e(slug)}" data-committed-id="{_e(video_id or "")}" data-youtube-id="{_e(video_id or "")}">
       <p class="kicker">{_e(film.pretty)}</p>
       <h2>{_e(film.clue)}</h2>
       {poster}
@@ -1703,19 +1815,22 @@ def _staging_row(root: Path, film: SolvedFilm, record: dict | None) -> str:
           <button type="button" class="copy-field" data-copy="{_e(desc)}" data-copy-label="Copy description">Copy description</button>
         </p>
         <p class="youtube-poster">{_e(YOUTUBE_POSTER_NOTE)}</p>
-        <form class="mark-uploaded" data-mark-uploaded data-slug="{_e(slug)}">
-          <label>YouTube Shorts URL
-            <input name="url" type="url" placeholder="https://www.youtube.com/shorts/…" autocomplete="off">
-          </label>
-          <button type="submit" class="reveal">Mark as uploaded</button>
-          <p class="suggest-status" data-mark-status></p>
-        </form>
-        <p class="youtube-persist">This browser remembers the id. Paste the Shorts URL here, or tell us and we will persist it on the site.</p>
       </div>
       <div data-staging-posted{posted_hidden}>
         <p class="kicker">On YouTube</p>
         <p><a class="action" data-shorts-link href="{_e(posted_href)}" target="_blank" rel="noopener">Open on YouTube</a></p>
       </div>
+      <form class="mark-uploaded decide-youtube" data-decide-youtube data-slug="{_e(slug)}">
+        <p class="youtube-help">Decide after you upload. Pending stays in Needs upload. On YouTube means it is already there.</p>
+        <div class="decide-actions">
+          <button type="button" data-decide="pending" aria-pressed="{pending_pressed}">Pending</button>
+          <button type="button" data-decide="there" aria-pressed="{there_pressed}">On YouTube</button>
+        </div>
+        <label>YouTube Shorts URL
+          <input name="url" type="url" placeholder="https://www.youtube.com/shorts/…" autocomplete="off" value="{_e(url_value)}">
+        </label>
+        <p class="suggest-status" data-mark-status></p>
+      </form>
       {opener}
     </article>
     """
@@ -1739,22 +1854,28 @@ def _upload_body(root: Path) -> str:
             posted.append(row)
         else:
             pending.append(row)
-    pending_html = "".join(pending) or "<p>Nothing waiting. Every daily Short is on YouTube.</p>"
+    pending_html = "".join(pending) or '<p data-pending-empty>Nothing waiting. Every daily Short is on YouTube.</p>'
     posted_html = "".join(posted)
     empty_posted = "" if posted_html else '<p data-on-youtube-empty>None of the daily Shorts are on the committed list yet.</p>'
+    undecided = undecided_section_html(
+        [row for row in data.get("unmatched") or [] if isinstance(row, dict)],
+        published_film_lines(root),
+        pending_slugs(root, data),
+    )
     return f"""
-    {_croc_hello("", title="Upload these Shorts to YouTube.", lede="Two lists for " + CHANNEL_HANDLE + ". Download, unzip if from the zip, drag the mp4 onto Studio — you cannot drag from this page. We do not upload for you.")}
-    <p class="lede" data-yt-uploads-key="{_e(LOCAL_STORAGE_KEY)}">The channel intro Short is already live at <a href="{_e(shorts_url(INTRO_YOUTUBE_ID))}" target="_blank" rel="noopener">YouTube</a>. It is not a daily /c/ film. Daily films stay under Needs upload until a YouTube id is committed or you mark one in this browser.</p>
+    {_croc_hello("", title="Upload these Shorts to YouTube.", lede="Download a Short, drop the mp4 on YouTube Studio, then decide which are there and which are still pending.")}
+    <p class="lede" data-yt-uploads-key="{_e(LOCAL_STORAGE_KEY)}">Needs upload is still pending. On YouTube is already there. The channel intro Short is already live at <a href="{_e(shorts_url(INTRO_YOUTUBE_ID))}" target="_blank" rel="noopener">YouTube</a>. It is not a daily film. A decision without a Shorts link stays in this browser.</p>
     {studio_confirmations_html()}
     {_needs_upload_zip_bar(root)}
     <section class="staging-list" id="needs-upload">
       <h2>Needs upload</h2>
-      <p>Not yet on {CHANNEL_HANDLE}.</p>
+      <p><span data-pending-count>{len(pending)}</span> still pending. Not yet on {CHANNEL_HANDLE}.</p>
       <div id="needs-upload-list">{pending_html}</div>
     </section>
+    {undecided}
     <section class="staging-list" id="on-youtube">
       <h2>On YouTube</h2>
-      <p>Already posted. The committed JSON is source of truth when we know the id.</p>
+      <p><span data-posted-count>{len(posted)}</span> already there.</p>
       {empty_posted}
       <div id="on-youtube-list">{posted_html}</div>
     </section>
@@ -1853,6 +1974,31 @@ def attach_video_posters(html_text: str) -> str:
         html_text,
         flags=re.I,
     )
+
+
+def publish_upload_desk(root: Path | None = None) -> Path:
+    """Rewrite the YouTube desk from the committed there / pending lists."""
+    root = Path(root or SITE_ROOT)
+    assets = root / "assets"
+    assets.mkdir(parents=True, exist_ok=True)
+    (assets / "style.css").write_text(CSS, encoding="utf-8")
+    (assets / "app.js").write_text(JS, encoding="utf-8")
+    ensure_uploads_json(root)
+    write_needs_upload_zips(root)
+    page = root / "upload.html"
+    page.write_text(
+        _page(
+            _upload_body(root),
+            PageSeo(
+                title=f"Upload Shorts to YouTube — {BRAND}",
+                description="Download each cryptic.fit Short, drop it on YouTube Studio, then decide which are there and which are still pending.",
+                path="/upload.html",
+                json_ld=website_ld(),
+            ),
+        ),
+        encoding="utf-8",
+    )
+    return page
 
 
 def publish_films(root: Path) -> Path:

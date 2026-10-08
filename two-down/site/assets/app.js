@@ -334,59 +334,151 @@ function youtubeShortsUrl(id) {
   return "https://www.youtube.com/shorts/" + id;
 }
 
+function setDecidePressed(row, which) {
+  if (!row) return;
+  row.querySelectorAll("[data-decide]").forEach((btn) => {
+    btn.setAttribute("aria-pressed", btn.dataset.decide === which ? "true" : "false");
+  });
+}
+
+function refreshStagingCounts() {
+  const pending = document.querySelectorAll("#needs-upload-list [data-staging-row]").length;
+  const posted = document.querySelectorAll("#on-youtube-list [data-staging-row]").length;
+  const pendingCount = document.querySelector("[data-pending-count]");
+  const postedCount = document.querySelector("[data-posted-count]");
+  if (pendingCount) pendingCount.textContent = String(pending);
+  if (postedCount) postedCount.textContent = String(posted);
+  const empty = document.querySelector("[data-on-youtube-empty]");
+  if (empty) empty.hidden = posted > 0;
+  const pendingEmpty = document.querySelector("[data-pending-empty]");
+  if (pendingEmpty) pendingEmpty.hidden = pending > 0;
+}
+
+function showPendingRow(row) {
+  const pendingBits = row.querySelector("[data-staging-pending]");
+  const postedBits = row.querySelector("[data-staging-posted]");
+  if (pendingBits) pendingBits.hidden = false;
+  if (postedBits) postedBits.hidden = true;
+  const list = document.getElementById("needs-upload-list");
+  if (list && row.parentElement && row.parentElement.id !== "needs-upload-list") {
+    list.appendChild(row);
+  }
+  setDecidePressed(row, "pending");
+  refreshStagingCounts();
+}
+
 function showPostedRow(row, id) {
   const pendingBits = row.querySelector("[data-staging-pending]");
   const postedBits = row.querySelector("[data-staging-posted]");
   const link = row.querySelector("[data-shorts-link]");
   if (pendingBits) pendingBits.hidden = true;
   if (postedBits) postedBits.hidden = false;
-  if (link && id) {
-    link.href = youtubeShortsUrl(id);
-    link.textContent = "Open on YouTube";
+  if (link) {
+    if (id) {
+      link.href = youtubeShortsUrl(id);
+      link.textContent = "Open on YouTube";
+    } else {
+      link.href = "https://www.youtube.com/@crypticfit";
+      link.textContent = "Marked there in this browser";
+    }
   }
-  row.dataset.youtubeId = id || "";
+  row.dataset.youtubeId = id || row.dataset.committedId || "";
   const list = document.getElementById("on-youtube-list");
   if (list && row.parentElement && row.parentElement.id !== "on-youtube-list") {
     list.appendChild(row);
   }
-  const empty = document.querySelector("[data-on-youtube-empty]");
-  if (empty) empty.hidden = Boolean(list && list.querySelector("[data-staging-row]"));
+  setDecidePressed(row, "there");
+  refreshStagingCounts();
 }
 
 function applyStagingMarks() {
   const local = loadLocalUploads();
   document.querySelectorAll("[data-staging-row]").forEach((row) => {
     const slug = row.dataset.slug;
-    const rec = slug ? local[slug] : null;
-    const id = (rec && rec.youtube_id) || row.dataset.youtubeId || "";
-    if (id) showPostedRow(row, id);
-  });
-  const list = document.getElementById("on-youtube-list");
-  const empty = document.querySelector("[data-on-youtube-empty]");
-  if (empty) empty.hidden = Boolean(list && list.querySelector("[data-staging-row]"));
-}
-
-document.querySelectorAll("[data-mark-uploaded]").forEach((form) => {
-  form.addEventListener("submit", (event) => {
-    event.preventDefault();
-    const slug = form.dataset.slug;
-    const input = form.querySelector("input[name='url']");
-    const status = form.querySelector("[data-mark-status]");
-    const id = parseYoutubeId(input ? input.value : "");
-    if (!slug || !id) {
-      if (status) status.textContent = "Paste a YouTube Shorts or watch URL.";
+    const committed = row.dataset.committedId || "";
+    if (committed) {
+      showPostedRow(row, committed);
       return;
     }
-    const local = loadLocalUploads();
+    const rec = slug ? local[slug] : null;
+    if (rec && rec.status === "pending") {
+      showPendingRow(row);
+      return;
+    }
+    const id = (rec && rec.youtube_id) || "";
+    if ((rec && rec.status === "there") || id) showPostedRow(row, id);
+  });
+  refreshStagingCounts();
+}
+
+function rememberDecision(slug, status, id) {
+  const local = loadLocalUploads();
+  if (status === "pending") {
+    delete local[slug];
+  } else {
     local[slug] = {
-      youtube_id: id,
-      url: youtubeShortsUrl(id),
+      status: "there",
+      youtube_id: id || "",
+      url: id ? youtubeShortsUrl(id) : "",
       uploaded_at: new Date().toISOString().slice(0, 10),
     };
-    saveLocalUploads(local);
+  }
+  saveLocalUploads(local);
+}
+
+document.querySelectorAll("[data-decide-youtube]").forEach((form) => {
+  form.addEventListener("click", (event) => {
+    const btn = event.target.closest("[data-decide]");
+    if (!btn || !form.contains(btn)) return;
+    event.preventDefault();
+    const slug = form.dataset.slug;
     const row = form.closest("[data-staging-row]");
-    if (row) showPostedRow(row, id);
-    if (status) status.textContent = "Saved in this browser. Tell us the URL and we will persist it on the site.";
+    const status = form.querySelector("[data-mark-status]");
+    const input = form.querySelector("input[name='url']");
+    const decision = btn.dataset.decide;
+    if (!slug || !row) return;
+    if (decision === "pending") {
+      if (row.dataset.committedId) {
+        if (status) status.textContent = "Already on YouTube. The site list keeps it there.";
+        setDecidePressed(row, "there");
+        return;
+      }
+      rememberDecision(slug, "pending", "");
+      showPendingRow(row);
+      if (status) status.textContent = "Pending. It stays in Needs upload.";
+      return;
+    }
+    const typed = input ? input.value : "";
+    const id = parseYoutubeId(typed);
+    if (typed.trim() && !id) {
+      if (status) status.textContent = "Paste a YouTube Shorts or watch URL, or leave the box empty.";
+      return;
+    }
+    rememberDecision(slug, "there", id);
+    showPostedRow(row, id || row.dataset.committedId || "");
+    if (status) {
+      status.textContent = id
+        ? "On YouTube in this browser. The Shorts link is saved here."
+        : "On YouTube in this browser. Paste the Shorts link when you have it.";
+    }
+  });
+});
+
+document.querySelectorAll("[data-assign-unmatched]").forEach((form) => {
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const videoId = form.dataset.youtubeId || "";
+    const select = form.querySelector("select[name='slug']");
+    const status = form.querySelector("[data-mark-status]");
+    const slug = select ? select.value : "";
+    if (!slug || !videoId) {
+      if (status) status.textContent = "Left undecided. Pending films stay pending.";
+      return;
+    }
+    rememberDecision(slug, "there", videoId);
+    const row = document.querySelector('[data-staging-row][data-slug="' + slug + '"]');
+    if (row) showPostedRow(row, videoId);
+    if (status) status.textContent = "Filed on that film in this browser.";
   });
 });
 applyStagingMarks();

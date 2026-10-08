@@ -63,7 +63,14 @@ twodown today
 # or, once videos are already rendered:
 twodown upload
 twodown upload --no-youtube          # TikTok + Instagram + Facebook only
+twodown youtube                      # which Shorts are on @crypticfit, which are pending
+twodown youtube --assign https://www.youtube.com/shorts/ID slug
+twodown youtube --pending slug       # send a film back to Needs upload
 ```
+
+`twodown youtube` reads the public @crypticfit feed. A title that is the film slug
+(`crypticfit guardian 30112 5a`) is filed under On YouTube. Anything else stays
+pending until you decide, on the upload page or with `--assign`.
 
 `twodown connect` prints the exact steps and links for each app.
 

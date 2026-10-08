@@ -7,7 +7,7 @@ from datetime import datetime
 from pathlib import Path
 
 from twodown.ads import ads_status
-from twodown.config import DEFAULT_OUTPUT, DEFAULT_VOICE_ALIAS, SITE_HOST, SITE_ORIGIN, SOURCE_SITE, STUDY_SLUG, VOICES
+from twodown.config import DEFAULT_OUTPUT, DEFAULT_VOICE_ALIAS, SITE_HOST, SITE_ORIGIN, SITE_ROOT, SOURCE_SITE, STUDY_SLUG, VOICES
 from twodown.ingest import LONDON
 from twodown.live import (
     PRODUCT_CHECK_NAMES,
@@ -20,6 +20,7 @@ from twodown.live import (
 from twodown.models import DailyPair
 from twodown.pipeline import render_one_short, run_today
 from twodown.scenes import DEFAULT_SCENE, list_scenes
+from twodown.staging import decide_upload, sync_channel_uploads, youtube_desk
 from twodown.social import (
     PLATFORMS,
     connect_instructions,
@@ -104,6 +105,66 @@ def _wanted(args) -> dict[str, bool]:
     }
 
 
+def _print_youtube_desk(desk: dict) -> None:
+    there = desk.get("there") or []
+    pending = desk.get("pending") or []
+    undecided = desk.get("undecided") or []
+    applied = desk.get("applied") or {}
+    print(f"On YouTube ({len(there)})")
+    for row in there:
+        print(f"  {row['slug']}  {row['url']}")
+    if not there:
+        print("  none")
+    print(f"Pending ({len(pending)})")
+    for slug in pending:
+        print(f"  {slug}")
+    if not pending:
+        print("  none")
+    print(f"On the channel, not decided ({len(undecided)})")
+    for row in undecided:
+        title = row.get("title") or row.get("youtube_id")
+        video_id = row.get("youtube_id")
+        print(f"  {title}  https://www.youtube.com/shorts/{video_id}")
+    if not undecided:
+        print("  none")
+    if applied:
+        print("Filed from the channel:")
+        for slug, match in applied.items():
+            print(f"  {slug}  {match.get('youtube_id')}")
+
+
+def _youtube_desk(args) -> int:
+    root = args.site
+    if args.assign:
+        youtube_ref, slug = args.assign
+        try:
+            decide_upload(root, slug, youtube_ref)
+        except ValueError as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
+        print(f"On YouTube  {slug}")
+    if args.pending:
+        try:
+            decide_upload(root, args.pending, None)
+        except ValueError as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
+        print(f"Pending  {args.pending}")
+    from twodown.site import publish_upload_desk
+
+    if args.no_fetch:
+        desk = youtube_desk(root)
+    else:
+        try:
+            desk = sync_channel_uploads(root)
+        except Exception as exc:
+            print(f"Channel feed skipped: {exc}", file=sys.stderr)
+            desk = youtube_desk(root)
+    publish_upload_desk(root)
+    _print_youtube_desk(desk)
+    return 0
+
+
 def _print_status() -> None:
     status = platform_status()
     hints = setup_hints()
@@ -170,6 +231,20 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("connect", help="Show the token JSON the upload agent needs")
     sub.add_parser("live", help="Check which public URLs actually respond")
 
+    youtube = sub.add_parser(
+        "youtube",
+        help="See which Shorts are on @crypticfit and which are still pending",
+    )
+    youtube.add_argument("--site", type=Path, default=SITE_ROOT)
+    youtube.add_argument(
+        "--assign",
+        nargs=2,
+        metavar=("YOUTUBE", "SLUG"),
+        help="Decide that this YouTube Short is that film",
+    )
+    youtube.add_argument("--pending", metavar="SLUG", help="Decide this film is still pending")
+    youtube.add_argument("--no-fetch", action="store_true", help="Use the saved list and skip the channel feed")
+
     args = parser.parse_args(argv)
 
     if args.cmd == "voices":
@@ -213,6 +288,9 @@ def main(argv: list[str] | None = None) -> int:
         print(connect_instructions(), end="")
         _print_status()
         return 0
+
+    if args.cmd == "youtube":
+        return _youtube_desk(args)
 
     if args.cmd == "live":
         print("Public URLs (live = HTTP 2xx/3xx from here right now)")
