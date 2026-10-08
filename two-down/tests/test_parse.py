@@ -27,6 +27,25 @@ def _post(html: str, paper: str = "Independent", puzzle_id: str = "12458", sette
     )
 
 
+def test_sunday_blog_puts_the_answer_on_the_next_row():
+    html = """
+    <table>
+      <tr><td colspan="2">Across</td></tr>
+      <tr><td>1a</td><td>Sample surface for the test solver (4,4)</td></tr>
+      <tr><td></td><td>TEST CLUE — a charade of TEST and CLUE for the fixture</td></tr>
+    </table>
+    """
+    clues = usable(parse_post(_post(html, paper="Independent on Sunday", puzzle_id="1910", setter="Filbert")))
+    assert len(clues) == 1
+    clue = clues[0]
+    assert clue.number == "1"
+    assert clue.slug.endswith("-1a")
+    assert clue.answer == "TEST CLUE"
+    assert clue.enumeration == "4,4"
+    assert clue.clue == "Sample surface for the test solver"
+    assert "charade of TEST and CLUE" in clue.parse
+
+
 def test_parse_independent_detail_table():
     html = (FIXTURES / "independent_detail.html").read_text(encoding="utf-8")
     clues = parse_post(_post(html))

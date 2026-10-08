@@ -111,6 +111,18 @@ def _is_number(text: str) -> bool:
     return bool(re.match(r"^\d+[a-zA-Z]?$", text.strip()))
 
 
+def _plain_number(number: str, direction: str) -> str:
+    """1a under Across is clue 1, so the slug does not become 1aa."""
+    match = re.match(r"^(\d+)([aAdD])$", (number or "").strip())
+    if not match:
+        return (number or "").strip()
+    letter = match.group(2).lower()
+    expected = "a" if direction == "across" else "d"
+    if letter == expected:
+        return match.group(1)
+    return (number or "").strip()
+
+
 def _underlined(node: Tag) -> str | None:
     bits: list[str] = []
     for el in node.find_all(style=True):
@@ -133,6 +145,16 @@ def _split_enumeration(clue: str) -> tuple[str, str]:
     if not match:
         return clue, ""
     return _clean(clue[: match.start()]), match.group(1).replace(" ", "")
+
+
+def _answer_before_dash(text: str) -> tuple[str, str]:
+    """Sunday blogs put the answer, then a dash, then the parse on the next row."""
+    cleaned = _clean(text)
+    for sep in ("—", "–", " - "):
+        if sep in cleaned:
+            head, tail = cleaned.split(sep, 1)
+            return _clean(head), _clean(tail)
+    return "", cleaned
 
 
 def _split_clue_and_rest(text: str) -> tuple[str, str, str]:
@@ -318,8 +340,21 @@ def _parse_table(post: PuzzlePost, table: Tag) -> list[Clue]:
             continue
 
         # Format A: number | clue + answer + parse in one cell.
+        # Sunday blogs use the same two cells for the clue, then a second row
+        # whose text is "ANSWER — parse".
         if len(cells) == 2 and _is_number(texts[0]):
             clue_text, enumeration, answer, definition, parse = _parse_detail_cell(cells[1])
+            if not answer and i + 1 < len(rows):
+                nxt = rows[i + 1].find_all(["td", "th"], recursive=False)
+                nxt_text = [_cell_text(c) for c in nxt]
+                if nxt_text and not _is_number(nxt_text[0] or "x"):
+                    head, tail = _answer_before_dash(nxt_text[-1])
+                    if head and _looks_like_answer(head):
+                        answer = head
+                        parse = tail or parse
+                        if not clue_text:
+                            clue_text, enumeration, _rest = _split_clue_and_rest(texts[1])
+                        i += 1
             clues.append(
                 _make_clue(
                     post,
@@ -441,6 +476,7 @@ def _make_clue(
     answer = _clean(answer).upper()
     clue = _clean(clue)
     parse = _clean(parse)
+    number = _plain_number(number, direction)
     skipped = _skip_reason(clue, answer, parse)
     enum_ok = _enumeration_ok(answer, enumeration) if enumeration else False
     return Clue(
