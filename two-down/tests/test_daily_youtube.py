@@ -68,7 +68,7 @@ def test_published_kicker_keeps_a_clue_of_the_day_label(tmp_path):
     assert clue.paper == "Guardian"
     assert clue.theme == "Clue of the day"
     assert clue.answer == "EXAMPLE"
-    assert "Clue of the day" in video_title(clue)
+    assert video_title(clue).startswith("Cryptic Croc · cryptic.fit · Clue of the day · ")
     assert "EXAMPLE" not in video_title(clue)
 
 
@@ -76,7 +76,7 @@ def test_feed_matches_the_uploaded_title(tmp_path):
     slug = "independent-12481-1a"
     (tmp_path / "c" / slug).mkdir(parents=True)
     (tmp_path / "c" / slug / "index.html").write_text("<p>x</p>", encoding="utf-8")
-    title = "cryptic.fit · Clue of the day · Native Australian, reportedly, may fish with spectacles (8) #Shorts"
+    title = "Cryptic Croc · cryptic.fit · Clue of the day · Native Australian, reportedly, may fish with spectacles (8) #Shorts"
     xml = f"""<?xml version="1.0" encoding="UTF-8"?>
     <feed xmlns="http://www.w3.org/2005/Atom" xmlns:yt="http://www.youtube.com/xml/schemas/2015">
       <entry>

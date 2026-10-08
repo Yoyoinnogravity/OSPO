@@ -12,6 +12,9 @@ from twodown.tokens import secret_text
 YOUTUBE_CHANNEL = BRAND
 YOUTUBE_CHANNEL_URL = "https://www.youtube.com/@crypticfit"
 YOUTUBE_STUDIO = "https://www.youtube.com/upload"
+# Both names belong in the title. Search for "Cryptic Croc" or "cryptic.fit"
+# misses a file named crypticfit-guardian-30112-5a.
+TITLE_LEAD = "Cryptic Croc · cryptic.fit · "
 SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
 TOKEN_ENV = "TWODOWN_YOUTUBE_TOKEN"
 CLIENT_ENV = "TWODOWN_YOUTUBE_CLIENT_SECRET"
@@ -27,12 +30,12 @@ def short_mp4_url(slug: str) -> str:
 def video_title_from_line(clue_line: str) -> str:
     """Same 100-character Short title as video_title, from an already-joined clue line."""
     line = (clue_line or "").strip()
-    title = f"{YOUTUBE_CHANNEL} · {line} #Shorts"
+    title = f"{TITLE_LEAD}{line} #Shorts"
     if len(title) <= 100:
         return title
-    room = 100 - len(f"{YOUTUBE_CHANNEL} ·  #Shorts")
+    room = 100 - len(f"{TITLE_LEAD} #Shorts")
     clipped = line[: max(10, room - 1)].rstrip() + "…"
-    return f"{YOUTUBE_CHANNEL} · {clipped} #Shorts"[:100]
+    return f"{TITLE_LEAD}{clipped} #Shorts"[:100]
 
 
 def youtube_ready() -> bool:
@@ -56,10 +59,10 @@ def _credentials():
 
 def video_title(clue: Clue) -> str:
     enum = f" ({clue.enumeration})" if clue.enumeration else ""
-    lead = f"{YOUTUBE_CHANNEL} · "
+    lead = TITLE_LEAD
     theme = (clue.theme or "").strip()
     if theme:
-        lead = f"{YOUTUBE_CHANNEL} · {theme} · "
+        lead = f"{TITLE_LEAD}{theme} · "
     title = f"{lead}{clue.clue}{enum} #Shorts"
     if len(title) <= 100:
         return title
@@ -104,7 +107,14 @@ def video_insert_body(item: SpokenClue, privacy: str = "public") -> dict:
         "snippet": {
             "title": video_title(item.clue),
             "description": video_description(item),
-            "tags": ["cryptic.fit", "cryptic crossword", item.clue.device, item.clue.setter],
+            "tags": [
+                "Cryptic Croc",
+                "cryptic.fit",
+                "cryptic fit",
+                "cryptic crossword",
+                item.clue.device,
+                item.clue.setter,
+            ],
             "categoryId": YOUTUBE_CATEGORY_EDUCATION,
             "defaultLanguage": "en",
         },

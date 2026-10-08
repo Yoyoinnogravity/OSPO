@@ -4,7 +4,7 @@ from twodown.config import BRAND, BRAND_PROMISE, CREDIT_LINE, SITE_ORIGIN, THINK
 from twodown.models import Clue, SpokenClue
 from twodown.scenes import get_scene
 
-HASHTAGS = "#crypticcrossword #crypticfit #crossword #shorts"
+HASHTAGS = "#CrypticCroc #crypticfit #crypticcrossword #crossword #shorts"
 SOCIAL_HANDLE = BRAND
 
 
@@ -18,7 +18,7 @@ def social_caption(item: SpokenClue, *, spoil: bool = False) -> str:
     clue = item.clue
     page = item.site_path or SITE_ORIGIN
     lines = [
-        f"{SOCIAL_HANDLE} · {clue_line(clue)}",
+        f"Cryptic Croc · {SOCIAL_HANDLE} · {clue_line(clue)}",
         "",
         f"{THINK_PROMPT} The parse is in the video.",
     ]
@@ -43,6 +43,7 @@ def youtube_description(item: SpokenClue) -> str:
     clue = item.clue
     page = item.site_path or SITE_ORIGIN
     return (
+        "Cryptic Croc on cryptic.fit.\n"
         f"{SOCIAL_HANDLE} — {BRAND_PROMISE}.\n"
         f"{CREDIT_LINE}\n\n"
         f"{clue_line(clue)}\n"
@@ -53,4 +54,5 @@ def youtube_description(item: SpokenClue) -> str:
         f"{clue.paper} {clue.puzzle_id} by {clue.setter}. "
         f"Blogged by {clue.blogger}.\n"
         f"{get_scene(item.scene).youtube_credit}\n"
+        f"{HASHTAGS}\n"
     )

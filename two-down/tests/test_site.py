@@ -164,11 +164,11 @@ def test_publish_site_writes_spoiler_pages(tmp_path):
     films_page = (tmp_path / "films.html").read_text(encoding="utf-8")
     assert "Download Short" in films_page
     assert 'href="media/independent-12458-12a.mp4"' in films_page
-    assert 'download="crypticfit-independent-12458-12a.mp4"' in films_page
+    assert 'download="Cryptic-Croc-cryptic.fit-independent-12458-12a.mp4"' in films_page
     assert STUDIO_DROP_HELP in films_page
     assert "Download Short" in index
     assert 'href="media/independent-12458-12a.mp4"' in index
-    assert 'download="crypticfit-independent-12458-12a.mp4"' in index
+    assert 'download="Cryptic-Croc-cryptic.fit-independent-12458-12a.mp4"' in index
     assert STUDIO_DROP_HELP in index
     assert "https://www.youtube.com/upload" in index
     assert "@crypticfun" not in index
@@ -201,11 +201,11 @@ def test_publish_site_writes_spoiler_pages(tmp_path):
     assert "adsbygoogle" not in clue_page
     assert "Download Short" in clue_page
     assert 'href="../../media/independent-12458-12a.mp4"' in clue_page
-    assert 'download="crypticfit-independent-12458-12a.mp4"' in clue_page
+    assert 'download="Cryptic-Croc-cryptic.fit-independent-12458-12a.mp4"' in clue_page
     assert "https://www.youtube.com/upload" in clue_page
     assert STUDIO_DROP_HELP in clue_page
     assert "Copy title" in clue_page
-    assert "cryptic.fit · Rioting led unrest" in clue_page
+    assert "Cryptic Croc · cryptic.fit · Rioting led unrest" in clue_page
     assert (tmp_path / "robots.txt").exists()
     css = (tmp_path / "assets" / "style.css").read_text(encoding="utf-8")
     assert "body.scene-photo header a" in css
@@ -315,7 +315,7 @@ def test_solved_shelf_hides_the_answer(tmp_path):
     assert 'id="independent-12462-6a"' in played
     assert 'data-slug="independent-12462-6a"' in played
     assert 'href="media/independent-12462-6a.mp4"' in played
-    assert 'download="crypticfit-independent-12462-6a.mp4"' in played
+    assert 'download="Cryptic-Croc-cryptic.fit-independent-12462-6a.mp4"' in played
     assert "Download Short" in played
     assert "Open YouTube Studio" in played
     assert STUDIO_DROP_HELP in played
@@ -374,7 +374,7 @@ def test_publish_site_opens_a_clue_page_at_the_player(tmp_path):
     assert "is-open" not in clue_page
     assert "Download Short" in clue_page
     assert 'href="../../media/independent-12458-12a.mp4"' in clue_page
-    assert 'download="crypticfit-independent-12458-12a.mp4"' in clue_page
+    assert 'download="Cryptic-Croc-cryptic.fit-independent-12458-12a.mp4"' in clue_page
     assert STUDIO_DROP_HELP in clue_page
     index = (root / "index.html").read_text(encoding="utf-8")
     pair_html = index.split("Today’s clue.", 1)[1].split("Keep the clue coming", 1)[0]
@@ -508,14 +508,15 @@ def test_retarget_cdn_keeps_the_media_filename():
 def test_youtube_titles_use_cryptic_fun_channel():
     clue = _item().clue
     title = video_title(clue)
-    assert title.startswith("cryptic.fit · ")
+    assert title.startswith("Cryptic Croc · cryptic.fit · ")
     assert title.endswith("#Shorts")
     assert "END RESULT" not in title
+    assert "Cryptic Croc" in title
     assert YOUTUBE_CHANNEL == "cryptic.fit"
     assert YOUTUBE_CHANNEL_URL == "https://www.youtube.com/@crypticfit"
     assert YOUTUBE_STUDIO == "https://www.youtube.com/upload"
     assert short_mp4_url("guardian-30124-9a") == "https://cryptic.fit/media/guardian-30124-9a.mp4"
-    assert video_title_from_line("Bring out client I fancy with no end of distinction (6)").startswith("cryptic.fit · ")
+    assert video_title_from_line("Bring out client I fancy with no end of distinction (6)").startswith("Cryptic Croc · cryptic.fit · ")
     assert len(title) <= 100
     assert "https://cryptic.fit/support.html" in youtube_description(_item())
     assert "unique cryptic crossword clues and solutions" in youtube_description(_item())
@@ -532,6 +533,10 @@ def test_youtube_insert_body_is_not_made_for_kids():
     assert body["snippet"]["categoryId"] == "27"
     assert body["snippet"]["defaultLanguage"] == "en"
     assert "END RESULT" not in body["snippet"]["title"]
+    assert "END RESULT" not in body["snippet"]["description"]
+    assert "Cryptic Croc" in body["snippet"]["title"]
+    assert "Cryptic Croc" in body["snippet"]["tags"]
+    assert "cryptic.fit" in body["snippet"]["tags"]
     assert body["snippet"]["title"].endswith("#Shorts")
     assert set(body["status"]) == {
         "privacyStatus",
@@ -571,7 +576,7 @@ def test_attach_youtube_upload_is_idempotent_and_lands_on_the_mp4():
     once = attach_youtube_upload(page, kit_prefix="../../")
     assert once.count("data-youtube-upload") == 1
     assert 'href="../../media/guardian-30124-9a.mp4"' in once
-    assert 'download="crypticfit-guardian-30124-9a.mp4"' in once
+    assert 'download="Cryptic-Croc-cryptic.fit-guardian-30124-9a.mp4"' in once
     assert STUDIO_DROP_HELP in once
     assert "Copy title" in once
     assert "https://www.youtube.com/upload" in once
@@ -592,7 +597,9 @@ def test_attach_youtube_upload_is_idempotent_and_lands_on_the_mp4():
     assert "Open YouTube Studio" in filmed
     assert STUDIO_DROP_HELP in filmed
     assert "ELICIT" not in filmed
-    assert short_download_name("guardian-30124-9a") == "crypticfit-guardian-30124-9a.mp4"
+    assert short_download_name("guardian-30124-9a") == "Cryptic-Croc-cryptic.fit-guardian-30124-9a.mp4"
     assert "Solve it, I know you can." in studio_description()
+    assert "Cryptic Croc" in studio_description()
+    assert "cryptic.fit" in studio_description()
     assert "Answer" not in studio_description()
 

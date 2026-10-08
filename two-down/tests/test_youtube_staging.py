@@ -98,7 +98,7 @@ def test_publish_films_writes_two_staging_sections(tmp_path):
     assert "independent-12462-6a" in posted
     assert "financial-times-18494-5a" not in posted.split("</section>", 1)[0]
     assert "Download Short" in needs
-    assert 'download="crypticfit-financial-times-18494-5a.mp4"' in needs
+    assert 'download="Cryptic-Croc-cryptic.fit-financial-times-18494-5a.mp4"' in needs
     assert "Open YouTube Studio" in needs
     assert "https://www.youtube.com/shorts/7q-WFyj0WnA" in posted
     assert "#Shorts" in needs
@@ -106,7 +106,7 @@ def test_publish_films_writes_two_staging_sections(tmp_path):
     assert "SILICON" not in page
     assert "Fifteen Squared" not in page
     assert "adsbygoogle" not in page
-    title = "cryptic.fit · Colin is buildinga semiconductor (7) #Shorts"
+    title = "Cryptic Croc · cryptic.fit · Colin is buildinga semiconductor (7) #Shorts"
     assert title in needs
     assert "SILICON" not in title
     assert studio_description() in needs
@@ -133,8 +133,8 @@ def test_zip_builder_excludes_uploaded(tmp_path):
     dests = write_needs_upload_zips(tmp_path)
     assert [path.name for path in dests] == ["crypticfit-needs-upload-1.zip"]
     names = ZipFile(dests[0]).namelist()
-    assert names == ["crypticfit-financial-times-18494-5a.mp4"]
-    assert "crypticfit-independent-12462-6a.mp4" not in names
+    assert names == ["Cryptic-Croc-cryptic.fit-financial-times-18494-5a.mp4"]
+    assert "Cryptic-Croc-cryptic.fit-independent-12462-6a.mp4" not in names
     assert dests[0].read_bytes()[:2] == b"PK"
     assert b"git-lfs.github.com" not in dests[0].read_bytes()[:200]
     publish_films(tmp_path)
@@ -163,15 +163,15 @@ def test_zip_builder_splits_under_the_github_blob_limit(tmp_path):
         "crypticfit-needs-upload-2.zip",
     ]
     listed = [ZipFile(path).namelist() for path in dests]
-    assert listed[0] == ["crypticfit-financial-times-18494-5a.mp4"]
-    assert listed[1] == ["crypticfit-guardian-30127-16a.mp4"]
+    assert listed[0] == ["Cryptic-Croc-cryptic.fit-financial-times-18494-5a.mp4"]
+    assert listed[1] == ["Cryptic-Croc-cryptic.fit-guardian-30127-16a.mp4"]
     for path in dests:
         assert path.read_bytes()[:2] == b"PK"
         assert path.stat().st_size < 90 * 1024 * 1024
         assert "PIN-UP" not in path.name
         assert "SILICON" not in path.name
         assert "STATUS" not in path.name
-    assert "crypticfit-independent-12462-6a.mp4" not in {name for part in listed for name in part}
+    assert "Cryptic-Croc-cryptic.fit-independent-12462-6a.mp4" not in {name for part in listed for name in part}
     assert "aimlessly-sonia.mp4" not in {name for part in listed for name in part}
     publish_films(tmp_path)
     # Tiny fixture mp4s fit in one part at the default 80MB cap.
@@ -317,7 +317,7 @@ def test_feed_match_is_unique_or_left_pending():
     unique = [
         {
             "youtube_id": "7q-WFyj0WnA",
-            "title": "cryptic.fit · Model youngster eating in (3-2) #Shorts",
+            "title": "Cryptic Croc · cryptic.fit · Model youngster eating in (3-2) #Shorts",
             "published": "2026-09-21T20:15:54+00:00",
             "description": "https://cryptic.fit/c/independent-12462-6a/",
             "link": "https://www.youtube.com/shorts/7q-WFyj0WnA",
@@ -388,7 +388,7 @@ def test_apply_feed_matches_persists_only_safe_hits(tmp_path):
     <feed xmlns="http://www.w3.org/2005/Atom" xmlns:yt="http://www.youtube.com/xml/schemas/2015" xmlns:media="http://search.yahoo.com/mrss/">
       <entry>
         <yt:videoId>7q-WFyj0WnA</yt:videoId>
-        <title>cryptic.fit · Model youngster eating in (3-2) #Shorts</title>
+        <title>Cryptic Croc · cryptic.fit · Model youngster eating in (3-2) #Shorts</title>
         <published>2026-09-21T20:15:54+00:00</published>
         <media:group>
           <media:description>https://cryptic.fit/c/independent-12462-6a/</media:description>

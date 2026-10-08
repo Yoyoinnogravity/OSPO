@@ -46,8 +46,17 @@ _BRAND_SLUG_PREFIXES = ("crypticfit-", "cryptic-fit-")
 
 
 def studio_description() -> str:
-    """Spoiler-free YouTube description paste. Never the answer."""
-    return f"{TAGLINE}\n{SITE_ORIGIN}"
+    """Spoiler-free YouTube description paste. Never the answer.
+
+    Cryptic Croc and cryptic.fit have to be written out. A title taken from
+    the old crypticfit- filename is not found by either search.
+    """
+    return (
+        "Cryptic Croc on cryptic.fit.\n"
+        f"{TAGLINE}\n"
+        f"{SITE_ORIGIN}\n"
+        "#CrypticCroc #crypticfit #crypticcrossword #shorts"
+    )
 
 
 def studio_confirmations_html() -> str:
@@ -66,7 +75,7 @@ def studio_confirmations_html() -> str:
         <div><dt>Category</dt><dd>Education</dd></div>
         <div><dt>Visibility</dt><dd>Public</dd></div>
         <div><dt>Movie / licensed music we do not own</dt><dd>No</dd></div>
-        <div><dt>Title</dt><dd>Clue + #Shorts, never the answer</dd></div>
+        <div><dt>Title</dt><dd>Cryptic Croc · cryptic.fit · the clue, then #Shorts, never the answer.</dd></div>
         <div><dt>Description</dt><dd><pre>{desc}</pre></dd></div>
       </dl>
       <p class="youtube-help">Studio still needs a click. Daily upload quota still applies.</p>
@@ -74,7 +83,8 @@ def studio_confirmations_html() -> str:
 
 
 def short_download_name(slug: str) -> str:
-    return f"crypticfit-{slug}.mp4"
+    """Filename YouTube uses as the title when the file is dropped without a paste."""
+    return f"Cryptic-Croc-cryptic.fit-{slug}.mp4"
 
 
 def shorts_url(youtube_id: str) -> str:

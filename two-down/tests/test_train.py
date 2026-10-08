@@ -82,7 +82,8 @@ def test_times_day_without_a_written_clue_falls_through_to_the_theme(tmp_path):
     assert pick.clue.theme == CLUE_OF_THE_DAY
     assert pick.clue.paper == "Guardian"
     title = video_title(pick.clue)
-    assert title.startswith("cryptic.fit · Clue of the day · ")
+    assert title.startswith("Cryptic Croc · cryptic.fit · Clue of the day · ")
+    assert "EXAMPLE" not in title
     assert pick.clue.answer not in title
 
 
