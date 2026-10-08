@@ -12,6 +12,7 @@ from twodown.config import (
     CLUES_PER_DAY,
     DEFAULT_OUTPUT,
     DEFAULT_VOICE_ALIAS,
+    OWN_CLUES,
     SITE_ORIGIN,
     SITE_ROOT,
     SOURCE_SITE,
@@ -26,7 +27,7 @@ from twodown.audio import publish_short_to_media
 from twodown.render import draw_beat, draw_clue_card, draw_reveal_card, render_video, write_thumbnail
 from twodown.scenes import pick_scenes
 from twodown.script import write_parts
-from twodown.select import select_pair
+from twodown.train import mark_own_clue_used, pick_clue_of_the_day, rotation_slot
 from twodown.site import publish_site
 from twodown.social import publish_pair, setup_hints
 from twodown.voice import build_short_soundtrack, resolve_voice, synthesise_parts
@@ -528,7 +529,6 @@ def run_today(
     posts = fetch_daily_posts()
     todays = posts_for_london_date(posts, day)
     clues = [clue for post in todays for clue in parse_post(post)]
-    pair_clues = select_pair(clues, n=CLUES_PER_DAY)
     stamp = _today_stamp(day if todays else None)
     if todays:
         stamp = todays[0].date.astimezone(LONDON).date().isoformat()
@@ -572,6 +572,11 @@ def run_today(
                 encoding="utf-8",
             )
             return skipped
+    filmed = datetime.strptime(stamp, "%Y-%m-%d").date()
+    pick = pick_clue_of_the_day(clues, filmed, own_path=OWN_CLUES)
+    pair_clues = [pick.clue] if pick else []
+    if pick and pick.clue.own_id:
+        mark_own_clue_used(pick.clue, stamp, OWN_CLUES)
     alias = _voice_alias(voice)
     resolved_voice = resolve_voice(alias)
     scene_slugs = pick_scenes(stamp, len(pair_clues), scene)
@@ -625,6 +630,8 @@ def run_today(
         clues=spoken,
         source_posts=[p.url for p in todays],
         source_site=SOURCE_SITE,
+        train_slot=pick.slot if pick else rotation_slot(filmed),
+        train_source=pick.source if pick else None,
     )
     if publish and spoken:
         site = publish_site(result, SITE_ROOT)

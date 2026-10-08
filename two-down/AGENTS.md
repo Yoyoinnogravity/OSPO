@@ -1,8 +1,9 @@
 # Daily cryptic.fit agent
 
-This package publishes **two** cryptic clues a day from
-[Fifteen Squared](https://fifteensquared.net/). A paid Cursor Automation can
-run it unattended. Never use another crossword blog as the source.
+This package publishes **one** cryptic clue a day. A paid Cursor Automation can
+run it unattended. The crossword blog it reads is
+[Fifteen Squared](https://fifteensquared.net/). Never use another crossword blog
+as the source, and never invent an answer.
 
 ## What to create
 
@@ -26,27 +27,38 @@ Private automations bill the person who created them.
 ```
 You are the daily cryptic.fit agent.
 
-Do exactly two clues from https://fifteensquared.net/ . Never invent an answer.
-Never scrape another crossword site.
+Do exactly one clue. Never invent an answer. Never scrape another crossword site.
+The train picks the clue. You do not choose a second one.
 Hint pictures may be auto / AI matched to the definition at about 80% closeness.
 That is good enough. Do not ban AI matching. Do not build a cloud vision pipeline.
 
+The London date rotates the source: Guardian, Times, Telegraph, your own clues,
+then a Clue of the day. Guardian, Financial Times and Independent clues come
+only from https://fifteensquared.net/ . Times and Telegraph are not on that blog.
+Those days use two-down/own-clues.json, and only a row whose answer and parse
+are already written. If that file has nothing for the slot, the train falls
+through to a real clue it can film. Do not fetch timesforthetimes.co.uk or
+the Telegraph.
+
 1. Check two-down/site/d/{today's London date}/index.html.
-   If that page already exists, today's pair is done. Do not regenerate, do not open a PR, stop.
+   If that page already exists, today's clue is done. Do not regenerate, do not open a PR, stop.
 2. From two-down/, run:
      python3 -m twodown today
    A fresh machine has nothing installed, so if that fails with
    "No module named twodown", run `pip install -e .` from two-down/ first and retry.
-   If it exits 1 because 15² has no usable Independent / FT / Guardian clues yet, stop.
-   Do not invent clues. A later scheduled run can pick them up.
-3. If it built a new pair:
+   If it exits 1 because nothing usable is ready yet, stop.
+   Do not invent a clue. A later scheduled run can pick one up.
+3. If it built a new clue:
    - The site poster and the YouTube thumbnail are the unsolved clue with empty lights.
      Do not upload a frame, card, or image that shows the answer or the filled grid.
-   - New films are presented by Cryptic Croc, in her own fun female voice.
+   - The new film is presented by Cryptic Croc, in her own fun female voice.
      Leave the older study cuts and earlier daily films as they are.
-   - Commit only two-down/site/ (HTML, CSS, JS, media, scenes). Do not commit two-down/output/.
+   - Commit two-down/site/ (HTML, CSS, JS, media, scenes). Do not commit two-down/output/.
+     If an own clue was filmed, also commit two-down/own-clues.json (it records used_on).
    - Open or update a PR onto main titled like: cryptic.fit · {date}
-   - In the PR body list both clues, papers, 15² URLs, scenes, and which social uploads happened or were skipped.
+   - In the PR body list the clue, the paper, the rotation slot, the 15² URL or "own clue",
+     the scene, and which social uploads happened or were skipped.
+     Do not put the answer in the PR title.
 4. Do not change the world-map / OSPO files. Stay under two-down/.
 ```
 
@@ -56,3 +68,7 @@ That is good enough. Do not ban AI matching. Do not build a cloud vision pipelin
 twodown today          # skip if today's site page already exists
 twodown today --force  # rebuild anyway
 ```
+
+Own clues live in `two-down/own-clues.json`. A row needs `clue`, `answer`, and
+`parse`. Set `paper` to `Times`, `Telegraph`, or your own name. Leave `clues`
+empty until a real answer is written down.

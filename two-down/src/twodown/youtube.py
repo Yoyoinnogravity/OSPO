@@ -56,12 +56,16 @@ def _credentials():
 
 def video_title(clue: Clue) -> str:
     enum = f" ({clue.enumeration})" if clue.enumeration else ""
-    title = f"{YOUTUBE_CHANNEL} · {clue.clue}{enum} #Shorts"
+    lead = f"{YOUTUBE_CHANNEL} · "
+    theme = (clue.theme or "").strip()
+    if theme:
+        lead = f"{YOUTUBE_CHANNEL} · {theme} · "
+    title = f"{lead}{clue.clue}{enum} #Shorts"
     if len(title) <= 100:
         return title
-    room = 100 - len(f"{YOUTUBE_CHANNEL} · {enum} #Shorts")
+    room = 100 - len(f"{lead}{enum} #Shorts")
     clipped = clue.clue[: max(10, room - 1)].rstrip() + "…"
-    return f"{YOUTUBE_CHANNEL} · {clipped}{enum} #Shorts"[:100]
+    return f"{lead}{clipped}{enum} #Shorts"[:100]
 
 
 def video_description(item: SpokenClue) -> str:

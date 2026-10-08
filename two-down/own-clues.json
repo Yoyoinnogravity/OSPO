@@ -1,0 +1,4 @@
+{
+  "readme": "Clues you have already solved. Required on each row: clue, answer, parse. Optional: paper (Times, Telegraph, or your name), enumeration, setter, puzzle_id, number, direction, definition, device, id. Times and Telegraph are not fetched. A row with no answer is skipped. used_on is written when that clue is filmed.",
+  "clues": []
+}

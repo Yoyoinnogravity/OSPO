@@ -74,7 +74,7 @@ def write_youtube_banner(dest: Path) -> Path:
     small = _font(FONT_SANS, 28)
     cryptic, _, tail = BRAND.partition(".")
     suffix = f".{tail}" if tail else ""
-    name = "Two cryptic clues a day"
+    name = "One cryptic clue a day"
     credit = TAGLINE
     cryptic_w = draw.textlength(cryptic, font=word)
     name_w = cryptic_w + draw.textlength(suffix, font=word)

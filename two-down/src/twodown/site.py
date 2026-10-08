@@ -1041,7 +1041,8 @@ def _page(body: str, seo: PageSeo, depth: int = 0, show_ads: bool = False) -> st
     {body}
   </main>
   <footer>
-    Two clues a day from the Independent, the Guardian and the Financial Times.
+    One clue a day. We read the Guardian, the Financial Times and the Independent.
+    Times, Telegraph and homemade clues go out only when the answer is already written.
     Not affiliated with those papers. Pick a voice and a place.
     One homemade clue a day via <a href="{prefix}suggest.html">Suggest</a>,
     or <a href="{prefix}follow.html">follow</a> by email, RSS or YouTube.
@@ -1191,9 +1192,10 @@ def _article(
     if clue.definition:
         extras.append(f'data-definition="{_e(clue.definition)}"')
     extra_attrs = (" " + " ".join(extras)) if extras else ""
+    theme = f"{_e(clue.theme)} · " if clue.theme else ""
     return f"""
     <article class="clue{opened}" data-slug="{_e(clue.slug)}"{extra_attrs}>
-      <p class="kicker">{_e(clue.paper)} {_e(clue.puzzle_id)} · {_e(clue.setter)} · {_e(clue.number)} {_e(clue.direction)} · {_e(clue.device)}</p>
+      <p class="kicker">{theme}{_e(clue.paper)} {_e(clue.puzzle_id)} · {_e(clue.setter)} · {_e(clue.number)} {_e(clue.direction)} · {_e(clue.device)}</p>
       {clue_block}
       <button class="reveal" type="button">Solve</button>
       <div class="spoiler" data-nosnippet>
@@ -1436,13 +1438,20 @@ def _ensure_download_shorts_chrome(html_text: str) -> str:
 def _ensure_home_download_note(html_text: str) -> str:
     if "Download Shorts for YouTube is on the" in html_text:
         return html_text
-    if "Today’s pair." not in html_text:
+    if "Today’s clue." not in html_text and "Today’s pair." not in html_text:
         return html_text
-    return html_text.replace(
+    for kicker in (
+        '<p class="kicker">Clue of the day',
+        '<p class="kicker">One clue',
         '<p class="kicker">Two clues',
-        _home_download_note() + "\n    <p class=\"kicker\">Two clues",
-        1,
-    )
+    ):
+        if kicker in html_text:
+            return html_text.replace(
+                kicker,
+                _home_download_note() + "\n    " + kicker,
+                1,
+            )
+    return html_text
 
 
 def _media_prefix(html_path: Path, root: Path) -> str:
@@ -1965,18 +1974,19 @@ def publish_site(pair: DailyPair, dest: Path | None = None) -> Path:
 
     pretty = datetime.strptime(pair.date, "%Y-%m-%d").strftime("%A %-d %B %Y")
     articles = "\n".join(_article(item, "media/") for item in pair.clues)
+    lead = pair.clues[0].clue.theme if pair.clues and pair.clues[0].clue.theme else "One clue"
     index_body = f"""
-    {_croc_hello("", title=TAGLINE, lede="Two clues a day from the Independent, the Guardian and the Financial Times. Have a go before you tap solve.")}
+    {_croc_hello("", title=TAGLINE, lede="One clue a day. Have a go before you tap solve.")}
     {_home_download_note("")}
-    <p class="kicker">Two clues · {_e(pretty)}</p>
-    <h2 class="day-title">Today’s pair.</h2>
+    <p class="kicker">{_e(lead)} · {_e(pretty)}</p>
+    <h2 class="day-title">Today’s clue.</h2>
     <p class="lede">Have a go before you tap solve. We speak the parses. We don’t nick the grid. Pick a place from the header if you’d rather solve against the Matterhorn than newsprint.</p>
     <section class="pair">
       {articles}
     </section>
     <aside class="teaser">
       <p class="kicker">Follow</p>
-      <h2>Keep the pair coming.</h2>
+      <h2>Keep the clue coming.</h2>
       <p>Follow is on by default. Email one clue a day, the RSS feed, or {BRAND} on YouTube. No account on the site.</p>
       <a class="action" href="follow.html">Follow {BRAND}</a>
     </aside>
@@ -1993,7 +2003,7 @@ def publish_site(pair: DailyPair, dest: Path | None = None) -> Path:
         _page(
             index_body,
             PageSeo(
-                title=f"Two cryptic clues · {pretty} — {BRAND}",
+                title=f"{lead} · {pretty} — {BRAND}",
                 description=homepage_description(pretty),
                 path="/",
                 json_ld=[website_ld(), item_list_ld(pair)],
@@ -2011,7 +2021,7 @@ def publish_site(pair: DailyPair, dest: Path | None = None) -> Path:
         _page(
             f"<h1>{_e(pretty)}</h1><section class='pair'>{day_articles}</section>{_keep_free_teaser('../../')}",
             PageSeo(
-                title=f"Two cryptic clues · {pretty} — {BRAND}",
+                title=f"{lead} · {pretty} — {BRAND}",
                 description=homepage_description(pretty),
                 path=f"/d/{pair.date}/",
                 og_type="article",
@@ -2053,7 +2063,7 @@ def publish_site(pair: DailyPair, dest: Path | None = None) -> Path:
 
     about = f"""
     <h1>About.</h1>
-    <p class="lede">{BRAND_LINE} {CREDIT_LINE} {CREDIT_WHO[:1].upper()}{CREDIT_WHO[1:]}. The only source is the Independent, the Guardian and the Financial Times. We never invent answers. Andrew invites, then Cryptic Croc presents the new films. Sonia, Libby, Ryan and Thomas stay on the voice list, and you can still pick a real place as the backdrop. The same Shorts go to YouTube, TikTok, Instagram and Facebook when those accounts are connected. The site is the spoiler-safe home.</p>
+    <p class="lede">{BRAND_LINE} {CREDIT_LINE} {CREDIT_WHO[:1].upper()}{CREDIT_WHO[1:]}. The only source we read is the Guardian, the Financial Times and the Independent. A Times, Telegraph or homemade clue is used only when the answer is already written down. We never invent answers. Andrew invites, then Cryptic Croc presents the new films. Sonia, Libby, Ryan and Thomas stay on the voice list, and you can still pick a real place as the backdrop. The same Shorts go to YouTube, TikTok, Instagram and Facebook when those accounts are connected. The site is the spoiler-safe home.</p>
     <p>Answers and wordplay belong to the setters and the bloggers. We rewrite for speech and always link the original post.</p>
     <p>Readers can <a href="suggest.html">suggest one homemade clue a day</a>, or ask for a daily clue by email. Both land in Aled’s inbox at <a href="mailto:{_e(SUGGEST_EMAIL)}">{_e(SUGGEST_EMAIL)}</a>.</p>
     <p>When the site has readers, a small labelled ad can sit under the pair — never on the answer. How that works is on <a href="support.html">Support</a>.</p>
@@ -2067,7 +2077,7 @@ def publish_site(pair: DailyPair, dest: Path | None = None) -> Path:
             about,
             PageSeo(
                 title=f"About — {BRAND}",
-                description=f"{BRAND_LINE} {CREDIT_LINE} From the Independent, the Guardian and the Financial Times. We never invent answers.",
+                description=f"{BRAND_LINE} {CREDIT_LINE} From the Guardian, the Financial Times and the Independent. We never invent answers.",
                 path="/about.html",
                 json_ld=website_ld(),
             ),
@@ -2311,9 +2321,9 @@ def publish_extra_items(items: list[SpokenClue], date: str, dest: Path | None = 
             _page(
                 f"<h1>{_e(pretty)}</h1><section class='pair'>{day_articles}</section>{_keep_free_teaser('../../')}",
                 PageSeo(
-                    title=f"Two cryptic clues · {pretty} — {BRAND}",
-                    description=homepage_description(pretty),
-                    path=f"/d/{date}/",
+                title=f"One clue · {pretty} — {BRAND}",
+                description=homepage_description(pretty),
+                path=f"/d/{date}/",
                     og_type="article",
                     json_ld=item_list_ld(pair),
                     published=date,

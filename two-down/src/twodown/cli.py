@@ -42,6 +42,8 @@ def _print_pair(pair) -> None:
     print(f"tiktok {', '.join(pair.tiktok_ids) if pair.tiktok_ids else 'skipped'}")
     print(f"ig    {', '.join(pair.instagram_ids) if pair.instagram_ids else 'skipped'}")
     print(f"fb    {', '.join(pair.facebook_ids) if pair.facebook_ids else 'skipped'}")
+    if getattr(pair, "train_slot", None):
+        print(f"train {pair.train_slot} via {pair.train_source or 'none'}")
     for i, item in enumerate(pair.clues, start=1):
         clue = item.clue
         print()
@@ -123,17 +125,17 @@ def _print_status() -> None:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="twodown",
-        description="Two cryptic clues a day from https://fifteensquared.net/.",
+        description="One cryptic clue a day from https://fifteensquared.net/, plus clues already written down.",
     )
     sub = parser.add_subparsers(dest="cmd", required=True)
 
-    today = sub.add_parser("today", help="Ingest https://fifteensquared.net/, pick two clues, speak, publish")
+    today = sub.add_parser("today", help="Ingest https://fifteensquared.net/, pick one clue, speak, publish")
     today.add_argument("--out", type=Path, default=DEFAULT_OUTPUT)
     today.add_argument("--voice", default=DEFAULT_VOICE_ALIAS, help="Film voice: croc, andrew, sonia, libby, ryan, thomas. Site visitors can pick any of these.")
     today.add_argument(
         "--scene",
         choices=[scene.slug for scene in list_scenes()],
-        help="Pin both Shorts to one background. Default: two different places.",
+        help="Pin the Short to one background. Default: a place for the day.",
     )
     today.add_argument("--date", help="London calendar date YYYY-MM-DD (default: today, else latest)")
     today.add_argument("--quiet", action="store_true", help="Skip TTS, video, site and social uploads")
@@ -143,7 +145,7 @@ def main(argv: list[str] | None = None) -> int:
     today.add_argument("--youtube-privacy", default="public", choices=["unlisted", "private", "public"])
     _add_social_flags(today)
 
-    upload = sub.add_parser("upload", help="Upload today's two Shorts to YouTube, TikTok, Instagram and Facebook")
+    upload = sub.add_parser("upload", help="Upload today's Short to YouTube, TikTok, Instagram and Facebook")
     upload.add_argument("--out", type=Path, default=DEFAULT_OUTPUT)
     upload.add_argument("--date", help="London calendar date YYYY-MM-DD")
     upload.add_argument("--youtube-privacy", default="public", choices=["unlisted", "private", "public"])
@@ -323,7 +325,10 @@ def main(argv: list[str] | None = None) -> int:
         print(f"already published {pair.date} — skip (use --force to rebuild)")
         return 0
     if not pair.clues:
-        print(f"No usable clues found on {SOURCE_SITE} for that date.", file=sys.stderr)
+        print(
+            f"No usable clue for {pair.date} (slot {pair.train_slot or 'unknown'}).",
+            file=sys.stderr,
+        )
         return 1
     if pair.already_published:
         print(f"already published {pair.date}")

@@ -33,7 +33,7 @@ def gsc_verification() -> str | None:
 
 def homepage_description(pretty_date: str) -> str:
     return (
-        f"Two cryptic crossword clues for {pretty_date}. "
+        f"One cryptic crossword clue for {pretty_date}. "
         "Have a go before you tap solve."
     )
 
@@ -85,7 +85,7 @@ def item_list_ld(pair: DailyPair) -> dict:
     return {
         "@context": "https://schema.org",
         "@type": "ItemList",
-        "name": f"{BRAND} pair {pair.date}",
+        "name": f"{BRAND} clue {pair.date}",
         "itemListElement": elements,
     }
 
@@ -154,7 +154,7 @@ def rss_xml(pair: DailyPair, pretty_date: str) -> str:
         (f"{item.clue.clue} ({item.clue.enumeration})." if item.clue.enumeration else f"{item.clue.clue}.")
         for item in pair.clues
     )
-    items.append(_rss_item(f"Today’s pair · {pretty_date}", day_link, homepage_description(pretty_date) + " " + clues, pair.date))
+    items.append(_rss_item(f"Today’s clue · {pretty_date}", day_link, homepage_description(pretty_date) + " " + clues, pair.date))
     for item in pair.clues:
         clue = item.clue
         link = canonical_url(f"/c/{clue.slug}/")

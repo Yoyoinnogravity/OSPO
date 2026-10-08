@@ -143,8 +143,13 @@ def _draw_wordmark(draw: ImageDraw.ImageDraw) -> None:
 
 def _draw_kicker(draw: ImageDraw.ImageDraw, clue: Clue) -> None:
     kicker = _font(FONT_SANS, 24)
+    y = 100
+    theme = (clue.theme or "").strip()
+    if theme:
+        _center_text(draw, 72, theme.upper(), _font(FONT_SANS_BOLD, 22), CRIMSON, spacing=0)
+        y = 112
     line = f"{clue.paper} {clue.puzzle_id}  ·  {clue.setter}  ·  {clue.number} {clue.direction}"
-    _center_text(draw, 100, line.upper(), kicker, MUTED, spacing=0)
+    _center_text(draw, y, line.upper(), kicker, MUTED, spacing=0)
 
 
 def _draw_clue(draw: ImageDraw.ImageDraw, clue: Clue, y: int = 280) -> int:
@@ -407,7 +412,7 @@ def write_share_card(dest: Path, scene: str | Scene | None = None) -> Path:
     draw.text((72, 200), cryptic, font=word, fill=ink)
     fit_x = 72 + draw.textlength(cryptic, font=word)
     draw.text((fit_x, 200), suffix, font=word, fill=CRIMSON)
-    draw.text((72, 300), "Two cryptic clues a day", font=sub, fill=muted)
+    draw.text((72, 300), "One cryptic clue a day", font=sub, fill=muted)
     draw.text((72, 350), TAGLINE, font=sub, fill=muted)
     img.save(dest, "WEBP", quality=82)
     return dest

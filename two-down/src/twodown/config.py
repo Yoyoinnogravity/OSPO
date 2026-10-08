@@ -106,7 +106,8 @@ HINT_MISS = "No relevant image found."
 HINT_VOICE_ALIAS = "croc"
 HINT_HOLD_SECONDS = 2.0
 HINT_PAUSE_SECONDS = 0.8
-CLUES_PER_DAY = 2
+# One Short a day. twodown.train rotates which source supplies it.
+CLUES_PER_DAY = 1
 # Lock the spoken beat on this constructed study clue before touching the others.
 # MASS MEDIA is FT 18483 1 across; twodown short rebuilds this clue only.
 STUDY_SLUG = "financial-times-18483-1a"
@@ -115,6 +116,9 @@ PINUP_SLUG = "independent-12462-6a"
 PACKAGE_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_OUTPUT = PACKAGE_ROOT / "output"
 SITE_ROOT = PACKAGE_ROOT / "site"
+# Clues Aled has already solved. Times, Telegraph, and homemade days read this.
+# Empty means those slots fall through. Never invent a row here.
+OWN_CLUES = PACKAGE_ROOT / "own-clues.json"
 INTRO_BUMPER = PACKAGE_ROOT / "assets" / "intro" / "aled-daily-dose.mp4"
 
 # Newsprint + crimson. Definition-red is the 15² convention made into a brand.

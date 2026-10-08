@@ -53,6 +53,10 @@ class Clue(BaseModel):
     hint_image: str | None = None
     hint_credit: str | None = None
     hint_line: str | None = None
+    # Shorts label, such as "Clue of the day". Never the answer.
+    theme: str | None = None
+    # Set when the clue came from own-clues.json, so the train can mark it used.
+    own_id: str | None = None
 
     @property
     def slug(self) -> str:
@@ -91,3 +95,6 @@ class DailyPair(BaseModel):
     facebook_ids: list[str] = Field(default_factory=list)
     site_index: str | None = None
     already_published: bool = False
+    # Calendar slot, and the source that actually supplied the clue.
+    train_slot: str | None = None
+    train_source: str | None = None

@@ -158,7 +158,7 @@ def get_scene(slug: str | None) -> Scene:
 
 
 def pick_scenes(date: str, n: int, scene: str | None = None) -> list[str]:
-    """Two Shorts a day get two different real places, unless --scene pins one."""
+    """Each Short gets a real place, unless --scene pins one."""
     if n <= 0:
         return []
     if scene:

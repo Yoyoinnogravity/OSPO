@@ -141,8 +141,8 @@ def test_publish_site_writes_spoiler_pages(tmp_path):
     assert (tmp_path / "c" / "independent-12458-12a" / "index.html").exists()
     assert (tmp_path / "support.html").exists()
     assert (tmp_path / "privacy.html").exists()
-    assert "Keep the pair coming" in index
-    assert index.find("Keep the pair coming") < index.find("When the hits come")
+    assert "Keep the clue coming" in index
+    assert index.find("Keep the clue coming") < index.find("When the hits come")
     assert "data-follow-toggle" in index
     assert "Following" in index
     assert (tmp_path / "follow.html").exists()
@@ -172,7 +172,7 @@ def test_publish_site_writes_spoiler_pages(tmp_path):
     assert STUDIO_DROP_HELP in index
     assert "https://www.youtube.com/upload" in index
     assert "@crypticfun" not in index
-    pair_html = index.split("Today’s pair.", 1)[1].split("Keep the pair coming", 1)[0]
+    pair_html = index.split("Today’s clue.", 1)[1].split("Keep the clue coming", 1)[0]
     assert pair_html.find("Solve") < pair_html.find("Download Short")
     first_before_spoiler = pair_html.split('class="spoiler"', 1)[0]
     assert "END RESULT" not in first_before_spoiler
@@ -257,7 +257,7 @@ def test_publish_extra_items_leaves_todays_pair(tmp_path):
     extra.clue.parse = "MINI full of ART"
     publish_extra_items([extra], "2026-10-01", dest=root)
     homepage = (root / "index.html").read_text(encoding="utf-8")
-    pair_html = homepage.split("Today’s pair.", 1)[1].split("Keep the pair coming", 1)[0]
+    pair_html = homepage.split("Today’s clue.", 1)[1].split("Keep the clue coming", 1)[0]
     assert 'data-slug="independent-12458-12a"' in pair_html
     assert 'data-slug="independent-12458-14a"' in pair_html
     assert "financial-times-18494-1a" not in pair_html
@@ -275,7 +275,7 @@ def test_publish_extra_items_leaves_todays_pair(tmp_path):
     earlier.clue.parse = "ASS in CAVA"
     publish_extra_items([earlier], "2026-09-30", dest=root)
     homepage = (root / "index.html").read_text(encoding="utf-8")
-    pair_html = homepage.split("Today’s pair.", 1)[1].split("Keep the pair coming", 1)[0]
+    pair_html = homepage.split("Today’s clue.", 1)[1].split("Keep the clue coming", 1)[0]
     assert "financial-times-18494-1a" not in pair_html
     assert "guardian-30125-1a" not in pair_html
     assert "guardian-30125-1a" in homepage
@@ -377,7 +377,7 @@ def test_publish_site_opens_a_clue_page_at_the_player(tmp_path):
     assert 'download="crypticfit-independent-12458-12a.mp4"' in clue_page
     assert STUDIO_DROP_HELP in clue_page
     index = (root / "index.html").read_text(encoding="utf-8")
-    pair_html = index.split("Today’s pair.", 1)[1].split("Keep the pair coming", 1)[0]
+    pair_html = index.split("Today’s clue.", 1)[1].split("Keep the clue coming", 1)[0]
     assert ">Solve<" in pair_html
     assert "is-open" not in pair_html
     assert 'id="play"' not in pair_html
