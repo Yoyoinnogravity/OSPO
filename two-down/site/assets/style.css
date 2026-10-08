@@ -329,13 +329,27 @@ a.action.download-short, a.action.download-all {
   flex-direction: column;
   gap: 6px;
 }
-.mark-uploaded input {
+.mark-uploaded input, .mark-uploaded select {
   font-family: "Liberation Serif", Georgia, serif;
   font-size: 1.05rem;
   color: var(--ink);
   background: var(--cream);
   border: 1px solid var(--rule);
   padding: 8px 10px;
+}
+.decide-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.decide-actions button {
+  font-family: "Liberation Sans", sans-serif;
+  background: transparent;
+  color: var(--crimson);
+  border: 1px solid var(--crimson);
+  padding: 10px 16px;
+  cursor: pointer;
+  font-size: 0.95rem;
+}
+.decide-actions button[aria-pressed="true"] {
+  background: var(--crimson);
+  color: var(--cream);
 }
 button.copy-field {
   font-family: "Liberation Sans", sans-serif;
