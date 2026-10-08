@@ -537,6 +537,82 @@ def _pair_from_published_day(date: str) -> DailyPair:
     )
 
 
+def newest_pending_slugs(root: Path | None = None) -> tuple[str, list[str]] | None:
+    """Newest site day that still has a download with no YouTube id."""
+    from twodown.staging import is_uploaded, load_uploads, videos_by_slug
+
+    site = Path(root or SITE_ROOT)
+    known = videos_by_slug(load_uploads(site))
+    days = sorted(path.parent.name for path in (site / "d").glob("*/index.html"))
+    for date in reversed(days):
+        waiting: list[str] = []
+        for slug in _day_slugs(site, date):
+            video = site / "media" / f"{slug}.mp4"
+            if not video.is_file() or is_uploaded(known.get(slug)):
+                continue
+            waiting.append(slug)
+        if waiting:
+            return date, waiting
+    return None
+
+
+def sync_channel_ledger(root: Path | None = None) -> dict[str, dict[str, str]]:
+    """Record unique public-feed matches so a download already on YouTube is not posted again."""
+    from twodown.staging import apply_feed_matches, fetch_channel_feed, published_slugs
+    from twodown.youtube import video_title
+
+    site = Path(root or SITE_ROOT)
+    films: list[tuple[str, str]] = []
+    for slug in published_slugs(site):
+        try:
+            films.append((slug, video_title(published_clue(slug, site))))
+        except (FileNotFoundError, ValueError):
+            films.append((slug, slug))
+    try:
+        entries = fetch_channel_feed()
+    except Exception:
+        return {}
+    return apply_feed_matches(site, entries, films)
+
+
+def post_newest_downloads(privacy: str = "public") -> DailyPair:
+    """Upload every unpublished Short from the newest day that still has one."""
+    from twodown.youtube import remember_youtube_ids, upload_clues, youtube_ready
+
+    sync_channel_ledger(SITE_ROOT)
+    found = newest_pending_slugs(SITE_ROOT)
+    voice = resolve_voice(DEFAULT_VOICE_ALIAS)
+    if found is None:
+        return DailyPair(date="", voice=voice, source_site=SOURCE_SITE, already_published=True)
+    date, slugs = found
+    items: list[SpokenClue] = []
+    for slug in slugs:
+        try:
+            clue = published_clue(slug, SITE_ROOT)
+        except (FileNotFoundError, ValueError):
+            continue
+        video = SITE_ROOT / "media" / f"{slug}.mp4"
+        thumb = SITE_ROOT / "media" / f"{slug}-thumb.jpg"
+        items.append(
+            SpokenClue(
+                clue=clue,
+                script="",
+                voice=voice,
+                video_path=str(video),
+                thumbnail_path=str(thumb) if thumb.is_file() else None,
+                site_path=f"{SITE_ORIGIN}/c/{slug}/",
+            )
+        )
+    pair = DailyPair(date=date, voice=voice, clues=items, source_site=SOURCE_SITE, site_index=str(SITE_ROOT / "index.html"))
+    if items and youtube_ready():
+        pair.youtube_ids = upload_clues(pair.clues, privacy=privacy, limit=None)
+        if remember_youtube_ids(pair):
+            from twodown.site import publish_films
+
+            publish_films(SITE_ROOT)
+    return pair
+
+
 def published_date(site_root: Path | None, date: str) -> bool:
     """True when today's archive page is already on the static site."""
     root = Path(site_root or SITE_ROOT)

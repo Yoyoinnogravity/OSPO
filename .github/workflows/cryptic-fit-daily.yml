@@ -31,6 +31,12 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y ffmpeg fonts-liberation
           pip install -e "./two-down"
+      - name: Post the newest downloads
+        id: downloads
+        env:
+          TWODOWN_YOUTUBE_TOKEN: ${{ secrets.TWODOWN_YOUTUBE_TOKEN }}
+        run: python3 -m twodown upload --pending --youtube-required
+        continue-on-error: true
       - name: Film today's clue and upload it
         id: film
         env:
@@ -49,10 +55,10 @@ jobs:
           fi
           git commit -m "cryptic.fit · $(TZ=Europe/London date +%F)"
           git push origin HEAD:main
-      - name: Require a YouTube id
-        if: steps.film.outcome != 'success'
+      - name: Require the downloads on YouTube
+        if: steps.downloads.outcome != 'success'
         run: |
-          echo "Today's Short is not on YouTube."
+          echo "The newest downloads are not on YouTube."
           echo "Add repository secret TWODOWN_YOUTUBE_TOKEN: the cryptic.fit OAuth JSON (youtube.upload)."
           echo "Channel: https://www.youtube.com/@crypticfit"
           exit 1

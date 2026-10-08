@@ -219,19 +219,30 @@ def sync_channel_ids(pair: DailyPair, root: Path | None = None) -> bool:
     return changed
 
 
-def upload_pair(pair: DailyPair, privacy: str = "public") -> list[str]:
+def upload_clues(
+    items: list[SpokenClue],
+    privacy: str = "public",
+    limit: int | None = None,
+) -> list[str]:
+    """Upload Shorts that have no id yet. None means every item in the list."""
     ids: list[str] = []
     fresh: list[SpokenClue] = []
-    for item in pair.clues:
+    for item in items:
         if not item.youtube_id:
             item.youtube_id = known_youtube_id(item.clue.slug)
         if item.youtube_id:
             ids.append(item.youtube_id)
         else:
             fresh.append(item)
-    for item in fresh[:CLUES_PER_DAY]:
+    batch = fresh if limit is None else fresh[:limit]
+    for item in batch:
         video_id = upload_short(item, privacy=privacy)
         if video_id:
             ids.append(video_id)
+    return ids
+
+
+def upload_pair(pair: DailyPair, privacy: str = "public") -> list[str]:
+    ids = upload_clues(pair.clues, privacy=privacy, limit=CLUES_PER_DAY)
     pair.youtube_ids = ids
     return ids

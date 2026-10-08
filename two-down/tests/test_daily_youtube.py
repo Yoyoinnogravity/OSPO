@@ -1,7 +1,7 @@
 from twodown.models import Clue, DailyPair, SpokenClue
-from twodown.pipeline import published_clue
+from twodown.pipeline import newest_pending_slugs, published_clue
 from twodown.staging import apply_feed_matches, load_uploads, parse_channel_feed, record_youtube_upload
-from twodown.youtube import upload_pair, video_title
+from twodown.youtube import upload_clues, upload_pair, video_title
 
 
 def _clue(**kwargs) -> Clue:
@@ -70,6 +70,50 @@ def test_published_kicker_keeps_a_clue_of_the_day_label(tmp_path):
     assert clue.answer == "EXAMPLE"
     assert video_title(clue).startswith("Cryptic Croc · cryptic.fit · Clue of the day · ")
     assert "EXAMPLE" not in video_title(clue)
+
+
+def _day(root, date: str, slugs: list[str]) -> None:
+    folder = root / "d" / date
+    folder.mkdir(parents=True)
+    articles = "\n".join(f'<article class="clue" data-slug="{slug}"></article>' for slug in slugs)
+    (folder / "index.html").write_text(articles, encoding="utf-8")
+    media = root / "media"
+    media.mkdir(exist_ok=True)
+    for slug in slugs:
+        (media / f"{slug}.mp4").write_bytes(b"film")
+
+
+def test_newest_pending_day_is_the_latest_download(tmp_path):
+    _day(tmp_path, "2026-10-01", ["old-1a"])
+    _day(tmp_path, "2026-10-03", ["new-6a", "new-11a"])
+    page = tmp_path / "c" / "old-1a"
+    page.mkdir(parents=True)
+    (page / "index.html").write_text("<p>x</p>", encoding="utf-8")
+    record_youtube_upload(tmp_path, "old-1a", "7q-WFyj0WnA", "2026-10-01")
+    assert newest_pending_slugs(tmp_path) == ("2026-10-03", ["new-6a", "new-11a"])
+
+
+def test_upload_clues_posts_every_download_on_that_day(tmp_path, monkeypatch):
+    slug_a = "independent-12477-6a"
+    slug_b = "independent-12477-11a"
+    for slug in (slug_a, slug_b):
+        (tmp_path / "c" / slug).mkdir(parents=True)
+        (tmp_path / "c" / slug / "index.html").write_text("<p>x</p>", encoding="utf-8")
+    monkeypatch.setattr("twodown.youtube.SITE_ROOT", tmp_path)
+    posted: list[str] = []
+
+    def fake_upload(item, privacy="public"):
+        posted.append(item.clue.slug)
+        return "aaaaaaaaaaa" if item.clue.slug.endswith("6a") else "bbbbbbbbbbb"
+
+    monkeypatch.setattr("twodown.youtube.upload_short", fake_upload)
+    items = [
+        SpokenClue(clue=_clue(puzzle_id="12477", number="6"), script="", voice="en-US-AvaNeural", video_path="a.mp4"),
+        SpokenClue(clue=_clue(puzzle_id="12477", number="11"), script="", voice="en-US-AvaNeural", video_path="b.mp4"),
+    ]
+    ids = upload_clues(items, limit=None)
+    assert posted == [slug_a, slug_b]
+    assert ids == ["aaaaaaaaaaa", "bbbbbbbbbbb"]
 
 
 def test_feed_matches_the_uploaded_title(tmp_path):
