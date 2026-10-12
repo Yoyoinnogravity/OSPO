@@ -223,7 +223,7 @@ body.scene-photo h2 { text-shadow: 0 2px 18px rgba(0,0,0,0.55); }
 .suggest-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .suggest-form button:disabled { opacity: 0.5; cursor: not-allowed; }
 .suggest-status { font-family: "Liberation Sans", sans-serif; font-size: 0.9rem; color: var(--muted); margin: 0; }
-a.action {
+a.action, button.action {
   display: inline-block;
   font-family: "Liberation Sans", sans-serif;
   background: var(--crimson);
@@ -232,6 +232,7 @@ a.action {
   padding: 10px 16px;
   text-decoration: none;
   font-size: 0.95rem;
+  cursor: pointer;
 }
 a.action.ghost {
   background: transparent;
@@ -245,6 +246,35 @@ a.action.ghost {
   align-items: center;
   margin: 14px 0 8px;
 }
+.youtube-upload > .youtube-help,
+.youtube-upload > .drag-status,
+.studio-batch > .youtube-help,
+.studio-batch > .drag-status {
+  flex-basis: 100%;
+}
+.drag-status {
+  font-family: "Liberation Sans", sans-serif;
+  font-size: 0.9rem;
+  color: var(--muted);
+  margin: 0;
+}
+body.scene-photo main > .youtube-help,
+body.scene-photo .studio-batch .youtube-help,
+body.scene-photo .studio-batch .drag-status {
+  color: #eadfd0;
+  text-shadow: 0 2px 18px rgba(0, 0, 0, 0.55);
+}
+.studio-batch {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin: 0 0 28px;
+}
+.youtube-upload.is-ready .download-short {
+  box-shadow: inset 0 0 0 2px var(--cream);
+}
+.youtube-upload.is-busy .download-short { opacity: 0.72; }
 .youtube-title, .youtube-copy {
   font-family: "Liberation Sans", sans-serif;
   font-size: 0.85rem;
@@ -299,7 +329,7 @@ a.action.ghost {
 @media (max-width: 640px) {
   .youtube-confirmations dl div { grid-template-columns: 1fr; gap: 2px 0; }
 }
-a.action.download-short, a.action.download-all {
+a.action.download-short, button.action.download-short, a.action.download-all {
   font-size: 1.2rem;
   font-weight: 700;
   padding: 16px 22px;

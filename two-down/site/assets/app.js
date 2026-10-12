@@ -390,3 +390,273 @@ document.querySelectorAll("[data-mark-uploaded]").forEach((form) => {
   });
 });
 applyStagingMarks();
+
+const shortFiles = new Map();
+const shortLoads = new Map();
+const SAVE_BATCH = 6;
+const FOLDER_DB = "cryptic-fit-studio";
+const FOLDER_STORE = "handles";
+let studioFolder = null;
+
+function dragSrcOf(box) {
+  if (!box) return "";
+  const raw = box.getAttribute("data-drag-src") || "";
+  if (!raw) return "";
+  let url;
+  try {
+    url = new URL(raw, window.location.href);
+  } catch (err) {
+    return "";
+  }
+  if (url.origin === window.location.origin) return url.href;
+  const file = url.pathname.split("/").filter(Boolean).pop();
+  if (!file) return "";
+  return new URL("/media/" + file, window.location.origin).href;
+}
+
+function markDragReady(box) {
+  box.classList.remove("is-busy");
+  box.classList.add("is-ready");
+  const status = box.querySelector("[data-drag-status]");
+  if (status) status.textContent = "Ready. Download it, then drag the file onto YouTube Studio.";
+  refreshBatchStatus();
+}
+
+function saveDownload(file) {
+  const url = URL.createObjectURL(file);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = file.name;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+
+function openFolderDb() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(FOLDER_DB, 1);
+    request.onupgradeneeded = () => {
+      request.result.createObjectStore(FOLDER_STORE);
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+function idbGet(db, key) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(FOLDER_STORE, "readonly");
+    const req = tx.objectStore(FOLDER_STORE).get(key);
+    req.onsuccess = () => resolve(req.result || null);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function idbPut(db, key, value) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(FOLDER_STORE, "readwrite");
+    tx.objectStore(FOLDER_STORE).put(value, key);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+async function loadFolder() {
+  try {
+    const db = await openFolderDb();
+    const handle = await idbGet(db, "youtube");
+    db.close();
+    return handle;
+  } catch (err) {
+    return null;
+  }
+}
+
+async function rememberFolder(handle) {
+  const db = await openFolderDb();
+  await idbPut(db, "youtube", handle);
+  db.close();
+}
+
+async function ensureFolder() {
+  if (studioFolder) {
+    let perm = "prompt";
+    try {
+      perm = await studioFolder.queryPermission({ mode: "readwrite" });
+    } catch (err) {
+      perm = "prompt";
+    }
+    if (perm !== "granted") {
+      try {
+        perm = await studioFolder.requestPermission({ mode: "readwrite" });
+      } catch (err) {
+        perm = "denied";
+      }
+    }
+    if (perm === "granted") return studioFolder;
+    studioFolder = null;
+  }
+  if (!window.showDirectoryPicker) return null;
+  let handle;
+  try {
+    handle = await window.showDirectoryPicker({
+      mode: "readwrite",
+      id: "cryptic-fit-youtube",
+      startIn: "downloads",
+    });
+  } catch (err) {
+    if (err && err.name === "TypeError") {
+      handle = await window.showDirectoryPicker({ mode: "readwrite", id: "cryptic-fit-youtube" });
+    } else {
+      throw err;
+    }
+  }
+  studioFolder = handle;
+  try {
+    await rememberFolder(handle);
+  } catch (err) {
+    studioFolder = handle;
+  }
+  return handle;
+}
+
+async function writeToFolder(dir, file) {
+  const fh = await dir.getFileHandle(file.name, { create: true });
+  const stream = await fh.createWritable();
+  await stream.write(file);
+  await stream.close();
+}
+
+function prepareShort(box) {
+  const src = dragSrcOf(box);
+  const name = (box && box.getAttribute("data-drag-name")) || "cryptic-fit-short.mp4";
+  if (!src) return Promise.resolve(null);
+  if (shortFiles.has(src)) {
+    markDragReady(box);
+    return Promise.resolve(shortFiles.get(src));
+  }
+  if (shortLoads.has(src)) return shortLoads.get(src);
+  box.classList.add("is-busy");
+  const status = box.querySelector("[data-drag-status]");
+  if (status) status.textContent = "Preparing the film…";
+  const job = fetch(src).then((response) => {
+    if (!response.ok) throw new Error("missing film");
+    return response.blob();
+  }).then((blob) => {
+    const file = new File([blob], name, { type: blob.type || "video/mp4" });
+    shortFiles.set(src, file);
+    document.querySelectorAll("[data-drag-src]").forEach((other) => {
+      if (dragSrcOf(other) === src) markDragReady(other);
+    });
+    return file;
+  }).catch(() => {
+    box.classList.remove("is-busy");
+    shortLoads.delete(src);
+    if (status) status.textContent = "Could not fetch the film. Use Download Short.";
+    return null;
+  });
+  shortLoads.set(src, job);
+  return job;
+}
+
+function pendingRows() {
+  return Array.from(document.querySelectorAll("#needs-upload-list [data-staging-row]")).filter((row) => {
+    const pending = row.querySelector("[data-staging-pending]");
+    return pending && !pending.hidden && !row.dataset.youtubeId;
+  });
+}
+
+function readyBatchFiles() {
+  return pendingRows()
+    .slice(0, SAVE_BATCH)
+    .map((row) => shortFiles.get(dragSrcOf(row.querySelector("[data-drag-src]"))))
+    .filter(Boolean);
+}
+
+function refreshBatchStatus() {
+  const status = document.querySelector("[data-drag-batch-status]");
+  if (!status) return;
+  const waiting = pendingRows();
+  const ready = readyBatchFiles().length;
+  const cap = Math.min(SAVE_BATCH, waiting.length);
+  if (!cap) {
+    status.textContent = "Nothing left to save.";
+    return;
+  }
+  status.textContent = ready + " of " + cap + " ready. Save them, then drag the files onto YouTube Studio.";
+}
+
+document.querySelectorAll(".youtube-upload[data-drag-src]").forEach((box) => {
+  box.addEventListener("pointerenter", () => { prepareShort(box); }, { once: true });
+  const link = box.querySelector("a.download-short");
+  if (!link) return;
+  link.addEventListener("pointerdown", () => { prepareShort(box); });
+  link.addEventListener("click", (event) => {
+    const file = shortFiles.get(dragSrcOf(box));
+    const status = box.querySelector("[data-drag-status]");
+    if (!file) {
+      prepareShort(box);
+      if (status) status.textContent = "Downloading. Drag the file onto YouTube Studio.";
+      return;
+    }
+    event.preventDefault();
+    saveDownload(file);
+    if (status) status.textContent = "Saved. Drag the file onto YouTube Studio.";
+  });
+});
+
+document.querySelectorAll("article.clue .reveal").forEach((button) => {
+  button.addEventListener("click", () => {
+    const article = button.closest("article");
+    const box = article && article.querySelector(".youtube-upload[data-drag-src]");
+    if (box) prepareShort(box);
+  });
+});
+
+Array.from(document.querySelectorAll("#needs-upload-list .youtube-upload[data-drag-src]")).slice(0, SAVE_BATCH).forEach((box, index) => {
+  window.setTimeout(() => { prepareShort(box); }, index * 150);
+});
+
+const batchButton = document.querySelector("[data-save-batch]");
+if (batchButton) {
+  batchButton.addEventListener("click", async () => {
+    const status = document.querySelector("[data-drag-batch-status]");
+    const boxes = pendingRows().slice(0, SAVE_BATCH).map((row) => row.querySelector(".youtube-upload[data-drag-src]")).filter(Boolean);
+    let dir = null;
+    if (window.showDirectoryPicker) {
+      try {
+        dir = await ensureFolder();
+      } catch (err) {
+        if (err && err.name === "AbortError") {
+          if (status) status.textContent = "No folder chosen. Click again and pick one, or use Download Short on each film.";
+          return;
+        }
+        dir = null;
+      }
+    }
+    await Promise.all(boxes.map((box) => prepareShort(box)));
+    const files = readyBatchFiles();
+    if (!files.length) {
+      if (status) status.textContent = "Still preparing. Try again in a moment.";
+      return;
+    }
+    if (dir) {
+      let wrote = 0;
+      for (const file of files) {
+        try {
+          await writeToFolder(dir, file);
+          wrote += 1;
+        } catch (err) {
+          saveDownload(file);
+        }
+      }
+      if (status) status.textContent = "Saved " + wrote + " in the folder you chose. Drag them onto YouTube Studio.";
+      return;
+    }
+    files.forEach(saveDownload);
+    if (status) status.textContent = "Saved " + files.length + " to Downloads. Drag them onto YouTube Studio.";
+  });
+}
+loadFolder().then((handle) => { studioFolder = handle; });
+refreshBatchStatus();

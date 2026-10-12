@@ -46,8 +46,8 @@ from twodown.staging import (
     ensure_uploads_json,
     is_uploaded,
     load_uploads,
-    short_download_name,
     shorts_url,
+    studio_drag_filename,
     studio_confirmations_html,
     studio_description,
     videos_by_slug,
@@ -286,7 +286,7 @@ body.scene-photo h2 { text-shadow: 0 2px 18px rgba(0,0,0,0.55); }
 .suggest-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .suggest-form button:disabled { opacity: 0.5; cursor: not-allowed; }
 .suggest-status { font-family: "Liberation Sans", sans-serif; font-size: 0.9rem; color: var(--muted); margin: 0; }
-a.action {
+a.action, button.action {
   display: inline-block;
   font-family: "Liberation Sans", sans-serif;
   background: var(--crimson);
@@ -295,6 +295,7 @@ a.action {
   padding: 10px 16px;
   text-decoration: none;
   font-size: 0.95rem;
+  cursor: pointer;
 }
 a.action.ghost {
   background: transparent;
@@ -308,6 +309,35 @@ a.action.ghost {
   align-items: center;
   margin: 14px 0 8px;
 }
+.youtube-upload > .youtube-help,
+.youtube-upload > .drag-status,
+.studio-batch > .youtube-help,
+.studio-batch > .drag-status {
+  flex-basis: 100%;
+}
+.drag-status {
+  font-family: "Liberation Sans", sans-serif;
+  font-size: 0.9rem;
+  color: var(--muted);
+  margin: 0;
+}
+body.scene-photo main > .youtube-help,
+body.scene-photo .studio-batch .youtube-help,
+body.scene-photo .studio-batch .drag-status {
+  color: #eadfd0;
+  text-shadow: 0 2px 18px rgba(0, 0, 0, 0.55);
+}
+.studio-batch {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin: 0 0 28px;
+}
+.youtube-upload.is-ready .download-short {
+  box-shadow: inset 0 0 0 2px var(--cream);
+}
+.youtube-upload.is-busy .download-short { opacity: 0.72; }
 .youtube-title, .youtube-copy {
   font-family: "Liberation Sans", sans-serif;
   font-size: 0.85rem;
@@ -362,7 +392,7 @@ a.action.ghost {
 @media (max-width: 640px) {
   .youtube-confirmations dl div { grid-template-columns: 1fr; gap: 2px 0; }
 }
-a.action.download-short, a.action.download-all {
+a.action.download-short, button.action.download-short, a.action.download-all {
   font-size: 1.2rem;
   font-weight: 700;
   padding: 16px 22px;
@@ -824,6 +854,276 @@ document.querySelectorAll("[data-mark-uploaded]").forEach((form) => {
   });
 });
 applyStagingMarks();
+
+const shortFiles = new Map();
+const shortLoads = new Map();
+const SAVE_BATCH = 6;
+const FOLDER_DB = "cryptic-fit-studio";
+const FOLDER_STORE = "handles";
+let studioFolder = null;
+
+function dragSrcOf(box) {
+  if (!box) return "";
+  const raw = box.getAttribute("data-drag-src") || "";
+  if (!raw) return "";
+  let url;
+  try {
+    url = new URL(raw, window.location.href);
+  } catch (err) {
+    return "";
+  }
+  if (url.origin === window.location.origin) return url.href;
+  const file = url.pathname.split("/").filter(Boolean).pop();
+  if (!file) return "";
+  return new URL("/media/" + file, window.location.origin).href;
+}
+
+function markDragReady(box) {
+  box.classList.remove("is-busy");
+  box.classList.add("is-ready");
+  const status = box.querySelector("[data-drag-status]");
+  if (status) status.textContent = "Ready. Download it, then drag the file onto YouTube Studio.";
+  refreshBatchStatus();
+}
+
+function saveDownload(file) {
+  const url = URL.createObjectURL(file);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = file.name;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+
+function openFolderDb() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(FOLDER_DB, 1);
+    request.onupgradeneeded = () => {
+      request.result.createObjectStore(FOLDER_STORE);
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+function idbGet(db, key) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(FOLDER_STORE, "readonly");
+    const req = tx.objectStore(FOLDER_STORE).get(key);
+    req.onsuccess = () => resolve(req.result || null);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function idbPut(db, key, value) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(FOLDER_STORE, "readwrite");
+    tx.objectStore(FOLDER_STORE).put(value, key);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+async function loadFolder() {
+  try {
+    const db = await openFolderDb();
+    const handle = await idbGet(db, "youtube");
+    db.close();
+    return handle;
+  } catch (err) {
+    return null;
+  }
+}
+
+async function rememberFolder(handle) {
+  const db = await openFolderDb();
+  await idbPut(db, "youtube", handle);
+  db.close();
+}
+
+async function ensureFolder() {
+  if (studioFolder) {
+    let perm = "prompt";
+    try {
+      perm = await studioFolder.queryPermission({ mode: "readwrite" });
+    } catch (err) {
+      perm = "prompt";
+    }
+    if (perm !== "granted") {
+      try {
+        perm = await studioFolder.requestPermission({ mode: "readwrite" });
+      } catch (err) {
+        perm = "denied";
+      }
+    }
+    if (perm === "granted") return studioFolder;
+    studioFolder = null;
+  }
+  if (!window.showDirectoryPicker) return null;
+  let handle;
+  try {
+    handle = await window.showDirectoryPicker({
+      mode: "readwrite",
+      id: "cryptic-fit-youtube",
+      startIn: "downloads",
+    });
+  } catch (err) {
+    if (err && err.name === "TypeError") {
+      handle = await window.showDirectoryPicker({ mode: "readwrite", id: "cryptic-fit-youtube" });
+    } else {
+      throw err;
+    }
+  }
+  studioFolder = handle;
+  try {
+    await rememberFolder(handle);
+  } catch (err) {
+    studioFolder = handle;
+  }
+  return handle;
+}
+
+async function writeToFolder(dir, file) {
+  const fh = await dir.getFileHandle(file.name, { create: true });
+  const stream = await fh.createWritable();
+  await stream.write(file);
+  await stream.close();
+}
+
+function prepareShort(box) {
+  const src = dragSrcOf(box);
+  const name = (box && box.getAttribute("data-drag-name")) || "cryptic-fit-short.mp4";
+  if (!src) return Promise.resolve(null);
+  if (shortFiles.has(src)) {
+    markDragReady(box);
+    return Promise.resolve(shortFiles.get(src));
+  }
+  if (shortLoads.has(src)) return shortLoads.get(src);
+  box.classList.add("is-busy");
+  const status = box.querySelector("[data-drag-status]");
+  if (status) status.textContent = "Preparing the film…";
+  const job = fetch(src).then((response) => {
+    if (!response.ok) throw new Error("missing film");
+    return response.blob();
+  }).then((blob) => {
+    const file = new File([blob], name, { type: blob.type || "video/mp4" });
+    shortFiles.set(src, file);
+    document.querySelectorAll("[data-drag-src]").forEach((other) => {
+      if (dragSrcOf(other) === src) markDragReady(other);
+    });
+    return file;
+  }).catch(() => {
+    box.classList.remove("is-busy");
+    shortLoads.delete(src);
+    if (status) status.textContent = "Could not fetch the film. Use Download Short.";
+    return null;
+  });
+  shortLoads.set(src, job);
+  return job;
+}
+
+function pendingRows() {
+  return Array.from(document.querySelectorAll("#needs-upload-list [data-staging-row]")).filter((row) => {
+    const pending = row.querySelector("[data-staging-pending]");
+    return pending && !pending.hidden && !row.dataset.youtubeId;
+  });
+}
+
+function readyBatchFiles() {
+  return pendingRows()
+    .slice(0, SAVE_BATCH)
+    .map((row) => shortFiles.get(dragSrcOf(row.querySelector("[data-drag-src]"))))
+    .filter(Boolean);
+}
+
+function refreshBatchStatus() {
+  const status = document.querySelector("[data-drag-batch-status]");
+  if (!status) return;
+  const waiting = pendingRows();
+  const ready = readyBatchFiles().length;
+  const cap = Math.min(SAVE_BATCH, waiting.length);
+  if (!cap) {
+    status.textContent = "Nothing left to save.";
+    return;
+  }
+  status.textContent = ready + " of " + cap + " ready. Save them, then drag the files onto YouTube Studio.";
+}
+
+document.querySelectorAll(".youtube-upload[data-drag-src]").forEach((box) => {
+  box.addEventListener("pointerenter", () => { prepareShort(box); }, { once: true });
+  const link = box.querySelector("a.download-short");
+  if (!link) return;
+  link.addEventListener("pointerdown", () => { prepareShort(box); });
+  link.addEventListener("click", (event) => {
+    const file = shortFiles.get(dragSrcOf(box));
+    const status = box.querySelector("[data-drag-status]");
+    if (!file) {
+      prepareShort(box);
+      if (status) status.textContent = "Downloading. Drag the file onto YouTube Studio.";
+      return;
+    }
+    event.preventDefault();
+    saveDownload(file);
+    if (status) status.textContent = "Saved. Drag the file onto YouTube Studio.";
+  });
+});
+
+document.querySelectorAll("article.clue .reveal").forEach((button) => {
+  button.addEventListener("click", () => {
+    const article = button.closest("article");
+    const box = article && article.querySelector(".youtube-upload[data-drag-src]");
+    if (box) prepareShort(box);
+  });
+});
+
+Array.from(document.querySelectorAll("#needs-upload-list .youtube-upload[data-drag-src]")).slice(0, SAVE_BATCH).forEach((box, index) => {
+  window.setTimeout(() => { prepareShort(box); }, index * 150);
+});
+
+const batchButton = document.querySelector("[data-save-batch]");
+if (batchButton) {
+  batchButton.addEventListener("click", async () => {
+    const status = document.querySelector("[data-drag-batch-status]");
+    const boxes = pendingRows().slice(0, SAVE_BATCH).map((row) => row.querySelector(".youtube-upload[data-drag-src]")).filter(Boolean);
+    let dir = null;
+    if (window.showDirectoryPicker) {
+      try {
+        dir = await ensureFolder();
+      } catch (err) {
+        if (err && err.name === "AbortError") {
+          if (status) status.textContent = "No folder chosen. Click again and pick one, or use Download Short on each film.";
+          return;
+        }
+        dir = null;
+      }
+    }
+    await Promise.all(boxes.map((box) => prepareShort(box)));
+    const files = readyBatchFiles();
+    if (!files.length) {
+      if (status) status.textContent = "Still preparing. Try again in a moment.";
+      return;
+    }
+    if (dir) {
+      let wrote = 0;
+      for (const file of files) {
+        try {
+          await writeToFolder(dir, file);
+          wrote += 1;
+        } catch (err) {
+          saveDownload(file);
+        }
+      }
+      if (status) status.textContent = "Saved " + wrote + " in the folder you chose. Drag them onto YouTube Studio.";
+      return;
+    }
+    files.forEach(saveDownload);
+    if (status) status.textContent = "Saved " + files.length + " to Downloads. Drag them onto YouTube Studio.";
+  });
+}
+loadFolder().then((handle) => { studioFolder = handle; });
+refreshBatchStatus();
 """
 
 
@@ -1064,7 +1364,7 @@ def _root_prefix(media_prefix: str) -> str:
 
 _YOUTUBE_CHUNK = re.compile(
     r"""
-    \s*<div\s+class="youtube-upload"[^>]*>.*?</div>
+    \s*<div\s+class="youtube-upload\b[^"]*"[^>]*>.*?</div>
     (?:\s*<p\s+class="youtube-title">.*?</p>)?
     (?:\s*<details\s+class="youtube-copy">.*?</details>)?
     (?:\s*<p\s+class="youtube-(?:copy|help|poster|desc|note)">.*?</p>)*
@@ -1081,15 +1381,16 @@ def _youtube_upload_block(
     kit_href: str | None = None,
     file_href: str | None = None,
 ) -> str:
-    """Download the Short as a local file, then drop it on Studio."""
+    """Save the Short under its YouTube title, then drag that file onto Studio."""
     href = file_href or f"media/{slug}.mp4"
-    filename = short_download_name(slug)
+    drag_name = studio_drag_filename(title)
     desc = studio_description() if description is None else description
     kit = f'<a href="{_e(kit_href)}">Upload kit</a>' if kit_href else ""
     return f"""
-      <div class="youtube-upload" data-youtube-upload="{_e(slug)}">
+      <div class="youtube-upload" data-youtube-upload="{_e(slug)}" data-drag-src="{_e(href)}" data-drag-name="{_e(drag_name)}">
         <p class="youtube-help">{_e(STUDIO_DROP_HELP)}</p>
-        <a class="action download-short" href="{_e(href)}" download="{_e(filename)}">Download Short</a>
+        <p class="drag-status" data-drag-status>Preparing this film…</p>
+        <a class="action download-short" href="{_e(href)}" download="{_e(drag_name)}" draggable="false">Download Short</a>
         <a class="action ghost" href="{_e(YOUTUBE_STUDIO)}" target="_blank" rel="noopener">Open YouTube Studio</a>
         {kit}
       </div>
@@ -1101,6 +1402,38 @@ def _youtube_upload_block(
       </p>
       <p class="youtube-poster">{_e(YOUTUBE_POSTER_NOTE)}</p>
     """
+
+
+def _studio_title(body: str, clue_line: str) -> str:
+    """YouTube title for a saved mp4, including the theme when the kicker has one."""
+    kicker_m = re.search(r'<p class="kicker">([^<]*)</p>', body)
+    if kicker_m:
+        from twodown.models import Clue
+        from twodown.pipeline import _CLUE_LINE, _KICKER
+
+        kick = _KICKER.match(html.unescape(kicker_m.group(1)).strip())
+        parsed = _CLUE_LINE.match(clue_line.strip())
+        if kick and parsed:
+            try:
+                return video_title(
+                    Clue(
+                        source_url="https://cryptic.fit/",
+                        paper=kick["paper"].strip(),
+                        puzzle_id=kick["puzzle_id"],
+                        setter=kick["setter"].strip(),
+                        blogger="",
+                        number=kick["number"],
+                        direction=kick["direction"],
+                        clue=parsed["clue"].strip(),
+                        enumeration=parsed["enum"].strip(),
+                        answer="",
+                        parse="",
+                        theme=(kick.group("theme") or "").strip() or None,
+                    )
+                )
+            except (TypeError, ValueError):
+                pass
+    return video_title_from_line(clue_line)
 
 
 def attach_youtube_upload(html_text: str, kit_prefix: str = "") -> str:
@@ -1129,7 +1462,7 @@ def attach_youtube_upload(html_text: str, kit_prefix: str = "") -> str:
         clue_line = html.unescape(clue_m.group(1)).strip() if clue_m else page_h1 or slug
         block = _youtube_upload_block(
             slug,
-            video_title_from_line(clue_line),
+            _studio_title(body, clue_line),
             kit_href=f"{kit_prefix}upload.html#{slug}",
             file_href=f"{kit_prefix}media/{slug}.mp4",
         )
@@ -1586,7 +1919,7 @@ def _playable_daily(root: Path) -> str:
         if slug:
             upload = _youtube_upload_block(
                 slug,
-                video_title_from_line(film.clue),
+                _studio_title(f'<p class="kicker">{_e(film.kicker)}</p>', film.clue),
                 kit_href=f"upload.html#{slug}",
                 file_href=f"media/{slug}.mp4",
             )
@@ -1690,7 +2023,7 @@ def _staging_row(root: Path, film: SolvedFilm, record: dict | None) -> str:
     if film.slug:
         opener = f'<p class="credit"><a href="c/{_e(film.slug)}/#play">Open this clue</a></p>'
     mp4 = short_mp4_url(slug)
-    filename = short_download_name(slug)
+    drag_name = studio_drag_filename(title)
     posted_href = shorts_url(video_id) if video_id else YOUTUBE_CHANNEL_URL
     pending_hidden = " hidden" if video_id else ""
     posted_hidden = "" if video_id else " hidden"
@@ -1700,9 +2033,10 @@ def _staging_row(root: Path, film: SolvedFilm, record: dict | None) -> str:
       <h2>{_e(film.clue)}</h2>
       {poster}
       <div data-staging-pending{pending_hidden}>
-        <p class="youtube-help">{_e(STUDIO_DROP_HELP)} Unzip if you used the zip.</p>
-        <div class="youtube-upload" data-youtube-upload="{_e(slug)}">
-          <a class="action download-short" href="{_e(mp4)}" download="{_e(filename)}">Download Short</a>
+        <div class="youtube-upload" data-youtube-upload="{_e(slug)}" data-drag-src="{_e(mp4)}" data-drag-name="{_e(drag_name)}">
+          <p class="youtube-help">{_e(STUDIO_DROP_HELP)}</p>
+          <p class="drag-status" data-drag-status>Preparing this film…</p>
+          <a class="action download-short" href="{_e(mp4)}" download="{_e(drag_name)}" draggable="false">Download Short</a>
           <a class="action ghost" href="{_e(YOUTUBE_STUDIO)}" target="_blank" rel="noopener">Open YouTube Studio</a>
         </div>
         <p class="youtube-title">YouTube title for <a href="{_e(YOUTUBE_CHANNEL_URL)}" target="_blank" rel="noopener">{_e(CHANNEL_HANDLE)}</a><code>{_e(title)}</code>
@@ -1751,11 +2085,21 @@ def _upload_body(root: Path) -> str:
     pending_html = "".join(pending) or "<p>Nothing waiting. Every daily Short is on YouTube.</p>"
     posted_html = "".join(posted)
     empty_posted = "" if posted_html else '<p data-on-youtube-empty>None of the daily Shorts are on the committed list yet.</p>'
+    batch = ""
+    if pending:
+        batch = """
+    <div class="studio-batch" data-save-batch-row>
+      <p class="youtube-help">Pick a folder once. The files use the YouTube titles. Drag them onto Studio.</p>
+      <button type="button" class="action download-short" data-save-batch>Save the first 6 for YouTube</button>
+      <p class="drag-status" data-drag-batch-status>Preparing the newest Shorts…</p>
+    </div>
+"""
     return f"""
-    {_croc_hello("", title="Upload these Shorts to YouTube.", lede="Two lists for " + CHANNEL_HANDLE + ". The daily job posts today's Short when the YouTube token is set. This page is the record. You still cannot drag from this page.")}
+    {_croc_hello("", title="Upload these Shorts to YouTube.", lede="Download the films, then drag those files onto YouTube Studio. The file name is the title. Open Studio in another window. The daily job posts today's Short when the YouTube token is set.")}
     <p class="lede" data-yt-uploads-key="{_e(LOCAL_STORAGE_KEY)}">The channel intro Short is already live at <a href="{_e(shorts_url(INTRO_YOUTUBE_ID))}" target="_blank" rel="noopener">YouTube</a>. It is not a daily /c/ film. Daily films stay under Needs upload until a YouTube id is committed or you mark one in this browser.</p>
     {studio_confirmations_html()}
     {_needs_upload_zip_bar(root)}
+    {batch}
     <section class="staging-list" id="needs-upload">
       <h2>Needs upload</h2>
       <p>Not yet on {CHANNEL_HANDLE}.</p>

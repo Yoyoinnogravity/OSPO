@@ -1,6 +1,6 @@
 from twodown.captions import youtube_description
 from twodown.models import Clue, DailyPair, SpokenClue
-from twodown.staging import STUDIO_DROP_HELP, short_download_name, studio_description
+from twodown.staging import STUDIO_DROP_HELP, short_download_name, studio_description, studio_drag_filename
 from twodown.config import SITE_ROOT
 from twodown.site import (
     _ensure_download_shorts_chrome,
@@ -164,11 +164,12 @@ def test_publish_site_writes_spoiler_pages(tmp_path):
     films_page = (tmp_path / "films.html").read_text(encoding="utf-8")
     assert "Download Short" in films_page
     assert 'href="media/independent-12458-12a.mp4"' in films_page
-    assert 'download="Cryptic-Croc-cryptic.fit-independent-12458-12a.mp4"' in films_page
+    titled = studio_drag_filename(video_title_from_line("Rioting led unrest in the final analysis (3,6)"))
+    assert f'download="{titled}"' in films_page
     assert STUDIO_DROP_HELP in films_page
     assert "Download Short" in index
     assert 'href="media/independent-12458-12a.mp4"' in index
-    assert 'download="Cryptic-Croc-cryptic.fit-independent-12458-12a.mp4"' in index
+    assert f'download="{titled}"' in index
     assert STUDIO_DROP_HELP in index
     assert "https://www.youtube.com/upload" in index
     assert "@crypticfun" not in index
@@ -181,7 +182,11 @@ def test_publish_site_writes_spoiler_pages(tmp_path):
     assert "Download Short" in upload_page
     assert "Open YouTube Studio" in upload_page
     assert STUDIO_DROP_HELP in upload_page
-    assert "cannot drag from this page" in upload_page
+    assert "Save the first 6 for YouTube" in upload_page
+    assert "data-save-batch" in upload_page
+    assert "Drag into YouTube" not in upload_page
+    assert 'draggable="true"' not in upload_page
+    assert "cannot drag from this page" not in upload_page
     assert "Copy title" in upload_page
     assert "Solve it, I know you can." in upload_page
     assert "Answer: END RESULT" not in upload_page
@@ -201,7 +206,7 @@ def test_publish_site_writes_spoiler_pages(tmp_path):
     assert "adsbygoogle" not in clue_page
     assert "Download Short" in clue_page
     assert 'href="../../media/independent-12458-12a.mp4"' in clue_page
-    assert 'download="Cryptic-Croc-cryptic.fit-independent-12458-12a.mp4"' in clue_page
+    assert f'download="{titled}"' in clue_page
     assert "https://www.youtube.com/upload" in clue_page
     assert STUDIO_DROP_HELP in clue_page
     assert "Copy title" in clue_page
@@ -213,6 +218,9 @@ def test_publish_site_writes_spoiler_pages(tmp_path):
     assert "article.clue.is-solved .answer" in css
     app = (tmp_path / "assets" / "app.js").read_text(encoding="utf-8")
     assert "is-solved" in app
+    assert "createObjectURL" in app
+    assert "showDirectoryPicker" in app
+    assert "dataTransfer.items.add" not in app
     assert "playFromHash" in app
     assert "wantsPlay" in app
     assert "sidecarTried" in app
@@ -314,8 +322,9 @@ def test_solved_shelf_hides_the_answer(tmp_path):
     assert 'href="c/independent-12462-6a/#play"' in played
     assert 'id="independent-12462-6a"' in played
     assert 'data-slug="independent-12462-6a"' in played
+    shelf_name = studio_drag_filename(video_title_from_line("Model youngster eating in (3-2)"))
     assert 'href="media/independent-12462-6a.mp4"' in played
-    assert 'download="Cryptic-Croc-cryptic.fit-independent-12462-6a.mp4"' in played
+    assert f'download="{shelf_name}"' in played
     assert "Download Short" in played
     assert "Open YouTube Studio" in played
     assert STUDIO_DROP_HELP in played
@@ -330,7 +339,10 @@ def test_solved_shelf_hides_the_answer(tmp_path):
     assert "Download Short" in kit
     assert "Open YouTube Studio" in kit
     assert STUDIO_DROP_HELP in kit
-    assert "cannot drag from this page" in kit
+    assert "Save the first 6 for YouTube" in kit
+    assert "data-drag-src" in kit
+    assert "Drag into YouTube" not in kit
+    assert "cannot drag from this page" not in kit
     assert ".youtube-upload" in (tmp_path / "assets" / "style.css").read_text(encoding="utf-8")
     day_html = (day / "index.html").read_text(encoding="utf-8")
     assert "Download Short" in day_html
@@ -374,7 +386,7 @@ def test_publish_site_opens_a_clue_page_at_the_player(tmp_path):
     assert "is-open" not in clue_page
     assert "Download Short" in clue_page
     assert 'href="../../media/independent-12458-12a.mp4"' in clue_page
-    assert 'download="Cryptic-Croc-cryptic.fit-independent-12458-12a.mp4"' in clue_page
+    assert f'download="{studio_drag_filename(video_title_from_line("Rioting led unrest in the final analysis (3,6)"))}"' in clue_page
     assert STUDIO_DROP_HELP in clue_page
     index = (root / "index.html").read_text(encoding="utf-8")
     pair_html = index.split("Today’s clue.", 1)[1].split("Keep the clue coming", 1)[0]
@@ -576,7 +588,18 @@ def test_attach_youtube_upload_is_idempotent_and_lands_on_the_mp4():
     once = attach_youtube_upload(page, kit_prefix="../../")
     assert once.count("data-youtube-upload") == 1
     assert 'href="../../media/guardian-30124-9a.mp4"' in once
-    assert 'download="Cryptic-Croc-cryptic.fit-guardian-30124-9a.mp4"' in once
+    assert f'download="{studio_drag_filename(video_title_from_line("Bring out client I fancy with no end of distinction (6)"))}"' in once
+    themed = """
+    <article class="clue" data-slug="independent-12484-9a">
+      <p class="kicker">Clue of the day · Independent 12484 · Math · 9 across · container</p>
+      <p class="clue-text">Special police officers drinking last of booze in short glasses (5)</p>
+      <video class="short" src="media/independent-12484-9a.mp4"></video>
+    </article>
+    """
+    themed_html = attach_youtube_upload(themed)
+    assert "Clue of the day" in themed_html
+    assert "(5) #Shorts" in themed_html
+    assert "glasse…" not in themed_html
     assert STUDIO_DROP_HELP in once
     assert "Copy title" in once
     assert "https://www.youtube.com/upload" in once
