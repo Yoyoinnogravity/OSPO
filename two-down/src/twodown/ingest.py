@@ -22,9 +22,21 @@ TITLE_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     ),
     (re.compile(r"Independent\s+([\d,]+)\s*(?:/|by)\s*(.+)$", re.I), "Independent"),
     (re.compile(r"Financial Times\s+([\d,]+)\s+by\s+(.+)$", re.I), "Financial Times"),
-    (re.compile(r"Guardian Prize\s*([\d,]+)\s*(?:/|:|by)?\s*(.+)$", re.I), "Guardian"),
-    (re.compile(r"Guardian(?: Cryptic(?: crossword)?)?(?: No\.?)?\s*([\d,]+)\s*(?:/|:|by)\s*(.+)$", re.I), "Guardian"),
-    (re.compile(r"Guardian(?: Cryptic(?: crossword)?)?(?: No\.?)?\s*([\d,]+)\s+(.+)$", re.I), "Guardian"),
+    (
+        re.compile(
+            r"Guardian(?:\s+(?!Prize\b)\w+){0,3}\s+Prize(?:\s+Crossword)?\s*([\d,]+)\s*(?:/|:|by)\s*(.+)$",
+            re.I,
+        ),
+        "Guardian",
+    ),
+    (
+        re.compile(
+            r"Guardian(?: Cryptic(?: crossword)?)?\.?\s*(?:No\.?)?\s*([\d,]+)\s*(?:/|:|by)\s*(.+)$",
+            re.I,
+        ),
+        "Guardian",
+    ),
+    (re.compile(r"Guardian(?: Cryptic(?: crossword)?)?\.?\s*(?:No\.?)?\s*([\d,]+)\s+(.+)$", re.I), "Guardian"),
 ]
 
 DAILY_PATH = re.compile(
@@ -62,7 +74,8 @@ def parse_title(title: str) -> tuple[str, str, str]:
         if match:
             puzzle_id = match.group(1).replace(",", "")
             setter = match.group(2).strip(" /")
-            setter = re.sub(r"\s+", " ", setter)
+            setter = re.sub(r"\s*\(\d{1,2}\s+\w+\s+\d{4}\)\s*$", "", setter)
+            setter = re.sub(r"\s+", " ", setter).strip()
             return paper, puzzle_id, setter
     return "Unknown", "", raw
 
