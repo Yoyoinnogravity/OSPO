@@ -264,6 +264,12 @@ def test_parse_title_variants():
     assert parse_title("Guardian Cryptic crossword No 30,108 by Paul") == ("Guardian", "30108", "Paul")
     assert parse_title("Guardian Cryptic 30127 Budmo") == ("Guardian", "30127", "Budmo")
     assert parse_title("Guardian Prize 30,122 / Fed") == ("Guardian", "30122", "Fed")
+    assert parse_title("Guardian Saturday Prize Crossword 30,128 by Paul (3 October 2026)") == (
+        "Guardian",
+        "30128",
+        "Paul",
+    )
+    assert parse_title("Guardian Cryptic crossword. No 30,135 by Anto") == ("Guardian", "30135", "Anto")
     assert parse_title("Independent on Sunday 1,907 by Filbert") == (
         "Independent on Sunday",
         "1907",

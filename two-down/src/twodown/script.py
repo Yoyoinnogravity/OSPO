@@ -149,7 +149,13 @@ def speak_parse_asides(text: str) -> str:
             return ""
         return f". {inner}."
 
-    opened = _ASIDE.sub(_aside, text)
+    opened = text
+    for _ in range(6):
+        nxt = re.sub(r"\s*\(([^()]*)\)", _aside, opened)
+        if nxt == opened:
+            break
+        opened = nxt
+    opened = _ASIDE.sub(_aside, opened)
     opened = re.sub(r"\.\s*\.", ".", opened)
     opened = re.sub(r"\.\s*,", ".", opened)
     opened = re.sub(r"\s+", " ", opened).strip()
@@ -191,8 +197,19 @@ def _spoken_parse(parse: str, answer: str = "") -> str:
             return head + (tail.upper() if head.isupper() else tail.lower())
         return head + tail.lower()
 
+    def _glue_head(match: re.Match[str]) -> str:
+        body, tail = match.group(1), match.group(2)
+        if len(body) == 1:
+            return body + tail
+        return body.lower() + tail.lower()
+
     text = re.sub(r"([A-Za-z])\[([a-z]+|[A-Z])\]", _glue_tail, text)
+    text = re.sub(r"([A-Za-z])\{([a-z]+|[A-Z])\}", _glue_tail, text)
+    text = re.sub(r"\[([a-z]+|[A-Z])\]([A-Za-z])", _glue_head, text)
+    text = re.sub(r"\{([a-z]+|[A-Z])\}([A-Za-z])", _glue_head, text)
     text = re.sub(r"\[([^]]+)\]", r" \1 ", text)
+    text = re.sub(r"\{([^}]+)\}", r" \1 ", text)
+    text = re.sub(r"\(=\s*", "(", text)
     text = text.replace("+", " plus ")
     text = re.sub(r"\s+", " ", text)
     if answer:

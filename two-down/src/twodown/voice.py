@@ -54,6 +54,21 @@ from twodown.script import ScriptParts
 _SSML_MARKUP = re.compile(r"<\s*speak\b|2001/10/synthesis", re.I)
 
 
+def _use_current_edge_speech_host() -> None:
+    """Speak through the host Edge uses now.
+
+    speech.platform.bing.com answers 403. The same legacy token still
+    opens api.msedgeservices.com. Claiming the v2 token format does not.
+    """
+    import edge_tts.communicate as communicate
+    from edge_tts.constants import TRUSTED_CLIENT_TOKEN
+
+    communicate.WSS_URL = (
+        "wss://api.msedgeservices.com/tts/cognitiveservices/websocket/v1"
+        f"?Ocp-Apim-Subscription-Key={TRUSTED_CLIENT_TOKEN}"
+    )
+
+
 def resolve_voice(name: str | None) -> str:
     if not name:
         return VOICES[DEFAULT_VOICE_ALIAS]
@@ -80,6 +95,7 @@ async def _synth(
     # the voice reads "speak version" plus the xmlns out loud.
     if _SSML_MARKUP.search(script or ""):
         raise ValueError("plain speech only; SSML is read aloud as markup")
+    _use_current_edge_speech_host()
     communicate = edge_tts.Communicate(
         script, voice=voice, rate=rate, pitch=pitch, volume=volume
     )

@@ -17,6 +17,7 @@ from twodown.staging import (
     slug_from_title,
     studio_confirmations_html,
     studio_description,
+    studio_drag_filename,
     uploaded_slugs,
     write_needs_upload_zips,
 )
@@ -98,7 +99,7 @@ def test_publish_films_writes_two_staging_sections(tmp_path):
     assert "independent-12462-6a" in posted
     assert "financial-times-18494-5a" not in posted.split("</section>", 1)[0]
     assert "Download Short" in needs
-    assert 'download="Cryptic-Croc-cryptic.fit-financial-times-18494-5a.mp4"' in needs
+    assert f'download="{studio_drag_filename(video_title_from_line("Colin is buildinga semiconductor (7)"))}"' in needs
     assert "Open YouTube Studio" in needs
     assert "https://www.youtube.com/shorts/7q-WFyj0WnA" in posted
     assert "#Shorts" in needs
@@ -404,3 +405,12 @@ def test_apply_feed_matches_persists_only_safe_hits(tmp_path):
     )
     assert applied["independent-12462-6a"]["youtube_id"] == "7q-WFyj0WnA"
     assert uploaded_slugs(tmp_path) == ["independent-12462-6a"]
+
+
+def test_studio_drag_filename_is_a_safe_youtube_title():
+    name = studio_drag_filename("Cryptic Croc · cryptic.fit · Clue: with a colon (5) #Shorts")
+    assert name.endswith(".mp4")
+    assert ":" not in name
+    assert "Cryptic Croc" in name
+    assert "#" in name
+    assert studio_drag_filename("") == "cryptic-fit-short.mp4"

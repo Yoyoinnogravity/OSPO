@@ -19,6 +19,7 @@ from twodown.pipeline import (
     mass_media_clue,
 )
 from twodown.script import (
+    _spoken_parse,
     speak_answer,
     speak_enumeration,
     speak_intro,
@@ -409,6 +410,30 @@ def test_pin_up_stays_on_the_published_site():
     assert speak_parse_tokens("Three hyphen two.") == "Three hyphen two."
     assert speak_parse_tokens("Slang for an attractive person.") == "Slang for an attractive person."
     assert speak_parse_tokens("12 across, 3-2") == "12 across, 3-2"
+
+
+def test_speech_uses_the_edge_services_host():
+    import edge_tts.communicate as communicate
+
+    from twodown.voice import _use_current_edge_speech_host
+
+    _use_current_edge_speech_host()
+    assert communicate.WSS_URL.startswith(
+        "wss://api.msedgeservices.com/tts/cognitiveservices/websocket/v1?"
+    )
+    assert "Ocp-Apim-Subscription-Key=" in communicate.WSS_URL
+    assert "speech.platform.bing.com" not in communicate.WSS_URL
+
+
+def test_spoken_parse_glues_a_curly_unused_tail():
+    spoken = speak_parse_asides(_spoken_parse("S{pecial} + (PCs(=police constables) around [booz]e)", "SPECS"))
+    assert "{" not in spoken
+    assert "[" not in spoken
+    assert "(" not in spoken
+    assert "=" not in spoken
+    assert "special" in spoken.lower()
+    assert "booze" in spoken.lower()
+    assert "police constables" in spoken.lower()
 
 
 def test_speech_uses_the_clue_and_the_solution_not_a_web_address():

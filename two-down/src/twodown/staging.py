@@ -21,8 +21,7 @@ NEEDS_UPLOAD_ZIP_PREFIX = "crypticfit-needs-upload"
 MAX_NEEDS_UPLOAD_ZIP_BYTES = 80 * 1024 * 1024
 ZIP_ENTRY_OVERHEAD = 128
 NEEDS_UPLOAD_ZIP_HELP = (
-    "Unzip each file, then drag the mp4s from your Downloads folder onto YouTube Studio. "
-    "Do not drop the zip. You cannot drag from this page."
+    "The zip is a backup: unzip it, then drag the mp4s. Do not drop the zip."
 )
 YOUTUBE_STUDIO_UPLOAD = "https://www.youtube.com/upload"
 CHANNEL_HANDLE = "@crypticfit"
@@ -32,8 +31,8 @@ INTRO_YOUTUBE_ID = "8D8XTzkgNLE"
 INTRO_NOTE = "Channel intro Short. Not a published daily /c/ film."
 LOCAL_STORAGE_KEY = "cryptic-fit-youtube-uploads"
 STUDIO_DROP_HELP = (
-    "Download the file, then drag it from your Downloads folder onto YouTube Studio. "
-    "You cannot drag from this page."
+    "Download the Short, then drag that file onto YouTube Studio. "
+    "The file name is the title."
 )
 YOUTUBE_POSTER_NOTE = "The poster is the unsolved clue. Do not upload a frame that shows the answer."
 YOUTUBE_CONFIRMATIONS_ID = "youtube-confirmations"
@@ -85,6 +84,19 @@ def studio_confirmations_html() -> str:
 def short_download_name(slug: str) -> str:
     """Filename YouTube uses as the title when the file is dropped without a paste."""
     return f"Cryptic-Croc-cryptic.fit-{slug}.mp4"
+
+
+def studio_drag_filename(title: str) -> str:
+    """Download name YouTube Studio reads as the video title.
+
+    A colon is unsafe in a file name. Question marks stay so the title can
+    keep them when the computer allows that character.
+    """
+    cleaned = re.sub(r"[\\/:\r\n]+", " ", title or "")
+    cleaned = re.sub(r"\s+", " ", cleaned).strip(" .")
+    if not cleaned:
+        cleaned = "cryptic-fit-short"
+    return f"{cleaned}.mp4"
 
 
 def shorts_url(youtube_id: str) -> str:
