@@ -1,0 +1,14 @@
+# Candooka — https://candooka.world
+User-agent: *
+Allow: /
+Allow: /about.html
+Allow: /insights/
+Allow: /work/
+Allow: /content/
+Disallow: /api/
+Disallow: /vendor/
+Disallow: /data/
+Disallow: /insights/_template.html
+Disallow: /work/_template.html
+
+Sitemap: https://candooka.world/sitemap.xml

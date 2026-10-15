@@ -1,0 +1,111 @@
+/* Candooka public pages — about, insights, work */
+:root {
+  --bg: #071018;
+  --bg-card: #0d1a24;
+  --ink: #e8f1f6;
+  --muted: #8aa3b3;
+  --line: rgba(255, 255, 255, 0.1);
+  --accent: #3d9fd6;
+  --accent-2: #7ec8e3;
+  --ok: #6bcb8b;
+  --max: 44rem;
+  --wide: 68rem;
+}
+*, *::before, *::after { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  font-family: Inter, "Segoe UI", system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  line-height: 1.65;
+  font-size: 17px;
+}
+img { max-width: 100%; height: auto; display: block; }
+a { color: var(--accent-2); text-decoration-thickness: 1px; }
+a:hover { color: #fff; }
+.skip {
+  position: absolute; left: -999px; top: 0;
+}
+.skip:focus {
+  left: 8px; top: 8px; z-index: 9;
+  background: #fff; color: #000; padding: 8px 12px;
+}
+.site-header {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 1rem; flex-wrap: wrap;
+  padding: 0.85rem 1.4rem;
+  border-bottom: 1px solid var(--line);
+  background: rgba(7, 16, 24, 0.92);
+  position: sticky; top: 0; z-index: 5;
+  backdrop-filter: blur(10px);
+}
+.brand { display: flex; align-items: center; gap: 0.7rem; color: inherit; text-decoration: none; font-weight: 700; }
+.brand img { width: 36px; height: 36px; }
+nav { display: flex; gap: 1.1rem; flex-wrap: wrap; }
+nav a { color: var(--muted); text-decoration: none; font-size: 0.92rem; }
+nav a:hover, nav a[aria-current="page"] { color: var(--ink); }
+.wrap { max-width: var(--max); margin: 0 auto; padding: 2.2rem 1.25rem 4rem; }
+.wrap-wide { max-width: var(--wide); }
+.kicker { letter-spacing: 0.12em; text-transform: uppercase; font-size: 0.72rem; color: var(--accent-2); font-weight: 700; }
+h1 { font-size: clamp(1.8rem, 4vw, 2.6rem); line-height: 1.2; margin: 0.35rem 0 0.8rem; }
+h2 { font-size: 1.35rem; margin: 2rem 0 0.6rem; }
+h3 { font-size: 1.05rem; margin: 1.4rem 0 0.4rem; }
+.lede, .summary { color: var(--muted); font-size: 1.08rem; }
+.meta { color: var(--muted); font-size: 0.88rem; display: flex; gap: 0.75rem; flex-wrap: wrap; margin: 0.8rem 0 1.4rem; }
+.hero-img {
+  width: 100%; max-height: 22rem; object-fit: cover;
+  border-radius: 12px; border: 1px solid var(--line); margin: 1rem 0 1.6rem;
+}
+.card-grid {
+  display: grid; gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+.card {
+  background: var(--bg-card); border: 1px solid var(--line);
+  border-radius: 12px; padding: 1.1rem 1.15rem; text-decoration: none; color: inherit;
+  display: block;
+}
+.card:hover { border-color: var(--accent); }
+.card h2 { margin: 0.3rem 0 0.4rem; font-size: 1.15rem; }
+.card p { margin: 0; color: var(--muted); font-size: 0.95rem; }
+.toc {
+  background: var(--bg-card); border: 1px solid var(--line);
+  border-radius: 10px; padding: 0.9rem 1.1rem; margin: 1.2rem 0 1.8rem;
+}
+.toc h2 { margin: 0 0 0.5rem; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+.toc ol { margin: 0; padding-left: 1.2rem; }
+.toc a { color: var(--ink); text-decoration: none; }
+article p { margin: 0.85rem 0; }
+article ul, article ol { color: var(--ink); }
+.outcomes, .duties {
+  background: var(--bg-card); border: 1px solid var(--line);
+  border-radius: 12px; padding: 1rem 1.2rem 1.1rem; margin: 1.2rem 0;
+}
+.outcomes li { margin: 0.35rem 0; }
+.gallery {
+  display: grid; gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  margin: 1.2rem 0 2rem;
+}
+.gallery figure { margin: 0; }
+.gallery figcaption { color: var(--muted); font-size: 0.82rem; margin-top: 0.4rem; }
+.site-footer {
+  border-top: 1px solid var(--line); padding: 1.4rem;
+  color: var(--muted); font-size: 0.85rem; text-align: center;
+}
+.cta {
+  display: inline-block; margin-top: 1.2rem;
+  background: var(--accent); color: #041018; font-weight: 700;
+  padding: 0.65rem 1.1rem; border-radius: 8px; text-decoration: none;
+}
+.cta:hover { color: #041018; filter: brightness(1.08); }
+.profile {
+  display: grid; gap: 1.2rem; align-items: start;
+  grid-template-columns: 120px 1fr;
+}
+.profile img { width: 120px; height: 120px; border-radius: 50%; object-fit: cover; border: 1px solid var(--line); }
+@media (max-width: 640px) {
+  .profile { grid-template-columns: 1fr; }
+  nav { width: 100%; }
+}
