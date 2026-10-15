@@ -1,0 +1,1740 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<title>Candooka OSPO - Offshore Survey Planner & Route Planning Software | Marine Survey Optimization</title>
+<meta name="description" content="Candooka OSPO is an offshore survey planner and offshore route planning software for marine survey optimization: preplot generation, seismic survey planning, offshore survey route optimizer with deep-search optimization (1500 iterations), look-ahead timing, survey duration estimation, offshore cost estimation, tide prediction, geodetic transformation engine and marine GIS planning software with KML, Shapefile and GeoJSON export."/>
+<meta name="keywords" content="offshore survey planner, offshore route planning software, marine survey optimization, preplot generation software, offshore survey planning tool, geophysical survey planning, offshore navigation optimization, marine GIS planning software, offshore survey route optimizer, seismic survey planning software, survey line preplot generator, offshore look-ahead timing, survey duration estimation, offshore cost estimation tool, tide prediction for offshore surveys, geodetic transformation engine, GIS layer management, KML, Shapefile, GeoJSON, marine spatial analysis tools, offshore survey reporting software, route planning for seismic vessels, marine operations planning software, offshore survey efficiency tools, marine geospatial analysis, offshore operational planning, survey line geometry optimization, vessel routing algorithms, marine mapping and spatial data, offshore project management tools, seismic acquisition planning, bathymetry-aware route planning, offshore environmental constraints, marine navigation efficiency, offshore data layers and mapping, survey turnaround time reduction, Candooka OSPO, Candooka Offshore Survey Planner, Candooka Route Optimization Engine, Candooka Preplot Generator, Candooka Marine GIS Tools"/>
+<meta name="robots" content="index, follow"/>
+<meta name="author" content="Candooka"/>
+<link rel="canonical" href="https://candooka.world/"/>
+<!-- Open Graph -->
+<meta property="og:type" content="website"/>
+<meta property="og:url" content="https://candooka.world/"/>
+<meta property="og:site_name" content="Candooka OSPO - Candooka Offshore Survey Planner"/>
+<meta property="og:title" content="Candooka OSPO - Offshore Survey Planner &amp; Route Planning Software"/>
+<meta property="og:description" content="Marine survey optimization and geophysical survey planning: preplot generation software, offshore survey route optimizer with deep-search optimization, tide predictions, cost estimation and marine GIS planning tools (KML, Shapefile, GeoJSON)."/>
+<meta property="og:image" content="https://candooka.world/earth.jpg"/>
+<!-- Twitter -->
+<meta name="twitter:card" content="summary_large_image"/>
+<meta name="twitter:title" content="Candooka OSPO - Offshore Survey Planner &amp; Route Planning Software"/>
+<meta name="twitter:description" content="Offshore survey planning tool: preplot generation, seismic survey planning, route optimization for seismic vessels, tide prediction, cost estimation and marine GIS tools."/>
+<meta name="twitter:image" content="https://candooka.world/earth.jpg"/>
+<!-- Structured data: software application -->
+<script type="application/ld+json">
+{
+ "@context": "https://schema.org",
+ "@type": "SoftwareApplication",
+ "name": "Candooka OSPO - Candooka Offshore Survey Planner",
+ "alternateName": ["Candooka OSPO", "Candooka Route Optimization Engine", "Candooka Preplot Generator", "Candooka Marine GIS Tools"],
+ "url": "https://candooka.world/",
+ "applicationCategory": "BusinessApplication",
+ "applicationSubCategory": "Offshore Survey Planning Tool",
+ "operatingSystem": "Web browser",
+ "description": "Offshore survey planner and offshore route planning software for marine survey optimization: preplot generation, geophysical survey planning, seismic survey planning software, offshore navigation optimization, survey duration estimation, offshore cost estimation, tide prediction for offshore surveys, geodetic transformation engine and marine GIS planning software.",
+ "featureList": [
+ "Survey line preplot generator and automated preplot generation for marine surveys",
+ "Offshore survey route optimizer with deep-search optimization (1500 iterations)",
+ "Route planning for seismic vessels and seismic acquisition planning",
+ "Offshore look-ahead timing and survey duration estimation",
+ "Offshore cost estimation tool and reporting workflows",
+ "Tide prediction for offshore surveys",
+ "Geodetic transformation engine",
+ "GIS layer management (KML, Shapefile, GeoJSON) and marine spatial analysis tools",
+ "Offshore survey reporting software and summary reports",
+ "Vessel routing algorithms and survey line geometry optimization",
+ "Bathymetry-aware route planning around offshore environmental constraints"
+ ],
+ "keywords": "offshore survey planner, offshore route planning software, marine survey optimization, preplot generation software, geophysical survey planning, offshore survey route optimizer, seismic survey planning software, marine GIS planning software, offshore navigation optimization, marine operations planning software",
+ "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD", "description": "Free trial" },
+ "publisher": { "@type": "Organization", "name": "Candooka", "url": "https://candooka.world/" }
+}
+</script>
+<!-- Structured data: FAQ (long-tail queries) -->
+<script type="application/ld+json">
+{
+ "@context": "https://schema.org",
+ "@type": "FAQPage",
+ "mainEntity": [
+ { "@type": "Question", "name": "What is the best software for offshore survey route planning?", "acceptedAnswer": { "@type": "Answer", "text": "Candooka OSPO is an offshore survey planner and route optimizer that plans efficient seismic survey routes in complex geometry using deep-search optimization algorithms (1500 iterations per plan), reducing survey duration and vessel downtime." } },
+ { "@type": "Question", "name": "How do I generate preplots for seismic surveys?", "acceptedAnswer": { "@type": "Answer", "text": "Candooka's preplot generator provides automated preplot generation for marine surveys: define line spacing, azimuth and survey area, then export offshore survey plans to KML, Shapefile or GeoJSON." } },
+ { "@type": "Question", "name": "Can I plan offshore surveys with tide predictions?", "acceptedAnswer": { "@type": "Answer", "text": "Yes - Candooka OSPO includes tide prediction for offshore surveys alongside look-ahead timing, survey duration estimation and offshore cost estimation workflows." } },
+ { "@type": "Question", "name": "How do I reduce survey duration and vessel downtime?", "acceptedAnswer": { "@type": "Answer", "text": "Candooka's route optimization engine minimizes line-turn transit time with vessel routing algorithms and survey line geometry optimization, cutting survey turnaround time for seismic vessels." } },
+ { "@type": "Question", "name": "Does Candooka provide marine GIS tools for offshore operations?", "acceptedAnswer": { "@type": "Answer", "text": "Yes - Candooka Marine GIS Tools include GIS layer management (KML, Shapefile, GeoJSON), marine spatial analysis, measurement tools, offshore data layers and mapping, and offshore survey reporting for client representatives." } }
+ ]
+}
+</script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script>if(!/Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)&&window.innerWidth>768){document.write('<link rel="stylesheet" href="https://cesium.com/downloads/cesiumjs/releases/1.119/Build/Cesium/Widgets/widgets.css"/>')}</script>
+<link rel="stylesheet" href="style.css?v=3.6"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+</head>
+<body>
+ <!-- SEO landing content for crawlers when JavaScript is unavailable -->
+ <noscript>
+ <main>
+ <h1>Candooka OSPO - Offshore Survey Planner &amp; Offshore Route Planning Software</h1>
+ <h2>Marine Survey Optimization, Preplot Generation Software &amp; Geophysical Survey Planning</h2>
+ <p>The Candooka Offshore Survey Planner is an offshore survey planning tool and offshore survey route optimizer
+ for seismic survey planning, offshore navigation optimization and marine operations planning. The Candooka Route
+ Optimization Engine plans efficient seismic survey routes in complex geometry using deep-search optimization
+ algorithms (1500 iterations per plan), vessel routing algorithms and survey line geometry optimization to reduce
+ survey duration and vessel downtime.</p>
+ <h2>Survey Line Preplot Generator</h2>
+ <p>Automated preplot generation for marine surveys with the Candooka Preplot Generator: generate preplots for
+ seismic surveys, then export offshore survey plans to KML, Shapefile or GeoJSON.</p>
+ <h2>Offshore Look-Ahead Timing, Survey Duration &amp; Cost Estimation</h2>
+ <p>Offshore look-ahead timing, survey duration estimation and offshore cost estimation workflows - including
+ standby, downtime and survey turnaround time reduction - designed for offshore project management and client
+ representatives.</p>
+ <h2>Tide Prediction, Geodetic Transformations &amp; Marine GIS Planning Software</h2>
+ <p>Offshore survey planning with tide predictions, a geodetic transformation engine, bathymetry-aware route
+ planning around offshore environmental constraints, and Candooka Marine GIS Tools: GIS layer management (KML,
+ Shapefile, GeoJSON), marine spatial analysis tools, marine geospatial analysis, offshore data layers and mapping,
+ and offshore survey reporting software.</p>
+ <p>Candooka OSPO requires JavaScript. Please enable JavaScript to use the offshore survey planning tool at
+ <a href="https://candooka.world/">candooka.world</a>.</p>
+ </main>
+ </noscript>
+ <!-- Base Layer Chooser (shown after sign-in) -->
+ <div id="baselayer-chooser" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(6,6,12,0.92); z-index:9998; align-items:center; justify-content:center;">
+ <div style="background:#0e0e16; border:1px solid #1a1a24; border-radius:8px; padding:28px 32px; width:100%; max-width:400px; box-shadow:0 16px 64px rgba(0,0,0,0.7); text-align:center;">
+ <div style="font-size:14px; font-weight:700; color:#e0e8f0; margin-bottom:6px;">Choose Default Base Map</div>
+ <div style="font-size:11px; color:#8a9bb0; margin-bottom:20px;">Select your preferred map background. You can change this anytime in the Layers panel.</div>
+ <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:20px;">
+ <button onclick="selectBaseLayer('satellite')" style="padding:14px 10px; border-radius:6px; border:2px solid #333; background:#1a1a2e; color:#e0e8f0; cursor:pointer; font-size:12px; font-weight:600; transition:all 0.15s;">Satellite</button>
+ <button onclick="selectBaseLayer('ocean')" style="padding:14px 10px; border-radius:6px; border:2px solid #333; background:#1a1a2e; color:#e0e8f0; cursor:pointer; font-size:12px; font-weight:600; transition:all 0.15s;">Ocean</button>
+ <button onclick="selectBaseLayer('dark')" style="padding:14px 10px; border-radius:6px; border:2px solid #333; background:#1a1a2e; color:#e0e8f0; cursor:pointer; font-size:12px; font-weight:600; transition:all 0.15s;">Dark</button>
+ <button onclick="selectBaseLayer('osm')" style="padding:14px 10px; border-radius:6px; border:2px solid #333; background:#1a1a2e; color:#e0e8f0; cursor:pointer; font-size:12px; font-weight:600; transition:all 0.15s;">Street Map</button>
+ <button onclick="selectBaseLayer('nautical')" style="padding:14px 10px; border-radius:6px; border:2px solid #333; background:#1a1a2e; color:#e0e8f0; cursor:pointer; font-size:12px; font-weight:600;">Nautical Chart</button>
+ <button onclick="selectBaseLayer('topo')" style="padding:14px 10px; border-radius:6px; border:2px solid #333; background:#1a1a2e; color:#e0e8f0; cursor:pointer; font-size:12px; font-weight:600; transition:all 0.15s; grid-column: span 2;">Topographic</button>
+ </div>
+ <button onclick="selectBaseLayer('satellite')" style="padding:8px 20px; border-radius:4px; border:none; background:#333; color:#8a9bb0; cursor:pointer; font-size:11px;">Skip (use Satellite)</button>
+ </div>
+ </div>
+ <!-- Full-Screen Sign-In Overlay -->
+ <div id="signin-overlay" style="position:fixed; top:0; left:0; right:0; bottom:0; background:#06060c; z-index:9999; display:flex; align-items:flex-start; justify-content:center; overflow-y:auto; font-family:'Segoe UI', system-ui, -apple-system, sans-serif;">
+ <div style="background:#0e0e16; border:1px solid #1a1a24; border-radius:6px; padding:32px; width:100%; max-width:420px; box-shadow:0 16px 64px rgba(0,0,0,0.7); text-align:center; margin:auto 16px; padding-top:32px; padding-bottom:32px;">
+ <!-- Corporate Logo -->
+ <div style="margin-bottom:10px;">
+ <svg width="56" height="56" viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Candooka OSPO logo">
+ <circle cx="28" cy="28" r="25" stroke="#1e3a52" stroke-width="2"/>
+ <path d="M14 18 H42 A5 5 0 0 1 42 28 H14 A5 5 0 0 0 14 38 H42" stroke="#00d2ff" stroke-width="2.5" stroke-linecap="round"/>
+ <circle cx="14" cy="18" r="3" fill="#4eba6f"/>
+ <circle cx="42" cy="38" r="3" fill="#ff453a"/>
+ </svg>
+ </div>
+ <h1 style="font-size:16px; font-weight:700; color:#e0e8f0; letter-spacing:1.4px; margin:0 0 4px 0;">CANDOOKA OSPO</h1>
+ <h2 style="font-size:11px; font-weight:400; color:#8a9bb0; letter-spacing:0.3px; margin:0 0 16px 0;">Offshore Survey Planner &amp; Route Optimizer</h2>
+ <div style="text-align:left; margin-bottom:20px; padding:10px 14px; background:#0a0a12; border:1px solid #1a1a24; border-radius:4px;">
+ <h2 style="font-size:9px; color:#5a6a7a; font-weight:600; letter-spacing:0.5px; text-transform:uppercase; margin:0 0 8px 0;">Offshore Survey Planning Features</h2>
+ <ul style="margin:0; padding:0 0 0 14px; font-size:10px; color:#a0aebb; line-height:1.9; list-style:disc;">
+ <li>Preplot Generation</li>
+ <li>Survey Route Planning &amp; Deep-Search Optimization (iterated local search)</li>
+ <li>Look-Ahead Timing</li>
+ <li>Overall Duration (inc. standby, downtime etc.)</li>
+ <li>Cost Estimations</li>
+ <li>Tide Predictions</li>
+ <li>Geodetic Transformations</li>
+ <li>GIS Functionality (add layers, measure lines, paths, areas etc.)</li>
+ <li>Export preplots, route plans and layers to KML, Shapefiles or GeoJSON</li>
+ <li>Post-Plot P1/11, P1/90, P2/11, P2/94 Interrogation &amp; QC</li>
+ <li>Coverage Plots for all offset groups</li>
+ <li>Summary Reports</li>
+ </ul>
+ </div>
+ <!-- Tab Selector -->
+ <div style="display:flex; gap:0; margin-bottom:20px; background:#0a0a12; border-radius:4px; border:1px solid #1a1a24; overflow:hidden;">
+ <button id="signin-tab-login" onclick="switchSignInTab('login')" style="flex:1; padding:9px; background:#1e1e2e; border:none; color:#e2e8f0; font-size:11px; font-weight:700; cursor:pointer; letter-spacing:0.4px; font-family:inherit; transition:all 0.15s;">SIGN IN</button>
+ <button id="signin-tab-trial" onclick="switchSignInTab('trial')" style="flex:1; padding:9px; background:transparent; border:none; color:#7c8c9e; font-size:11px; font-weight:700; cursor:pointer; letter-spacing:0.4px; font-family:inherit; transition:all 0.15s;">1-MONTH FREE ACCESS</button>
+ </div>
+ <!-- Sign In Form -->
+ <div id="signin-form-login">
+ <div style="text-align:left; margin-bottom:18px;">
+ <label style="display:block; font-size:10px; font-weight:600; color:#8a9bb0; margin-bottom:6px; letter-spacing:0.5px; text-transform:uppercase;">Username or Email</label>
+ <input type="text" id="signin-username" placeholder="name@company.com" autocomplete="username" style="width:100%; padding:10px 12px; background:#0a0a12; border:1px solid #1a1a24; border-radius:3px; color:#e2e8f0; font-size:12px; outline:none; font-family:inherit; transition:border-color 0.12s;" onfocus="this.style.borderColor='#2a5580'" onblur="this.style.borderColor='#1a1a24'" onkeydown="if(event.key==='Enter'){document.getElementById('signin-password').focus();}" />
+ </div>
+ <div style="text-align:left; margin-bottom:24px;">
+ <label style="display:block; font-size:10px; font-weight:600; color:#8a9bb0; margin-bottom:6px; letter-spacing:0.5px; text-transform:uppercase;">Password</label>
+ <input type="password" id="signin-password" placeholder="********" autocomplete="current-password" style="width:100%; padding:10px 12px; background:#0a0a12; border:1px solid #1a1a24; border-radius:3px; color:#e2e8f0; font-size:12px; outline:none; font-family:inherit; transition:border-color 0.12s;" onfocus="this.style.borderColor='#2a5580'" onblur="this.style.borderColor='#1a1a24'" onkeydown="if(event.key==='Enter'){handleSignIn();}" />
+ </div>
+ <div id="signin-error" style="color:#d4828a; font-size:11px; margin-bottom:16px; display:none; text-align:left; line-height:1.4;"></div>
+ <!-- Site-loading indicator: visible until app.js finishes downloading (slow connections) -->
+ <style>@keyframes signin-spin { to { transform: rotate(360deg); } }</style>
+ <div id="site-loading" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; margin-bottom:12px; color:#f5a623; font-size:11px; font-weight:600;">
+ <div class="vessel-loader" role="img" aria-label="Site loading" style="margin:0;">
+ <div class="vl-line"></div>
+ <div class="vl-acq"></div>
+ <div class="vl-seabed"></div>
+ <div class="vl-shots">
+ <span class="vl-ping vl-down"></span>
+ <span class="vl-ping vl-down vl-d2"></span>
+ <span class="vl-ping vl-up"></span>
+ <span class="vl-ping vl-up vl-u2"></span>
+ </div>
+ <svg class="vl-ship" width="120" height="30" viewBox="0 0 120 30">
+ <g class="vl-bob">
+ <path d="M2 20.5 L10 20.5 L8 24 L4 24 Z" fill="#ffd60a"/>
+ <path d="M6 20.5 V15.5" stroke="#ffd60a" stroke-width="1"/>
+ <circle cx="6" cy="14.8" r="1.2" fill="#ff453a"/>
+ <g stroke="#f5a623" stroke-width="1" fill="none" opacity="0.75">
+ <path d="M8 22 Q 45 19 84 21.5"/>
+ <path d="M8 26 Q 45 23.5 84 23.5"/>
+ <path d="M8 24 Q 45 21 84 22.5"/>
+ </g>
+ <path d="M84 18 L106 18 L115 22.5 L106 27 L84 27 Z" fill="#5ba3d9"/>
+ <rect x="88" y="11" width="12" height="7" rx="1" fill="#cfe3f5"/>
+ <rect x="101" y="14" width="6" height="4" rx="1" fill="#9fc3e0"/>
+ <path d="M92 11 V6" stroke="#cfe3f5" stroke-width="1.5"/>
+ </g>
+ </svg>
+ </div>
+ <span id="site-loading-text">&#8987; Site loading&hellip; please wait</span>
+ </div>
+ <button id="signin-button" disabled onclick="handleSignIn()" style="width:100%; padding:11px; background:#2a5580; color:#e2e8f0; border:none; border-radius:4px; font-size:12px; font-weight:700; letter-spacing:0.5px; cursor:pointer; margin-bottom:12px; transition:background 0.12s; outline:none; font-family:inherit; opacity:0.55;" onmouseover="this.style.background='#346a99'" onmouseout="this.style.background='#2a5580'">SIGN IN</button>
+ <script>
+ // Stubs so clicks/Enter presses before app.js finishes loading show a
+ // clear "still loading" message instead of silently doing nothing.
+ // app.js overrides these when it loads (top-level function declarations).
+ window.handleSignIn = window.handleSignIn || function () {
+ var t = document.getElementById('site-loading-text');
+ if (t) t.innerHTML = '&#8987; Still loading the site &mdash; please wait, sign-in will enable automatically&hellip;';
+ };
+ window.switchSignInTab = window.switchSignInTab || function () { window.handleSignIn(); };
+ window.showAdminLogin = window.showAdminLogin || function () { window.handleSignIn(); };
+ window.submitTrialRequest = window.submitTrialRequest || function () { window.handleSignIn(); };
+ </script>
+ <div style="font-size:9px; color:#5a6a7a; text-align:center; line-height:1.6; margin-top:8px; padding-top:12px; border-top:1px solid #1a1a24;">
+ <strong style="color:#7c8c9e;">Guest Access:</strong><br>Username: <span style="color:#4eba6f; font-family:monospace;">GUEST</span><br>Password: <span style="color:#4eba6f; font-family:monospace;">candooka-ospo</span>
+ </div>
+ </div>
+ <!-- 1-Month Free Access Form -->
+ <div id="signin-form-trial" style="display:none; text-align:left;">
+ <div style="font-size:10px; color:#8a9bb0; margin-bottom:14px; text-align:center; line-height:1.5;">Get <strong style="color:#4eba6f;">1 month free access</strong>to the full survey planning suite. Just enter your email and phone number below.
+ </div>
+ <div style="margin-bottom:12px;">
+ <label style="display:block; font-size:10px; font-weight:600; color:#8a9bb0; margin-bottom:5px; letter-spacing:0.5px; text-transform:uppercase;">Email Address</label>
+ <input type="email" id="trial-email" placeholder="name@company.com" style="width:100%; padding:10px 12px; background:#0a0a12; border:1px solid #1a1a24; border-radius:3px; color:#e2e8f0; font-size:12px; outline:none; font-family:inherit; transition:border-color 0.12s;" onfocus="this.style.borderColor='#2a5580'" onblur="this.style.borderColor='#1a1a24'" />
+ </div>
+ <div style="margin-bottom:12px;">
+ <label style="display:block; font-size:10px; font-weight:600; color:#8a9bb0; margin-bottom:5px; letter-spacing:0.5px; text-transform:uppercase;">Phone (SMS / WhatsApp)</label>
+ <input type="tel" id="trial-phone" placeholder="+60 123 456 789" style="width:100%; padding:10px 12px; background:#0a0a12; border:1px solid #1a1a24; border-radius:3px; color:#e2e8f0; font-size:12px; outline:none; font-family:inherit; transition:border-color 0.12s;" onfocus="this.style.borderColor='#2a5580'" onblur="this.style.borderColor='#1a1a24'" />
+ </div>
+ <div style="margin-bottom:14px;">
+ <label style="display:block; font-size:10px; font-weight:600; color:#8a9bb0; margin-bottom:5px; letter-spacing:0.5px; text-transform:uppercase;">Name / Company (optional)</label>
+ <input type="text" id="trial-name" placeholder="John Smith / Survey Co." style="width:100%; padding:10px 12px; background:#0a0a12; border:1px solid #1a1a24; border-radius:3px; color:#e2e8f0; font-size:12px; outline:none; font-family:inherit; transition:border-color 0.12s;" onfocus="this.style.borderColor='#2a5580'" onblur="this.style.borderColor='#1a1a24'" />
+ </div>
+ <button onclick="submitTrialRequest()" style="width:100%; padding:11px; background:#1a5e3a; color:#e2e8f0; border:none; border-radius:4px; font-size:12px; font-weight:700; letter-spacing:0.5px; cursor:pointer; margin-bottom:12px; outline:none; font-family:inherit; transition:background 0.12s;" onmouseover="this.style.background='#237a4a'" onmouseout="this.style.background='#1a5e3a'">GET FREE ACCESS</button>
+ </div>
+ <div style="font-size:11px; color:#7c8c9e; margin-top:4px; border-top:1px solid #1a1a24; padding-top:12px;">Are you an administrator? <a href="#" onclick="showAdminLogin()" style="color:#4eba6f; text-decoration:none; font-weight:600;">Add/Manage Users</a>
+ </div>
+ <div style="font-size:9px; color:#5a6a7a; margin-top:16px; padding-top:12px; border-top:1px solid #1a1a24; line-height:1.5;">
+ <strong style="color:#7c8c9e;">For Client confidentiality</strong> - No preplot or postplot survey data is stored on our servers.
+ </div>
+ <div style="font-size:9px; color:#5a6a7a; margin-top:12px; padding-top:12px; border-top:1px solid #1a1a24; line-height:1.5;">
+ <strong style="color:#7c8c9e;">For technical support, or to report bugs:</strong><br>admin@candooka.world<br>aledmorgan@gmail.com<br>
+ +60 123 825 450 (WhatsApp, SMS, voice)
+ </div>
+ </div>
+ </div>
+ <div id="app">
+ <!-- ===== TIER 1: App Bar (Top Tier) ===== -->
+ <header id="tier1" style="display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 0 20px;">
+ <span class="logo" onclick="showToast('Resetting...'); setTimeout(() =>window.location.reload(), 600);" style="margin-right: 12px; flex-shrink: 0; cursor: pointer;" title="Reset Planner">OSPO <span style="font-size:9px;color:#5a6a7a;font-weight:400;">v3.5</span></span>
+ <div class="t1-menu-wrapper" style="display: flex; flex: 1; gap: 6px; align-items: center; margin-right: 8px;">
+ <!-- Load P1 -->
+ <label class="corp-btn btn-load" for="file-input" style="flex: 1; text-align: center; margin: 0; cursor: pointer;">LOAD P1</label>
+ <input type="file" id="file-input" accept=".csv,.xlsx,.xls,.txt,.p190,.p111,.p1,.a190,.pp1" multiple style="display:none" onchange="loadFile(event)"/>
+ <!-- Load CSV (manual column mapping) -->
+ <label class="corp-btn" for="file-input-csv" style="flex: 1; text-align: center; margin: 0; cursor: pointer;">LOAD CSV</label>
+ <input type="file" id="file-input-csv" accept=".csv,.txt,.tsv" style="display:none" onchange="loadCSVManual(event)"/>
+ <!-- Generate Preplot -->
+ <button class="corp-btn btn-preplot" onclick="generatePreplot()" style="flex: 1; text-align: center; margin: 0;">GENERATE PREPLOT</button>
+ <!-- Preplot Editor -->
+ <button class="corp-btn" onclick="openPreplotEditor()" style="flex: 1; text-align: center; margin: 0;">PREPLOT EDITOR</button>
+ <!-- Tide Prediction -->
+ <button class="corp-btn" onclick="togglePanel('tides')" style="flex: 1; text-align: center; margin: 0;">TIDE PREDICTION</button>
+ <!-- Geodesy -->
+ <button class="corp-btn" id="nav-geodesy" onclick="openGeodesyPanel()" style="flex: 1; text-align: center; margin: 0;">GEODESY</button>
+ <!-- Measure -->
+ <button class="corp-btn" onclick="togglePanel('measure')" style="flex: 1; text-align: center; margin: 0;">MEASURE</button>
+ <!-- Layers -->
+ <button class="corp-btn" onclick="togglePanel('layers')" style="flex: 1; text-align: center; margin: 0;">LAYERS</button>
+ <!-- AIS -->
+ <button class="corp-btn" id="nav-ais" onclick="openAisPanel()" title="Live AIS vessel traffic" style="flex: 1; text-align: center; margin: 0; border-color:#38bdf8; color:#7dd3fc;">AIS</button>
+ <!-- Save Plan -->
+ <button class="corp-btn" onclick="togglePanel('save-plan')" style="flex: 1; text-align: center; margin: 0;">SAVE PLAN</button>
+ <!-- Restore Plan -->
+ <button class="corp-btn" onclick="openRestorePlanPanel()" style="flex: 1; text-align: center; margin: 0;">RESTORE PLAN</button>
+ <!-- Cost -->
+ <button class="corp-btn" onclick="openCostPanel()" style="flex: 1; text-align: center; margin: 0;">COST</button>
+ <!-- Time -->
+ <button class="corp-btn" onclick="openTimePanel()" style="flex: 1; text-align: center; margin: 0;">TIME</button>
+ <!-- Licensing -->
+ <button class="corp-btn" onclick="togglePanel('licensing')" style="flex: 1; text-align: center; margin: 0;">LICENSING</button>
+ <!-- Reports Nav -->
+ <button class="corp-nav-btn" id="nav-reports" onclick="switchNav('reports')" style="flex: 1; text-align: center; margin: 0; border: 1px solid #1e1e2e; border-radius: 3px; background: #13131d; height: 26px; display: inline-flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 600;">REPORTS</button>
+ </div>
+ <div class="t1-right" style="flex-shrink: 0; display: flex; align-items: center; gap: 12px;">
+ <!-- Secure Discreet Admin DB Access -->
+ <button class="t1-admin" onclick="showAdminLogin()" style="background:transparent; border:none; color:#7c8c9e; font-size:9px; cursor:pointer; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; outline:none; transition:color 0.12s; margin-right:4px; font-family:inherit;">Admin DB</button>
+ <span id="user-display" style="display:none; font-size:10px; color:#8a9bb0; font-weight:600; margin-right:2px; max-width:140px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"></span>
+ <button id="btn-logout" class="t1-logout" onclick="logoutUser()" title="Log out and clear session"
+  style="display:none; align-items:center; gap:4px; background:#1a1a24; border:1px solid #ff453a; color:#ff453a; font-size:10px; cursor:pointer; font-weight:700; text-transform:uppercase; letter-spacing:0.4px; outline:none; font-family:inherit; padding:4px 10px; border-radius:3px; height:24px;">Logout</button>
+ <span class="t1-status"><span class="dot-green"></span>ONLINE</span>
+ <button class="t1-icon" onclick="togglePanel('settings-popup')" title="Settings" style="margin: 0;">&#9881;</button>
+ </div>
+ </header>
+ <!-- ===== TIER 2: Toolbar (Bottom Tier) ===== -->
+ <nav id="tier2" style="display: flex; align-items: center; justify-content: space-between; gap: 6px; width: 100%; padding: 0 20px;">
+ <div class="t2-menu-wrapper" style="display: flex; flex: 1; gap: 6px; align-items: center; overflow-x: auto; overflow-y: hidden;">
+ <!-- Plan Survey Tab -->
+ <button class="t2-btn btn-criteria" id="tab-plan" onclick="switchTab('plan')" style="text-align: center; justify-content: center; margin: 0; height: 28px; font-weight: 700;">SURVEY CRITERIA</button>
+ <!-- Highlighted orange Start Pt button -->
+ <button class="t2-btn btn-startpt" onclick="togglePanel('start-point')" style="text-align: center; justify-content: center; margin: 0; height: 28px; padding: 4px 12px;">START PT</button>
+ <!-- Start Time -->
+ <button class="t2-btn btn-starttime" onclick="togglePanel('start-time')" style="text-align: center; justify-content: center; margin: 0; height: 28px; padding: 4px 12px;">START TIME</button>
+ <!-- Turn Radius -->
+ <button class="t2-btn btn-radius" onclick="togglePanel('turn-radius')" style="text-align: center; justify-content: center; margin: 0; height: 28px; padding: 4px 12px;">RADIUS <span class="val" id="val-turn-radius">5.1km</span></button>
+ <!-- Speed -->
+ <button class="t2-btn btn-speed" onclick="togglePanel('speed')" style="text-align: center; justify-content: center; margin: 0; height: 28px; padding: 4px 12px;">SPEED <span class="val" id="val-speed">4kn</span></button>
+ <!-- Run In/Out -->
+ <button class="t2-btn btn-runinout" onclick="togglePanel('run-inout')" style="text-align: center; justify-content: center; margin: 0; height: 28px; padding: 4px 12px;">RUN IN/OUT <span class="val" id="val-run-inout">0/0m</span></button>
+ <button class="t2-btn btn-lines" onclick="showLineManager()" style="text-align: center; justify-content: center; margin: 0; height: 28px; padding: 4px 12px; color: #ff69b4; font-weight: 700;">LINES</button>
+ <button class="t2-btn btn-priority" onclick="togglePanel('priority')" style="text-align: center; justify-content: center; margin: 0; height: 28px; padding: 4px 12px;">PRIORITY</button>
+ <button class="t2-btn btn-obstruct" onclick="togglePanel('obstructions')" style="text-align: center; justify-content: center; margin: 0; height: 28px; padding: 4px 12px;">OBSTRUCTIONS</button>
+ <button class="t2-btn btn-postplot-qc" onclick="showPostplotQC()" style="text-align: center; justify-content: center; margin: 0; height: 28px; padding: 4px 12px; border: 1px solid #a855f7; color: #c084fc; font-weight: 700;">POSTPLOT QC</button>
+ <button class="t2-btn btn-fold-coverage" onclick="showFoldCoverage()" style="text-align: center; justify-content: center; margin: 0; height: 28px; padding: 4px 12px; border: 1px solid #2dd4bf; color: #5eead4; font-weight: 700;">FOLD COVERAGE</button>
+ <button class="t2-btn btn-ray-trace" onclick="showRayTracing()" title="Acoustic ray tracing for OBN / water-column paths" style="text-align: center; justify-content: center; margin: 0; height: 28px; padding: 4px 12px; border: 1px solid #f59e0b; color: #fbbf24; font-weight: 700;">RAY TRACING</button>
+ <button class="t2-btn" onclick="planRoute()" style="text-align: center; justify-content: center; margin: 0; height: 28px; padding: 4px 12px; border: 1px solid #30d158; color: #4ef5a3; font-weight: 700;">ROUTE PLANNING</button>
+ <button class="t2-btn btn-reset" id="btn-reset-route" onclick="resetRoute()" style="text-align: center; justify-content: center; margin: 0; height: 28px; padding: 4px 12px;">RESET ROUTE</button>
+ <div style="position:relative;display:inline-block;flex-shrink:0;">
+ <button class="t2-btn btn-copymap" id="btn-copy-map" onclick="toggleCopyMapMenu(event)" title="Copy the active map to the clipboard (choose what to include), without the floating panels" style="text-align: center; justify-content: center; margin: 0; height: 28px; padding: 4px 12px; border: 1px solid #38bdf8; color: #7dd3fc; font-weight: 700;">COPY MAP</button>
+ <div id="copymap-dropdown" onclick="event.stopPropagation()" style="display:none;position:fixed;z-index:10000;background:#0e0e16;border:1px solid #1a1a24;border-radius:6px;box-shadow:0 8px 24px rgba(0,0,0,0.8);min-width:230px;padding:6px 0;font-size:11px;pointer-events:auto;">
+ <div style="padding:4px 12px;color:#5a6a7a;font-size:9px;font-weight:600;letter-spacing:0.4px;text-transform:uppercase;">Copy Map to Clipboard</div>
+ <button onclick="copyMapToClipboard('full')" style="display:block;width:100%;text-align:left;padding:6px 16px;background:none;border:none;color:#e0e8f0;cursor:pointer;font-size:11px;font-family:inherit;" onmouseover="this.style.background='#1a1a2e'" onmouseout="this.style.background='none'">Full map (with basemap)</button>
+ <button onclick="copyMapToClipboard('nobasemap')" style="display:block;width:100%;text-align:left;padding:6px 16px;background:none;border:none;color:#e0e8f0;cursor:pointer;font-size:11px;font-family:inherit;" onmouseover="this.style.background='#1a1a2e'" onmouseout="this.style.background='none'">Overlays only (transparent, no basemap)</button>
+ <div style="height:1px;background:#1a1a24;margin:4px 0;"></div>
+ <button onclick="copyMapToClipboard('preplot')" style="display:block;width:100%;text-align:left;padding:6px 16px;background:none;border:none;color:#e0e8f0;cursor:pointer;font-size:11px;font-family:inherit;" onmouseover="this.style.background='#1a1a2e'" onmouseout="this.style.background='none'">Preplot lines only (with basemap)</button>
+ <button onclick="copyMapToClipboard('route')" style="display:block;width:100%;text-align:left;padding:6px 16px;background:none;border:none;color:#e0e8f0;cursor:pointer;font-size:11px;font-family:inherit;" onmouseover="this.style.background='#1a1a2e'" onmouseout="this.style.background='none'">Planned route only (with basemap)</button>
+ </div>
+ </div>
+ <button class="corp-view-btn active" id="nav-map" onclick="switchNav('map')" style="text-align: center; justify-content: center; margin: 0; height: 28px; padding: 4px 12px;">MAP</button>
+ </div>
+ <!-- Export Dropdown - Outside scrollable area to ensure visibility -->
+ <div style="position:relative;display:inline-block;flex-shrink:0;">
+ <button class="t2-btn" id="btn-export-menu" onclick="toggleExportMenu(event)" style="text-align:center;justify-content:center;margin:0;height:28px;padding:4px 12px;border:1px solid #e67e22;color:#e67e22;font-weight:700;">EXPORT v</button>
+ <div id="export-dropdown" onclick="event.stopPropagation()" style="display:none;position:fixed;z-index:10000;background:#0e0e16;border:1px solid #1a1a24;border-radius:6px;box-shadow:0 8px 24px rgba(0,0,0,0.8);min-width:220px;padding:6px 0;font-size:11px;pointer-events:auto;">
+ <div style="padding:4px 12px;color:#5a6a7a;font-size:9px;font-weight:600;letter-spacing:0.4px;text-transform:uppercase;">KML Export</div>
+ <button onclick="exportKML('lines')" style="display:block;width:100%;text-align:left;padding:6px 16px;background:none;border:none;color:#e0e8f0;cursor:pointer;font-size:11px;font-family:inherit;" onmouseover="this.style.background='#1a1a2e'" onmouseout="this.style.background='none'">Full Fold Lines Only</button>
+ <button onclick="exportKML('layers')" style="display:block;width:100%;text-align:left;padding:6px 16px;background:none;border:none;color:#e0e8f0;cursor:pointer;font-size:11px;font-family:inherit;" onmouseover="this.style.background='#1a1a2e'" onmouseout="this.style.background='none'">User-Defined Layers</button>
+ <div style="height:1px;background:#1a1a24;margin:4px 0;"></div>
+ <div style="padding:4px 12px;color:#5a6a7a;font-size:9px;font-weight:600;letter-spacing:0.4px;text-transform:uppercase;">GeoJSON Export</div>
+ <button onclick="exportShapefile('lines')" style="display:block;width:100%;text-align:left;padding:6px 16px;background:none;border:none;color:#e0e8f0;cursor:pointer;font-size:11px;font-family:inherit;" onmouseover="this.style.background='#1a1a2e'" onmouseout="this.style.background='none'">Full Fold Lines Only</button>
+ <button onclick="exportShapefile('layers')" style="display:block;width:100%;text-align:left;padding:6px 16px;background:none;border:none;color:#e0e8f0;cursor:pointer;font-size:11px;font-family:inherit;" onmouseover="this.style.background='#1a1a2e'" onmouseout="this.style.background='none'">User-Defined Layers</button>
+ <div style="height:1px;background:#1a1a24;margin:4px 0;"></div>
+ <div style="padding:4px 12px;color:#5a6a7a;font-size:9px;font-weight:600;letter-spacing:0.4px;text-transform:uppercase;">Other Formats</div>
+ <button onclick="exportPreplotCSV()" style="display:block;width:100%;text-align:left;padding:6px 16px;background:none;border:none;color:#e0e8f0;cursor:pointer;font-size:11px;font-family:inherit;" onmouseover="this.style.background='#1a1a2e'" onmouseout="this.style.background='none'">Export CSV</button>
+ <button onclick="_ppgExportP190()" style="display:block;width:100%;text-align:left;padding:6px 16px;background:none;border:none;color:#e0e8f0;cursor:pointer;font-size:11px;font-family:inherit;" onmouseover="this.style.background='#1a1a2e'" onmouseout="this.style.background='none'">Export P1/90</button>
+ </div>
+ </div>
+ <!-- Route Step-Through Controls -->
+ <div id="route-stepper" style="display:none; position:fixed; bottom:50px; left:50%; transform:translateX(-50%); z-index:800; background:rgba(0,0,0,0.9); border:1px solid #333; border-radius:6px; padding:6px 12px; align-items:center; gap:8px;">
+ <button onclick="routeStepPrev()" style="background:none;border:1px solid #444;color:#fff;border-radius:4px;padding:3px 10px;cursor:pointer;font-size:12px;">< Prev</button>
+ <span id="stepper-label" style="color:#fff;font-size:11px;min-width:120px;text-align:center;">Line 1 / 31</span>
+ <button onclick="routeStepNext()" style="background:none;border:1px solid #444;color:#fff;border-radius:4px;padding:3px 10px;cursor:pointer;font-size:12px;">Next ></button>
+ <button onclick="routeStepAll()" style="background:none;border:1px solid #30d158;color:#30d158;border-radius:4px;padding:3px 10px;cursor:pointer;font-size:11px;font-weight:700;">Show All</button>
+ <span style="width:1px;height:16px;background:#444;margin:0 4px;"></span>
+ <button onclick="startVesselSimulation()" style="background:none;border:1px solid #00d2ff;color:#00d2ff;border-radius:4px;padding:3px 10px;cursor:pointer;font-size:11px;font-weight:700;">>Simulate</button>
+ <button onclick="saveScenario()" style="background:none;border:1px solid #ffd60a;color:#ffd60a;border-radius:4px;padding:3px 8px;cursor:pointer;font-size:11px;font-weight:700;">Save</button>
+ <button onclick="showScenarioCompare()" style="background:none;border:1px solid #a855f7;color:#a855f7;border-radius:4px;padding:3px 8px;cursor:pointer;font-size:11px;font-weight:700;">Compare</button>
+ <button onclick="hideRouteStepper()" style="background:none;border:none;color:#a0aebb;cursor:pointer;font-size:14px;">x</button>
+ </div>
+ </nav>
+ <!-- ===== MAIN CONTENT ===== -->
+ <div id="main" style="flex:1; position:relative; overflow:hidden; background:#000; width:100%;">
+ <div id="survey-list-panel" style="display:none">
+ <div id="survey-list-header">Survey Lines</div>
+ <div id="survey-list"></div>
+ </div>
+ <div id="cesium-globe"></div>
+ <div id="map" style="display:none"></div>
+ <!-- Survey Type Indicator -->
+ <div id="survey-type-indicator" style="position:absolute; top:12px; left:12px; z-index:700; background:rgba(0,0,0,0.85); border:2px solid #00d2ff; border-radius:6px; padding:6px 14px; color:#00d2ff; font-size:14px; font-weight:700; letter-spacing:1px; pointer-events:none; display:none;">
+ 3D SURVEY
+ </div>
+ <!-- Scale bar bottom info -->
+ <div id="bottom-bar">
+ <span id="zoom-level">Z: 10</span>
+ <span id="coords-display">E: -- N: -- | --, -- | --</span>
+ </div>
+ <!-- Route Stats Ribbon -->
+ <div id="route-stats" style="display:none; position:fixed; bottom:10px; left:50%; transform:translateX(-50%); height:28px; align-items:center; gap:6px; background:rgba(0,0,0,0.9); padding:0 12px; border-radius:4px; border:1px solid #1a1a24; z-index:50;">
+ <span id="stat-distance"></span>
+ <span id="stat-line-km"></span>
+ <span id="stat-sq-km"></span>
+ <span id="stat-time"></span>
+ <span id="stat-skipped"></span>
+ <span id="stat-skipped-sp" style="color:#ff9500;"></span>
+ <span id="stat-obs-avoid" style="color:#ffd60a;"></span>
+ <span id="stat-infill" style="color:#ff44ff;"></span>
+ <span id="stat-acquired" style="color:#8a9bb0;"></span>
+ </div>
+ </div>
+ <!-- Right controls -->
+ <div id="right-controls">
+ <button class="map-ctrl-btn" onclick="flyToMyLocation()" title="My Location">&#9737;</button>
+ <button class="map-ctrl-btn" id="ctrl-mode-toggle" onclick="toggleMapMode()" title="Toggle 2D/3D Mode" style="font-weight:700; font-size:10px; background:#00d2ff; color:#000; border:none;">2D</button>
+ <button class="map-ctrl-btn" onclick="togglePanel('layers')" title="Layers" style="font-size:14px;">&#9776;</button>
+ <button class="map-ctrl-btn" onclick="zoomInView()" title="Zoom In">+</button>
+ <button class="map-ctrl-btn" onclick="zoomOutView()" title="Zoom Out">-</button>
+ <div class="ctrl-divider"></div>
+ <button class="map-ctrl-btn" id="ctrl-weather" onclick="openWeatherChooser()" title="Wind &amp; Waves (and sea temperature)" aria-label="Wind and Waves" style="display:flex;align-items:center;justify-content:center;padding:0;">
+ <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <path d="M4 7h11a2.5 2.5 0 1 0-2.5-2.5" stroke="#7dd3fc" stroke-width="1.8" stroke-linecap="round"/>
+  <path d="M4 12h14a2.5 2.5 0 1 1-2.5 2.5" stroke="#38bdf8" stroke-width="1.8" stroke-linecap="round"/>
+  <path d="M3 18.5c1.6-1.2 3.2-1.2 4.8 0s3.2 1.2 4.8 0 3.2-1.2 4.8 0 3.2 1.2 4.8 0" stroke="#94a3b8" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+ </svg>
+ </button>
+ <button class="map-ctrl-btn" onclick="toggleAnnotations()" title="Arrows">&#8679;</button>
+ <button class="map-ctrl-btn" onclick="toggleLabels()" title="Labels">A</button>
+ </div>
+ </div>
+ <!-- Weather: Sea temp (NOAA) / Wind / Waves; 6h cache -->
+ <div id="weather-chooser" style="display:none;position:fixed;bottom:80px;right:24px;z-index:10050;width:260px;background:#0d1526;border:1px solid #334155;border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,0.55);overflow:hidden;font-family:inherit;">
+ <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid #1e293b;">
+ <span style="font-size:12px;font-weight:700;color:#fff;">Weather - choose layer</span>
+ <button onclick="closeWeatherUI()" style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:16px;line-height:1;">&times;</button>
+ </div>
+ <div style="padding:12px;">
+ <p style="font-size:10px;color:#94a3b8;margin:0 0 10px 0;">NOAA public-domain data via CoastWatch ERDDAP. Cached 6 hours at map centre.</p>
+ <button onclick="openSeaTemp()" style="width:100%;height:40px;margin-bottom:8px;border:none;border-radius:8px;background:#0891b2;color:#fff;font-weight:700;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="4" stroke="#fff" stroke-width="1.8"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M5.6 18.4L7 17M17 7l1.4-1.4" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/></svg>
+  Sea temp (NOAA)
+ </button>
+ <button onclick="openWeatherMode('wind')" style="width:100%;height:40px;margin-bottom:8px;border:1px solid #475569;border-radius:8px;background:#1e293b;color:#fff;font-weight:700;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+   <path d="M4 8h12a2.5 2.5 0 1 0-2.5-2.5" stroke="#7dd3fc" stroke-width="1.8" stroke-linecap="round"/>
+   <path d="M4 13h14a2.5 2.5 0 1 1-2.5 2.5" stroke="#38bdf8" stroke-width="1.8" stroke-linecap="round"/>
+   <path d="M4 18h8" stroke="#64748b" stroke-width="1.8" stroke-linecap="round"/>
+  </svg>
+  Wind (NOAA GFS)
+ </button>
+ <button onclick="openWeatherMode('waves')" style="width:100%;height:40px;border:1px solid #475569;border-radius:8px;background:#1e293b;color:#fff;font-weight:700;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+   <path d="M3 10c1.8-1.4 3.6-1.4 5.4 0s3.6 1.4 5.4 0 3.6-1.4 5.4 0" stroke="#38bdf8" stroke-width="1.8" stroke-linecap="round"/>
+   <path d="M3 15c1.8-1.4 3.6-1.4 5.4 0s3.6 1.4 5.4 0 3.6-1.4 5.4 0" stroke="#94a3b8" stroke-width="1.8" stroke-linecap="round"/>
+   <path d="M3 20c1.8-1.4 3.6-1.4 5.4 0s3.6 1.4 5.4 0 3.6-1.4 5.4 0" stroke="#64748b" stroke-width="1.8" stroke-linecap="round"/>
+  </svg>
+  Waves (NOAA WW3)
+ </button>
+ <div style="font-size:9px;color:#556;margin-top:10px;line-height:1.4;">Wind: NOAA/NCEP GFS 10 m &nbsp;·&nbsp; Waves: NOAA WAVEWATCH III &nbsp;·&nbsp; SST: NOAA MUR/OISST</div>
+ </div>
+ </div>
+ <div id="weather-panel" style="display:none;position:fixed;bottom:80px;right:24px;z-index:10050;width:360px;max-height:70vh;background:#0d1526;border:1px solid #334155;border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,0.55);overflow:hidden;font-family:inherit;">
+ <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid #1e293b;gap:8px;">
+ <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+ <span id="weather-panel-title" style="font-size:12px;font-weight:700;color:#fff;">Sea temp | 6h cache</span>
+ <button onclick="openSeaTemp()" style="font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid #475569;background:#164e63;color:#fff;cursor:pointer;" title="Sea temperature">SST</button>
+ <button onclick="openWeatherMode('wind')" style="font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid #475569;background:#1e293b;color:#cbd5e1;cursor:pointer;display:inline-flex;align-items:center;gap:4px;" title="Wind">
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 9h11a2 2 0 1 0-2-2" stroke="#7dd3fc" stroke-width="2" stroke-linecap="round"/><path d="M3 14h13a2 2 0 1 1-2 2" stroke="#38bdf8" stroke-width="2" stroke-linecap="round"/></svg>
+  Wind
+ </button>
+ <button onclick="openWeatherMode('waves')" style="font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid #475569;background:#1e293b;color:#cbd5e1;cursor:pointer;display:inline-flex;align-items:center;gap:4px;" title="Waves">
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M2 12c1.5-1 3-1 4.5 0s3 1 4.5 0 3-1 4.5 0 3 1 4.5 0" stroke="#94a3b8" stroke-width="2" stroke-linecap="round"/></svg>
+  Waves
+ </button>
+ </div>
+ <div style="display:flex;gap:4px;">
+ <button onclick="(window._weatherMode==='sst'?openSeaTemp(true):openWeatherMode(window._weatherMode||'wind', true))" title="Force refresh" style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:12px;"></button>
+ <button onclick="closeWeatherUI()" style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:16px;line-height:1;">&times;</button>
+ </div>
+ </div>
+ <div id="weather-sst" style="display:none;padding:10px 12px;border-bottom:1px solid #1e293b;background:rgba(8,145,178,0.15);"></div>
+ <div id="weather-meta" style="padding:6px 12px;font-size:10px;color:#64748b;font-family:ui-monospace,monospace;"></div>
+ <!-- Windy embed removed — wind/waves from NOAA public-domain ERDDAP via /api/noaa-marine.php -->
+ <iframe id="weather-iframe" title="Weather map (unused)" style="display:none;width:100%;height:0;border:0;"></iframe>
+ </div>
+ <!-- Settings panels (popups) -->
+ <!-- Predicted Tides Popup Panel -->
+ <div id="panel-tides" class="settings-panel" style="display:none; min-width:360px; max-height:90vh; overflow-y:auto;">
+ <button class="panel-close-btn" onclick="hidePanel('tides')">&times;</button>
+ <div class="panel-title">Predicted Tides</div>
+ <!-- Tide Model Selector -->
+ <div class="panel-row" style="margin-bottom:12px">
+ <label style="width:80px">Tide Model</label>
+ <select id="tide-model" onchange="updateTideModelInfo(); updateTidePreview()" style="flex:1;background:#111;border:1px solid #222;color:#fff;padding:5px 8px;border-radius:4px;font-size:12px;outline:none;cursor:pointer;">
+ <option value="TPXO9" selected>TPXO9 (Oregon State - Global)</option>
+ <option value="TPXO8">TPXO8 (8 constituents)</option>
+ <option value="EOT20">EOT20 (DGFI-TUM - Empirical)</option>
+ <option value="FES2014">FES2014 (LEGOS/CNES)</option>
+ <option value="GOT4.10">GOT4.10 (NASA/GSFC)</option>
+ </select>
+ </div>
+ <div id="tide-model-info" style="font-size:10px;color:#a0aebb;margin-bottom:12px; line-height:1.4">TPXO9 - 15-constituent global ocean tide model (M2, S2, N2, K2, K1, O1, P1, Q1, M4, MS4, MN4, Mf, Mm, Ssa, S1) with 1/6 deg atlas resolution. Nodal/astronomical corrections applied.
+ </div>
+ <!-- Location Selection - Primary Action -->
+ <div style="background:#0a1a2a; border:1px solid #00d2ff44; border-radius:5px; padding:10px; margin-bottom:12px;">
+ <div style="font-size:10px; color:#00d2ff; font-weight:700; margin-bottom:8px; letter-spacing:0.5px;">PREDICTION LOCATION</div>
+ <button id="tide-pick-map-btn" onclick="startTideMapPick()" style="width:100%;padding:10px;border-radius:5px;border:2px solid #00d2ff;background:#1a1a2e;color:#00d2ff;font-weight:700;cursor:pointer;font-size:13px;outline:none;margin-bottom:8px;">Choose Location on Map</button>
+ <div style="display:flex; gap:10px; align-items:center;">
+ <div class="panel-row" style="flex:1; margin-bottom:0;">
+ <label style="width:40px">Lat</label>
+ <input type="number" id="tide-lat" step="0.00001" onchange="updateTidePreview()" style="width:100%;" />
+ </div>
+ <div class="panel-row" style="flex:1; margin-bottom:0;">
+ <label style="width:40px">Lon</label>
+ <input type="number" id="tide-lon" step="0.00001" onchange="updateTidePreview()" style="width:100%;" />
+ </div>
+ </div>
+ </div>
+ <!-- Date Input Fields -->
+ <div style="background:#0a1a2a; border:1px solid #00d2ff44; border-radius:5px; padding:10px; margin-bottom:12px;">
+ <div style="font-size:10px; color:#00d2ff; font-weight:700; margin-bottom:8px; letter-spacing:0.5px;">PREDICTION DATE RANGE</div>
+ <div class="panel-row" style="margin-bottom:6px">
+ <label style="width:80px">From</label>
+ <input type="date" id="tide-date-from" onchange="updateTidePreview()" title="Day, month and year - the range is echoed below with the month spelled out" style="flex:1;background:#252545;border:1px solid #3a3a60;color:#e0e0e0;padding:5px 8px;border-radius:4px;font-size:12px;outline:none;" />
+ </div>
+ <div class="panel-row" style="margin-bottom:0">
+ <label style="width:80px">To</label>
+ <input type="date" id="tide-date-to" onchange="updateTidePreview()" style="flex:1;background:#252545;border:1px solid #3a3a60;color:#e0e0e0;padding:5px 8px;border-radius:4px;font-size:12px;outline:none;" />
+ </div>
+ <!-- The pickers show the browser's locale format (which can be MM/DD or
+ DD/MM); this echoes the range with the month spelled out. -->
+ <div id="tide-date-echo" style="font-size:10px; color:#00d2ff; margin-top:6px; text-align:center;"></div>
+ </div>
+ <!-- Datum Reference -->
+ <div class="panel-row" style="margin-bottom:12px">
+ <label style="width:80px">Datum</label>
+ <select id="tide-datum" onchange="updateTidePreview()" style="flex:1;background:#111;border:1px solid #222;color:#fff;padding:5px 8px;border-radius:4px;font-size:12px;outline:none;cursor:pointer;">
+ <option value="LAT">LAT (Lowest Astronomical Tide)</option>
+ <option value="MSL">MSL (Mean Sea Level)</option>
+ </select>
+ </div>
+ <!-- Interactive Graph Container -->
+ <div style="background:#111; border:1px solid #222; border-radius:6px; padding:10px; margin-bottom:12px; height:210px; display:flex; flex-direction:column; justify-content:space-between; position:relative; overflow:hidden;">
+ <!-- Working-on-it loading box overlay -->
+ <div id="tide-loading-box" style="position:absolute; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.85); display:none; flex-direction:column; align-items:center; justify-content:center; z-index:10;">
+ <div style="color:#00d2ff; font-size:11px; font-weight:800; display:flex; align-items:center; gap:8px; margin-bottom:4px; letter-spacing:0.5px;">
+ <span style="display:inline-block; width:12px; height:12px; border:2px solid #00d2ff; border-top-color:transparent; border-radius:50%; animation: spin 0.8s linear infinite;"></span>WORKING ON IT
+ </div>
+ <div style="color:#a0aebb; font-size:9px;">Fetching ocean model tide data...</div>
+ </div>
+ <!-- Tide curve with height and time axes, drawn by renderTideCurve() -->
+ <div id="tide-graph" style="width:100%; height:100%;"></div>
+ </div>
+ <!-- Stats -->
+ <div style="display:flex; justify-content:space-between; font-size:11px; margin-bottom:14px; background:#111; padding:8px 12px; border-radius:4px; border:1px solid #222;">
+ <div><span style="color:#a0aebb">High:</span> <strong style="color:#30d158" id="tide-stat-high">2.50m</strong></div>
+ <div><span style="color:#a0aebb">Average:</span> <strong style="color:#00d2ff" id="tide-stat-avg">1.25m</strong></div>
+ <div><span style="color:#a0aebb">Low:</span> <strong style="color:#ff453a" id="tide-stat-low">0.10m</strong></div>
+ </div>
+ <div id="tide-source-note" style="font-size:9px; color:#8a9bb0; margin:-8px 0 12px 0; line-height:1.4;"></div>
+ <div style="position:sticky; bottom:0; background:#0e0e16; padding-top:10px; border-top:1px solid #222; margin-top:8px;">
+ <div style="display:flex; gap:6px; margin-bottom:8px;">
+ <button class="panel-ok" onclick="downloadTideCSV()" style="flex:1.5; margin:0; background:#30d158; color:#000; border:none; font-weight:700;">&#x2B73; Download CSV</button>
+ <button class="panel-ok" onclick="emailTideCSV()" style="flex:1.5; margin:0; background:#f5a623; color:#000; border:none; font-weight:700;">&#x2709; Share CSV</button>
+ </div>
+ <div style="display:flex; gap:6px;">
+ <button class="panel-ok" onclick="saveTideCoordinatesDefault()" style="flex:1.5; margin:0; background:#00d2ff; color:#000; border:none;">Save as Default</button>
+ <button class="panel-cancel" onclick="hidePanel('tides')" style="flex:1;">Close</button>
+ </div>
+ </div>
+ </div>
+ <!-- Geodesy Panel -->
+ <div id="panel-geodesy" class="settings-panel" style="display:none; min-width:340px">
+ <button class="panel-close-btn" onclick="hidePanel('geodesy')">&times;</button>
+ <div class="panel-title">Geodesy & Coordinate Systems</div>
+ <div style="font-size:11px;color:#a0aebb;margin-bottom:12px;line-height:1.4">Configure projection and ellipsoid parameters for grid-to-geographic conversions.
+ </div>
+ <div class="panel-row">
+ <label style="width:110px">Ellipsoid/Datum</label>
+ <select id="geo-ellipsoid" style="flex:1;background:#111111;border:1px solid #222222;color:#ffffff;padding:5px 8px;border-radius:4px;font-size:12px">
+ <option value="WGS84">WGS 84 (Standard GPS)</option>
+ <option value="GRS80">GRS 80</option>
+ <option value="ED50">ED 50 (North Sea)</option>
+ <option value="NAD83">NAD 83 (North America)</option>
+ </select>
+ </div>
+ <div class="panel-row">
+ <label style="width:110px">Projection Type</label>
+ <select id="geo-projection" style="flex:1;background:#111111;border:1px solid #222222;color:#ffffff;padding:5px 8px;border-radius:4px;font-size:12px">
+ <option value="UTM">Transverse Mercator (UTM)</option>
+ <option value="GEOGRAPHIC">Geographic (Lat / Lon)</option>
+ </select>
+ </div>
+ <div style="background:#111111; border:1px solid #222222; border-radius:6px; padding:10px; margin-top:12px; margin-bottom:14px; font-size:11px; line-height:1.6">
+ <div style="display:flex; justify-content:space-between; color:#a0aebb;">
+ <span>Active UTM Zone:</span>
+ <strong style="color:#ffffff" id="geo-active-zone">31 N</strong>
+ </div>
+ <div style="display:flex; justify-content:space-between; color:#a0aebb; margin-top:4px;">
+ <span>Central Meridian:</span>
+ <strong style="color:#ffffff" id="geo-central-meridian">3 deg E</strong>
+ </div>
+ <div style="display:flex; justify-content:space-between; color:#a0aebb; margin-top:4px;">
+ <span>False Easting:</span>
+ <strong style="color:#ffffff">500,000 m</strong>
+ </div>
+ <div style="display:flex; justify-content:space-between; color:#a0aebb; margin-top:4px;">
+ <span>False Northing:</span>
+ <strong style="color:#ffffff" id="geo-false-northing">0 m</strong>
+ </div>
+ </div>
+ <!-- Single Coordinate Conversion -->
+ <div style="border-top:1px solid #222; padding-top:12px; margin-bottom:14px;">
+ <div style="font-size:10px; color:#a0aebb; margin-bottom:8px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px;">Coordinate Conversion</div>
+ <div style="display:flex; gap:6px; margin-bottom:8px;">
+ <button id="geo-mode-ll2utm" onclick="geoSetConvMode('ll2utm')" style="flex:1;padding:6px 8px;border-radius:4px;border:1px solid #00d2ff;background:#0a1a2a;color:#00d2ff;font-size:10px;font-weight:700;cursor:pointer;outline:none;">Lat/Lon ' UTM</button>
+ <button id="geo-mode-utm2ll" onclick="geoSetConvMode('utm2ll')" style="flex:1;padding:6px 8px;border-radius:4px;border:1px solid #333;background:#111;color:#a0aebb;font-size:10px;font-weight:700;cursor:pointer;outline:none;">UTM ' Lat/Lon</button>
+ </div>
+ <!-- Lat/Lon to UTM inputs -->
+ <div id="geo-conv-ll2utm" style="margin-bottom:8px;">
+ <div class="panel-row" style="margin-bottom:6px;">
+ <label style="width:70px;font-size:10px;">Latitude</label>
+ <input id="geo-conv-lat" type="text" placeholder="e.g. 51.5074 or 51 30 26.6 N" style="flex:1;padding:5px 8px;background:#0a0a12;border:1px solid #1a1a24;border-radius:3px;color:#e2e8f0;font-size:11px;outline:none;" />
+ </div>
+ <div class="panel-row" style="margin-bottom:6px;">
+ <label style="width:70px;font-size:10px;">Longitude</label>
+ <input id="geo-conv-lon" type="text" placeholder="e.g. -0.1278 or 0 7 40.1 W" style="flex:1;padding:5px 8px;background:#0a0a12;border:1px solid #1a1a24;border-radius:3px;color:#e2e8f0;font-size:11px;outline:none;" />
+ </div>
+ <div class="panel-row" style="margin-bottom:6px;">
+ <label style="width:70px;font-size:10px;">Zone (opt)</label>
+ <input id="geo-conv-zone-ll" type="number" min="1" max="60" placeholder="auto" style="width:50px;padding:5px 8px;background:#0a0a12;border:1px solid #1a1a24;border-radius:3px;color:#e2e8f0;font-size:11px;outline:none;text-align:center;" />
+ </div>
+ </div>
+ <!-- UTM to Lat/Lon inputs -->
+ <div id="geo-conv-utm2ll" style="display:none; margin-bottom:8px;">
+ <div class="panel-row" style="margin-bottom:6px;">
+ <label style="width:70px;font-size:10px;">Easting</label>
+ <input id="geo-conv-easting" type="text" placeholder="e.g. 500000" style="flex:1;padding:5px 8px;background:#0a0a12;border:1px solid #1a1a24;border-radius:3px;color:#e2e8f0;font-size:11px;outline:none;" />
+ </div>
+ <div class="panel-row" style="margin-bottom:6px;">
+ <label style="width:70px;font-size:10px;">Northing</label>
+ <input id="geo-conv-northing" type="text" placeholder="e.g. 5710000" style="flex:1;padding:5px 8px;background:#0a0a12;border:1px solid #1a1a24;border-radius:3px;color:#e2e8f0;font-size:11px;outline:none;" />
+ </div>
+ <div class="panel-row" style="margin-bottom:6px;">
+ <label style="width:70px;font-size:10px;">Zone</label>
+ <input id="geo-conv-zone-utm" type="number" min="1" max="60" style="width:50px;padding:5px 8px;background:#0a0a12;border:1px solid #1a1a24;border-radius:3px;color:#e2e8f0;font-size:11px;outline:none;text-align:center;" />
+ <select id="geo-conv-hemi" style="margin-left:6px;padding:5px 8px;background:#0a0a12;border:1px solid #1a1a24;border-radius:3px;color:#e2e8f0;font-size:11px;outline:none;">
+ <option value="N">North</option>
+ <option value="S">South</option>
+ </select>
+ </div>
+ </div>
+ <button onclick="geoConvertSingle()" style="width:100%;padding:7px 10px;border-radius:4px;border:1px solid #00d2ff;background:#0a1a2a;color:#00d2ff;font-weight:700;cursor:pointer;font-size:11px;outline:none;margin-bottom:6px;">Convert</button>
+ <div id="geo-conv-result" style="background:#0a0a12;border:1px solid #1a1a24;border-radius:4px;padding:8px 10px;font-size:11px;color:#30d158;min-height:20px;white-space:pre-wrap;"></div>
+ </div>
+ <!-- Batch Conversion -->
+ <div style="border-top:1px solid #222; padding-top:12px; margin-bottom:14px;">
+ <div style="font-size:10px; color:#a0aebb; margin-bottom:8px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px;">Batch Conversion</div>
+ <div style="font-size:9px; color:#666; margin-bottom:6px; line-height:1.4;">Paste multiple coordinates (one per line). Auto-detects Lat/Lon or UTM format.
+ </div>
+ <textarea id="geo-batch-input" rows="5" placeholder="Lat/Lon: 51.5074, -0.1278&#10;UTM: 500000 5710000 31N&#10;DMS: 51 30 26.6 N, 0 7 40.1 W" style="width:100%;padding:8px;background:#0a0a12;border:1px solid #1a1a24;border-radius:4px;color:#e2e8f0;font-size:10px;font-family:monospace;outline:none;resize:vertical;box-sizing:border-box;"></textarea>
+ <div style="display:flex; gap:6px; margin-top:6px; margin-bottom:6px;">
+ <button onclick="geoBatchConvert()" style="flex:1;padding:7px 10px;border-radius:4px;border:1px solid #00d2ff;background:#0a1a2a;color:#00d2ff;font-weight:700;cursor:pointer;font-size:11px;outline:none;">Convert All</button>
+ <button onclick="geoBatchCopy()" style="flex:0.6;padding:7px 10px;border-radius:4px;border:1px solid #333;background:#111;color:#a0aebb;font-weight:700;cursor:pointer;font-size:11px;outline:none;">Copy</button>
+ </div>
+ <textarea id="geo-batch-output" rows="5" readonly placeholder="Results will appear here..." style="width:100%;padding:8px;background:#0a0a12;border:1px solid #1a1a24;border-radius:4px;color:#30d158;font-size:10px;font-family:monospace;outline:none;resize:vertical;box-sizing:border-box;"></textarea>
+ </div>
+ <div style="display:flex; gap:8px;">
+ <button class="panel-ok" onclick="applyGeodesySettings(false)" style="flex:1; margin:0">Done</button>
+ <button class="panel-ok" onclick="applyGeodesySettings(true)" style="flex:1.5; margin:0; background:#00d2ff; color:#000; border:none;">Save as Default</button>
+ <button class="panel-cancel" onclick="hidePanel('geodesy')" style="flex:1">Close</button>
+ </div>
+ </div>
+ <!-- Measure Panel -->
+ <div id="panel-measure" class="settings-panel" style="display:none; min-width:320px;">
+ <button class="panel-close-btn" onclick="hidePanel('measure')">&times;</button>
+ <div class="panel-title">Measuring Tools</div>
+ <div style="font-size:11px;color:#a0aebb;margin-bottom:14px;line-height:1.4">Click on the map to measure distances, bearings, and areas. Press <strong>Escape</strong>or double-click to finish.
+ </div>
+ <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:14px;">
+ <button onclick="startMeasureDistance()" style="width:100%;padding:10px 12px;border-radius:6px;border:1px solid #333;background:#1a1a2e;color:#00d2ff;font-weight:700;cursor:pointer;font-size:12px;outline:none;text-align:left;">Distance - <span style="color:#a0aebb;font-weight:400;font-size:10px;">click points, double-click to finish</span>
+ </button>
+ <button onclick="startMeasureBearing()" style="width:100%;padding:10px 12px;border-radius:6px;border:1px solid #333;background:#1a1a2e;color:#00d2ff;font-weight:700;cursor:pointer;font-size:12px;outline:none;text-align:left;">Bearing - <span style="color:#a0aebb;font-weight:400;font-size:10px;">click two points for bearing &amp; range</span>
+ </button>
+ <button onclick="startMeasureArea()" style="width:100%;padding:10px 12px;border-radius:6px;border:1px solid #333;background:#1a1a2e;color:#00d2ff;font-weight:700;cursor:pointer;font-size:12px;outline:none;text-align:left;">Area - <span style="color:#a0aebb;font-weight:400;font-size:10px;">click polygon vertices, double-click to close</span>
+ </button>
+ </div>
+ <div id="measure-result" style="background:#111;border:1px solid #222;border-radius:6px;padding:10px 12px;font-size:12px;color:#30d158;min-height:20px;"></div>
+ <div style="margin-top:12px; display:flex; gap:8px;">
+ <button onclick="clearMeasure()" style="flex:1;padding:6px;border-radius:4px;border:1px solid #444;background:transparent;color:#ff453a;font-weight:700;cursor:pointer;font-size:11px;">Clear Measurement</button>
+ <button class="panel-cancel" onclick="hidePanel('measure')" style="flex:1">Close</button>
+ </div>
+ </div>
+ <!-- Start Line & Direction Chooser (shown before route planning) -->
+ <div id="start-line-chooser" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(6,6,12,0.88); z-index:9000; align-items:center; justify-content:center;">
+ <div style="background:#0e0e16; border:1px solid #1a1a24; border-radius:8px; padding:24px 28px; width:100%; max-width:420px; box-shadow:0 16px 64px rgba(0,0,0,0.7);">
+ <div style="font-size:14px; font-weight:700; color:#e0e8f0; margin-bottom:4px; text-align:center;">Choose Start Line & Direction</div>
+ <div style="font-size:11px; color:#8a9bb0; margin-bottom:12px; text-align:center;">Select which survey line to begin from and the acquisition direction.</div>
+ <div id="start-plan-type-banner" style="margin-bottom:12px;padding:8px 10px;border-radius:6px;border:1px solid #155e75;background:rgba(8,47,73,0.45);font-size:11px;color:#67e8f9;text-align:center;font-weight:700;"></div>
+ <div style="margin-bottom:12px;">
+ <label style="font-size:11px; color:#a0aebb; font-weight:600; margin-bottom:4px; display:block;">Plan (acquisition strategy)</label>
+ <select id="start-plan-select" style="width:100%; background:#111; border:1px solid #333; color:#e0e8f0; padding:8px 10px; border-radius:5px; font-size:12px; outline:none; cursor:pointer;">
+ <option value="auto">Auto - deep search + LKH-3 (shortest found; optimality gap reported)</option>
+ <option value="auto-nn">Auto - simple nearest neighbour (quick, no optimization)</option>
+ <option value="low-high">Line number Low &rarr; High</option>
+ <option value="high-low">Line number High &rarr; Low</option>
+ <option value="interleaved">Interleaved swaths (Low &rarr; High)</option>
+ <option value="interleaved-reverse">Interleaved swaths (High &rarr; Low)</option>
+ <option value="west-east">West &rarr; East</option>
+ <option value="east-west">East &rarr; West</option>
+ <option value="south-north">South &rarr; North</option>
+ <option value="north-south">North &rarr; South</option>
+ </select>
+ </div>
+ <div style="margin-bottom:12px;">
+ <label style="font-size:11px; color:#a0aebb; font-weight:600; margin-bottom:4px; display:block;">Optimizer Iterations (Auto plan deep search)</label>
+ <input type="number" id="start-iterations" value="1500" min="100" max="20000" step="100" style="width:100%; background:#111; border:1px solid #333; color:#e0e8f0; padding:8px 10px; border-radius:5px; font-size:12px; outline:none;" />
+ </div>
+ <div style="margin-bottom:12px;">
+ <label style="font-size:11px; color:#a0aebb; font-weight:600; margin-bottom:4px; display:block;">Start Line</label>
+ <select id="start-line-select" style="width:100%; background:#111; border:1px solid #333; color:#e0e8f0; padding:8px 10px; border-radius:5px; font-size:12px; outline:none; cursor:pointer;" onchange="previewStartLine()">
+ </select>
+ </div>
+ <div style="margin-bottom:16px;">
+ <label style="font-size:11px; color:#a0aebb; font-weight:600; margin-bottom:6px; display:block;">Direction</label>
+ <div style="display:flex; gap:8px;">
+ <button id="start-dir-fwd" onclick="setStartDirection(false)" style="flex:1; padding:10px; border-radius:5px; border:2px solid #00d2ff; background:#1a1a2e; color:#00d2ff; font-weight:700; cursor:pointer; font-size:12px;">&#8594; Forward (SOL &rarr; EOL)</button>
+ <button id="start-dir-rev" onclick="setStartDirection(true)" style="flex:1; padding:10px; border-radius:5px; border:2px solid #333; background:#1a1a2e; color:#8a9bb0; font-weight:700; cursor:pointer; font-size:12px;">&#8592; Reverse (EOL &rarr; SOL)</button>
+ </div>
+ </div>
+ <div style="display:flex; gap:8px;">
+ <button onclick="confirmStartLine()" style="flex:2; padding:10px; border-radius:5px; border:none; background:#00d2ff; color:#0e0e16; font-weight:700; cursor:pointer; font-size:13px;">Plan Route</button>
+ <button onclick="skipStartLineChooser()" style="flex:1; padding:10px; border-radius:5px; border:1px solid #333; background:transparent; color:#8a9bb0; font-weight:600; cursor:pointer; font-size:11px;">Auto</button>
+ </div>
+ </div>
+ </div>
+ <!-- Start Point Panel -->
+ <div id="panel-start-point" class="settings-panel" style="display:none; min-width:320px;">
+ <button class="panel-close-btn" onclick="hidePanel('start-point')">&times;</button>
+ <div class="panel-title">Set Start Location</div>
+ <div style="font-size:11px;color:#a0aebb;margin-bottom:8px;line-height:1.4">Select coordinates where the survey vessel starts transit to optimize the line sequence.
+ </div>
+ <div id="start-point-status" style="font-size:11px;color:#00d2ff;margin-bottom:12px;font-weight:600;">Current: First line start (Auto)</div>
+ <button class="panel-ok" onclick="triggerStartPointSelection()" style="width:100%; margin-bottom:8px; background:#e67e22; color:#fff; border:none; padding:8px; border-radius:4px; font-weight:700; cursor:pointer;">&#9737; Select on Map</button>
+ <button class="panel-cancel" onclick="useDefaultStartPoint()" style="width:100%; margin-bottom:10px; cursor:pointer;">Use First Line Start</button>
+ <!-- Start line & direction -->
+ <div style="border-top:1px solid #1a1a24; padding-top:10px; margin-bottom:10px;">
+ <div style="font-size:10px; color:#a0aebb; margin-bottom:6px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px;">Or Start From a Specific Line</div>
+ <label style="font-size:10px; color:#a0aebb; margin-bottom:4px; display:block;">Start Line</label>
+ <select id="sp-start-line" onchange="spPreviewStartLine()" style="width:100%; background:#111; border:1px solid #333; color:#e0e8f0; padding:6px 8px; border-radius:4px; font-size:11px; outline:none; cursor:pointer; margin-bottom:8px;"></select>
+ <label style="font-size:10px; color:#a0aebb; margin-bottom:4px; display:block;">Direction</label>
+ <div style="display:flex; gap:6px; margin-bottom:8px;">
+ <button id="sp-dir-fwd" onclick="spSetDirection(false)" style="flex:1; padding:7px; border-radius:4px; border:2px solid #00d2ff; background:#1a1a2e; color:#00d2ff; font-weight:700; cursor:pointer; font-size:10px;">&#8594; SOL &rarr; EOL</button>
+ <button id="sp-dir-rev" onclick="spSetDirection(true)" style="flex:1; padding:7px; border-radius:4px; border:2px solid #333; background:#1a1a2e; color:#8a9bb0; font-weight:700; cursor:pointer; font-size:10px;">&#8592; EOL &rarr; SOL</button>
+ </div>
+ <button class="panel-ok" onclick="spApplyStartLine()" style="width:100%; margin-bottom:0; background:#00d2ff; color:#0e0e16; border:none; padding:8px; border-radius:4px; font-weight:700; cursor:pointer;">Apply Start Line &amp; Re-plan</button>
+ </div>
+ <button class="panel-cancel" onclick="hidePanel('start-point')" style="width:100%; cursor:pointer;">Close</button>
+ </div>
+ <!-- Post-Plot QC Panel -->
+ <div id="panel-postplot-qc" class="settings-panel" style="display:none; width:760px; max-width:92vw; max-height:88vh; overflow-y:auto;">
+ <button class="panel-close-btn" onclick="hidePanel('postplot-qc')">&times;</button>
+ <div class="panel-title">Post-Plot QC - Attributes vs SP</div>
+ <div style="font-size:11px;color:#a0aebb;margin-bottom:10px;line-height:1.4;">Load acquired sequence files (P1/90, P1/11, raw P2/94 or raw P2/11) to extract per-shotpoint attributes and graph them against SP. P2/94 adds streamer depths, pitch/roll/heave, gyro/network observations and GPS heights; P2/11 adds gun depths/pressures/timing, MRU, gyros and GPS heights (auto-grouped by node). Files are processed locally - nothing is uploaded.
+ </div>
+ <input type="file" id="pp-qc-file" accept=".p190,.p111,.p1,.txt,.a190,.pp1,.sps,.p294,.p211,.p2,.raw" multiple style="display:none" onchange="ppQcLoadFiles(event)"/>
+ <div style="display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap; align-items:center;">
+ <button onclick="document.getElementById('pp-qc-file').click()" style="padding:7px 14px;border-radius:4px;border:none;background:#a855f7;color:#fff;font-weight:700;cursor:pointer;font-size:11px;">+ Load Post-Plot File(s)</button>
+ <select id="pp-qc-file-select" onchange="_ppQcOnFileChange()" style="background:#111;border:1px solid #333;color:#e0e8f0;padding:6px 8px;border-radius:4px;font-size:11px;outline:none;cursor:pointer;max-width:220px;"></select>
+ <select id="pp-qc-line-select" onchange="_ppQcOnLineChange()" style="background:#111;border:1px solid #333;color:#e0e8f0;padding:6px 8px;border-radius:4px;font-size:11px;outline:none;cursor:pointer;max-width:180px;"></select>
+ <select id="pp-qc-node-select" onchange="_ppQcRenderGraphs()" title="Graph an alternative node track (vessel, tail buoy, CMP...)" style="background:#111;border:1px solid #333;color:#ffd60a;padding:6px 8px;border-radius:4px;font-size:11px;outline:none;cursor:pointer;max-width:180px;display:none;"></select>
+ <button onclick="ppQcClear()" style="padding:6px 12px;border-radius:4px;border:1px solid #333;background:#1a1a2e;color:#ff453a;font-size:10px;font-weight:700;cursor:pointer;">Clear All</button>
+ </div>
+ <div style="display:flex; gap:12px; margin-bottom:10px; flex-wrap:wrap; align-items:center; font-size:10px; color:#8a9bb0;">
+ <span style="font-weight:700;color:#a0aebb;">QC limits (optional, per survey specs):</span>
+ <label style="display:flex;align-items:center;gap:4px;">SP interval
+ <input id="pp-qc-sp-nominal" type="number" step="0.1" placeholder="nom" onchange="_ppQcRenderGraphs()" style="background:#111;border:1px solid #333;color:#e0e8f0;padding:4px 6px;border-radius:4px;font-size:10px;width:52px;outline:none;"/>
+ +/- <input id="pp-qc-sp-tol" type="number" step="0.1" placeholder="10%" onchange="_ppQcRenderGraphs()" style="background:#111;border:1px solid #333;color:#e0e8f0;padding:4px 6px;border-radius:4px;font-size:10px;width:48px;outline:none;"/>m
+ </label>
+ <label style="display:flex;align-items:center;gap:4px;">Speed
+ <input id="pp-qc-spd-min" type="number" step="0.1" placeholder="min" onchange="_ppQcRenderGraphs()" style="background:#111;border:1px solid #333;color:#e0e8f0;padding:4px 6px;border-radius:4px;font-size:10px;width:48px;outline:none;"/> - <input id="pp-qc-spd-max" type="number" step="0.1" placeholder="max" onchange="_ppQcRenderGraphs()" style="background:#111;border:1px solid #333;color:#e0e8f0;padding:4px 6px;border-radius:4px;font-size:10px;width:48px;outline:none;"/>kn
+ </label>
+ <span style="color:#556;">Out-of-spec shots flagged red on graphs</span>
+ </div>
+ <div id="pp-qc-summary" style="font-size:10px;color:#8a9bb0;margin-bottom:10px;padding:6px 8px;background:#0a0a12;border-radius:4px;border:1px solid #1a1a24;">No post-plot files loaded.</div>
+ <div id="pp-qc-attr-picker" style="display:none;margin-bottom:10px;"></div>
+ <div id="pp-qc-graphs"></div>
+ </div>
+ <!-- Fold of Coverage Panel -->
+ <div id="panel-fold-coverage" class="settings-panel" style="display:none; width:840px; max-width:94vw; max-height:88vh; overflow-y:auto;">
+ <button class="panel-close-btn" onclick="hidePanel('fold-coverage')">&times;</button>
+ <div class="panel-title">Fold of Coverage - CMP Bin Maps</div>
+ <div style="font-size:11px;color:#a0aebb;margin-bottom:8px;line-height:1.4;">Builds CMP fold maps from P1 files containing shot (S) and receiver group (R) records. Each shot-channel midpoint is binned on the grid below, split into offset quarters of the cable (nears / near-mids / far-mids / fars / alls). Fold accumulates across every file you add - load the next sequence to build up coverage. Files are processed locally.
+ </div>
+ <div id="fold-limit-banner" style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:10px;padding:8px 10px;border-radius:5px;border:1px solid rgba(255,214,10,0.45);background:rgba(255,214,10,0.08);">
+  <div style="font-size:11px;color:#e8e0b0;line-height:1.45;">
+   <strong style="color:#ffd60a;">Coverage plot limit:</strong>
+   This session can process up to <strong style="color:#fff;">2 GB</strong> of P1 / fold data unless you upgrade.
+   <span id="fold-limit-usage" style="color:#a0aebb;"></span>
+  </div>
+  <button type="button" onclick="hidePanel('fold-coverage'); togglePanel('licensing');" style="flex-shrink:0;padding:5px 10px;border-radius:4px;border:1px solid #00d2ff;background:#0a1a2a;color:#00d2ff;font-size:10px;font-weight:700;cursor:pointer;white-space:nowrap;">Upgrade</button>
+ </div>
+ <div style="display:flex; gap:12px; margin-bottom:10px; flex-wrap:wrap; align-items:center; font-size:10px; color:#8a9bb0;">
+ <span style="font-weight:700;color:#a0aebb;">Bin grid:</span>
+ <label style="display:flex;align-items:center;gap:4px;">Origin E
+ <input id="fold-org-e" type="number" step="0.1" placeholder="auto" style="background:#111;border:1px solid #333;color:#e0e8f0;padding:4px 6px;border-radius:4px;font-size:10px;width:88px;outline:none;"/>
+ </label>
+ <label style="display:flex;align-items:center;gap:4px;">N
+ <input id="fold-org-n" type="number" step="0.1" placeholder="auto" style="background:#111;border:1px solid #333;color:#e0e8f0;padding:4px 6px;border-radius:4px;font-size:10px;width:92px;outline:none;"/>
+ </label>
+ <label style="display:flex;align-items:center;gap:4px;">Orientation
+ <input id="fold-az" type="number" step="0.1" placeholder="auto" style="background:#111;border:1px solid #333;color:#e0e8f0;padding:4px 6px;border-radius:4px;font-size:10px;width:56px;outline:none;"/>deg
+ </label>
+ <label style="display:flex;align-items:center;gap:4px;">Bin width (j)
+ <input id="fold-bin-w" type="number" step="0.1" value="25" style="background:#111;border:1px solid #333;color:#e0e8f0;padding:4px 6px;border-radius:4px;font-size:10px;width:52px;outline:none;"/>m
+ </label>
+ <label style="display:flex;align-items:center;gap:4px;">Bin height (i)
+ <input id="fold-bin-h" type="number" step="0.1" value="12.5" style="background:#111;border:1px solid #333;color:#e0e8f0;padding:4px 6px;border-radius:4px;font-size:10px;width:52px;outline:none;"/>m
+ </label>
+ <label style="display:flex;align-items:center;gap:4px;">Cable length
+ <input id="fold-cable" type="number" step="1" value="6000" style="background:#111;border:1px solid #333;color:#e0e8f0;padding:4px 6px;border-radius:4px;font-size:10px;width:60px;outline:none;"/>m
+ </label>
+ <label title="Display-only: stretches bin width relative to bin height for infill analysis" style="display:flex;align-items:center;gap:4px;">Aspect (width x)
+ <input id="fold-aspect" type="number" step="0.5" min="0.5" value="4" onchange="_foldRender()" style="background:#111;border:1px solid #333;color:#5eead4;padding:4px 6px;border-radius:4px;font-size:10px;width:48px;outline:none;"/>
+ </label>
+ <label title="Reject a bin hit when the bin already holds a hit in the same offset class" style="display:flex;align-items:center;gap:4px;">
+ <input id="fold-cor" type="checkbox" onchange="foldCorChanged()" style="width:14px;height:14px;cursor:pointer;"/>Common Offset Rejection, class
+ <input id="fold-cor-w" type="number" step="1" min="1" value="25" onchange="foldCorChanged()" style="background:#111;border:1px solid #333;color:#e0e8f0;padding:4px 6px;border-radius:4px;font-size:10px;width:48px;outline:none;"/>m
+ </label>
+ <label title="Flex (CMP) binning: expand the crossline bin width with offset. Values are % of the native bin width (100% = native, e.g. 150% of 25 m = 37.5 m). Linear = taper from first to last channel; Stepped = fixed % per offset group. Toggle any time - the fold is rebuilt from the stored data." style="display:flex;align-items:center;gap:4px;">Flex binning
+ <select id="fold-flex-mode" onchange="foldFlexChanged()" style="background:#111;border:1px solid #333;color:#e0e8f0;padding:4px 6px;border-radius:4px;font-size:10px;outline:none;cursor:pointer;">
+ <option value="off" selected>Off</option>
+ <option value="linear">Linear taper</option>
+ <option value="stepped">Stepped</option>
+ </select>
+ </label>
+ <span id="fold-flex-linear" style="display:none;align-items:center;gap:4px;">head
+ <input id="fold-flex-f0" type="number" step="5" min="10" value="150" onchange="foldFlexChanged()" style="background:#111;border:1px solid #333;color:#c084fc;padding:4px 6px;border-radius:4px;font-size:10px;width:52px;outline:none;"/> % ' tail
+ <input id="fold-flex-f1" type="number" step="5" min="10" value="300" onchange="foldFlexChanged()" style="background:#111;border:1px solid #333;color:#c084fc;padding:4px 6px;border-radius:4px;font-size:10px;width:52px;outline:none;"/> % of native width
+ </span>
+ <span id="fold-flex-stepped" style="display:none;align-items:center;gap:4px;">N
+ <input id="fold-flex-s0" type="number" step="5" min="10" value="100" onchange="foldFlexChanged()" style="background:#111;border:1px solid #333;color:#c084fc;padding:4px 6px;border-radius:4px;font-size:10px;width:52px;outline:none;"/>% NM
+ <input id="fold-flex-s1" type="number" step="5" min="10" value="150" onchange="foldFlexChanged()" style="background:#111;border:1px solid #333;color:#c084fc;padding:4px 6px;border-radius:4px;font-size:10px;width:52px;outline:none;"/>% FM
+ <input id="fold-flex-s2" type="number" step="5" min="10" value="200" onchange="foldFlexChanged()" style="background:#111;border:1px solid #333;color:#c084fc;padding:4px 6px;border-radius:4px;font-size:10px;width:52px;outline:none;"/>% F
+ <input id="fold-flex-s3" type="number" step="5" min="10" value="300" onchange="foldFlexChanged()" style="background:#111;border:1px solid #333;color:#c084fc;padding:4px 6px;border-radius:4px;font-size:10px;width:52px;outline:none;"/>%
+ </span>
+ </div>
+ <div style="font-size:9px;color:#556;margin:-4px 0 10px 0;">Origin/orientation left blank are taken from the first file (first midpoint / line azimuth). The grid locks after the first file - Reset Fold to change it.</div>
+ <input type="file" id="fold-file" accept=".p190,.p111,.p1,.txt,.a190,.pp1" multiple style="display:none" onchange="foldAddFiles(event)"/>
+ <input type="file" id="fold-load-file" accept=".json" style="display:none" onchange="foldLoad(event)"/>
+ <div style="display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap; align-items:center;">
+ <button onclick="document.getElementById('fold-file').click()" style="padding:7px 14px;border-radius:4px;border:none;background:#14b8a6;color:#fff;font-weight:700;cursor:pointer;font-size:11px;">+ Add P1 File(s) to Fold</button>
+ <button onclick="foldSave()" style="padding:6px 12px;border-radius:4px;border:1px solid #333;background:#1a1a2e;color:#5eead4;font-size:10px;font-weight:700;cursor:pointer;">Save Fold (.json)</button>
+ <button onclick="foldExportImages()" title="Download a lossless PNG per offset group" style="padding:6px 12px;border-radius:4px;border:1px solid #333;background:#1a1a2e;color:#5eead4;font-size:10px;font-weight:700;cursor:pointer;">Export Images (PNG)</button>
+ <button onclick="foldPlotOnMap()" title="Plot an offset group as a georeferenced overlay on the basemap" style="padding:6px 12px;border-radius:4px;border:1px solid #333;background:#1a1a2e;color:#5eead4;font-size:10px;font-weight:700;cursor:pointer;">Plot on Basemap</button>
+ <button onclick="document.getElementById('fold-load-file').click()" style="padding:6px 12px;border-radius:4px;border:1px solid #333;background:#1a1a2e;color:#5eead4;font-size:10px;font-weight:700;cursor:pointer;">Load Fold</button>
+ <button onclick="foldReset()" style="padding:6px 12px;border-radius:4px;border:1px solid #333;background:#1a1a2e;color:#ff453a;font-size:10px;font-weight:700;cursor:pointer;">Reset Fold</button>
+ </div>
+ <div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:10px;">
+ <div id="fold-summary" style="flex:1;font-size:10px;color:#8a9bb0;padding:6px 8px;background:#0a0a12;border-radius:4px;border:1px solid #1a1a24;">No fold data - add a P1 file with receiver (R) records.</div>
+ <div style="position:relative;flex-shrink:0;">
+ <button id="fold-files-btn" onclick="foldToggleFileList()" style="display:none;padding:6px 12px;border-radius:4px;border:1px solid #333;background:#1a1a2e;color:#5eead4;font-size:10px;font-weight:700;cursor:pointer;white-space:nowrap;">Files (0) v</button>
+ <div id="fold-file-list" style="display:none;position:absolute;right:0;top:calc(100% + 4px);z-index:1000;min-width:320px;max-width:440px;max-height:220px;overflow-y:auto;font-size:10px;background:#12121c;border:1px solid #2a2a3a;border-radius:6px;padding:8px 10px;box-shadow:0 8px 24px rgba(0,0,0,0.5);"></div>
+ </div>
+ </div>
+ <div id="fold-maps"></div>
+ </div>
+ <!-- Ray Tracing (OBN / water-column acoustic paths) -->
+ <div id="panel-ray-tracing" class="settings-panel" style="display:none; width:720px; max-width:94vw; max-height:88vh; overflow-y:auto;">
+ <button class="panel-close-btn" onclick="hidePanel('ray-tracing'); rayTraceStopPick();">&times;</button>
+ <div class="panel-title">Ray Tracing - OBN / Water Column</div>
+ <div style="font-size:11px;color:#a0aebb;margin-bottom:10px;line-height:1.45;">
+ Acoustic paths from a source to seabed nodes through a layered velocity model (Snell's law).
+ First slice for OBN planning: place a source, place or generate a node patch, then trace rays for travel time and emergence angle.
+ </div>
+ <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+  <div style="background:#0a0a12;border:1px solid #1a1a24;border-radius:6px;padding:10px;">
+   <div style="font-size:10px;color:#fbbf24;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;margin-bottom:8px;">Geometry</div>
+   <div class="panel-row" style="margin-bottom:6px;">
+    <label style="width:110px;font-size:11px;color:#c0c8d4;">Source depth</label>
+    <input id="ray-src-z" type="number" min="0" step="1" value="8" style="width:80px;padding:4px 6px;border-radius:3px;border:1px solid #333;background:#111;color:#fff;font-size:11px;outline:none;"/>
+    <span style="font-size:10px;color:#666;margin-left:4px;">m</span>
+   </div>
+   <div class="panel-row" style="margin-bottom:6px;">
+    <label style="width:110px;font-size:11px;color:#c0c8d4;">Node / seabed</label>
+    <input id="ray-rcv-z" type="number" min="1" step="1" value="1000" style="width:80px;padding:4px 6px;border-radius:3px;border:1px solid #333;background:#111;color:#fff;font-size:11px;outline:none;"/>
+    <span style="font-size:10px;color:#666;margin-left:4px;">m</span>
+   </div>
+   <div class="panel-row" style="margin-bottom:6px;">
+    <label style="width:110px;font-size:11px;color:#c0c8d4;">Max offset</label>
+    <input id="ray-max-off" type="number" min="100" step="100" value="8000" style="width:80px;padding:4px 6px;border-radius:3px;border:1px solid #333;background:#111;color:#fff;font-size:11px;outline:none;"/>
+    <span style="font-size:10px;color:#666;margin-left:4px;">m</span>
+   </div>
+   <div class="panel-row" style="margin-bottom:6px;">
+    <label style="width:110px;font-size:11px;color:#c0c8d4;">Max rays drawn</label>
+    <input id="ray-max-draw" type="number" min="1" max="500" step="1" value="80" style="width:80px;padding:4px 6px;border-radius:3px;border:1px solid #333;background:#111;color:#fff;font-size:11px;outline:none;"/>
+   </div>
+  </div>
+  <div style="background:#0a0a12;border:1px solid #1a1a24;border-radius:6px;padding:10px;">
+   <div style="font-size:10px;color:#fbbf24;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;margin-bottom:8px;">Velocity model (1D layers)</div>
+   <div style="font-size:9px;color:#666;margin-bottom:6px;">Bottom depth (m) and P-velocity (m/s) per layer, top to bottom.</div>
+   <div id="ray-vmodel-rows" style="max-height:120px;overflow-y:auto;margin-bottom:6px;"></div>
+   <div style="display:flex;gap:6px;flex-wrap:wrap;">
+    <button type="button" onclick="rayAddLayer()" style="padding:4px 8px;border-radius:3px;border:1px solid #333;background:#1a1a2e;color:#e0e8f0;font-size:10px;cursor:pointer;">+ Layer</button>
+    <button type="button" onclick="rayPresetWater()" style="padding:4px 8px;border-radius:3px;border:1px solid #333;background:#1a1a2e;color:#5eead4;font-size:10px;cursor:pointer;">Water only 1500</button>
+    <button type="button" onclick="rayPresetGradient()" style="padding:4px 8px;border-radius:3px;border:1px solid #333;background:#1a1a2e;color:#5eead4;font-size:10px;cursor:pointer;">Water gradient</button>
+   </div>
+  </div>
+ </div>
+ <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center;">
+  <button type="button" id="ray-btn-src" onclick="rayTracePickSource()" style="padding:7px 12px;border-radius:4px;border:none;background:#f59e0b;color:#111;font-weight:700;cursor:pointer;font-size:11px;">1. Place Source</button>
+  <button type="button" id="ray-btn-node" onclick="rayTracePickNode()" style="padding:7px 12px;border-radius:4px;border:1px solid #f59e0b;background:#1a1205;color:#fbbf24;font-weight:700;cursor:pointer;font-size:11px;">2. Place Node</button>
+  <button type="button" onclick="rayGeneratePatch()" style="padding:7px 12px;border-radius:4px;border:1px solid #333;background:#1a1a2e;color:#e0e8f0;font-weight:700;cursor:pointer;font-size:11px;">Generate Node Patch</button>
+  <button type="button" onclick="rayTraceRun()" style="padding:7px 14px;border-radius:4px;border:none;background:#30d158;color:#000;font-weight:700;cursor:pointer;font-size:11px;">Trace Rays</button>
+  <button type="button" onclick="rayTraceClear()" style="padding:7px 12px;border-radius:4px;border:1px solid #333;background:#1a1a2e;color:#ff453a;font-weight:700;cursor:pointer;font-size:11px;">Clear</button>
+ </div>
+ <div style="display:flex;gap:10px;margin-bottom:8px;font-size:10px;color:#8a9bb0;flex-wrap:wrap;">
+  <label style="display:flex;align-items:center;gap:4px;">Patch nx
+   <input id="ray-patch-nx" type="number" min="1" max="40" value="5" style="width:44px;padding:3px 4px;border-radius:3px;border:1px solid #333;background:#111;color:#fff;font-size:10px;outline:none;"/>
+  </label>
+  <label style="display:flex;align-items:center;gap:4px;">ny
+   <input id="ray-patch-ny" type="number" min="1" max="40" value="5" style="width:44px;padding:3px 4px;border-radius:3px;border:1px solid #333;background:#111;color:#fff;font-size:10px;outline:none;"/>
+  </label>
+  <label style="display:flex;align-items:center;gap:4px;">Spacing
+   <input id="ray-patch-dx" type="number" min="10" step="10" value="400" style="width:56px;padding:3px 4px;border-radius:3px;border:1px solid #333;background:#111;color:#fff;font-size:10px;outline:none;"/> m
+  </label>
+ </div>
+ <div id="ray-summary" style="font-size:10px;color:#8a9bb0;padding:8px 10px;background:#0a0a12;border:1px solid #1a1a24;border-radius:4px;margin-bottom:10px;">
+  No rays yet - place a source and at least one node, then Trace Rays.
+ </div>
+ <div style="font-size:10px;color:#fbbf24;font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.4px;">Vertical profile (offset vs depth)</div>
+ <canvas id="ray-profile-canvas" width="680" height="260" style="width:100%;max-width:680px;height:260px;background:#07070c;border:1px solid #1a1a24;border-radius:4px;display:block;margin-bottom:8px;"></canvas>
+ <div style="font-size:9px;color:#556;line-height:1.4;">Rays are coloured by travel time on the map. Profile shows depth downward; source at top. Critical / turning rays that cannot reach the node depth are skipped.</div>
+ </div>
+ <!-- AIS Panel (tier-1) -->
+ <div id="panel-ais" class="settings-panel" style="display:none; min-width:340px; max-width:420px; max-height:90vh; overflow-y:auto;">
+ <button class="panel-close-btn" onclick="hidePanel('ais')">&times;</button>
+ <div class="panel-title">Live AIS</div>
+ <div id="ais-feed-status" style="font-size:11px;color:#94a3b8;margin-bottom:12px;line-height:1.45;">Loading feed status…</div>
+
+ <div style="border:1px solid #1e293b;border-radius:8px;padding:10px 12px;margin-bottom:12px;background:#0a0a12;">
+ <div style="font-size:10px;color:#7dd3fc;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;margin-bottom:8px;">Free coastal feeds</div>
+ <label style="display:flex; align-items:center; gap:8px; font-size:12px; color:#e2e8f0; cursor:pointer; margin-bottom:8px;">
+ <input type="checkbox" id="ais-show-bbox" onchange="toggleAisInView(this.checked)" style="accent-color:#00d2ff;"/>Show vessels in map view
+ </label>
+ <div style="font-size:10px;color:#64748b;line-height:1.4;">Digitraffic (Finnish/Baltic) + Kystverket Norway open AIS. Pan the map into those waters to see traffic.</div>
+ </div>
+
+ <div style="border:1px solid #422006;border-radius:8px;padding:10px 12px;margin-bottom:12px;background:rgba(120,53,15,0.15);">
+ <div style="font-size:10px;color:#fbbf24;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;margin-bottom:8px;">Seismic fleet</div>
+ <label style="display:flex; align-items:center; gap:8px; font-size:12px; color:#e2e8f0; cursor:pointer; margin-bottom:8px;">
+ <input type="checkbox" id="ais-show-seismic" onchange="toggleSeismicFleetAis(this.checked)" style="accent-color:#fbbf24;"/>Show working seismic fleet on AIS
+ </label>
+ <div id="ais-seismic-status" style="font-size:10px; color:#a0aebb; margin-bottom:8px; line-height:1.35;"></div>
+ <div style="font-size:10px;color:#fcd34d;line-height:1.45;border-top:1px solid #78350f;padding-top:8px;">
+ Worldwide offshore seismic ships are mostly beyond coastal AIS. Mapping the global working fleet needs <b style="color:#fde68a;">paid satellite AIS</b> (e.g. Kpler / MarineTraffic). Free feeds only catch them when they are in Nordic/Baltic coverage.
+ </div>
+ </div>
+
+ <div style="border:1px solid #1e293b;border-radius:8px;padding:10px 12px;margin-bottom:4px;background:#0a0a12;">
+ <div style="font-size:10px;color:#a0aebb;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;margin-bottom:8px;">Track one vessel (MMSI)</div>
+ <div style="display:flex; gap:6px;">
+ <input type="text" id="ais-track-mmsi" placeholder="9-digit MMSI" maxlength="9" style="flex:1; min-width:0; padding:5px 8px; background:#05050a; border:1px solid #1a1a24; border-radius:3px; color:#e2e8f0; font-size:11px; outline:none;"/>
+ <button onclick="startVesselTracking()" style="padding:5px 10px; background:#0a0a12; border:1px solid #00d2ff; border-radius:3px; color:#00d2ff; font-size:10px; cursor:pointer;">TRACK</button>
+ <button onclick="stopVesselTracking()" style="padding:5px 10px; background:#0a0a12; border:1px solid #1a1a24; border-radius:3px; color:#a0aebb; font-size:10px; cursor:pointer;">STOP</button>
+ </div>
+ <div id="ais-track-status" style="font-size:10px; color:#a0aebb; margin-top:6px;"></div>
+ </div>
+ </div>
+ <!-- Layers Panel -->
+ <div id="panel-layers" class="settings-panel" style="display:none; min-width:280px; max-height:90vh; overflow-y:auto;">
+ <button class="panel-close-btn" onclick="hidePanel('layers')">&times;</button>
+ <div class="panel-title">Map Layers</div>
+ <div style="font-size:11px;color:#a0aebb;margin-bottom:14px;">Toggle map layer visibility overlays.
+ </div>
+ <div class="panel-row" style="justify-content:space-between; margin-bottom:12px;">
+ <label>Survey Lines</label>
+ <input type="checkbox" id="layer-toggle-lines" checked onchange="toggleSurveyLayer('lines')" style="flex:none; width:20px; height:20px; cursor:pointer;" />
+ </div>
+ <div class="panel-row" style="justify-content:space-between; margin-bottom:12px;">
+ <label>Line Labels (No. &amp; SP)</label>
+ <input type="checkbox" id="layer-toggle-labels" checked onchange="toggleSurveyLayer('labels')" style="flex:none; width:20px; height:20px; cursor:pointer;" />
+ </div>
+ <div class="panel-row" style="justify-content:space-between; margin-bottom:12px;">
+ <label>Planned Route</label>
+ <input type="checkbox" id="layer-toggle-route" checked onchange="toggleSurveyLayer('route')" style="flex:none; width:20px; height:20px; cursor:pointer;" />
+ </div>
+ <div class="panel-row" style="justify-content:space-between; margin-bottom:12px;">
+ <label>Annotations, Arrows &amp; Start Point</label>
+ <input type="checkbox" id="layer-toggle-annotations" checked onchange="toggleSurveyLayer('annotations')" style="flex:none; width:20px; height:20px; cursor:pointer;" />
+ </div>
+ <div class="panel-row" style="justify-content:space-between; margin-bottom:14px;">
+ <label>Obstructions / Hazards</label>
+ <input type="checkbox" id="layer-toggle-obstructions" checked onchange="toggleSurveyLayer('obstructions')" style="flex:none; width:20px; height:20px; cursor:pointer;" />
+ </div>
+ <!-- Base Map Selection -->
+ <div style="border-top:1px solid #1a1a24; padding-top:14px; margin-bottom:14px;">
+ <div style="font-size:10px; color:#a0aebb; margin-bottom:8px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px;">Base Map</div>
+ <div style="display:flex; flex-direction:column; gap:5px;">
+ <label style="display:flex; align-items:center; gap:8px; font-size:11px; color:#ccc; cursor:pointer;">
+ <input type="radio" name="layers-basemap" value="satellite" onchange="switchBaseMap('satellite')" onclick="switchBaseMap('satellite')" checked style="accent-color:#00d2ff;"/>Satellite Imagery (Esri)
+ </label>
+ <label style="display:flex; align-items:center; gap:8px; font-size:11px; color:#ccc; cursor:pointer;">
+ <input type="radio" name="layers-basemap" value="osm" onchange="switchBaseMap('osm')" onclick="switchBaseMap('osm')" style="accent-color:#00d2ff;"/>OpenStreetMap
+ </label>
+ <label style="display:flex; align-items:center; gap:8px; font-size:11px; color:#ccc; cursor:pointer;">
+ <input type="radio" name="layers-basemap" value="dark" onchange="switchBaseMap('dark')" onclick="switchBaseMap('dark')" style="accent-color:#00d2ff;"/>Dark (CartoDB)
+ </label>
+ <label style="display:flex; align-items:center; gap:8px; font-size:11px; color:#ccc; cursor:pointer;">
+ <input type="radio" name="layers-basemap" value="topo" onchange="switchBaseMap('topo')" onclick="switchBaseMap('topo')" style="accent-color:#00d2ff;"/>Topographic (OpenTopoMap)
+ </label>
+ <label style="display:flex; align-items:center; gap:8px; font-size:11px; color:#ccc; cursor:pointer;">
+ <input type="radio" name="layers-basemap" value="ocean" onchange="switchBaseMap('ocean')" onclick="switchBaseMap('ocean')" style="accent-color:#00d2ff;"/>Ocean Basemap (Esri)
+ </label>
+ <label style="display:flex; align-items:center; gap:8px; font-size:11px; color:#ccc; cursor:pointer;">
+ <input type="radio" name="layers-basemap" value="light" onchange="switchBaseMap('light')" onclick="switchBaseMap('light')" style="accent-color:#00d2ff;"/>Light (CartoDB)
+ </label>
+ <label style="display:flex; align-items:center; gap:8px; font-size:11px; color:#ccc; cursor:pointer;">
+ <input type="radio" name="layers-basemap" value="voyager" onchange="switchBaseMap('voyager')" onclick="switchBaseMap('voyager')" style="accent-color:#00d2ff;"/>Voyager (CartoDB)
+ </label>
+ <label style="display:flex; align-items:center; gap:8px; font-size:11px; color:#ccc; cursor:pointer;">
+ <input type="radio" name="layers-basemap" value="osm-hot" onchange="switchBaseMap('osm-hot')" onclick="switchBaseMap('osm-hot')" style="accent-color:#00d2ff;"/>Humanitarian (OSM HOT)
+ </label>
+ <label style="display:flex; align-items:center; gap:8px; font-size:11px; color:#ccc; cursor:pointer;">
+ <input type="radio" name="layers-basemap" value="esri-street" onchange="switchBaseMap('esri-street')" onclick="switchBaseMap('esri-street')" style="accent-color:#00d2ff;"/>Street Map (Esri)
+ </label>
+ <label style="display:flex; align-items:center; gap:8px; font-size:11px; color:#ccc; cursor:pointer;">
+ <input type="radio" name="layers-basemap" value="esri-topo" onchange="switchBaseMap('esri-topo')" onclick="switchBaseMap('esri-topo')" style="accent-color:#00d2ff;"/>Topographic (Esri)
+ </label>
+ <label style="display:flex; align-items:center; gap:8px; font-size:11px; color:#ccc; cursor:pointer;">
+ <input type="radio" name="layers-basemap" value="esri-gray" onchange="switchBaseMap('esri-gray')" onclick="switchBaseMap('esri-gray')" style="accent-color:#00d2ff;"/>Light Gray Canvas (Esri)
+ </label>
+ <label style="display:flex; align-items:center; gap:8px; font-size:11px; color:#ccc; cursor:pointer;">
+ <input type="radio" name="layers-basemap" value="esri-natgeo" onchange="switchBaseMap('esri-natgeo')" onclick="switchBaseMap('esri-natgeo')" style="accent-color:#00d2ff;"/>NatGeo Style (Esri)
+ </label>
+ <label style="display:flex; align-items:center; gap:8px; font-size:11px; color:#ccc; cursor:pointer;">
+ <input type="radio" name="layers-basemap" value="esri-relief" onchange="switchBaseMap('esri-relief')" onclick="switchBaseMap('esri-relief')" style="accent-color:#00d2ff;"/>Shaded Relief (Esri)
+ </label>
+ <label style="display:flex; align-items:center; gap:8px; font-size:11px; color:#ccc; cursor:pointer;">
+ <input type="radio" name="layers-basemap" value="nautical" onchange="switchBaseMap('nautical')" onclick="switchBaseMap('nautical')" style="accent-color:#00d2ff;"/>Nautical Chart (BA-style GEBCO bathy chart + ENC where published + seamarks)
+ </label>
+ <label style="display:flex; align-items:center; gap:8px; font-size:11px; color:#ccc; cursor:pointer;">
+ <input type="radio" name="layers-basemap" value="shipping" onchange="switchBaseMap('shipping')" onclick="switchBaseMap('shipping')" style="accent-color:#00d2ff;"/>Global Shipping Density (World Bank/IMF AIS)
+ </label>
+ <label title="NASA GIBS JPL MUR sea-surface temperature (~1 km). Loaded only when you select it." style="display:flex; align-items:center; gap:8px; font-size:11px; color:#ccc; cursor:pointer;">
+ <input type="radio" name="layers-basemap" value="sst" onchange="switchBaseMap('sst')" onclick="switchBaseMap('sst')" style="accent-color:#00d2ff;"/>Sea Surface Temp (GIBS MUR) - on request
+ </label>
+ </div>
+ </div>
+ <!-- Overlay Layers -->
+ <div style="border-top:1px solid #1a1a24; padding-top:14px; margin-bottom:14px;">
+ <div style="font-size:10px; color:#a0aebb; margin-bottom:8px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px;">Overlay Layers</div>
+ <div style="display:flex; flex-direction:column; gap:5px;">
+ <label style="display:flex; align-items:center; gap:8px; font-size:11px; color:#ccc; cursor:pointer;">
+ <input type="checkbox" id="layer-overlay-bathy" onchange="toggleMapLayer('bathymetry')" style="accent-color:#00d2ff;"/>Bathymetry Contours (EMODnet)
+ </label>
+ <label title="NASA GIBS JPL MUR SST heatmap. Fetched only when checked - not loaded at startup." style="display:flex; align-items:center; gap:8px; font-size:11px; color:#ccc; cursor:pointer;">
+ <input type="checkbox" id="layer-overlay-sst" onchange="toggleMapLayer('sst')" style="accent-color:#00d2ff;"/>Sea Surface Temp (GIBS MUR) - on request
+ </label>
+ <label style="display:flex; align-items:center; gap:8px; font-size:11px; color:#ccc; cursor:pointer;">
+ <input type="checkbox" id="layer-overlay-gebco" onchange="toggleMapLayer('gebco')" style="accent-color:#00d2ff;"/>GEBCO Bathymetry
+ </label>
+ <label style="display:flex; align-items:center; gap:8px; font-size:11px; color:#ccc; cursor:pointer;">
+ <input type="checkbox" id="layer-overlay-vessel" onchange="toggleMapLayer('vessel-density')" style="accent-color:#00d2ff;"/>Vessel Route Density Heatmap (EMODnet AIS)
+ </label>
+ <label style="display:flex; align-items:center; gap:8px; font-size:11px; color:#ccc; cursor:pointer;">
+ <input type="checkbox" id="layer-overlay-vessel-global" onchange="toggleMapLayer('vessel-global')" style="accent-color:#00d2ff;"/>Global Shipping Density Heatmap (World Bank/IMF AIS 2015-2021)
+ </label>
+ <label style="display:flex; align-items:center; gap:8px; font-size:11px; color:#ccc; cursor:pointer;">
+ <input type="checkbox" id="layer-overlay-vessel-fishing" onchange="toggleMapLayer('vessel-fishing')" style="accent-color:#00d2ff;"/>Fishing Traffic Density (World Bank/IMF AIS)
+ </label>
+ <label style="display:flex; align-items:center; gap:8px; font-size:11px; color:#ccc; cursor:pointer;">
+ <input type="checkbox" id="layer-overlay-vessel-passenger" onchange="toggleMapLayer('vessel-passenger')" style="accent-color:#00d2ff;"/>Passenger Traffic Density (World Bank/IMF AIS)
+ </label>
+ <label style="display:flex; align-items:center; gap:8px; font-size:11px; color:#ccc; cursor:pointer;">
+ <input type="checkbox" id="layer-overlay-vessel-oilgas" onchange="toggleMapLayer('vessel-oilgas')" style="accent-color:#00d2ff;"/>Oil &amp; Gas Vessel Density (World Bank/IMF AIS)
+ </label>
+ <label style="display:flex; align-items:center; gap:8px; font-size:11px; color:#ccc; cursor:pointer;">
+ <input type="checkbox" id="layer-overlay-grid" onchange="toggleMapLayer('grid')" style="accent-color:#00d2ff;"/>UTM Grid Overlay
+ </label>
+ <label title="Isogonic curves: lines of equal magnetic declination (WMM), each labelled with annual rate of change. Amber = east, cyan = west, white = agonic (0)." style="display:flex; align-items:center; gap:8px; font-size:11px; color:#ccc; cursor:pointer;">
+ <input type="checkbox" id="layer-overlay-declination" onchange="toggleMapLayer('declination')" style="accent-color:#f59e0b;"/>Magnetic Declination (isogones)
+ </label>
+ <div id="mag-iso-controls" style="display:flex;align-items:center;gap:8px;margin:2px 0 6px 28px;flex-wrap:wrap;">
+  <label style="font-size:10px;color:#8a9bb0;display:flex;align-items:center;gap:4px;">Interval
+   <select id="mag-iso-interval" onchange="magIsoIntervalChanged()" style="padding:3px 6px;border-radius:3px;border:1px solid #333;background:#111;color:#fff;font-size:10px;outline:none;">
+    <option value="0.5">0.5°</option>
+    <option value="1" selected>1°</option>
+    <option value="2">2°</option>
+    <option value="5">5°</option>
+   </select>
+  </label>
+  <span id="mag-iso-status" style="font-size:9px;color:#556;"></span>
+ </div>
+ <label style="display:flex; align-items:center; gap:8px; font-size:11px; color:#ccc; cursor:pointer;">
+ <input type="checkbox" id="layer-overlay-nav" onchange="toggleMapLayer('nav')" style="accent-color:#00d2ff;"/>Seamarks (OpenSeaMap)
+ </label>
+ <label title="Official electronic navigational charts rendered with S-52 symbology. Charted coverage: US waters (NOAA ENC) and Norwegian waters incl. Svalbard (Kartverket)." style="display:flex; align-items:center; gap:8px; font-size:11px; color:#ccc; cursor:pointer;">
+ <input type="checkbox" id="layer-overlay-enc" onchange="toggleMapLayer('enc')" style="accent-color:#00d2ff;"/>Official ENC Charts (NOAA / Kartverket)
+ </label>
+ <label style="display:flex; align-items:center; gap:8px; font-size:11px; color:#ccc; cursor:pointer;">
+ <input type="checkbox" id="layer-overlay-fold" onchange="foldToggleOverlayLayer(this.checked)" style="accent-color:#00d2ff;"/>Fold Coverage (QC)
+ </label>
+ <label title="As-shot vessel track: acquired/partial lines in sequence-number order with turn paths between them. Assign Seq numbers in the Line Manager." style="display:flex; align-items:center; gap:8px; font-size:11px; color:#ccc; cursor:pointer;">
+ <input type="checkbox" id="layer-overlay-acqroute" onchange="toggleAcquiredRoute(this.checked)" style="accent-color:#ffd60a;"/>Acquired Route (sequences)
+ </label>
+ <div style="margin-top:10px; padding-top:10px; border-top:1px solid #1a1a24;">
+ <div style="font-size:10px; color:#a0aebb; margin-bottom:6px; font-weight:700; letter-spacing:0.5px;">LIVE AIS</div>
+ <button type="button" onclick="openAisPanel()" style="width:100%;padding:8px 10px;border-radius:4px;border:1px solid #155e75;background:#0c1929;color:#7dd3fc;font-weight:700;cursor:pointer;font-size:11px;font-family:inherit;text-align:left;">Open AIS panel →</button>
+ <div style="font-size:9px; color:#556; margin-top:6px; line-height:1.35;">Free coastal AIS (Nordic/Baltic). Worldwide seismic fleet needs paid satellite AIS.</div>
+ </div>
+ </div>
+ </div>
+ <!-- User Data Layers (editable — distinct from map overlays) -->
+ <div id="user-defined-layers-section" style="border:1px solid #0e7490; border-radius:8px; padding:12px 12px 10px; margin-bottom:14px; background:linear-gradient(180deg, rgba(8,47,73,0.45) 0%, rgba(14,14,22,0.9) 100%); box-shadow:inset 0 0 0 1px rgba(0,210,255,0.08);">
+ <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;">
+ <div style="font-size:11px; color:#67e8f9; font-weight:700; text-transform:uppercase; letter-spacing:0.6px;">Your layers</div>
+ <span style="font-size:9px;color:#22d3ee;background:rgba(0,210,255,0.12);border:1px solid #155e75;border-radius:999px;padding:2px 8px;font-weight:700;">editable</span>
+ </div>
+ <div style="font-size:10px;color:#94a3b8;margin-bottom:10px;line-height:1.4;">User-defined drawings and imports. Select a layer below or double-click it on the map to change colour, outline weight, and labels.</div>
+ <!-- Label -->
+ <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+ <label style="font-size:10px; color:#a0aebb; width:50px;">Label</label>
+ <input type="text" id="layer-user-label" placeholder="Feature name (optional)" style="flex:1;padding:5px 8px;background:#0a0a12;border:1px solid #1a1a24;border-radius:3px;color:#e2e8f0;font-size:11px;outline:none;" />
+ <label style="display:flex;align-items:center;gap:4px;font-size:10px;color:#a0aebb;cursor:pointer;white-space:nowrap;">
+ <input type="checkbox" id="layer-user-show-label" checked style="accent-color:#00d2ff;" />Show
+ </label>
+ </div>
+ <!-- Color Controls -->
+ <div style="display:flex; gap:6px; align-items:center; margin-bottom:6px;">
+ <label style="font-size:10px; color:#a0aebb; width:50px;">Outline</label>
+ <input type="color" id="layer-user-poly-stroke" value="#00d2ff" style="width:28px; height:22px; border:1px solid #333; border-radius:3px; background:#111; cursor:pointer; padding:0;" />
+ <label style="font-size:10px; color:#a0aebb; width:30px; margin-left:4px;">Fill</label>
+ <input type="color" id="layer-user-poly-fill" value="#00d2ff" style="width:28px; height:22px; border:1px solid #333; border-radius:3px; background:#111; cursor:pointer; padding:0;" />
+ <label style="font-size:10px; color:#a0aebb; width:30px; margin-left:4px;">Wt</label>
+ <input type="number" id="layer-user-stroke-weight" value="2" min="1" max="8" style="width:40px;padding:3px 4px;background:#0a0a12;border:1px solid #1a1a24;border-radius:3px;color:#e2e8f0;font-size:11px;outline:none;text-align:center;" />
+ </div>
+ <div style="display:flex; gap:8px; align-items:center; margin-bottom:10px;">
+ <label style="font-size:10px; color:#a0aebb; width:50px;">Opacity</label>
+ <input type="range" id="layer-user-poly-opacity" min="0" max="100" value="25" oninput="document.getElementById('layer-user-poly-opacity-val').textContent=this.value+'%'" style="flex:1; accent-color:#00d2ff; height:14px;" />
+ <span id="layer-user-poly-opacity-val" style="font-size:9px; color:#a0aebb; width:28px; text-align:right;">25%</span>
+ </div>
+ <div style="display:flex; gap:8px; align-items:center; margin-bottom:10px;">
+ <label style="font-size:10px; color:#a0aebb; width:50px;">Style</label>
+ <select id="layer-user-outline-style" style="flex:1;padding:4px 6px;background:#0a0a12;border:1px solid #1a1a24;border-radius:3px;color:#e2e8f0;font-size:11px;outline:none;">
+ <option value="solid" selected>Solid outline</option>
+ <option value="dashed">Dashed outline</option>
+ <option value="dotted">Dotted outline</option>
+ <option value="none">No outline</option>
+ </select>
+ <label style="display:flex;align-items:center;gap:4px;font-size:10px;color:#a0aebb;cursor:pointer;white-space:nowrap;">
+ <input type="checkbox" id="layer-user-no-fill" style="accent-color:#00d2ff;" />No fill
+ </label>
+ </div>
+ <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:10px;">
+ <button onclick="addUserPolygon()" style="width:100%;padding:8px 10px;border-radius:4px;border:1px solid #155e75;background:#0c1929;color:#67e8f9;font-weight:700;cursor:pointer;font-size:11px;outline:none;text-align:left;font-family:inherit;transition:all 0.12s;" onmouseover="this.style.background='#132337'" onmouseout="this.style.background='#0c1929'">Draw Polygon - <span style="color:#94a3b8;font-weight:400;font-size:10px;">click vertices, double-click to close</span>
+ </button>
+ <button onclick="addUserPoint()" style="width:100%;padding:8px 10px;border-radius:4px;border:1px solid #155e75;background:#0c1929;color:#67e8f9;font-weight:700;cursor:pointer;font-size:11px;outline:none;text-align:left;font-family:inherit;transition:all 0.12s;" onmouseover="this.style.background='#132337'" onmouseout="this.style.background='#0c1929'">Add Point - <span style="color:#94a3b8;font-weight:400;font-size:10px;">click to place</span>
+ </button>
+ <button onclick="loadKMLFile()" style="width:100%;padding:8px 10px;border-radius:4px;border:1px solid #155e75;background:#0c1929;color:#67e8f9;font-weight:700;cursor:pointer;font-size:11px;outline:none;text-align:left;font-family:inherit;transition:all 0.12s;" onmouseover="this.style.background='#132337'" onmouseout="this.style.background='#0c1929'">Load KML File
+ </button>
+ <button onclick="loadShapefile()" style="width:100%;padding:8px 10px;border-radius:4px;border:1px solid #155e75;background:#0c1929;color:#67e8f9;font-weight:700;cursor:pointer;font-size:11px;outline:none;text-align:left;font-family:inherit;transition:all 0.12s;" onmouseover="this.style.background='#132337'" onmouseout="this.style.background='#0c1929'">Load Shapefile (.shp / .zip)
+ </button>
+ <button onclick="loadGeoJSONFile()" style="width:100%;padding:8px 10px;border-radius:4px;border:1px solid #155e75;background:#0c1929;color:#67e8f9;font-weight:700;cursor:pointer;font-size:11px;outline:none;text-align:left;font-family:inherit;transition:all 0.12s;" onmouseover="this.style.background='#132337'" onmouseout="this.style.background='#0c1929'">Load GeoJSON
+ </button>
+ <button onclick="pasteTextCoordinates()" style="width:100%;padding:8px 10px;border-radius:4px;border:1px solid #155e75;background:#0c1929;color:#67e8f9;font-weight:700;cursor:pointer;font-size:11px;outline:none;text-align:left;font-family:inherit;transition:all 0.12s;" onmouseover="this.style.background='#132337'" onmouseout="this.style.background='#0c1929'">Paste Text Coordinates - <span style="color:#94a3b8;font-weight:400;font-size:10px;">polygon or points</span>
+ </button>
+ </div>
+ <!-- Active user layers list -->
+ <div style="font-size:9px;color:#67e8f9;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:6px;">Active user layers <span id="layer-user-layers-count" style="color:#64748b;font-weight:600;text-transform:none;letter-spacing:0;"></span></div>
+ <div id="layer-user-layers-list" style="font-size:11px; color:#e2e8f0; max-height:200px; overflow-y:auto; margin-bottom:4px; border:1px solid #164e63; border-radius:6px; background:rgba(2,12,24,0.65); padding:4px;"></div>
+ <div style="font-size:9px;color:#64748b;line-height:1.35;margin-bottom:2px;">Click a row to select and zoom. Edit for colour / weight / labels. Double-click the feature on the map to edit.</div>
+ <!-- Hidden file inputs -->
+ <input type="file" id="kml-file-input" accept=".kml,.kmz" style="display:none;" onchange="handleKMLUpload(event)" />
+ <input type="file" id="shp-file-input" accept=".shp,.zip,.dbf,.shx,.prj,.cpg" multiple style="display:none;" onchange="handleShapefileUpload(event)" />
+ <input type="file" id="geojson-file-input" accept=".geojson,.json" style="display:none;" onchange="handleGeoJSONUpload(event)" />
+ </div>
+ <!-- Hazards / Obstructions -->
+ <div style="border-top:1px solid #1a1a24; padding-top:14px; margin-bottom:14px;">
+ <div style="font-size:10px; color:#a0aebb; margin-bottom:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px;">Hazards &amp; Obstructions</div>
+ <!-- Obstruction Type -->
+ <div class="panel-row" style="margin-bottom:10px;">
+ <label style="width:110px">Hazard Type</label>
+ <select id="layer-obstruction-type" style="flex:1; padding:5px 8px; background:#0a0a12; border:1px solid #1a1a24; border-radius:3px; color:#e2e8f0; font-size:11px; outline:none; font-family:inherit; cursor:pointer;">
+ <option value="platform">Platform / Rig</option>
+ <option value="shallow">Shallow / Shoal</option>
+ <option value="wreck">Wreck</option>
+ <option value="island">Island / Rock</option>
+ <option value="cable">Cable / Pipeline</option>
+ <option value="restricted">Restricted Area</option>
+ <option value="anchorage">Anchorage</option>
+ <option value="fishfarm">Fish Farm</option>
+ <option value="windfarm">Wind Farm</option>
+ <option value="other" selected>Other / Unknown</option>
+ </select>
+ </div>
+ <!-- Exclusion Zone Size -->
+ <div class="panel-row" style="margin-bottom:10px;">
+ <label style="width:110px">Exclusion Zone (m)</label>
+ <input type="number" id="layer-exclusion-zone" value="500" min="0" step="50" style="flex:1; padding:5px 8px; background:#0a0a12; border:1px solid #1a1a24; border-radius:3px; color:#e2e8f0; font-size:12px; outline:none; font-family:inherit;" />
+ </div>
+ <!-- Mark as Obstruction toggle -->
+ <div class="panel-row" style="justify-content:space-between; margin-bottom:12px;">
+ <label style="width:auto; font-size:11px;">Mark as Obstruction (avoid in route)</label>
+ <input type="checkbox" id="layer-mark-obstruction" checked style="flex:none; width:20px; height:20px; cursor:pointer;" />
+ </div>
+ <!-- Draw buttons -->
+ <div style="display:flex; flex-direction:column; gap:8px;">
+ <button onclick="layerDrawPolygon()" style="width:100%; padding:9px 12px; border-radius:4px; border:1px solid #1e1e2e; background:#13131d; color:#5ba3d9; font-weight:700; cursor:pointer; font-size:11px; outline:none; text-align:left; font-family:inherit; transition:all 0.12s;" onmouseover="this.style.background='#1a1a2a'" onmouseout="this.style.background='#13131d'">Draw Polygon Zone
+ </button>
+ <button onclick="layerDrawPoint()" style="width:100%; padding:9px 12px; border-radius:4px; border:1px solid #1e1e2e; background:#13131d; color:#5ba3d9; font-weight:700; cursor:pointer; font-size:11px; outline:none; text-align:left; font-family:inherit; transition:all 0.12s;" onmouseover="this.style.background='#1a1a2a'" onmouseout="this.style.background='#13131d'">Place Point with Exclusion Radius
+ </button>
+ </div>
+ </div>
+ <!-- Active features list -->
+ <div id="layer-features-list" style="max-height:120px; overflow-y:auto; font-size:10px; color:#a0aebb; margin-bottom:14px;"></div>
+ <button class="panel-cancel" onclick="hidePanel('layers')" style="width:100%; cursor:pointer;">Close</button>
+ </div>
+ <!-- Line Manager Panel -->
+ <div id="panel-line-manager" class="settings-panel" style="display:none; min-width:340px; max-width:420px; max-height:90vh; overflow-y:auto;">
+ <div data-dialog-header="1" style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:14px;padding-right:0;">
+ <div class="panel-title" style="margin:0;flex:1;">Line Manager</div>
+ <button type="button" id="lm-close-btn" onclick="closeLineManager()" title="Close Line Manager" style="flex:none;background:#1a1a2e;border:1px solid #444;color:#e2e8f0;font-size:12px;font-weight:700;padding:4px 10px;border-radius:4px;cursor:pointer;z-index:30;position:relative;">Close</button>
+ </div>
+ <div style="font-size:11px;color:#a0aebb;margin-bottom:10px;line-height:1.4;">Review preplot lines below. Mark acquired or partial lines to exclude them from routing. Add infill lines if needed.
+ </div>
+ <div style="font-size:10px;color:#5a6a7a;margin-bottom:10px;font-style:italic;">Right-click a line for more options</div>
+ <!-- Bulk actions -->
+ <div style="display:flex; gap:6px; margin-bottom:10px; flex-wrap:wrap;">
+ <button onclick="lmSelectAll()" style="padding:5px 10px;border-radius:3px;border:1px solid #333;background:#1a1a2e;color:#30d158;font-size:10px;font-weight:700;cursor:pointer;">Select All</button>
+ <button onclick="lmDeselectAll()" style="padding:5px 10px;border-radius:3px;border:1px solid #333;background:#1a1a2e;color:#ff453a;font-size:10px;font-weight:700;cursor:pointer;">Deselect All</button>
+ <button onclick="lmMarkSelectedAcquired()" style="padding:5px 10px;border-radius:3px;border:1px solid #333;background:#1a1a2e;color:#f5a623;font-size:10px;font-weight:700;cursor:pointer;">Mark Acquired</button>
+ <button onclick="lmMarkAllAcquired()" style="padding:5px 10px;border-radius:3px;border:1px solid #333;background:#1a1a2e;color:#666;font-size:10px;font-weight:700;cursor:pointer;">Mark All Acquired</button>
+ <button onclick="lmResetAll()" style="padding:5px 10px;border-radius:3px;border:1px solid #333;background:#1a1a2e;color:#aaa;font-size:10px;font-weight:700;cursor:pointer;">Reset All</button>
+ <button onclick="lmResetAllPriorities()" title="Set every line's acquisition priority back to Neutral (50)" style="padding:5px 10px;border-radius:3px;border:1px solid #333;background:#1a1a2e;color:#ffd60a;font-size:10px;font-weight:700;cursor:pointer;">Reset Priorities</button>
+ </div>
+ <!-- Line count summary -->
+ <div id="lm-summary" style="font-size:10px;color:#8a9bb0;margin-bottom:10px;padding:6px 8px;background:#0a0a12;border-radius:4px;border:1px solid #1a1a24;"></div>
+ <!-- Line list -->
+ <div id="lm-line-list" style="max-height:45vh; overflow-y:auto; margin-bottom:6px; border:1px solid #1a1a24; border-radius:4px;"></div>
+ <!-- Priority footnote -->
+ <div style="font-size:9px;color:#5a6a7a;margin-bottom:12px;line-height:1.5;padding:6px 8px;background:#0a0a12;border-radius:4px;border:1px solid #1a1a24;">
+ <strong style="color:#8a9bb0;">Priority (1&ndash;100):</strong>sets the acquisition order &mdash; <span style="color:#ffd60a;">lower numbers are acquired first</span>, higher numbers last. <strong style="color:#8a9bb0;">50 = Neutral</strong> (default). E.g. a line set to 1 is shot before all others; a line set to 100 is left until the end. Within the same priority the planner still optimises transit time.
+ </div>
+ <!-- Infill Lines -->
+ <div style="border-top:1px solid #1a1a24; padding-top:12px; margin-bottom:12px;">
+ <div style="font-size:10px; color:#a0aebb; margin-bottom:8px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px;">Infill Lines</div>
+ <div style="font-size:10px;color:#666;margin-bottom:8px;">Add infill lines between existing lines to fill coverage gaps.</div>
+ <div style="display:flex; gap:6px; align-items:center; margin-bottom:8px;">
+ <label style="font-size:10px; color:#a0aebb; width:80px;">Offset (m)</label>
+ <input type="number" id="lm-infill-offset" value="0" step="25" style="flex:1;padding:5px 8px;background:#0a0a12;border:1px solid #1a1a24;border-radius:3px;color:#e2e8f0;font-size:11px;outline:none;" />
+ </div>
+ <div style="display:flex; gap:6px; align-items:center; margin-bottom:8px;">
+ <label style="font-size:10px; color:#a0aebb; width:80px;">Between</label>
+ <select id="lm-infill-from" style="flex:1;padding:5px 8px;background:#0a0a12;border:1px solid #1a1a24;border-radius:3px;color:#e2e8f0;font-size:11px;outline:none;"></select>
+ <span style="color:#666;font-size:10px;">&amp;</span>
+ <select id="lm-infill-to" style="flex:1;padding:5px 8px;background:#0a0a12;border:1px solid #1a1a24;border-radius:3px;color:#e2e8f0;font-size:11px;outline:none;"></select>
+ </div>
+ <button onclick="lmAddInfillLine()" style="width:100%;padding:8px 10px;border-radius:4px;border:1px solid #1e1e2e;background:#13131d;color:#5ba3d9;font-weight:700;cursor:pointer;font-size:11px;outline:none;text-align:center;">+ Add Infill Line</button>
+ </div>
+ <!-- Action buttons -->
+ <div style="position:sticky; bottom:0; background:#0e0e16; padding-top:10px; border-top:1px solid #222;">
+ <button onclick="lmSolveRoute()" style="width:100%;padding:10px 12px;border-radius:4px;border:none;background:#30d158;color:#000;font-weight:700;cursor:pointer;font-size:12px;margin-bottom:6px;">Solve Route (Planned Lines Only)</button>
+ <div style="display:flex; gap:6px; margin-bottom:6px;">
+ <button onclick="lmResetAll()" style="flex:1;padding:6px;border-radius:4px;border:1px solid #333;background:#1a1a2e;color:#aaa;font-size:10px;font-weight:700;cursor:pointer;">Reset Prime to Planned</button>
+ <button onclick="lmRemoveAllInfill()" style="flex:1;padding:6px;border-radius:4px;border:1px solid #333;background:#1a1a2e;color:#ff453a;font-size:10px;font-weight:700;cursor:pointer;">Remove All Infill</button>
+ </div>
+ <div style="display:flex; gap:6px;">
+ <button type="button" onclick="closeLineManager()" class="panel-cancel" style="flex:1; cursor:pointer;font-weight:700;border:1px solid #666;color:#fff;background:#222;">Close</button>
+ <button type="button" onclick="showLineManager()" style="flex:1;padding:6px;border-radius:4px;border:1px solid #333;background:#1a1a2e;color:#00d2ff;font-size:11px;font-weight:600;cursor:pointer;">Refresh</button>
+ <button type="button" onclick="lmSaveAsDefault()" style="flex:1.5;padding:6px;border-radius:4px;border:none;background:#00d2ff;color:#000;font-size:11px;font-weight:700;cursor:pointer;">Save as Default</button>
+ </div>
+ </div>
+ </div>
+ <!-- Priority Panel -->
+ <div id="panel-priority" class="settings-panel" style="display:none; min-width:320px;">
+ <button class="panel-close-btn" onclick="hidePanel('priority')">&times;</button>
+ <div class="panel-title">Execution Priority</div>
+ <div style="font-size:11px;color:#a0aebb;margin-bottom:14px;line-height:1.4">Select the pathfinding solver optimization strategy.
+ </div>
+ <div class="panel-row" style="gap:12px; margin-bottom:12px; align-items:center;">
+ <input type="radio" name="opt-strategy" id="opt-shortest" checked value="shortest" onchange="changeOptimizationStrategy('shortest')" style="flex:none; width:18px; height:18px; cursor:pointer;" />
+ <label for="opt-shortest" style="width:auto; color:#ffffff; font-weight:600; cursor:pointer;">Shortest Distance (Standard)</label>
+ </div>
+ <div class="panel-row" style="gap:12px; margin-bottom:12px; align-items:center;">
+ <input type="radio" name="opt-strategy" id="opt-turns" value="turns" onchange="changeOptimizationStrategy('turns')" style="flex:none; width:18px; height:18px; cursor:pointer;" />
+ <label for="opt-turns" style="width:auto; color:#ffffff; cursor:pointer;">Minimum Turn Complexity</label>
+ </div>
+ <div class="panel-row" style="gap:12px; margin-bottom:14px; align-items:center;">
+ <input type="radio" name="opt-strategy" id="opt-sequential" value="sequential" onchange="changeOptimizationStrategy('sequential')" style="flex:none; width:18px; height:18px; cursor:pointer;" />
+ <label for="opt-sequential" style="width:auto; color:#ffffff; cursor:pointer;">Sequential Order (West to East)</label>
+ </div>
+ <button class="panel-cancel" onclick="hidePanel('priority')" style="width:100%; cursor:pointer;">Close</button>
+ </div>
+ <!-- Reports Panel -->
+ <div id="panel-reports" class="settings-panel" style="display:none; min-width:420px; max-width:500px;">
+ <button class="panel-close-btn" onclick="hidePanel('reports')">&times;</button>
+ <div class="panel-title" style="display:flex; justify-content:space-between; align-items:center;">
+ <span>Survey Planning Report</span>
+ </div>
+ <div style="font-size:10px;color:#a0aebb;margin-bottom:10px;display:flex;justify-content:space-between;">
+ <span id="rep-generated">-</span>
+ <span id="rep-user">-</span>
+ </div>
+ <div id="report-body" style="background:#111; border:1px solid #222; border-radius:6px; padding:12px; font-size:11px; line-height:1.7; margin-bottom:12px; max-height:420px; overflow-y:auto;">
+ <!-- Survey Configuration -->
+ <div style="border-bottom:1px solid #333; padding-bottom:5px; margin-bottom:8px; font-weight:700; color:#00d2ff; text-transform:uppercase; letter-spacing:0.5px; font-size:10px;">Survey Configuration</div>
+ <div style="display:flex; justify-content:space-between;"><span>Survey Type:</span><strong id="rep-survey-type">-</strong></div>
+ <div style="display:flex; justify-content:space-between;"><span>Vessel Speed:</span><strong id="rep-speed">-</strong></div>
+ <div style="display:flex; justify-content:space-between;"><span>Minimum Turn Radius:</span><strong id="rep-radius">-</strong></div>
+ <div style="display:flex; justify-content:space-between;"><span>Run-in / Run-out:</span><strong id="rep-runinout">-</strong></div>
+ <div style="display:flex; justify-content:space-between;"><span>Line Spacing:</span><strong id="rep-line-spacing">-</strong></div>
+ <div style="display:flex; justify-content:space-between;"><span>Swath Width:</span><strong id="rep-swath-width">-</strong></div>
+ <div style="display:flex; justify-content:space-between;"><span>Line Progression:</span><strong id="rep-progression">-</strong></div>
+ <div style="display:flex; justify-content:space-between;"><span>Fold of Coverage:</span><strong id="rep-fold">-</strong></div>
+ <div style="display:flex; justify-content:space-between;"><span>Coordinate Datum:</span><strong id="rep-datum">WGS 84</strong></div>
+ <div style="display:flex; justify-content:space-between;"><span>Projection:</span><strong id="rep-projection">-</strong></div>
+ <!-- Survey Area -->
+ <div style="border-bottom:1px solid #333; padding-bottom:5px; margin-bottom:8px; margin-top:14px; font-weight:700; color:#00d2ff; text-transform:uppercase; letter-spacing:0.5px; font-size:10px;">Survey Area Extents</div>
+ <div style="display:flex; justify-content:space-between;"><span>North Boundary:</span><strong id="rep-bound-n">-</strong></div>
+ <div style="display:flex; justify-content:space-between;"><span>South Boundary:</span><strong id="rep-bound-s">-</strong></div>
+ <div style="display:flex; justify-content:space-between;"><span>East Boundary:</span><strong id="rep-bound-e">-</strong></div>
+ <div style="display:flex; justify-content:space-between;"><span>West Boundary:</span><strong id="rep-bound-w">-</strong></div>
+ <div style="display:flex; justify-content:space-between;"><span>Area Centroid:</span><strong id="rep-centroid">-</strong></div>
+ <div style="display:flex; justify-content:space-between;"><span>Bounding Box Area:</span><strong id="rep-bbox-area">-</strong></div>
+ <!-- Line Metrics -->
+ <div style="border-bottom:1px solid #333; padding-bottom:5px; margin-bottom:8px; margin-top:14px; font-weight:700; color:#00d2ff; text-transform:uppercase; letter-spacing:0.5px; font-size:10px;">Acquisition Line Metrics</div>
+ <div style="display:flex; justify-content:space-between;"><span>Total Survey Lines:</span><strong id="rep-lines-count">-</strong></div>
+ <div style="display:flex; justify-content:space-between;"><span>Line Bearing:</span><strong id="rep-line-bearing">-</strong></div>
+ <div style="display:flex; justify-content:space-between;"><span>Shortest Line:</span><strong id="rep-shortest-line">-</strong></div>
+ <div style="display:flex; justify-content:space-between;"><span>Longest Line:</span><strong id="rep-longest-line">-</strong></div>
+ <div style="display:flex; justify-content:space-between;"><span>Average Line Length:</span><strong id="rep-avg-line">-</strong></div>
+ <div style="display:flex; justify-content:space-between;"><span>Full Fold Distance:</span><strong id="rep-line-km" style="color:#30d158;">-</strong></div>
+ <div style="display:flex; justify-content:space-between;"><span>Full Fold Area:</span><strong id="rep-sq-km" style="color:#30d158;">-</strong></div>
+ <div style="display:flex; justify-content:space-between;color:#888;font-size:10px;"><span>Run In/Out:</span><strong id="rep-run-inout" style="font-weight:400;">-</strong></div>
+ <div style="display:flex; justify-content:space-between;color:#888;font-size:10px;"><span>Total (incl. runs):</span><strong id="rep-total-line-km" style="font-weight:400;">-</strong></div>
+ <!-- Acquired vs Planned Split -->
+ <div style="border-bottom:1px solid #333; padding-bottom:5px; margin-bottom:8px; margin-top:14px; font-weight:700; color:#00d2ff; text-transform:uppercase; letter-spacing:0.5px; font-size:10px;">Acquired vs Planned Split</div>
+ <div style="font-size:9px;color:#f5a623;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:4px;">Acquired</div>
+ <div style="display:flex; justify-content:space-between;"><span>Prime Acquired (full fold):</span><strong id="rep-prime-acquired-ff" style="color:#888;">-</strong></div>
+ <div style="display:flex; justify-content:space-between;"><span>Prime Acquired (inc. run-outs):</span><strong id="rep-prime-acquired-ro" style="color:#888;">-</strong></div>
+ <div style="display:flex; justify-content:space-between;"><span>Infill Acquired (full fold):</span><strong id="rep-infill-acquired-ff" style="color:#888;">-</strong></div>
+ <div style="display:flex; justify-content:space-between;"><span>Infill Acquired (inc. run-outs):</span><strong id="rep-infill-acquired-ro" style="color:#888;">-</strong></div>
+ <div style="font-size:9px;color:#30d158;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;margin:8px 0 4px;">Planned (Remaining)</div>
+ <div style="display:flex; justify-content:space-between;"><span>Prime Planned (full fold):</span><strong id="rep-prime-remaining-ff" style="color:#30d158;">-</strong></div>
+ <div style="display:flex; justify-content:space-between;"><span>Prime Planned (inc. run-outs):</span><strong id="rep-prime-remaining-ro" style="color:#30d158;">-</strong></div>
+ <div style="display:flex; justify-content:space-between;"><span>Infill Planned (full fold):</span><strong id="rep-infill-remaining-ff" style="color:#30d158;">-</strong></div>
+ <div style="display:flex; justify-content:space-between;"><span>Infill Planned (inc. run-outs):</span><strong id="rep-infill-remaining-ro" style="color:#30d158;">-</strong></div>
+ <!-- Route & Transit -->
+ <div style="border-bottom:1px solid #333; padding-bottom:5px; margin-bottom:8px; margin-top:14px; font-weight:700; color:#00d2ff; text-transform:uppercase; letter-spacing:0.5px; font-size:10px;">Route & Line Changes</div>
+ <div style="display:flex; justify-content:space-between;"><span>Total Route Distance:</span><strong id="rep-total-km">-</strong></div>
+ <div style="display:flex; justify-content:space-between;"><span>Online Distance:</span><strong id="rep-online-km">-</strong></div>
+ <div style="display:flex; justify-content:space-between;"><span>Line Change Distance:</span><strong id="rep-transit-km">-</strong></div>
+ <div style="display:flex; justify-content:space-between;"><span>Number of Line Changes:</span><strong id="rep-num-turns">-</strong></div>
+ <div style="display:flex; justify-content:space-between;"><span>Avg Line Change Distance:</span><strong id="rep-avg-transit">-</strong></div>
+ <!-- Time Estimates -->
+ <div style="border-bottom:1px solid #333; padding-bottom:5px; margin-bottom:8px; margin-top:14px; font-weight:700; color:#00d2ff; text-transform:uppercase; letter-spacing:0.5px; font-size:10px;">Duration Estimates</div>
+ <div style="display:flex; justify-content:space-between;"><span>Online Acquisition Time:</span><strong id="rep-online-time">-</strong></div>
+ <div style="display:flex; justify-content:space-between;"><span>Line Change Time:</span><strong id="rep-transit-time">-</strong></div>
+ <div style="display:flex; justify-content:space-between;"><span style="font-weight:700;color:#30d158;">Bare Bones Duration (Online + Line Change):</span><strong id="rep-bare-duration" style="color:#30d158;">-</strong></div>
+ <div style="display:flex; justify-content:space-between;"><span>Estimated Completion (Bare Bones):</span><strong id="rep-bare-completion">-</strong></div>
+ <!-- Adjustments -->
+ <div style="border-bottom:1px solid #333; padding-bottom:5px; margin-bottom:8px; margin-top:14px; font-weight:700; color:#00d2ff; text-transform:uppercase; letter-spacing:0.5px; font-size:10px;">Adjustments</div>
+ <div style="display:flex; justify-content:space-between;"><span>Technical Downtime:</span><strong id="rep-tech-downtime">-</strong></div>
+ <div style="display:flex; justify-content:space-between;"><span>Standby Time:</span><strong id="rep-standby-time">-</strong></div>
+ <div style="display:flex; justify-content:space-between;"><span>Time Adjustments:</span><strong id="rep-time-adjustments">-</strong></div>
+ <div style="display:flex; justify-content:space-between;"><span>Infill %:</span><strong id="rep-infill-pct">-</strong></div>
+ <div style="display:flex; justify-content:space-between;"><span>Mob/Demob Days:</span><strong id="rep-mob-demob-days">-</strong></div>
+ <div style="display:flex; justify-content:space-between;"><span>Additional Planned Days:</span><strong id="rep-additional-planned">-</strong></div>
+ <div style="display:flex; justify-content:space-between;"><span>Additional Unplanned Days:</span><strong id="rep-additional-unplanned">-</strong></div>
+ <!-- Full Duration -->
+ <div style="border-bottom:1px solid #333; padding-bottom:5px; margin-bottom:8px; margin-top:14px; font-weight:700; color:#00d2ff; text-transform:uppercase; letter-spacing:0.5px; font-size:10px;">Full Project Duration</div>
+ <div style="display:flex; justify-content:space-between;"><span style="font-weight:700;color:#ffd60a;">Total Projected Duration:</span><strong id="rep-duration" style="color:#ffd60a;">-</strong></div>
+ <div style="display:flex; justify-content:space-between;"><span>Estimated Completion (Full):</span><strong id="rep-completion">-</strong></div>
+ <!-- Cost Estimation -->
+ <div style="border-bottom:1px solid #333; padding-bottom:5px; margin-bottom:8px; margin-top:14px; font-weight:700; color:#00d2ff; text-transform:uppercase; letter-spacing:0.5px; font-size:10px;">Cost Estimation</div>
+ <div style="display:flex; justify-content:space-between;"><span>Vessel Day Rate:</span><strong id="rep-day-rate">-</strong></div>
+ <div id="rep-cost-breakdown" style="margin-top:4px;"></div>
+ <div style="display:flex; justify-content:space-between; border-top:1px solid #333; margin-top:4px; padding-top:4px;"><span style="font-weight:700;color:#ff453a;">Estimated Total Cost:</span><strong id="rep-total-cost" style="color:#ff453a;">-</strong></div>
+ <!-- Efficiency -->
+ <div style="border-bottom:1px solid #333; padding-bottom:5px; margin-bottom:8px; margin-top:14px; font-weight:700; color:#00d2ff; text-transform:uppercase; letter-spacing:0.5px; font-size:10px;">Efficiency Analysis</div>
+ <div style="display:flex; justify-content:space-between;"><span>Productive Ratio:</span><strong id="rep-productive-ratio">-</strong></div>
+ <div style="display:flex; justify-content:space-between;"><span>Line Change Overhead:</span><strong id="rep-transit-overhead">-</strong></div>
+ <div style="display:flex; justify-content:space-between;"><span>Source Density:</span><strong id="rep-density">-</strong></div>
+ <!-- Hazards -->
+ <div style="border-bottom:1px solid #333; padding-bottom:5px; margin-bottom:8px; margin-top:14px; font-weight:700; color:#00d2ff; text-transform:uppercase; letter-spacing:0.5px; font-size:10px;">Hazards & Exclusions</div>
+ <div style="display:flex; justify-content:space-between;"><span>Exclusion Zones:</span><strong id="rep-hazards">-</strong></div>
+ <div style="display:flex; justify-content:space-between;"><span>Skipped Distance:</span><strong id="rep-skipped">-</strong></div>
+ <div style="display:flex; justify-content:space-between;"><span>Skipped SP (offline):</span><strong id="rep-skipped-sp">-</strong></div>
+ <div style="display:flex; justify-content:space-between;"><span>Offline no-SP threshold:</span><strong id="rep-offline-threshold">-</strong></div>
+ <div style="display:flex; justify-content:space-between;"><span>Lines Affected:</span><strong id="rep-lines-affected">-</strong></div>
+ <!-- Line Schedule -->
+ <div style="border-bottom:1px solid #333; padding-bottom:5px; margin-bottom:8px; margin-top:14px; font-weight:700; color:#00d2ff; text-transform:uppercase; letter-spacing:0.5px; font-size:10px;">Line Schedule</div>
+ <div id="rep-line-schedule" style="font-size:10px; line-height:1.5;"></div>
+ </div>
+ <div style="position:sticky; bottom:0; background:#0e0e16; padding-top:10px; border-top:1px solid #222;">
+ <div style="display:flex; gap:6px; margin-bottom:8px;">
+ <button onclick="printReport()" class="panel-ok" style="flex:2; margin:0; background:#00d2ff; color:#000; border:none; font-weight:700;">&#x1F4C4; Generate PDF Report</button>
+ </div>
+ <div style="display:flex; gap:6px;">
+ <button onclick="exportReportCSV()" class="panel-ok" style="flex:1; margin:0; background:#30d158; color:#000; border:none;">Export CSV</button>
+ <button class="panel-cancel" onclick="hidePanel('reports')" style="flex:1;">Close</button>
+ </div>
+ <div style="font-size:9px; color:#666; margin-top:6px; text-align:center;">PDF opens in a new tab - use your browser's Print/Save as PDF</div>
+ </div>
+ </div>
+ <!-- Licensing Popup Panel -->
+ <div id="panel-licensing" class="settings-panel" style="display:none; min-width:380px;">
+ <button class="panel-close-btn" onclick="hidePanel('licensing')">&times;</button>
+ <div class="panel-title">Candooka Licensing Portal</div>
+ <!-- Tab Selectors -->
+ <div style="display:flex; gap:6px; margin-bottom:14px; background:#111; padding:3px; border-radius:6px; border:1px solid #222;">
+ <button id="lic-tab-trial" onclick="switchLicTab('trial')" style="flex:1; padding:6px; background:#222; border:none; color:#ffffff; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer;">1-Month Free Trial</button>
+ <button id="lic-tab-pay" onclick="switchLicTab('pay')" style="flex:1; padding:6px; background:transparent; border:none; color:#a0aebb; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer;">Commercial Pro</button>
+ </div>
+ <!-- TRIAL FORM -->
+ <div id="lic-form-trial">
+ <div style="font-size:11px;color:#a0aebb;margin-bottom:14px;line-height:1.4">Apply for a <strong>1-Month Free Trial License</strong>for your organization. Please enter your name, email, and phone below to activate.
+ </div>
+ <div class="panel-row">
+ <label style="width:90px">Full Name</label>
+ <input type="text" id="licensing-name" placeholder="John Doe" />
+ </div>
+ <div class="panel-row">
+ <label style="width:90px">Email</label>
+ <input type="email" id="licensing-email" placeholder="john.doe@company.com" />
+ </div>
+ <div class="panel-row">
+ <label style="width:90px">Phone</label>
+ <input type="tel" id="licensing-phone" placeholder="+1 (555) 012-3456" />
+ </div>
+ <div style="margin-top:16px; display:flex; justify-content:flex-end; gap:8px;">
+ <button class="panel-ok" onclick="requestTrialLicense()" style="background:#30d158; margin:0; color:#000;">Submit Trial</button>
+ <button class="panel-cancel" onclick="hidePanel('licensing')">Cancel</button>
+ </div>
+ </div>
+ <!-- COMMERCIAL FORM -->
+ <div id="lic-form-pay" style="display:none">
+ <div style="font-size:11px;color:#a0aebb;margin-bottom:14px;line-height:1.4">Select a <strong>License Plan</strong>with full features, real-time sync, and premium marine survey route planning.
+ </div>
+ <!-- Plan Selection -->
+ <div style="display:flex; gap:8px; margin-bottom:14px;">
+ <label style="flex:1; cursor:pointer;">
+ <input type="radio" name="lic-plan" value="week" style="display:none;" onchange="updateLicPlan()"/>
+ <div class="lic-plan-card" id="lic-plan-week" style="background:#1a1a1a; padding:10px 8px; border-radius:6px; border:2px solid #333; text-align:center; transition:border-color 0.2s;">
+ <div style="color:#fff; font-size:12px; font-weight:700;">1 Week</div>
+ <div style="color:#00d2ff; font-size:16px; font-weight:800; margin:4px 0;">$100</div>
+ <div style="color:#a0aebb; font-size:9px;">Short-term project</div>
+ </div>
+ </label>
+ <label style="flex:1; cursor:pointer;">
+ <input type="radio" name="lic-plan" value="month" checked style="display:none;" onchange="updateLicPlan()"/>
+ <div class="lic-plan-card" id="lic-plan-month" style="background:#1a1a1a; padding:10px 8px; border-radius:6px; border:2px solid #00d2ff; text-align:center; transition:border-color 0.2s;">
+ <div style="color:#fff; font-size:12px; font-weight:700;">1 Month</div>
+ <div style="color:#00d2ff; font-size:16px; font-weight:800; margin:4px 0;">$300</div>
+ <div style="color:#a0aebb; font-size:9px;">Standard survey</div>
+ </div>
+ </label>
+ <label style="flex:1; cursor:pointer;">
+ <input type="radio" name="lic-plan" value="year" style="display:none;" onchange="updateLicPlan()"/>
+ <div class="lic-plan-card" id="lic-plan-year" style="background:#1a1a1a; padding:10px 8px; border-radius:6px; border:2px solid #333; text-align:center; transition:border-color 0.2s;">
+ <div style="color:#fff; font-size:12px; font-weight:700;">1 Year</div>
+ <div style="color:#00d2ff; font-size:16px; font-weight:800; margin:4px 0;">$2,000</div>
+ <div style="color:#a0aebb; font-size:9px;">Best value</div>
+ </div>
+ </label>
+ </div>
+ <div class="panel-row">
+ <label style="width:90px">Name on Card</label>
+ <input type="text" id="licensing-pay-name" placeholder="John Doe" />
+ </div>
+ <div class="panel-row">
+ <label style="width:90px">Email Address</label>
+ <input type="email" id="licensing-pay-email" placeholder="john@company.com" />
+ </div>
+ <div class="panel-row">
+ <label style="width:90px">Card Number</label>
+ <input type="text" id="licensing-card" placeholder="4111 2222 3333 4444" maxlength="19" oninput="formatCardNumber(this)" />
+ </div>
+ <div style="display:flex; gap:10px;">
+ <div class="panel-row" style="flex:1;">
+ <label style="width:50px">Expiry</label>
+ <input type="text" id="licensing-expiry" placeholder="MM/Ymaxlength="5" oninput="formatExpiry(this)" />
+ </div>
+ <div class="panel-row" style="flex:1;">
+ <label style="width:40px">CVC</label>
+ <input type="password" id="licensing-cvc" placeholder="***" maxlength="4" />
+ </div>
+ </div>
+ <div style="margin-top:16px; display:flex; justify-content:flex-end; gap:8px;">
+ <button class="panel-ok" onclick="purchaseLicense()" style="background:#00d2ff; margin:0; color:#000;">Purchase License</button>
+ <button class="panel-cancel" onclick="hidePanel('licensing')">Cancel</button>
+ </div>
+ </div>
+ <!-- Contact Details -->
+ <div style="margin-top:18px; padding-top:14px; border-top:1px solid #222;">
+ <div style="font-size:10px; color:#a0aebb; margin-bottom:8px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px;">Contact Us</div>
+ <div style="font-size:11px; color:#ccc; line-height:1.8;">
+ <div><span style="color:#a0aebb;">WhatsApp / SMS / Voice:</span> <a href="https://wa.me/60123825450" target="_blank" style="color:#30d158; text-decoration:none;">+60 123 825 450</a></div>
+ <div><span style="color:#a0aebb;">Email:</span> <a href="mailto:admin@candooka.world" style="color:#00d2ff; text-decoration:none;">admin@candooka.world</a></div>
+ <div style="padding-left:42px;"><a href="mailto:aledmorgan@gmail.com" style="color:#00d2ff; text-decoration:none;">aledmorgan@gmail.com</a></div>
+ </div>
+ </div>
+ </div>
+ <!-- Save Plan Popup Panel -->
+ <div id="panel-save-plan" class="settings-panel" style="display:none; min-width:320px;">
+ <button class="panel-close-btn" onclick="hidePanel('save-plan')">&times;</button>
+ <div class="panel-title">Save Plan to candooka.world</div>
+ <div style="font-size:11px;color:#a0aebb;margin-bottom:14px;line-height:1.4">Save the current survey status, obstructions, and planned route to the shared enterprise directory.
+ </div>
+ <div class="panel-row">
+ <label style="width:80px">File Name</label>
+ <input type="text" id="save-file-name" placeholder="survey_block_alpha" />
+ </div>
+ <div style="margin-top:16px; display:flex; justify-content:flex-end; gap:8px;">
+ <button type="button" class="panel-ok" onclick="savePlanToDirectory()" style="background:#00d2ff; margin:0; color:#000;">Save File</button>
+ <button class="panel-cancel" onclick="hidePanel('save-plan')">Cancel</button>
+ </div>
+ </div>
+ <!-- Restore Plan Popup Panel -->
+ <div id="panel-restore-plan" class="settings-panel" style="display:none; min-width:420px; max-width:500px;">
+ <button class="panel-close-btn" onclick="hidePanel('restore-plan')">&times;</button>
+ <div class="panel-title">Shared Directory (candooka.world)</div>
+ <div style="font-size:11px;color:#a0aebb;margin-bottom:12px;line-height:1.4">Load planning statuses created by any enterprise user to recover or continue work.
+ </div>
+ <div id="shared-directory-list" style="max-height:220px; overflow-y:auto; border:1px solid #222; border-radius:4px; margin-bottom:16px; background:#000;">
+ <!-- Dynamic files rendered here -->
+ </div>
+ <div style="display:flex; justify-content:flex-end;">
+ <button class="panel-cancel" onclick="hidePanel('restore-plan')" style="width:100%">Close Directory</button>
+ </div>
+ </div>
+ <div id="panel-turn-radius" class="settings-panel" style="display:none">
+ <button class="panel-close-btn" onclick="hidePanel('turn-radius')">&times;</button>
+ <div class="panel-title">Min Turn Radius</div>
+ <div class="panel-row" style="margin-bottom:14px;">
+ <label>Radius</label>
+ <input type="number" id="input-turn-radius" value="5100" min="100" step="100"/>
+ <span>m</span>
+ </div>
+ <div style="display:flex; gap:6px;">
+ <button class="panel-ok" onclick="applyTurnRadius(false)" style="flex:1.2; margin:0;">Done</button>
+ <button class="panel-ok" onclick="applyTurnRadius(true)" style="flex:1.8; margin:0; background:#00d2ff; color:#000; border:none;">Save as Default</button>
+ <button class="panel-cancel" onclick="hidePanel('turn-radius')" style="flex:1;">Cancel</button>
+ </div>
+ </div>
+ <div id="panel-speed" class="settings-panel" style="display:none">
+ <button class="panel-close-btn" onclick="hidePanel('speed')">&times;</button>
+ <div class="panel-title">Vessel Speed</div>
+ <div class="panel-row" style="margin-bottom:10px;">
+ <label>Online Speed</label>
+ <input type="number" id="input-speed" value="4" min="0.5" max="20" step="0.5"/>
+ <span>knots</span>
+ </div>
+ <div class="panel-row" style="margin-bottom:14px;">
+ <label>Turn / Offline Speed</label>
+ <input type="number" id="input-turn-speed" value="6" min="0.5" max="20" step="0.5"/>
+ <span>knots</span>
+ </div>
+ <div style="display:flex; gap:6px;">
+ <button class="panel-ok" onclick="applySpeed(false)" style="flex:1.2; margin:0;">Done</button>
+ <button class="panel-ok" onclick="applySpeed(true)" style="flex:1.8; margin:0; background:#00d2ff; color:#000; border:none;">Save as Default</button>
+ <button class="panel-cancel" onclick="hidePanel('speed')" style="flex:1;">Cancel</button>
+ </div>
+ </div>
+ <div id="panel-run-inout" class="settings-panel" style="display:none">
+ <button class="panel-close-btn" onclick="hidePanel('run-inout')">&times;</button>
+ <div class="panel-title">Run In / Out</div>
+ <div class="panel-row">
+ <label>Run-in</label>
+ <input type="number" id="input-runin" value="0" min="0" step="50"/>
+ <span>m</span>
+ </div>
+ <div class="panel-row" style="margin-bottom:14px;">
+ <label>Run-out</label>
+ <input type="number" id="input-runout" value="0" min="0" step="50"/>
+ <span>m</span>
+ </div>
+ <div style="display:flex; gap:6px;">
+ <button class="panel-ok" onclick="applyRunInOut(false)" style="flex:1.2; margin:0;">Done</button>
+ <button class="panel-ok" onclick="applyRunInOut(true)" style="flex:1.8; margin:0; background:#00d2ff; color:#000; border:none;">Save as Default</button>
+ <button class="panel-cancel" onclick="hidePanel('run-inout')" style="flex:1;">Cancel</button>
+ </div>
+ </div>
+ <div id="panel-start-time" class="settings-panel" style="display:none">
+ <button class="panel-close-btn" onclick="hidePanel('start-time')">&times;</button>
+ <div class="panel-title">Start Time</div>
+ <div class="panel-row" style="margin-bottom:14px;">
+ <label>Date/Time</label>
+ <input type="datetime-local" id="input-start-time"/>
+ </div>
+ <div style="display:flex; gap:6px;">
+ <button class="panel-ok" onclick="applyStartTime(false)" style="flex:1.2; margin:0;">Done</button>
+ <button class="panel-ok" onclick="applyStartTime(true)" style="flex:1.8; margin:0; background:#00d2ff; color:#000; border:none;">Save as Default</button>
+ <button class="panel-cancel" onclick="hidePanel('start-time')" style="flex:1;">Cancel</button>
+ </div>
+ </div>
+ <div id="panel-obstructions" class="settings-panel" style="display:none;min-width:320px">
+ <button class="panel-close-btn" onclick="hidePanel('obstructions')">&times;</button>
+ <div class="panel-title">Obstructions</div>
+ <div style="font-size:11px;color:#8a9bb8;margin-bottom:10px">Define exclusion zones. The vessel route will not enter these zones.
+ Affected SP ranges are automatically skipped.
+ </div>
+ <!-- Exclusion zone input -->
+ <div class="panel-row" style="margin-bottom:14px;">
+ <label>Exclusion Zone</label>
+ <input type="number" id="input-exclusion-zone" value="500" min="0" step="50" placeholder="metres"/>
+ <span>m</span>
+ </div>
+ <div class="panel-row" style="margin-bottom:8px;">
+ <label style="width:auto;max-width:160px;line-height:1.25;">No SP when offline &gt;</label>
+ <input type="number" id="input-offline-nosp" value="" min="1" step="10" placeholder="e.g. 100" title="Cross-track metres offline from the preplot line. Beyond this, shot points are not acquired and are deducted from SP / line km / sq km."/>
+ <span>m</span>
+ </div>
+ <div style="font-size:9px;color:#666;margin:-4px 0 12px 0;line-height:1.35;">When the vessel is more than this many metres offline from the planned line (obstacle detour), that along-line span counts as no SP acquired and is deducted from SP, line km, and sq km.</div>
+ <!-- Optional name & color -->
+ <div class="panel-row" style="margin-bottom:8px;">
+ <label style="width:60px;">Name</label>
+ <input type="text" id="input-obs-name" placeholder="(auto)" style="flex:1;padding:5px 8px;border-radius:4px;border:1px solid #222;background:#0a0a12;color:#fff;font-size:11px;outline:none;"/>
+ <input type="color" id="input-obs-color" value="#ff453a" title="Obstruction Color" style="width:32px;height:28px;border:1px solid #333;border-radius:4px;cursor:pointer;background:#0a0a12;margin-left:6px;"/>
+ </div>
+ <!-- Draw buttons -->
+ <button class="panel-ok" id="btn-draw-obstruction" onclick="startDrawObstruction()" style="margin-bottom:6px;width:100%">&#9998; Draw Polygon</button>
+ <button class="panel-ok" id="btn-draw-point-obs" onclick="startDrawPointObstruction()" style="margin-bottom:6px;width:100%;background:#9b59b6">&#9679; Place Point</button>
+ <button class="panel-ok" id="btn-finish-obstruction" onclick="finishDrawObstruction()" style="margin-bottom:6px;width:100%;display:none;background:#e67e22">&#10004; Finish Drawing</button>
+ <!-- Paste polygon/point -->
+ <div style="border-top:1px solid #1a1a24;padding-top:10px;margin-top:6px;margin-bottom:10px;">
+ <div style="font-size:9px;color:#5a6a7a;font-weight:600;letter-spacing:0.4px;margin-bottom:6px;text-transform:uppercase;">Paste Coordinates</div>
+ <div style="font-size:9px;color:#666;margin-bottom:6px;">Paste lat,lon pairs (one per line) or a single point. Supports: lat,lon / lon,lat / easting,northing</div>
+ <textarea id="input-obs-paste" rows="4" placeholder="e.g.&#10;51.5074, -0.1278&#10;51.5080, -0.1270&#10;51.5076, -0.1260" style="width:100%;padding:8px;border-radius:4px;border:1px solid #222;background:#0a0a12;color:#e0e8f0;font-size:10px;font-family:monospace;outline:none;resize:vertical;"></textarea>
+ <div class="panel-row" style="margin-top:6px;margin-bottom:6px;">
+ <label style="width:80px;font-size:10px;color:#a0aebb;">Format</label>
+ <select id="input-obs-paste-fmt" style="flex:1;padding:4px 8px;border-radius:4px;border:1px solid #222;background:#0a0a12;color:#fff;font-size:10px;outline:none;">
+ <option value="latlon">Lat, Lon</option>
+ <option value="lonlat">Lon, Lat</option>
+ <option value="utm">Easting, Northing (UTM)</option>
+ </select>
+ </div>
+ <button onclick="pasteObstruction()" style="width:100%;padding:8px;border-radius:4px;border:none;background:#e67e22;color:#fff;font-weight:700;cursor:pointer;font-size:11px;">Add from Pasted Text</button>
+ </div>
+ <!-- Import file -->
+ <label class="panel-ok" for="obs-file-input" style="display:block;text-align:center;margin-bottom:10px;width:100%;cursor:pointer;background:#2980b9">&#8593; Import KML / SHP / GeoJSON</label>
+ <input type="file" id="obs-file-input" accept=".kml,.shp,.geojson,.json" style="display:none" onchange="importObstructionFile(event)"/>
+ <!-- List -->
+ <div id="obstruction-list" style="max-height:160px;overflow-y:auto;margin-bottom:8px"></div>
+ <button class="panel-ok" onclick="clearAllObstructions()" style="background:#c0392b;width:100%;margin-bottom:14px;">Clear All</button>
+ <div style="display:flex; gap:6px;">
+ <button class="panel-ok" onclick="applyObstructionExclusion(false)" style="flex:1.2; margin:0;">Done</button>
+ <button class="panel-ok" onclick="applyObstructionExclusion(true)" style="flex:1.8; margin:0; background:#00d2ff; color:#000; border:none;">Save as Default</button>
+ <button class="panel-cancel" onclick="hidePanel('obstructions')" style="flex:1;">Cancel</button>
+ </div>
+ </div>
+ <!-- Admin Login Dialog -->
+ <div id="panel-admin-login" class="settings-panel" style="display:none;min-width:300px">
+ <button class="panel-close-btn" onclick="hidePanel('admin-login')">&times;</button>
+ <div class="panel-title">Admin Login</div>
+ <div class="panel-row">
+ <label>Password</label>
+ <input type="password" id="admin-password" placeholder="Enter admin password"/>
+ </div>
+ <div id="admin-login-error" style="color:#e74c3c;font-size:11px;margin-bottom:8px;display:none"></div>
+ <button class="panel-ok" onclick="adminLogin()">Login</button>
+ <button class="panel-cancel" onclick="hidePanel('admin-login')">Cancel</button>
+ </div>
+ <!-- Admin User Management Panel -->
+ <div id="panel-admin-panel" class="settings-panel" style="display:none;min-width:400px;max-width:500px;max-height:90vh;overflow-y:auto;-webkit-overflow-scrolling:touch;">
+ <button class="panel-close-btn" onclick="hidePanel('admin-panel')">&times;</button>
+ <div class="panel-title" style="display:flex;justify-content:space-between;align-items:center;padding-right:24px;">User Management
+ <button onclick="adminLogout()" style="background:none;border:1px solid #445;color:#8a9bb8;padding:3px 10px;border-radius:4px;cursor:pointer;font-size:10px">Logout</button>
+ </div>
+ <!-- Add user form -->
+ <div style="background:#151530;border:1px solid #2a2a50;border-radius:6px;padding:14px;margin-bottom:14px">
+ <div style="font-size:12px;font-weight:600;color:#1abc9c;margin-bottom:8px">Add New User</div>
+ <div style="font-size:11px;color:#8a9bb8;margin-bottom:10px;line-height:1.5">Username must be unique. After save we <strong style="color:#30d158">test live sign-in</strong> - if that fails, the user is rolled back so you are never left with a broken account.
+ </div>
+ <div class="panel-row">
+ <label>Name</label>
+ <input type="text" id="admin-user-name" placeholder="Unique username (sign-in name)" autocomplete="off"/>
+ </div>
+ <div class="panel-row">
+ <label>Email</label>
+ <input type="text" id="admin-user-email" placeholder="user@example.com" autocomplete="off"/>
+ </div>
+ <div class="panel-row">
+ <label>Phone</label>
+ <input type="tel" id="admin-user-phone" placeholder="+61 4xx xxx xxx" autocomplete="off"/>
+ </div>
+ <div class="panel-row">
+ <label>Password</label>
+ <input type="text" id="admin-user-password" placeholder="Required - tell the user this exact password" autocomplete="off"/>
+ </div>
+ <div class="panel-row">
+ <label>Active Dates</label>
+ <div style="display:flex; flex:1; gap:8px;">
+ <input type="date" id="admin-user-valid-from" style="flex:1;background:#252545;border:1px solid #3a3a60;color:#e0e0e0;padding:5px;border-radius:4px;font-size:12px;outline:none;" />
+ <span style="color:#8a9bb8; align-self:center; font-size:11px;">to</span>
+ <input type="date" id="admin-user-valid-to" style="flex:1;background:#252545;border:1px solid #3a3a60;color:#e0e0e0;padding:5px;border-radius:4px;font-size:12px;outline:none;" />
+ </div>
+ </div>
+ <div class="panel-row">
+ <label>Role</label>
+ <select id="admin-user-role" style="flex:1;background:#252545;border:1px solid #3a3a60;color:#e0e0e0;padding:5px 8px;border-radius:4px;font-size:12px">
+ <option value="viewer">Viewer</option>
+ <option value="operator">Operator</option>
+ <option value="Senior Surveyor">Senior Surveyor</option>
+ <option value="admin">Admin</option>
+ </select>
+ </div>
+ <button type="button" class="panel-ok" onclick="addUser()" style="width:100%;margin-top:6px">Add User &amp; Test Login on Server</button>
+ <div id="admin-add-user-status" style="display:none;margin-top:8px;font-size:11px;line-height:1.4;padding:8px;border-radius:4px;background:#0a0a12;border:1px solid #2a2a50;"></div>
+ </div>
+ <!-- User list -->
+ <div style="font-size:12px;font-weight:600;color:#c8c8e8;margin-bottom:6px">Registered Users</div>
+ <div id="admin-user-list" style="max-height:200px;overflow-y:auto;margin-bottom:12px;border:1px solid #2a2a50;border-radius:4px"></div>
+ <!-- Collapsible Permissions Matrix -->
+ <div style="background:#111; border:1px solid #2a2a50; border-radius:6px; padding:10px; margin-bottom:12px;">
+ <div onclick="togglePermissionsMatrix()" style="display:flex; justify-content:space-between; align-items:center; cursor:pointer; font-size:10px; font-weight:700; color:#1abc9c; letter-spacing:0.5px;">
+ <span>SHOW ACTIVE ROLE PERMISSIONS MATRIX</span>
+ <span id="matrix-arrow">&#9662;</span>
+ </div>
+ <div id="permissions-matrix-content" style="display:none; margin-top:8px; font-size:10px; border-top:1px solid #222; padding-top:8px; line-height:1.4;">
+ <div style="margin-bottom:6px;"><strong style="color:#ffffff;">Viewer:</strong>View Map, Read Survey Plans, Tide Predictions (Read-Only)</div>
+ <div style="margin-bottom:6px;"><strong style="color:#30d158;">Operator:</strong>Full Route Planning, Custom turn radius/speed/run-in/out & obstacle drawing</div>
+ <div style="margin-bottom:6px;"><strong style="color:#00d2ff;">Senior Surveyor:</strong>Complete Planning suite + automatic Admin & User Management access</div>
+ <div style="margin-bottom:8px;"><strong style="color:#af52de;">Admin:</strong>All capabilities + master database additions, role edits, and CSV/JSON transfers</div>
+ <div id="active-user-session-perms" style="margin-top:6px; border-top:1px dashed #2a2a50; padding-top:6px; color:#e67e22; font-weight:600;"></div>
+ </div>
+ </div>
+ <!-- Login Logs Section -->
+ <div style="background:#111; border:1px solid #2a2a50; border-radius:6px; padding:10px; margin-bottom:12px;">
+ <div onclick="toggleLoginLogs()" style="display:flex; justify-content:space-between; align-items:center; cursor:pointer; font-size:10px; font-weight:700; color:#e67e22; letter-spacing:0.5px;">
+ <span>SHOW LOGIN LOGS</span>
+ <span id="login-logs-arrow">&#9662;</span>
+ </div>
+ <div id="login-logs-content" style="display:none; margin-top:8px; font-size:10px; border-top:1px solid #222; padding-top:8px;">
+ <div id="login-logs-list" style="max-height:250px; overflow-y:auto; background:#0a0a1a; border:1px solid #1a1a30; border-radius:4px; padding:8px; font-family:monospace; line-height:1.3;">
+ <div style="color:#666; text-align:center; padding:20px;">Loading logs...</div>
+ </div>
+ </div>
+ </div>
+ <!-- Database controls -->
+ <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+ <button class="panel-ok" onclick="exportUserDBCsv()" style="flex:1;font-size:10px;padding:5px 8px;background:#2980b9">&#8595; Export CSV</button>
+ <button class="panel-ok" onclick="exportUserDBJson()" style="flex:1;font-size:10px;padding:5px 8px;background:#27ae60">&#8595; Export JSON</button>
+ <label class="panel-ok" for="import-users-file" style="flex:1;font-size:10px;padding:5px 8px;background:#8e44ad;text-align:center;cursor:pointer">&#8593; Import</label>
+ <input type="file" id="import-users-file" accept=".json,.csv" style="display:none" onchange="importUserDB(event)"/>
+ </div>
+ <div id="admin-db-stats" style="font-size:10px;color:#6060a0;margin-bottom:10px;text-align:center"></div>
+ <button class="panel-cancel" onclick="hidePanel('admin-panel')">Close</button>
+ </div>
+ <script>
+ // Only load Cesium (4MB 3D globe) on desktop - skip on mobile to prevent blank screen
+ if (!/Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) && window.innerWidth > 768) {
+ document.write('<script src="https://cesium.com/downloads/cesiumjs/releases/1.119/Build/Cesium/Cesium.js"><\/script>');
+ }
+ </script>
+ <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+ <script src="https://unpkg.com/shpjs@latest/dist/shp.min.js"></script>
+ <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+ <script src="app.js?v=16.22"></script>
+ <script src="ray_tracing_module.js?v=16.22"></script>
+ <script src="wmm_declination.js?v=16.22"></script>
+ <script src="magnetic_isogones.js?v=16.22"></script>
+</body>
+</html>
